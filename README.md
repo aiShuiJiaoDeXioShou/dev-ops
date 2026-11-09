@@ -12,7 +12,7 @@
 
 GitHub App 授权、成员与 Bot 的权限和凭据、统一 Git 接口及执行流程见[外部仓库集成架构](docs/architecture/external-repositories.md)。首批适配范围为 GitHub、Gitea，GitLab、Gitee、Codeup 预留扩展；当前为待实施验证的架构设计。
 
-前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。前端路由、查询缓存与基础 UI 已接入，认证和业务流程仍待实现。
+前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。V0.1 后端、共享 API 客户端与认证流程已实现；前端页面由 UI 线程按任务继续接入。
 
 界面与主要操作可查看 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](docs/desgin/interactive-prototype-v1/README.md)。
 
@@ -39,6 +39,19 @@ CLI 首次使用前执行 `pnpm prepare:clients`，之后查看帮助或检查�
 pnpm cli --help
 pnpm cli health --json
 ```
+
+V0.1 本地初始化和验证：
+
+```bash
+pnpm db:setup
+pnpm db:up
+pnpm db:migrate
+pnpm --dir apps/server seed:root   # 使用 apps/server/.env 的 ROOT_EMAIL / ROOT_INITIAL_PASSWORD
+pnpm test:db
+pnpm test:e2e
+```
+
+本地邮件默认使用 Mailpit 地址 `smtp://127.0.0.1:1025`（需自行启动 Mailpit）；stg 使用 Resend 时在 `apps/server/.env` 配置 `SMTP_URL` 与 `MAIL_FROM`。root 种子命令只在首次创建账号时使用密码，不写入业务表。
 
 完整验证与构建命令：
 
