@@ -18,6 +18,8 @@ import type { GitAdapter } from '../adapters/git/git.types.js'
 import { codeRoutes } from '../modules/code/code.routes.js'
 import { integrationsRoutes } from '../modules/integrations/integrations.routes.js'
 import type { GitAdapterFactory } from '../modules/integrations/public.js'
+import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.js'
+import { getSessionUser } from '../modules/identity/public.js'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -70,6 +72,13 @@ export function createHttpApp(
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id)
   })
+
+  const idempotency = createIdempotencyHooks({
+    db: services.database.db,
+    getUserId: async (headers) => (await getSessionUser(services.auth, headers))?.id ?? null,
+  })
+  app.addHook('preHandler', idempotency.preHandler)
+  app.addHook('onSend', idempotency.onSend)
 
   registerErrorHandlers(app)
 
