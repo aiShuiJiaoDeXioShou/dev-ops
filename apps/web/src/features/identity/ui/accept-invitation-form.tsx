@@ -1,0 +1,95 @@
+import { useState, type FormEvent } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate, useSearchParams } from 'react-router'
+import { isBusinessError } from '@dev-ops/api-client'
+import { apiClient } from '@/shared/api/client'
+import { Button } from '@/shared/ui/controls/button'
+import { Input } from '@/shared/ui/controls/input'
+import { PageLoading } from '@/shared/ui/page-state'
+import { sessionQueryOptions } from '../api/queries'
+
+/** 接受邀请并设置首次密码；邀请页面公开访问。 */
+export function AcceptInvitationForm() {
+  const [params] = useSearchParams()
+  const token = params.get('token') ?? ''
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const invitation = useQuery({
+    queryKey: ['identity', 'invitation', token],
+    queryFn: () => apiClient.getInvitation(token),
+    enabled: Boolean(token),
+    retry: false,
+  })
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState('')
+  const mutation = useMutation({
+    mutationFn: () => apiClient.acceptInvitation(token, { name: name.trim(), password }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey })
+      navigate('/projects', { replace: true })
+    },
+    onError: (cause: unknown) => {
+      setError(isBusinessError(cause) ? `无法加入团队：${cause.message}` : '接受邀请失败，请稍后重试。')
+    },
+  })
+  if (!token)
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        邀请链接缺少 token。
+      </p>
+    )
+  if (invitation.isPending) return <PageLoading />
+  if (invitation.isError || !invitation.data)
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        邀请无效或已过期，请联系团队管理员重新发送。
+      </p>
+    )
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    setError('')
+    if (name.trim().length === 0) return setError('请填写显示名称。')
+    if (password.length < 8) return setError('密码至少 8 个字符。')
+    if (password !== confirm) return setError('两次输入的密码不一致。')
+    mutation.mutate()
+  }
+  return (
+    <form className="space-y-4" onSubmit={submit} noValidate>
+      <div className="rounded-lg bg-muted p-3 text-sm">
+        加入团队 <strong>{invitation.data.data.teamName}</strong>，角色：{invitation.data.data.role}
+      </div>
+      <label className="block space-y-1.5 text-sm font-medium">
+        显示名称
+        <Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium">
+        设置密码
+        <Input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          autoComplete="new-password"
+        />
+      </label>
+      <label className="block space-y-1.5 text-sm font-medium">
+        确认密码
+        <Input
+          type="password"
+          value={confirm}
+          onChange={(event) => setConfirm(event.target.value)}
+          autoComplete="new-password"
+        />
+      </label>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Button type="submit" className="w-full" disabled={mutation.isPending}>
+        {mutation.isPending ? '加入中…' : '加入团队'}
+      </Button>
+    </form>
+  )
+}
