@@ -1,29 +1,31 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/geist';
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.985 0.003 250);
-  --foreground: oklch(0.205 0.015 250);
-  --card: oklch(1 0 0);
+  --background: #ffffff;
+  --foreground: #0f1115;
+  --card: #ffffff;
   --card-foreground: var(--foreground);
-  --popover: oklch(1 0 0);
+  --popover: #ffffff;
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.44 0.09 175);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.005 250);
+  --primary: #4176e6;
+  --primary-foreground: #ffffff;
+  --secondary: #f9fafb;
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.96 0.005 250);
-  --muted-foreground: oklch(0.50 0.015 250);
-  --accent: oklch(0.96 0.005 250);
+  --muted: #f5f6f7;
+  --muted-foreground: #61666b;
+  --accent: #ebeef2;
   --accent-foreground: var(--foreground);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.006 250);
-  --input: var(--border);
-  --ring: var(--primary);
+  --destructive: #ce5252;
+  --border: rgba(15, 17, 21, 0.08);
+  --input: rgba(15, 17, 21, 0.12);
+  --ring: #4176e6;
+  --sidebar: #f9fafb;
+  --sidebar-foreground: #0f1115;
   --radius: 0.625rem;
 }
 
@@ -34,8 +36,8 @@
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.78 0.12 175);
-  --primary-foreground: oklch(0.18 0.03 175);
+  --primary: #7aa0f0;
+  --primary-foreground: #0b1220;
   --secondary: oklch(0.26 0.012 250);
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
@@ -49,7 +51,7 @@
 }
 
 @theme inline {
-  --font-sans: "Geist Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans: 'Geist Variable', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-heading: var(--font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -69,6 +71,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-success: #269650;
+  --color-warning: #c98719;
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

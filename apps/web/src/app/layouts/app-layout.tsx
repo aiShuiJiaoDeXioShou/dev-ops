@@ -1,14 +1,23 @@
-import { Activity, ArrowUpRight, Blocks, LayoutDashboard, Menu } from 'lucide-react'
+import { Activity, ArrowUpRight, FlaskConical, LayoutDashboard, Menu } from 'lucide-react'
 import { NavLink, Outlet, useNavigation } from 'react-router'
 import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
 import { Separator } from '@/shared/ui/controls/separator'
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/shared/ui/controls/sheet'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/shared/ui/controls/sheet'
 import { cn } from '@/shared/lib/utils'
 
 const navigationItems = [
   { to: '/', label: '工作台', icon: LayoutDashboard },
   { to: '/system/status', label: '系统状态', icon: Activity },
+  ...(import.meta.env.DEV ? [{ to: '/prototype/projects', label: '交互原型', icon: FlaskConical }] : []),
 ]
 
 /**
@@ -19,22 +28,30 @@ const navigationItems = [
 function Navigation({ closeOnNavigate = false }: { closeOnNavigate?: boolean }) {
   return (
     <nav aria-label="主导航" className="space-y-1 px-3">
-      {navigationItems.map(item => {
+      {navigationItems.map((item) => {
         const link = (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.to === '/'}
-            className={({ isActive }) => cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-              isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              )
+            }
           >
             <item.icon className="size-4" aria-hidden="true" />
             {item.label}
           </NavLink>
         )
-        return closeOnNavigate ? <SheetClose key={item.to} asChild>{link}</SheetClose> : link
+        return closeOnNavigate ? (
+          <SheetClose key={item.to} asChild>
+            {link}
+          </SheetClose>
+        ) : (
+          link
+        )
       })}
     </nav>
   )
@@ -47,9 +64,7 @@ function Navigation({ closeOnNavigate = false }: { closeOnNavigate?: boolean }) 
 function WorkspaceBrand() {
   return (
     <div className="flex items-center gap-3 px-6 py-7">
-      <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-        <Blocks className="size-5" aria-hidden="true" />
-      </div>
+      <img src="/prototype/brand.svg" width={32} height={32} alt="" aria-hidden="true" />
       <div>
         <p className="text-sm font-semibold tracking-tight">项目开发平台</p>
         <p className="mt-0.5 text-xs text-muted-foreground">本地工作区</p>
@@ -67,7 +82,12 @@ export function AppLayout() {
 
   return (
     <div className="min-h-svh bg-background text-foreground">
-      <a href="#main-content" className="sr-only z-50 rounded-md bg-background p-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4">跳到主要内容</a>
+      <a
+        href="#main-content"
+        className="sr-only z-50 rounded-md bg-background p-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+      >
+        跳到主要内容
+      </a>
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r bg-card md:flex">
         <WorkspaceBrand />
         <p className="px-6 pb-3 text-xs font-medium tracking-wide text-muted-foreground">工作区</p>
@@ -108,7 +128,9 @@ export function AppLayout() {
           </Button>
         </header>
         {navigation.state !== 'idle' && (
-          <div role="status" className="border-b bg-primary/5 px-6 py-2 text-xs text-primary">页面加载中…</div>
+          <div role="status" className="border-b bg-primary/5 px-6 py-2 text-xs text-primary">
+            页面加载中…
+          </div>
         )}
         <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl p-5 outline-none sm:p-8 lg:p-10">
           <Outlet />

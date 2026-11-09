@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img"><title>小林 · 研发助手</title><style>
+/* 各角色错开呼吸与眨眼节奏，动作仅表达角色个性，不表示运行状态。 */
+.character{transform-origin:48px 68px;animation:idle 5.3s ease-in-out -2.6s infinite}
+.eyes{transform-origin:48px 45px;animation:blink 7.3s ease-in-out -3.6s infinite}
+@keyframes idle{0%,100%{transform:translateY(0) rotate(0) scale(1)}40%{transform:translateY(-4px) rotate(-3deg) scale(1.025,.985)}72%{transform:translateY(-1px) rotate(1.5deg) scale(.99,1.015)}}
+@keyframes blink{0%,41%,46%,100%{transform:scaleY(1)}43%,44%{transform:scaleY(.1)}}
+@media(prefers-reduced-motion:reduce){.character,.eyes{animation:none!important}}
+</style><ellipse cx="48" cy="84" rx="21" ry="3" fill="#17242b" opacity=".045"/><g class="character"><g transform="rotate(7 48 48)"><path d="M25 18C40 11 58 14 70 23c12 9 17 26 10 39-7 13-22 18-38 15C26 82 15 72 15 56 9 41 13 25 25 18Z" fill="#89C9B2"/><path d="M27 30c4-6 10-9 16-9" stroke="white" stroke-opacity=".24" stroke-width="4" stroke-linecap="round" fill="none"/><g class="eyes"><rect x="35" y="38" width="7" height="14" rx="3.5" fill="#253334"/><rect x="53" y="38" width="7" height="14" rx="3.5" fill="#253334"/></g></g></g></svg>
