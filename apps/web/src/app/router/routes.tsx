@@ -49,11 +49,6 @@ export function createAppRoutes(): RouteObject[] {
                 },
                 { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: PageSkeleton },
                 { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: PageSkeleton },
-                {
-                  path: 'settings',
-                  lazy: () => import('@/pages/project/project-settings-page'),
-                  HydrateFallback: PageSkeleton,
-                },
               ],
             },
             {

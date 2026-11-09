@@ -2,3 +2,4 @@ export { projectListQueryOptions, projectQueryOptions, projectStatsQueryOptions 
 export { ProjectList } from './ui/project-list'
 export { ProjectForm } from './ui/project-form'
 export { ProjectSettingsForm } from './ui/project-settings-form'
+export { ProjectSettingsDialog } from './ui/project-settings-dialog'

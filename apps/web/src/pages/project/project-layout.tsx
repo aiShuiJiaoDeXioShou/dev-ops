@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
-import { projectQueryOptions } from '@/features/projects/public'
+import { ProjectSettingsDialog, projectQueryOptions } from '@/features/projects/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { Tag } from '@/shared/ui/tag'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
@@ -18,6 +19,7 @@ export function Component() {
   const { projectId = '' } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const project = useQuery(projectQueryOptions(projectId))
   if (project.isPending) return <PageSkeleton />
   if (project.isError || !project.data) {
@@ -52,12 +54,7 @@ export function Component() {
             <Tag>{STATUS_LABELS[detail.status]}</Tag>
           </div>
           <div className="row header-actions">
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="项目设置"
-              onClick={() => navigate(`/projects/${projectId}/settings`)}
-            >
+            <button type="button" className="icon-btn" aria-label="项目设置" onClick={() => setSettingsOpen(true)}>
               <PrototypeIcon name="settings" />
             </button>
           </div>
@@ -80,6 +77,7 @@ export function Component() {
       <div className="content">
         <Outlet />
       </div>
+      <ProjectSettingsDialog projectId={projectId} open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   )
 }
