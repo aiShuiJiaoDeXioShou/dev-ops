@@ -13,6 +13,10 @@ pnpm dev
 
 `pnpm build` 执行 TypeScript 检查与生产构建，`pnpm lint` 执行 Oxlint 检查，`pnpm preview` 预览构建产物。
 
+按[项目根目录说明](../../README.md)启动 PostgreSQL、执行迁移并启动后端后，再运行前端开发服务。首页的“开发环境联通检查”会通过同源 `/api/v1/ready` 请求验证 Vite 代理、后端和数据库，成功时展示“已联通”及后端请求标识。
+
+检查请求最多等待 5 秒；网络异常、数据库未就绪或响应不符合契约时显示失败原因，可点击“重新检查”重试。该面板用于本地开发联调，尚未实现的登录和项目业务功能仍按需求推进。
+
 Tailwind 已通过 `@tailwindcss/vite` 接入，入口为 `src/index.css`，可直接在 JSX 中使用工具类：
 
 ```tsx

@@ -1,14 +1,20 @@
 import { useState } from 'react'
+import ConnectionStatus from './ConnectionStatus'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import './App.css'
 
+/**
+ * 渲染开发入口与环境联通状态。
+ * @returns 首页界面，联通面板自行管理请求及清理。
+ */
 function App() {
   const [count, setCount] = useState(0)
 
   return (
     <>
+      <ConnectionStatus />
       <section id="center">
         <div className="hero">
           <img src={heroImg} className="base" width="170" height="179" alt="" />

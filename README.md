@@ -2,6 +2,14 @@
 
 产品定位、已确认需求及待定事项见[项目管理与运维平台需求](docs/prd/mvp.md)。
 
+模块划分、功能优先级和版本验收见[需求版本规划](docs/prd/release-plan.md)，当前为规划草案。
+
+全项目的模块图、功能图和逻辑区域架构图见[项目结构图](docs/prd/project-maps.md)，可直接编辑 Mermaid 源图。
+
+首版功能清单、业务流程、验收标准和待确认问题见 [V0.1 需求细化](docs/prd/v0.1.md)。
+
+前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)，新增组件尚未接入。
+
 界面与主要操作可查看 [HTML 交互原型](.mobile-workspace/design/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](.mobile-workspace/design/interactive-prototype-v1/README.md)。
 
 前端位于 [apps/web](apps/web/README.md)，后端位于 [server](server/README.md)，命令行工具位于 [apps/cli](apps/cli/README.md)。三个项目分别管理依赖和锁文件，协作规则见 [AGENTS.md](AGENTS.md)。
