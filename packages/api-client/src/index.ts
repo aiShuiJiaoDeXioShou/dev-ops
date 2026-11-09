@@ -1,11 +1,98 @@
-import type { paths } from './generated/api.js'
+import type { components, paths } from './generated/api.js'
 import validateHealth from './generated/health.mjs'
 import validateReadiness from './generated/readiness.mjs'
 import validateError from './generated/error.mjs'
 
-export type HealthResponse = paths['/api/v1/health']['get']['responses'][200]['content']['application/json']
-export type ReadinessResponse = paths['/api/v1/ready']['get']['responses'][200]['content']['application/json']
-type RequestErrorCode = 'HTTP_ERROR' | 'NETWORK_ERROR' | 'TIMEOUT' | 'INVALID_RESPONSE'
+export type { components, paths } from './generated/api.js'
+
+/** 生成的 OpenAPI 路径集合。 */
+type ApiPath = keyof paths
+/** 自研接口只允许 GET/POST。 */
+type ApiMethod = 'get' | 'post'
+type Operation<P extends ApiPath, M extends ApiMethod> = paths[P] extends Record<M, infer O> ? O : never
+type ResponseJson<P extends ApiPath, M extends ApiMethod> =
+  Operation<P, M> extends { responses: { 200: { content: { 'application/json': infer R } } } } ? R : never
+/** 从 OpenAPI 提取的 200 成功 data 类型。 */
+export type ApiSuccessData<P extends ApiPath, M extends ApiMethod> =
+  Extract<ResponseJson<P, M>, { success: true }> extends { data: infer D } ? D : never
+/** 从 OpenAPI 提取的 POST 请求体类型。 */
+export type ApiBody<P extends ApiPath, M extends ApiMethod> =
+  Operation<P, M> extends { requestBody: { content: { 'application/json': infer B } } } ? B : undefined
+/** 从 OpenAPI 提取的查询参数类型。 */
+export type ApiQuery<P extends ApiPath, M extends ApiMethod> =
+  Operation<P, M> extends { parameters: { query?: infer Q } } ? Q : undefined
+
+export interface ApiCallOptions {
+  signal?: AbortSignal
+  idempotencyKey?: string
+}
+
+function isSuccessEnvelope(value: unknown): value is ApiSuccessEnvelope<unknown> {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'success' in value &&
+    value.success === true &&
+    'code' in value &&
+    value.code === 'OK' &&
+    'message' in value &&
+    typeof value.message === 'string' &&
+    'requestId' in value &&
+    typeof value.requestId === 'string' &&
+    'data' in value
+  )
+}
+
+function isFailureEnvelope(value: unknown): value is ApiFailureEnvelope {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'success' in value &&
+    value.success === false &&
+    'code' in value &&
+    typeof value.code === 'string' &&
+    'message' in value &&
+    typeof value.message === 'string' &&
+    'requestId' in value &&
+    typeof value.requestId === 'string'
+  )
+}
+
+function toQueryString(query: unknown): string {
+  if (typeof query !== 'object' || query === null) return ''
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue
+    params.set(key, String(value))
+  }
+  const text = params.toString()
+  return text ? `?${text}` : ''
+}
+
+function segment(value: string): string {
+  return encodeURIComponent(value)
+}
+
+export type HealthEnvelope = paths['/api/v1/health']['get']['responses'][200]['content']['application/json']
+export type ReadinessEnvelope = paths['/api/v1/ready']['get']['responses'][200]['content']['application/json']
+export type HealthResponse = Extract<HealthEnvelope, { success: true }>['data']
+export type ReadinessResponse = Extract<ReadinessEnvelope, { success: true }>['data']
+export type ApiErrorResponse = components['schemas']['def-0']
+export type ApiSuccessEnvelope<T> = {
+  success: true
+  code: 'OK'
+  message: string
+  requestId: string
+  data: T
+}
+export type ApiFailureEnvelope = {
+  success: false
+  code: string
+  message: string
+  requestId: string
+  data?: unknown
+}
+export type RequestErrorCode = 'HTTP_ERROR' | 'NETWORK_ERROR' | 'TIMEOUT' | 'INVALID_RESPONSE' | 'BUSINESS_ERROR'
 
 interface RequestErrorOptions {
   code: RequestErrorCode
@@ -48,9 +135,41 @@ export interface ApiClientOptions {
 }
 
 /**
+ * 生成前端幂等键，供创建、评论、提测等 POST 动作使用。
+ * @returns 随机 UUID 字符串；不依赖业务状态。
+ */
+export function createIdempotencyKey(): string {
+  return globalThis.crypto.randomUUID()
+}
+
+/**
+ * 判断错误是否为指定业务错误码。
+ * @param error 任意捕获值。
+ * @param code 可选业务错误码；省略时只判断业务错误类别。
+ * @returns 是否为匹配的 RequestError。
+ */
+export function isBusinessError(error: unknown, code?: string): error is RequestError {
+  return (
+    error instanceof RequestError &&
+    error.code === 'BUSINESS_ERROR' &&
+    (code === undefined || error.serverCode === code)
+  )
+}
+
+function createBusinessError(body: ApiFailureEnvelope, requestId: string): RequestError {
+  return new RequestError('操作未完成，请稍后重试。', {
+    code: 'BUSINESS_ERROR',
+    status: 200,
+    requestId,
+    responseValid: true,
+    serverCode: body.code,
+  })
+}
+
+/**
  * 创建不依赖浏览器全局对象的 API 客户端，不发起请求。
  * @param options 服务基础地址、超时、会话策略及可替换的 fetch 实现。
- * @returns 提供已校验健康与就绪请求的客户端；每次请求单独处理取消和超时。
+ * @returns 提供已校验响应信封的健康与就绪请求；每次请求单独处理取消和超时。
  * @throws 地址包含凭据、查询参数或片段，协议不支持，或超时不在 1 至 300000 毫秒时抛出错误。
  */
 export function createApiClient(options: ApiClientOptions) {
@@ -60,7 +179,13 @@ export function createApiClient(options: ApiClientOptions) {
   } catch {
     throw new Error('服务地址必须是完整的 HTTP 或 HTTPS URL')
   }
-  if (!['http:', 'https:'].includes(baseUrl.protocol) || baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash) {
+  if (
+    !['http:', 'https:'].includes(baseUrl.protocol) ||
+    baseUrl.username ||
+    baseUrl.password ||
+    baseUrl.search ||
+    baseUrl.hash
+  ) {
     throw new Error('服务地址仅支持 HTTP/HTTPS，且不能包含凭据、查询参数或片段')
   }
   const timeoutMs = options.timeoutMs ?? 5_000
@@ -69,17 +194,41 @@ export function createApiClient(options: ApiClientOptions) {
   }
   const fetchRequest = options.fetch
 
-  async function get<T>(path: string, validate: (value: unknown) => value is T, signal?: AbortSignal) {
+  /**
+   * 发起请求并完成传输层解析；不判断业务信封。
+   * @param path `/api/v1` 下的接口路径。
+   * @param method GET 或 POST；POST 以 JSON 提交。
+   * @param body POST 请求体。
+   * @param signal 调用方取消信号。
+   * @returns 已解析的 JSON 与服务端请求标识。
+   * @throws 网络、超时、HTTP 状态或非法 JSON 失败时抛出 RequestError。
+   */
+  async function requestJson(
+    path: string,
+    method: 'GET' | 'POST',
+    body: unknown | undefined,
+    signal: AbortSignal | undefined,
+    idempotencyKey?: string,
+  ) {
     const url = new URL(baseUrl)
-    url.pathname = `${url.pathname.replace(/\/+$/, '')}${path}`
+    const [pathname, queryString] = path.split('?')
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}${pathname ?? ''}`
+    url.search = queryString ?? ''
     const timeout = AbortSignal.timeout(timeoutMs)
     const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
     let response: Response
     try {
       response = await (fetchRequest ?? globalThis.fetch)(url, {
-        signal: requestSignal, redirect: 'error',
+        method,
+        signal: requestSignal,
+        redirect: 'error',
         credentials: options.credentials ?? 'omit',
-        headers: { accept: 'application/json' },
+        headers: {
+          accept: 'application/json',
+          ...(idempotencyKey === undefined ? {} : { 'idempotency-key': idempotencyKey }),
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
     } catch (error) {
       if (signal?.aborted) throw error
@@ -87,31 +236,87 @@ export function createApiClient(options: ApiClientOptions) {
         code: timeout.aborted ? 'TIMEOUT' : 'NETWORK_ERROR',
       })
     }
-    const requestId = response.headers.get('x-request-id')
-    let body: unknown
+
+    const headerRequestId = response.headers.get('x-request-id')
+    let payload: unknown
     try {
-      body = await response.json()
+      payload = await response.json()
     } catch (error) {
       if (signal?.aborted) throw error
-      if (timeout.aborted) throw new RequestError('请求超时，请稍后重试。', { code: 'TIMEOUT', requestId })
-      if (!response.ok) {
-        throw new RequestError(`服务请求失败（HTTP ${response.status}），请稍后重试。`, {
-          code: 'HTTP_ERROR', status: response.status, requestId, responseValid: false,
-        })
-      }
-      throw new RequestError('后端未返回有效 JSON。', { code: 'INVALID_RESPONSE', requestId })
+      if (timeout.aborted)
+        throw new RequestError('请求超时，请稍后重试。', { code: 'TIMEOUT', requestId: headerRequestId })
+      throw new RequestError(
+        response.ok ? '后端未返回有效 JSON。' : `服务请求失败（HTTP ${response.status}），请稍后重试。`,
+        { code: response.ok ? 'INVALID_RESPONSE' : 'HTTP_ERROR', status: response.status, requestId: headerRequestId },
+      )
     }
+
     if (!response.ok) {
-      const details = validateError(body)
-        ? { responseValid: true, serverCode: body.code }
+      const details = validateError(payload)
+        ? { responseValid: true, serverCode: payload.code }
         : { responseValid: false }
       throw new RequestError(`服务请求失败（HTTP ${response.status}），请稍后重试。`, {
-        code: 'HTTP_ERROR', status: response.status, requestId,
+        code: 'HTTP_ERROR',
+        status: response.status,
+        requestId: headerRequestId,
         ...details,
       })
     }
-    if (!validate(body)) throw new RequestError('后端响应不符合接口契约。', { code: 'INVALID_RESPONSE', requestId })
-    return { data: body, requestId }
+
+    return { payload, headerRequestId }
+  }
+
+  /**
+   * 校验统一响应信封并解包成功数据。
+   * @param path `/api/v1` 下的接口路径。
+   * @param validate 从 OpenAPI 生成的响应校验器。
+   * @param signal 调用方取消信号。
+   * @returns 成功信封中的业务数据与请求标识。
+   * @throws 契约错误、业务失败码或传输失败时抛出 RequestError。
+   */
+  async function getEnvelope<T>(
+    path: string,
+    validate: (value: unknown) => value is ApiSuccessEnvelope<T> | ApiFailureEnvelope,
+    signal?: AbortSignal,
+  ) {
+    const { payload, headerRequestId } = await requestJson(path, 'GET', undefined, signal)
+    if (!validate(payload)) {
+      throw new RequestError('后端响应不符合接口契约。', { code: 'INVALID_RESPONSE', requestId: headerRequestId })
+    }
+    const requestId = headerRequestId ?? payload.requestId
+    if (!payload.success) throw createBusinessError(payload, requestId)
+    return { data: payload.data, requestId }
+  }
+
+  /**
+   * 发起业务请求并解包统一信封；调用方显式给出成功数据类型。
+   * @param path `/api/v1` 下的路径。
+   * @param method GET 或 POST。
+   * @param body POST 请求体。
+   * @param options 取消信号、幂等键与查询参数。
+   * @returns 成功数据与请求标识。
+   * @throws 网络、超时、契约错误或业务失败时抛出 RequestError。
+   */
+  async function callTyped<T>(
+    path: string,
+    method: 'GET' | 'POST',
+    body: unknown | undefined,
+    options: ApiCallOptions & { query?: unknown } = {},
+  ): Promise<{ data: T; requestId: string }> {
+    const { payload, headerRequestId } = await requestJson(
+      `${path}${toQueryString(options.query)}`,
+      method,
+      body,
+      options.signal,
+      options.idempotencyKey,
+    )
+    if (isFailureEnvelope(payload)) {
+      throw createBusinessError(payload, headerRequestId ?? payload.requestId)
+    }
+    if (!isSuccessEnvelope(payload)) {
+      throw new RequestError('后端响应不符合接口契约。', { code: 'INVALID_RESPONSE', requestId: headerRequestId })
+    }
+    return { data: payload.data as T, requestId: headerRequestId ?? payload.requestId }
   }
 
   return {
@@ -119,21 +324,751 @@ export function createApiClient(options: ApiClientOptions) {
      * 读取进程存活状态，不检查数据库。
      * @param signal 调用方取消信号，覆盖连接和响应体读取。
      * @returns 已验证并筛选的存活状态及请求标识。
-     * @throws 请求失败、超时或契约错误时抛出 RequestError；主动取消向上传递。
+     * @throws 请求失败、超时、业务错误或契约错误时抛出 RequestError；主动取消向上传递。
      */
     async health(signal?: AbortSignal) {
-      const result = await get('/api/v1/health', validateHealth, signal)
+      const result = await getEnvelope<{ status: 'ok' }>('/api/v1/health', validateHealth, signal)
       return { ...result, data: { status: result.data.status } }
     },
     /**
      * 读取数据库就绪状态。
      * @param signal 调用方取消信号，覆盖连接和响应体读取。
      * @returns 已验证并筛选的就绪状态及请求标识。
-     * @throws 请求失败、超时或契约错误时抛出 RequestError；主动取消向上传递。
+     * @throws 请求失败、超时、业务错误或契约错误时抛出 RequestError；主动取消向上传递。
      */
     async ready(signal?: AbortSignal) {
-      const result = await get('/api/v1/ready', validateReadiness, signal)
+      const result = await getEnvelope<ReadinessResponse>('/api/v1/ready', validateReadiness, signal)
       return { ...result, data: { status: result.data.status, database: result.data.database } }
+    },
+
+    /** 读取当前用户加入的团队。 */
+    async listMyTeams(options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/me/teams', 'get'>>('/api/v1/me/teams', 'GET', undefined, options)
+    },
+    /** 由平台 root 创建团队并邀请管理员。 */
+    async createTeam(body: ApiBody<'/api/v1/platform/teams', 'post'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/platform/teams', 'post'>>(
+        '/api/v1/platform/teams',
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取团队成员。 */
+    async listTeamMembers(teamId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/members', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/members`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 更新成员角色或状态。 */
+    async updateTeamMember(
+      teamId: string,
+      userId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/members/{userId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/members/{userId}/update', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/members/${segment(userId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取团队邀请。 */
+    async listTeamInvitations(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/invitations', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/invitations', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/invitations`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 邀请成员加入团队。 */
+    async inviteTeamMember(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/invitations', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/invitations', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/invitations`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 重发邀请。 */
+    async resendInvitation(teamId: string, invitationId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/invitations/{invitationId}/resend', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/invitations/${segment(invitationId)}/resend`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 撤销邀请。 */
+    async revokeInvitation(teamId: string, invitationId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/invitations/{invitationId}/revoke', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/invitations/${segment(invitationId)}/revoke`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 读取邀请详情。 */
+    async getInvitation(token: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/invitations/{token}', 'get'>>(
+        `/api/v1/invitations/${segment(token)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 接受邀请并创建/登录账号。 */
+    async acceptInvitation(
+      token: string,
+      body: ApiBody<'/api/v1/invitations/{token}/accept', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/invitations/{token}/accept', 'post'>>(
+        `/api/v1/invitations/${segment(token)}/accept`,
+        'POST',
+        body,
+        options,
+      )
+    },
+
+    /** 读取团队项目列表。 */
+    async listProjects(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/projects', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/projects', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/projects`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 创建项目。 */
+    async createProject(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/projects', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/projects', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/projects`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取项目详情。 */
+    async getProject(projectId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 更新项目。 */
+    async updateProject(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/update', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取项目统计。 */
+    async getProjectStats(projectId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/stats', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/stats`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+
+    /** 读取项目需求列表。 */
+    async listRequirements(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/requirements', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/requirements', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/requirements`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 创建需求。 */
+    async createRequirement(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/requirements', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/requirements', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/requirements`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取需求详情。 */
+    async getRequirement(requirementId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}', 'get'>>(
+        `/api/v1/requirements/${segment(requirementId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 更新需求。 */
+    async updateRequirement(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/update', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取需求评论。 */
+    async listRequirementComments(
+      requirementId: string,
+      query?: ApiQuery<'/api/v1/requirements/{requirementId}/comments', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/comments', 'get'>>(
+        `/api/v1/requirements/${segment(requirementId)}/comments`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 新增需求评论。 */
+    async addRequirementComment(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/comments', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/comments', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/comments`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取需求活动。 */
+    async listRequirementActivities(
+      requirementId: string,
+      query?: ApiQuery<'/api/v1/requirements/{requirementId}/activities', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/activities', 'get'>>(
+        `/api/v1/requirements/${segment(requirementId)}/activities`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 需求开始开发。 */
+    async startRequirementDevelopment(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/start-development', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/start-development', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/start-development`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 需求提测。 */
+    async submitRequirementTest(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/submit-test', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/submit-test', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/submit-test`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 需求开始测试。 */
+    async startRequirementTest(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/start-test', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/start-test', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/start-test`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 需求撤回测试。 */
+    async withdrawRequirementTest(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/withdraw-test', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/withdraw-test', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/withdraw-test`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 需求退回开发。 */
+    async returnRequirementToDevelopment(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/return-to-development', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/return-to-development', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/return-to-development`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 查询需求测试通过资格。 */
+    async getRequirementTestPassEligibility(requirementId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/test-pass-eligibility', 'get'>>(
+        `/api/v1/requirements/${segment(requirementId)}/test-pass-eligibility`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 需求测试通过。 */
+    async passRequirementTest(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/pass-test', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/pass-test', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/pass-test`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 需求重新开发。 */
+    async reopenRequirementDevelopment(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/reopen-development', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/reopen-development', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/reopen-development`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 取消需求。 */
+    async cancelRequirement(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/cancel', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/cancel', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/cancel`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 恢复已取消需求。 */
+    async restoreRequirement(
+      requirementId: string,
+      body: ApiBody<'/api/v1/requirements/{requirementId}/restore', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/restore', 'post'>>(
+        `/api/v1/requirements/${segment(requirementId)}/restore`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取需求提测历史。 */
+    async listRequirementTestSubmissions(
+      requirementId: string,
+      query?: ApiQuery<'/api/v1/requirements/{requirementId}/test-submissions', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/requirements/{requirementId}/test-submissions', 'get'>>(
+        `/api/v1/requirements/${segment(requirementId)}/test-submissions`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+
+    /** 读取项目 Bug 列表。 */
+    async listBugs(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/bugs', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/bugs', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/bugs`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 创建 Bug。 */
+    async createBug(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/bugs', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/bugs', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/bugs`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取 Bug 详情。 */
+    async getBug(bugId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}', 'get'>>(
+        `/api/v1/bugs/${segment(bugId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 更新 Bug。 */
+    async updateBug(bugId: string, body: ApiBody<'/api/v1/bugs/{bugId}/update', 'post'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/update', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** Bug 开始修复。 */
+    async startBugFix(
+      bugId: string,
+      body: ApiBody<'/api/v1/bugs/{bugId}/start-fix', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/start-fix', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/start-fix`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 提交 Bug 回归。 */
+    async submitBugRegression(
+      bugId: string,
+      body: ApiBody<'/api/v1/bugs/{bugId}/submit-regression', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/submit-regression', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/submit-regression`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 撤回 Bug 回归。 */
+    async withdrawBugRegression(
+      bugId: string,
+      body: ApiBody<'/api/v1/bugs/{bugId}/withdraw-regression', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/withdraw-regression', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/withdraw-regression`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 记录 Bug 回归结论。 */
+    async recordBugRegression(
+      bugId: string,
+      body: ApiBody<'/api/v1/bugs/{bugId}/record-regression', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/record-regression', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/record-regression`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 关闭 Bug。 */
+    async closeBug(bugId: string, body: ApiBody<'/api/v1/bugs/{bugId}/close', 'post'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/close', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/close`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 重开 Bug。 */
+    async reopenBug(bugId: string, body: ApiBody<'/api/v1/bugs/{bugId}/reopen', 'post'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/reopen', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/reopen`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 关联 Bug 与需求。 */
+    async linkBugRequirement(
+      bugId: string,
+      body: ApiBody<'/api/v1/bugs/{bugId}/requirements', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/requirements', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/requirements`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 移除 Bug 与需求关联。 */
+    async unlinkBugRequirement(
+      bugId: string,
+      requirementId: string,
+      body: ApiBody<'/api/v1/bugs/{bugId}/requirements/{requirementId}/remove', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/requirements/{requirementId}/remove', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/requirements/${segment(requirementId)}/remove`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取 Bug 评论。 */
+    async listBugComments(
+      bugId: string,
+      query?: ApiQuery<'/api/v1/bugs/{bugId}/comments', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/comments', 'get'>>(
+        `/api/v1/bugs/${segment(bugId)}/comments`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 新增 Bug 评论。 */
+    async addBugComment(
+      bugId: string,
+      body: ApiBody<'/api/v1/bugs/{bugId}/comments', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/comments', 'post'>>(
+        `/api/v1/bugs/${segment(bugId)}/comments`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取 Bug 活动。 */
+    async listBugActivities(
+      bugId: string,
+      query?: ApiQuery<'/api/v1/bugs/{bugId}/activities', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bugs/{bugId}/activities', 'get'>>(
+        `/api/v1/bugs/${segment(bugId)}/activities`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+
+    /** 读取项目已关联仓库。 */
+    async listProjectRepositories(projectId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取可关联仓库。 */
+    async listAvailableRepositories(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/repositories/available', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/available', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/available`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 关联仓库到项目。 */
+    async linkRepository(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/repositories', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 移除项目仓库关联。 */
+    async unlinkRepository(
+      projectId: string,
+      repositoryId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/repositories/{repositoryId}/remove', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/remove', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/remove`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 创建代码引用。 */
+    async createCodeReference(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/code-references', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/code-references', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/code-references`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 刷新代码引用。 */
+    async refreshCodeReference(codeReferenceId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/code-references/{codeReferenceId}/refresh', 'post'>>(
+        `/api/v1/code-references/${segment(codeReferenceId)}/refresh`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 移除代码引用。 */
+    async removeCodeReference(
+      codeReferenceId: string,
+      body: ApiBody<'/api/v1/code-references/{codeReferenceId}/remove', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/code-references/{codeReferenceId}/remove', 'post'>>(
+        `/api/v1/code-references/${segment(codeReferenceId)}/remove`,
+        'POST',
+        body,
+        options,
+      )
+    },
+
+    /** 读取 Git 提供方。 */
+    async listGitProviders(options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/git-providers', 'get'>>(
+        '/api/v1/git-providers',
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取团队 Git 连接。 */
+    async listGitConnections(teamId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/git-connections', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/git-connections`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 创建 Git 连接或获取 GitHub 授权地址。 */
+    async createGitConnection(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/git-connections', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/git-connections', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/git-connections`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 检查 Git 连接。 */
+    async checkGitConnection(connectionId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/git-connections/{connectionId}/check', 'post'>>(
+        `/api/v1/git-connections/${segment(connectionId)}/check`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 同步 Git 仓库。 */
+    async syncGitRepositories(connectionId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/git-connections/{connectionId}/sync-repositories', 'post'>>(
+        `/api/v1/git-connections/${segment(connectionId)}/sync-repositories`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 读取连接仓库。 */
+    async listGitConnectionRepositories(
+      connectionId: string,
+      query?: ApiQuery<'/api/v1/git-connections/{connectionId}/repositories', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/git-connections/{connectionId}/repositories', 'get'>>(
+        `/api/v1/git-connections/${segment(connectionId)}/repositories`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 撤销 Git 连接。 */
+    async revokeGitConnection(
+      connectionId: string,
+      body: ApiBody<'/api/v1/git-connections/{connectionId}/revoke', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/git-connections/{connectionId}/revoke', 'post'>>(
+        `/api/v1/git-connections/${segment(connectionId)}/revoke`,
+        'POST',
+        body,
+        options,
+      )
     },
   }
 }
