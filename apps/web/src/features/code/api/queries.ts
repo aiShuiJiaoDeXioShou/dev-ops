@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { queryOptions, useQueries, useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 
 /** 团队 Git 连接。 */
@@ -33,4 +33,22 @@ export function availableRepositoriesQueryOptions(projectId: string, search = ''
       apiClient.listAvailableRepositories(projectId, search ? { search } : undefined, { signal }),
     enabled: Boolean(projectId),
   })
+}
+
+/**
+ * 汇总团队所有 Git 连接下已同步的仓库，供新建项目时直接选择。
+ * @param teamId 团队标识。
+ * @param enabled 是否允许立即请求，弹窗关闭时可延迟加载。
+ * @returns 扁平仓库列表和加载状态；连接不存在时返回空数组。
+ */
+export function useTeamRepositories(teamId: string, enabled = true) {
+  const connections = useQuery({ ...gitConnectionsQueryOptions(teamId), enabled: enabled && Boolean(teamId) })
+  const connectionIds = connections.data?.data.map((connection) => connection.id) ?? []
+  const repositoryQueries = useQueries({
+    queries: connectionIds.map((connectionId) => connectionRepositoriesQueryOptions(connectionId)),
+  })
+  return {
+    repositories: repositoryQueries.flatMap((query) => query.data?.data.items ?? []),
+    isLoading: connections.isPending || repositoryQueries.some((query) => query.isPending),
+  }
 }
