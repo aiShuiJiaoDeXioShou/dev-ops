@@ -41,10 +41,9 @@ export function AppLayout() {
     queryClient.clear()
     navigate('/login', { replace: true })
   }
-  const navItems = [
+  const primaryNavItems = [
     { to: '/projects', label: '项目', icon: 'folder' as const },
-    ...(!currentTeam || role === 'admin' ? [{ to: '/settings/team', label: '团队管理', icon: 'users' as const }] : []),
-    { to: '/system/status', label: '系统状态', icon: 'activity' as const },
+    { to: '/system/status', label: '运维', accessibleLabel: '系统状态', icon: 'activity' as const },
   ]
   return (
     <div className={cn('shell', menuOpen && 'menu-open')}>
@@ -57,10 +56,11 @@ export function AppLayout() {
           DevOps
         </Link>
         <nav className="nav" aria-label="主导航">
-          {navItems.map((item) => (
+          {primaryNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              aria-label={item.accessibleLabel}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
@@ -70,22 +70,15 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="side-bottom">
-          {teams.length > 1 && (
-            <div className="team-switcher" aria-label="切换团队">
-              {teams.map((team) => (
-                <button
-                  key={team.id}
-                  type="button"
-                  className={cn('team-token', team.id === currentTeam?.id && 'active')}
-                  title={team.name}
-                  aria-label={`切换到${team.name}`}
-                  aria-pressed={team.id === currentTeam?.id}
-                  onClick={() => setCurrentTeam(team.id)}
-                >
-                  <span>{team.name.slice(0, 1)}</span>
-                </button>
-              ))}
-            </div>
+          {(!currentTeam || role === 'admin') && (
+            <NavLink
+              to="/settings/team"
+              onClick={() => setMenuOpen(false)}
+              className={({ isActive }) => cn('nav-btn', isActive && 'active')}
+            >
+              <PrototypeIcon name="users" />
+              团队管理
+            </NavLink>
           )}
           <div className="user">
             <span className="avatar">{user.name.slice(0, 1)}</span>
@@ -103,6 +96,23 @@ export function AppLayout() {
             <PrototypeIcon name="logout" />
             退出登录
           </button>
+          {teams.length > 1 && (
+            <div className="team-switcher" aria-label="切换团队">
+              {teams.map((team) => (
+                <button
+                  key={team.id}
+                  type="button"
+                  className={cn('team-token', team.id === currentTeam?.id && 'active')}
+                  title={team.name}
+                  aria-label={`切换到${team.name}`}
+                  aria-pressed={team.id === currentTeam?.id}
+                  onClick={() => setCurrentTeam(team.id)}
+                >
+                  <span>{team.name.slice(0, 1)}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </aside>
       <div className="surface">

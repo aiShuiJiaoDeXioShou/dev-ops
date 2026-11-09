@@ -621,3 +621,11 @@
 .field-hint a {
   margin: 0 2px;
 }
+
+/* 与原型一致：导航默认正文色，仅当前项使用主题蓝；避免 <a> 默认蓝色让所有图标变蓝。 */
+.nav-btn {
+  color: var(--ink);
+}
+.nav-btn.active {
+  color: var(--blue);
+}
