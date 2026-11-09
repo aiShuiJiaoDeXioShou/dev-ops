@@ -92,7 +92,7 @@ export function BugActionDialog({
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? cause.message : '操作失败，请稍后重试。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   if (!action) return null

@@ -47,7 +47,7 @@ export function RepositoryPicker({
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? cause.message : '仓库关联失败。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   const createGithub = useMutation({
@@ -59,7 +59,7 @@ export function RepositoryPicker({
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? cause.message : 'GitHub 连接创建失败。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   const createConnection = useMutation({
@@ -79,7 +79,7 @@ export function RepositoryPicker({
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? cause.message : '连接创建失败。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   return (

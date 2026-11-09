@@ -42,14 +42,14 @@ export function ProjectForm({ teamId, open, onOpenChange, onCreated }: ProjectFo
       setName('')
       setDescription('')
       setError('')
-      showToast('项目已创建')
+      showToast('项目已创建', 'success')
       onOpenChange(false)
       onCreated?.(result.data.id)
     },
     onError: (cause: unknown) => {
       const message = describeRequestError(cause).description
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   const submit = (event: FormEvent) => {

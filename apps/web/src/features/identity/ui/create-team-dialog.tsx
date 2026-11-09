@@ -32,12 +32,12 @@ export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpen
       onOpenChange(false)
       setName('')
       setAdminEmail('')
-      showToast(`团队已创建，邀请邮件已发送至 ${adminEmail.trim()}。`)
+      showToast(`团队已创建，邀请邮件已发送至 ${adminEmail.trim()}。`, 'success')
     },
     onError: (cause: unknown) => {
       const message = describeRequestError(cause).description
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   const close = () => {

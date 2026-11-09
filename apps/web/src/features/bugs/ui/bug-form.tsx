@@ -85,7 +85,7 @@ export function BugForm({
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? describeRequestError(cause).description : '保存失败，请稍后重试。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   const submit = (event: FormEvent) => {

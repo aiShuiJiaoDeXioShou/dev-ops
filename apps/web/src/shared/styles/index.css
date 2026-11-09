@@ -590,3 +590,23 @@
 [data-slot='dialog-content'] form label > :not(:first-child) {
   margin-top: 0;
 }
+
+/* Toast 语义图标：与提示文字一起做 flex 中线对齐，不用无意义圆点。 */
+#toast {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.toast-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: currentColor;
+  color: #9aa3ae;
+}
+#toast[data-variant='success'] .toast-icon {
+  color: #7ee2a8;
+}
+#toast[data-variant='error'] .toast-icon {
+  color: #ffb4b4;
+}

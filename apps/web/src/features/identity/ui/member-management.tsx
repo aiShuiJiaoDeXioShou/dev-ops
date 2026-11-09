@@ -34,7 +34,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? describeRequestError(cause).description : '成员更新失败。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   const revoke = useMutation({
@@ -43,7 +43,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? describeRequestError(cause).description : '撤销邀请失败。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   if (members.isPending) return <PageLoading />

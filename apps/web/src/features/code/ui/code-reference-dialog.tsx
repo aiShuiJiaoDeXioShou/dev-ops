@@ -57,7 +57,7 @@ export function CodeReferenceDialog({
     onError: (cause: unknown) => {
       const message = isBusinessError(cause) ? describeRequestError(cause).description : '代码引用核对失败。'
       setError(message)
-      showToast(message)
+      showToast(message, 'error')
     },
   })
   return (
