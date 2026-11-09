@@ -182,7 +182,7 @@ flowchart TB
     class git,models,pipelines,observability,channels external
 ```
 
-访问控制与审计覆盖每次操作，包括 Bot 工具调用和外部结果上报。M12 表示接入职责，不代表必须建设通用插件系统。加密凭据存储是安全职责边界，不预设独立服务部署；产物存文件还是存引用仍按需求待定项确认。技术方案见[技术选型与集成方案](../technical-selection.md)和[后端架构](../../server/docs/architecture.md)。
+访问控制与审计覆盖每次操作，包括 Bot 工具调用和外部结果上报。M12 表示接入职责，不代表必须建设通用插件系统。加密凭据存储是安全职责边界，不预设独立服务部署；产物存文件还是存引用仍按需求待定项确认。技术方案见[技术选型与集成方案](../technical-selection.md)和[后端架构](../architecture/server-foundation.md)。
 
 阅读三张图时保持以下业务边界：
 

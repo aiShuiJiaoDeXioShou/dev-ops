@@ -1,0 +1,5 @@
+{
+  "extends": "../../tooling/typescript/node.json",
+  "compilerOptions": { "lib": ["ES2023", "DOM"] },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

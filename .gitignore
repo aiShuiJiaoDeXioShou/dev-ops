@@ -6,7 +6,10 @@ coverage/
 .env
 .env.*
 !.env.example
-.mobile-workspace!.env.*.example
+!.env.*.example
 .playwright-mcp
 .mobile-workspace
 work
+draft_*
+.artifacts/
+packages/api-client/src/generated/

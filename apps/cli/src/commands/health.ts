@@ -1,32 +1,14 @@
-/**
- * 请求后端存活接口并校验响应，避免把代理页面或错误数据当成健康状态。
- * @param url 已校验的 HTTP/HTTPS 健康检查完整地址。
- * @param timeoutMs 覆盖连接及响应体读取的超时，单位为毫秒，必须为正整数。
- * @returns 仅包含已验证状态的对象，不透传服务端其他字段。
- * @throws 请求超时、网络失败、HTTP 非成功状态或响应不符合接口契约时抛出中文错误。
- * @remarks 发起一次 GET 请求，不自动重试，也不跟随重定向。
- */
-export async function checkHealth(url: URL, timeoutMs: number): Promise<{ status: 'ok' }> {
-  const signal = AbortSignal.timeout(timeoutMs)
-  let response: Response
-  try {
-    response = await fetch(url, { signal, redirect: 'error', headers: { accept: 'application/json' } })
-  } catch {
-    throw new Error(signal.aborted ? '健康检查超时' : '无法连接后端，请检查服务地址和网络')
-  }
-  if (!response.ok) {
-    await response.body?.cancel()
-    throw new Error(`健康检查失败，HTTP ${response.status}`)
-  }
+import { createApiClient, type HealthResponse } from '@dev-ops/api-client'
 
-  let body: unknown
-  try {
-    body = await response.json()
-  } catch {
-    throw new Error(signal.aborted ? '健康检查超时' : '后端未返回有效 JSON')
-  }
-  if (typeof body !== 'object' || body === null || !('status' in body) || body.status !== 'ok') {
-    throw new Error('后端响应不符合健康检查契约')
-  }
-  return { status: 'ok' }
+/**
+ * 通过共享客户端请求后端存活状态，使用后端生成的接口契约校验响应。
+ * @param url 已校验的服务基础地址，可以包含反向代理前缀。
+ * @param timeoutMs 覆盖连接及响应体读取的超时，单位为毫秒。
+ * @returns 仅包含已验证状态的对象，不透传服务端额外字段。
+ * @throws 配置非法、请求失败、超时或响应不符合接口契约时抛出可展示错误。
+ * @remarks 发起一次 GET 请求，不自动重试或跟随重定向。
+ */
+export async function checkHealth(url: URL, timeoutMs: number): Promise<HealthResponse> {
+  const client = createApiClient({ baseUrl: url, timeoutMs })
+  return (await client.health()).data
 }

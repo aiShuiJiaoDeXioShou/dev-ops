@@ -1,0 +1,26 @@
+name: dev-ops
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: dev_ops
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请先执行 pnpm db:setup}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?缺少应用数据库密码}
+      MIGRATION_DATABASE_PASSWORD: ${MIGRATION_DATABASE_PASSWORD:?缺少迁移数据库密码}
+      TZ: UTC
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d dev_ops"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  postgres_data:

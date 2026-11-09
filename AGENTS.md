@@ -4,16 +4,28 @@
 
 ## 项目结构
 
-- `apps/web/`：React、TypeScript、Vite 前端，页面与组件位于 `src/`。
-- `apps/cli/`：Node.js、TypeScript 命令行工具，入口位于 `src/index.ts`，命令实现在 `src/commands/`，测试位于 `test/`。
-- `server/`：Node.js、Fastify、TypeScript 后端。
-- `server/src/modules/`：按业务组织模块，当前健康检查模块可作为路由与 schema 示例。
-- `server/src/config/`：配置加载与校验；`server/src/shared/`：跨模块复用的基础能力。
-- `server/src/db/`：Drizzle schema、连接池与迁移入口；`server/drizzle/`：版本化 SQL 和迁移元数据。
-- `compose.yaml`、`server/docker/postgres/`：本地 PostgreSQL 环境与首次初始化脚本。
-- `server/test/`：后端测试；`server/docs/`：后端技术方案；`docs/prd/`：产品需求。
+- `apps/web/`：React、TypeScript、Vite 前端；`src/app/` 组装应用，`pages/` 组合页面，`features/` 按业务组织，`shared/` 提供公共基础。
+- `apps/cli/`：Node.js、TypeScript 命令行工具；入口位于 `src/index.ts`，命令位于 `src/commands/`，测试位于 `test/`。
+- `apps/server/`：Node.js、Fastify、TypeScript 后端；`src/entrypoints/` 是进程入口，`bootstrap/` 负责依赖组装。
+- `apps/server/src/modules/`：业务模块；当前仅健康检查模块，后续模块按真实需求添加。
+- `apps/server/src/platform/`：进程配置、HTTP 公共能力、数据库连接与迁移执行器，不依赖业务模块。
+- `apps/server/src/bootstrap/database-schema.ts`：聚合模块表定义，供 Drizzle 生成迁移；`apps/server/drizzle/` 保存版本化 SQL 与元数据。
+- `packages/api-client/`：Web 和 CLI 共用的类型化客户端，类型与运行时校验器从后端 OpenAPI 生成。
+- `tooling/`：共享 TypeScript 配置、接口生成脚本及依赖边界检查；`tests/e2e/` 验证跨应用联通。
+- `deploy/compose.yaml`、`deploy/postgres/`：本地 PostgreSQL 环境与首次初始化脚本。
+- `docs/prd/`：产品需求；`docs/architecture/`：架构与数据库说明。
 
-前端、后端和 CLI 分别维护依赖与锁文件。运行方式见 [README.md](README.md)，后端扩展约定见 [server/README.md](server/README.md)，CLI 用法见 [apps/cli/README.md](apps/cli/README.md)。后端使用 PostgreSQL 18、Drizzle ORM 和 `pg` 连接池，数据库操作与迁移方式见[数据库说明](server/docs/database.md)。业务表按实际需求添加，不将基础设施接入描述为业务功能已实现。
+应用分别维护 package.json，仓库统一使用 pnpm 工作区和根锁文件。新增依赖在所属工作区声明，并更新根锁文件。应用使用 TypeScript 7；工程工具因编译器 API 兼容性使用根目录的 TypeScript 5，不能让工具依赖改变应用编译器。
+
+运行方式见 [README.md](README.md)，后端扩展约定见 [apps/server/README.md](apps/server/README.md)，CLI 用法见 [apps/cli/README.md](apps/cli/README.md)。后端使用 PostgreSQL 18、Drizzle ORM 和 `pg` 连接池，数据库操作见[数据库说明](docs/architecture/database.md)。目标模块归属见[架构方案](docs/architecture/system-design.md)；基础工程接入不代表业务功能已经实现。
+
+## 模块依赖
+
+1. Web 按 app → pages → features → shared 依赖；跨功能使用所属 feature 的 `public.ts`，禁止页面层之外反向引用页面或应用组装。
+2. 后端跨模块使用 `public.ts`，禁止读取其他模块的 repository、表定义和内部状态。bootstrap 可访问路由与构造入口完成组装，platform 不反向依赖业务模块。
+3. Web、CLI 只通过 API 操作 Server；共享包不导入应用源码，Server 不依赖生成的 api-client。
+4. 生成的接口类型与校验器不手工修改、不提交。修改 TypeBox 契约后运行根目录 `pnpm api:generate`，完整检查使用 `pnpm check`。
+5. 新增导入须通过 `pnpm check:boundaries`；根级检查同时验证越界导入和循环依赖确实会失败。
 
 ## 项目必须遵循的规范
 
@@ -41,7 +53,7 @@
 1. 按业务模块组织代码。路由负责 HTTP 输入输出，schema 定义接口契约，service 承载业务规则，repository 负责持久化；后两层按实际需求添加，不生成空壳分层。
 2. 业务函数通过参数接收依赖，避免直接依赖 Fastify 的 request/reply。跨模块使用明确接口，禁止绕过模块边界直接修改其他模块内部状态。
 3. 请求和响应使用 TypeBox schema，类型尽量从 schema 推导，避免重复维护相同结构。外部输入必须在入口校验，数据库查询结果不能未经筛选直接作为接口响应。
-4. 遵循现有 `/api/v1` 路由前缀及成功、错误响应约定，具体格式以 [server/README.md](server/README.md) 为准。新增接口同步维护 OpenAPI 契约。
+4. 遵循现有 `/api/v1` 路由前缀及成功、错误响应约定，具体格式以 [apps/server/README.md](apps/server/README.md) 为准。新增接口同步维护 OpenAPI 契约。
 5. 配置集中加载和校验，新增环境变量同步更新 `.env.example` 与说明。禁止在业务代码中散落读取环境变量或硬编码部署地址、凭据。
 6. 日志记录排障所需的业务标识和请求上下文，敏感字段脱敏；不得向客户端暴露内部堆栈、SQL 或凭据。不要在多个调用层重复记录同一异常。
 7. 涉及用户或项目资源的接口必须在服务端校验身份、资源归属和操作权限；前端隐藏按钮不能代替鉴权。
@@ -103,7 +115,7 @@
 
 ## 验证与交付
 
-1. 按改动范围执行项目已有检查，命令以各项目 `package.json` 为准。前端代码变更运行 `pnpm --dir apps/web lint` 和 `pnpm --dir apps/web build`；后端代码变更运行 `pnpm --dir server check` 和 `pnpm --dir server build`；CLI 代码变更运行 `pnpm --dir apps/cli check` 和 `pnpm --dir apps/cli build`。
+1. 完整工程检查在仓库根目录运行 `pnpm check`，包含契约生成、全部构建、依赖边界、应用测试和联通测试。局部检查前先运行 `pnpm prepare:clients`；命令以各项目 `package.json` 为准。前端代码变更运行 `pnpm --dir apps/web lint` 和 `pnpm --dir apps/web build`；后端代码变更运行 `pnpm --dir apps/server check` 和 `pnpm --dir apps/server build`；CLI 代码变更运行 `pnpm --dir apps/cli check` 和 `pnpm --dir apps/cli build`。
 2. 业务逻辑变更与缺陷修复补充有意义的测试，优先覆盖边界、失败路径、权限和并发条件。测试验证外部行为，避免只重复实现；纯文档修改检查内容、链接和命令是否准确即可。
-3. 涉及数据库配置、迁移或持久化的变更运行 `pnpm --dir server test:db`，验证迁移、权限、约束、事务和连接生命周期。业务关联建立后补充无外键一致性测试，不能仅以 mock 测试替代数据库验证。
+3. 涉及数据库配置、迁移或持久化的变更运行 `pnpm --dir apps/server test:db`，验证迁移、权限、约束、事务和连接生命周期。业务关联建立后补充无外键一致性测试，不能仅以 mock 测试替代数据库验证。
 4. 交付前检查改动范围与敏感信息，同步受影响的接口和文档。说明实际完成内容、执行过的验证及未验证项，不将未运行的检查描述为通过。

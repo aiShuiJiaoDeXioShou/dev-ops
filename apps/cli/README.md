@@ -2,7 +2,7 @@
 
 命令行工具使用 Node.js 和 TypeScript，提供帮助、版本和后端进程健康检查。入口是 [src/index.ts](src/index.ts)，参数解析与退出码处理位于 [src/cli.ts](src/cli.ts)，网络命令位于 [src/commands/health.ts](src/commands/health.ts)。
 
-CLI 通过 HTTP 调用后端，不直连 PostgreSQL。项目、PR、issue 和 bot 管理命令尚未实现。
+CLI 通过共享 `@dev-ops/api-client` 调用后端，不直连 PostgreSQL。项目、PR、issue 和 bot 管理命令尚未实现。
 
 ## 安装与运行
 
@@ -10,12 +10,13 @@ CLI 通过 HTTP 调用后端，不直连 PostgreSQL。项目、PR、issue 和 bo
 
 ```bash
 nvm use
-pnpm --dir apps/cli install --frozen-lockfile
+pnpm install --frozen-lockfile
+pnpm prepare:clients
 pnpm --dir apps/cli dev --help
 pnpm --dir apps/cli dev --version
 ```
 
-后端按[后端说明](../../server/README.md)启动后，可以执行：
+后端按[后端说明](../server/README.md)启动后，可以执行：
 
 ```bash
 pnpm --dir apps/cli dev health
@@ -51,4 +52,4 @@ node apps/cli/dist/index.js --version
 
 脚本需要读取纯 JSON 时，直接运行 `node apps/cli/dist/index.js health --json`，避免包管理器的脚本提示影响输出。包内已声明 `dev-ops` 可执行入口，但初始化不会进行全局安装或发布。
 
-新增命令时，在 `src/commands/` 实现命令，在 `src/cli.ts` 注册参数和分派逻辑，并同步更新帮助、本文档和 `test/` 中的行为测试。依赖和锁文件在本目录独立维护。
+新增命令时，在 `src/commands/` 实现命令，在 `src/cli.ts` 注册参数和分派逻辑，并同步更新帮助、本文档和 `test/` 中的行为测试。应用依赖在本目录声明，锁文件由根工作区统一维护。

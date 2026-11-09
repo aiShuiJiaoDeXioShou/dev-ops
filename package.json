@@ -1,0 +1,34 @@
+{
+  "name": "dev-ops-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.12.0",
+  "engines": {
+    "node": ">=24.15.0 <25"
+  },
+  "scripts": {
+    "dev": "pnpm prepare:clients && pnpm --parallel --filter @dev-ops/web --filter @dev-ops/server dev",
+    "dev:web": "pnpm prepare:clients && pnpm --filter @dev-ops/web dev",
+    "dev:server": "pnpm --filter @dev-ops/server dev",
+    "cli": "pnpm --filter @dev-ops/cli dev",
+    "api:generate": "pnpm --filter @dev-ops/server api:export && node tooling/scripts/generate-api-client.mjs",
+    "prepare:clients": "pnpm api:generate && pnpm --filter @dev-ops/api-client build",
+    "build": "pnpm api:generate && pnpm -r build",
+    "check": "pnpm build && pnpm check:boundaries && pnpm test:tooling && pnpm -r check && pnpm test:e2e",
+    "check:boundaries": "depcruise --config tooling/dependency-rules.mjs apps/web/src apps/server/src apps/cli/src packages/api-client/src",
+    "test:tooling": "node --test tooling/test/*.test.mjs",
+    "test:e2e": "node --test tests/e2e/*.test.mjs",
+    "test:db": "pnpm --filter @dev-ops/server test:db",
+    "db:setup": "pnpm --filter @dev-ops/server db:setup",
+    "db:up": "pnpm --filter @dev-ops/server db:up",
+    "db:down": "pnpm --filter @dev-ops/server db:down",
+    "db:migrate": "pnpm --filter @dev-ops/server db:migrate"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "18.7.2",
+    "typescript": "5.9.3",
+    "openapi-typescript": "7.13.0",
+    "ajv": "8.20.0"
+  }
+}

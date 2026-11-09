@@ -4,38 +4,39 @@
 
 | 属性 | 内容 |
 | --- | --- |
-| 状态 | 方案草案；Tailwind + shadcn/ui、内置 Better Auth 为已确认方向，新增组件尚未接入 |
+| 状态 | 前端路由、Query 与 shadcn/ui 基础设施已接入；表单、内置 Better Auth 与业务流程仍待实施 |
 | 负责人 | 项目维护者；研发负责集成与兼容性验证 |
 | 读者 | 项目维护者、前后端开发人员及测试人员 |
 | 范围 | 前后端基础组件、数据库访问、认证权限、测试与工程缺口 |
-| 关联 | [V0.1 需求](prd/v0.1.md)、[版本规划](prd/release-plan.md)、[后端架构](../server/docs/architecture.md)、[数据库说明](../server/docs/database.md) |
+| 关联 | [V0.1 需求](prd/v0.1.md)、[版本规划](prd/release-plan.md)、[后端架构](architecture/server-foundation.md)、[数据库说明](architecture/database.md) |
 
 ## 1. 方案摘要与现状依据
 
 建议在现有工程上补齐路由、数据缓存、基础 UI 和内置认证，保留已有后端与数据库组合。选择以标准协议、官方适配、可隔离测试和当前集成成本为依据；库的流行程度或其他项目采用情况不能代替本项目验证。
 
-本方案的目标是让后续业务模块使用一致的导航、请求、表单和权限边界。本文交付选型与接入设计，不安装依赖、不实现业务接口、不生成迁移，也不确定 PRD 中仍待确认的业务规则。Bot 执行、任务队列、文件存储和生产部署不进入本次基础组件接入范围。
+本方案的目标是让后续业务模块使用一致的导航、请求、表单和权限边界。本文记录选型与接入设计，并随实现更新状态；已接入部分见下表和[前端说明](../apps/web/README.md)。组件选型不确定 PRD 中仍待确认的业务规则。Bot 执行、任务队列、文件存储和生产部署不进入本次基础组件接入范围。
 
 文中状态含义如下：**当前已接入**表示工作区存在对应实现；**推荐接入**表示后续实施方向；**兼容性待验证**表示需要通过指定实验或测试才能采用。代码和测试文件存在，不表示本次已运行检查或功能已经部署。
 
 ### 1.1 工程核对依据
 
-以下结论来自 2026-11-09 工作区静态核对，工程参考提交为 `640350a8767a9f82921b6cd3261d71389e07aa27`。需求及部分说明文件包含未提交内容，本文按工作区内容引用，不将其视为已发布契约。
+以下结论来自 2026-11-09 工作区核对，工程参考提交为 `066101f2ac66c32d4633fcf920a8fc20aaba71e1`，包含此后未提交的前端基础设施接入。本文按工作区内容引用，不将其视为已发布契约。
 
 | 能力 | 当前状态 | 可核对的依据 |
 | --- | --- | --- |
-| 运行时与依赖管理 | Node.js 固定为 24.15.0；子项目分别维护 pnpm 配置和锁文件 | [.nvmrc](../.nvmrc)、[前端依赖](../apps/web/package.json)、[后端依赖](../server/package.json) |
-| 前端基础 | 已接入 React、TypeScript、Vite、Tailwind 和 React Compiler，主页面仍为模板 | [App.tsx](../apps/web/src/App.tsx)、[Vite 配置](../apps/web/vite.config.ts)、[样式入口](../apps/web/src/index.css) |
-| 路由、查询缓存、表单及 UI 组件 | 尚未接入本文推荐库；前端没有测试脚本 | [前端依赖与脚本](../apps/web/package.json) |
+| 运行时与依赖管理 | Node.js 固定为 24.15.0；应用分别声明依赖，根工作区统一管理锁文件 | [.nvmrc](../.nvmrc)、[前端依赖](../apps/web/package.json)、[后端依赖](../apps/server/package.json) |
+| 前端基础 | 已接入 React、TypeScript、Vite、Tailwind 和 React Compiler，提供响应式工作台和系统状态页 | [应用 Provider](../apps/web/src/app/providers/application.tsx)、[Vite 配置](../apps/web/vite.config.ts)、[样式入口](../apps/web/src/shared/styles/index.css) |
+| 路由、查询缓存及 UI 组件 | 已接入 React Router Data Mode、TanStack Query 和首批 shadcn/ui 控件；已有 Vitest、Testing Library、MSW 测试 | [路由](../apps/web/src/app/router/routes.tsx)、[查询配置](../apps/web/src/shared/api/query-client.ts)、[前端依赖与脚本](../apps/web/package.json) |
+| 表单 | React Hook Form 与 Zod 尚未接入，等待真实表单需求 | [前端依赖](../apps/web/package.json) |
 | 交互原型 | 独立 HTML/CSS/JS 原型，尚未迁入 React | [原型说明](../.mobile-workspace/design/interactive-prototype-v1/README.md) |
-| API 基础 | 已接入 Fastify、TypeBox、配置校验、日志、统一错误和 OpenAPI；模块只有健康检查 | [应用组装](../server/src/app.ts)、[健康检查](../server/src/modules/health/health.routes.ts)、[错误处理](../server/src/shared/errors.ts) |
-| 数据库基础 | 已接入 PostgreSQL、Drizzle、pg 连接池；正式迁移仅建立 app schema 与权限，没有业务表 | [连接实现](../server/src/db/client.ts)、[schema](../server/src/db/schema.ts)、[基础迁移](../server/drizzle/0000_initialize_app_schema.sql) |
-| 认证、成员与项目权限 | 尚未实现，Better Auth 尚未加入依赖 | [应用组装](../server/src/app.ts)、[后端依赖](../server/package.json) |
-| 后端测试 | 已有接口、配置和真实数据库集成测试文件 | [接口测试](../server/test/app.test.ts)、[配置测试](../server/test/config.test.ts)、[数据库测试](../server/test/integration/database.test.ts) |
+| API 基础 | 已接入 Fastify、TypeBox、配置校验、日志、统一错误和 OpenAPI；模块只有健康检查 | [应用组装](../apps/server/src/bootstrap/create-http-app.ts)、[健康检查](../apps/server/src/modules/health/health.routes.ts)、[错误处理](../apps/server/src/platform/http/errors.ts) |
+| 数据库基础 | 已接入 PostgreSQL、Drizzle、pg 连接池；正式迁移仅建立 app schema 与权限，没有业务表 | [连接实现](../apps/server/src/platform/database/client.ts)、[schema](../apps/server/src/bootstrap/database-schema.ts)、[基础迁移](../apps/server/drizzle/0000_initialize_app_schema.sql) |
+| 认证、成员与项目权限 | 尚未实现，Better Auth 尚未加入依赖 | [应用组装](../apps/server/src/bootstrap/create-http-app.ts)、[后端依赖](../apps/server/package.json) |
+| 后端测试 | 已有接口、配置和真实数据库集成测试文件 | [接口测试](../apps/server/test/http/app.test.ts)、[配置测试](../apps/server/test/config.test.ts)、[数据库测试](../apps/server/test/integration/database.test.ts) |
 
 ### 1.2 版本与来源使用方式
 
-已有版本范围以各子项目 `package.json` 为准，实际解析版本以锁文件为准。本文没有安装新增组件，也没有核对它们在当前 Node.js、React、TypeScript、Fastify、Drizzle 组合中的运行结果，因此不承诺新增组件的具体版本兼容性。
+已有版本范围以各子项目 `package.json` 为准，实际解析版本以锁文件为准。前端已接入组件的检查方式及执行范围见[前端说明](../apps/web/README.md#验证范围)；认证、表单及尚未安装的其他候选组件仍需完成各自兼容性验证。
 
 外部能力依据于 2026-11-09 核对的官方文档；DSH 源码另外固定到第 5 章的提交。实施时应选择当时受维护的正式版本，核对 peer dependencies、发布说明和迁移要求，再提交对应锁文件。适配器要求升级现有库时，单独评估升级成本，不能为了安装成功而关闭类型检查。
 
@@ -50,7 +51,7 @@
 | HTTP 请求 | 原生 fetch 的薄封装 | 标准 API 已能满足当前 HTTP 请求需求 | 统一超时、AbortSignal、响应校验和错误转换；不预建通用 SDK 框架 |
 | 基础 UI | shadcn/ui + 已有 Tailwind | 延续原型视觉，允许调整控件代码 | 按需纳入组件代码、统一主题变量，维护本地组件及其底层依赖 |
 | 表单 | react-hook-form、zod、@hookform/resolvers | 与所选 UI 组合，统一表单值、输入校验和错误展示 | 处理前端提示和服务端字段错误；后端继续执行权威校验 |
-| 错误与加载 | 路由错误边界、React Suspense；局部边界按需评估 [react-error-boundary](https://github.com/bvaughn/react-error-boundary) | 分别处理导航、懒加载与局部渲染故障 | 懒加载使用 Suspense，普通查询显式处理 pending、error 和空结果；维护恢复入口 |
+| 错误与加载 | Data Router 的 lazy、HydrateFallback、ErrorBoundary；需要独立懒加载组件时使用 React Suspense，局部边界按需评估 [react-error-boundary](https://github.com/bvaughn/react-error-boundary) | 分别处理导航、懒加载与局部渲染故障 | 路由提供初始化占位和导航提示，普通查询显式处理 pending、error 和空结果；维护恢复入口 |
 | 页面保活 | React Activity，按需使用 | 复用 React 已有的隐藏状态保留能力 | 只用于有明确状态保留需求的页面或面板，承担隐藏树的内存成本 |
 | 跨组件客户端状态 | [Zustand](https://github.com/pmndrs/zustand)，按需引入 | 为实际共享交互提供独立 store，便于隔离测试 | 出现无法由 URL、局部状态或现有上下文承接的共享交互时再添加 |
 
@@ -70,13 +71,13 @@ React Router 的 Data Mode 可在现有 SPA 中使用，无需先迁为全栈框
 
 ### 2.1 接入位置与通用组件
 
-以下目录为建议新增位置，当前不存在的目录不表示已有实现。`apps/web/src/app/` 放置路由表和 Provider 组装；`lib/` 放置请求与查询客户端配置；`components/ui/` 放置基础控件；业务页面与查询定义按实际模块组织，不生成空壳目录。
+当前 `apps/web/src/app/` 组装路由、Provider 和布局；`shared/api/` 初始化共享请求客户端与 Query，`shared/ui/` 放置基础控件；`pages/` 组合工作台与系统状态页，`features/system/` 持有就绪查询和状态卡片，通过 public.ts 对外提供。后续业务页面与查询按实际模块组织，不生成空壳目录。
 
-AppLayout 提供导航和内容出口，项目布局从路由参数取得当前项目。RequireAuth 在会话确认期间显示加载状态，未登录时进入登录入口；它只控制客户端导航，服务端仍需鉴权。NotFoundPage 处理未匹配路径，PageError 提供可执行的重试或返回入口。
+已实现的 AppLayout 提供桌面导航、移动抽屉和内容出口；NotFoundPage 处理未匹配路径，PageError 提供重试入口，路由错误页提供重新加载与返回入口。项目布局与 RequireAuth 尚未实现；后续项目布局从路由参数取得当前项目，RequireAuth 在会话确认期间显示加载状态，未登录时进入登录入口。客户端导航控制不能代替服务端鉴权。
 
-首批控件包括 Button、Input、Select、Dialog、Sheet、Tabs、Skeleton，以及项目使用的确认对话框、空状态和提交反馈。抽屉和弹窗需支持键盘关闭、焦点约束与关闭后焦点恢复。先完成原型所需组合，再决定是否需要复杂表格或虚拟列表。
+已纳入 Button、Card、Alert、Badge、Skeleton、Separator、Sheet，并实现通用加载、错误和空状态。Input、Select、Dialog、Tabs、确认对话框及提交反馈按后续真实页面需求补充。抽屉和弹窗需支持键盘关闭、焦点约束与关闭后焦点恢复，再按需要评估复杂表格或虚拟列表。
 
-请求层接收调用方的取消信号，并结合超时停止请求。业务错误保留后端 code、message、requestId，原始堆栈和敏感响应不进入提示；响应先作为 unknown 校验，再供页面使用。TypeBox/OpenAPI 继续定义业务接口，前端 Zod 只补充表单交互约束，不自行决定权限或状态流转。接口增长后可评估从 OpenAPI 生成客户端类型。
+当前 GET 请求层接收调用方取消信号，并结合 5 秒超时停止请求；响应先作为 unknown 校验，再供页面使用。失败保留安全提示、HTTP 状态和可用的 x-request-id，不展示原始错误体或堆栈。共享客户端按契约校验错误响应，保留合法的来源代码和校验结果，用户提示由客户端生成。TypeBox/OpenAPI 继续定义业务接口，前端 Zod 只补充表单交互约束，不自行决定权限或状态流转。当前从 OpenAPI 生成共享客户端类型及独立响应校验器，Web 和 CLI 使用同一来源。
 
 ### 2.2 数据缓存、保活与持久化
 
@@ -92,7 +93,7 @@ AppLayout 提供导航和内容出口，项目布局从路由参数取得当前�
 
 查询键包含实际隔离维度，例如身份、团队、项目、筛选和分页；示意为 `[用户标识, 团队标识, 'issues', 项目标识, 查询条件]`，只包含标识，不包含令牌。创建或修改事项成功后，失效相关详情、列表及计数；失败时保留可重试的错误，不伪装为成功。
 
-staleTime 决定数据多久被视为新鲜，gcTime 决定不活跃查询保留多久，二者不等同。Query 默认将缓存视为过期，并可能在挂载、重新聚焦或重连时刷新。接入时逐类确定时效，拒绝对认证失败或权限拒绝自动重试；实时状态与普通列表分别配置刷新策略。[Query 默认行为](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults)
+staleTime 决定数据多久被视为新鲜，gcTime 决定不活跃查询保留多久，二者不等同。Query 默认将缓存视为过期，并可能在挂载、重新聚焦或重连时刷新。[Query 默认行为](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults) 当前应用配置为 30 秒新鲜期、5 分钟回收期，网络、超时或 HTTP 5xx 最多重试一次，4xx 与契约错误不自动重试，写操作默认不重试。后续逐类确定时效，实时状态与普通列表分别配置刷新策略；当前没有业务 mutation、身份隔离或持久化缓存。
 
 | 状态内容 | 权威位置 | 保留与清理方式 |
 | --- | --- | --- |
@@ -104,7 +105,7 @@ staleTime 决定数据多久被视为新鲜，gcTime 决定不活跃查询保留
 
 Activity 隐藏时保留状态和 DOM、清理 Effects，显示时重新建立 Effects。卸载边界或刷新浏览器仍会失去这些状态；直接包住一个随路由切换被卸载的 Outlet，不能自动实现路由缓存。保活页面必须限制数量，并验证定时器、订阅和请求取消行为。[React Activity](https://react.dev/reference/react/Activity)
 
-认证会话由 Better Auth 客户端提供，不再复制为另一份长期全局状态。退出或切换身份时，先取消未完成的业务查询，再清理 Query、保活页面和身份相关草稿，避免旧请求回写。对其他标签页的退出通知补充同步测试。私有仓库缓存的读取仍受[来源授权约束](../server/docs/architecture.md#41-代码平台-api-接入)。
+认证会话由 Better Auth 客户端提供，不再复制为另一份长期全局状态。退出或切换身份时，先取消未完成的业务查询，再清理 Query、保活页面和身份相关草稿，避免旧请求回写。对其他标签页的退出通知补充同步测试。私有仓库缓存的读取仍受[来源授权约束](architecture/server-foundation.md#41-代码平台-api-接入)。
 
 ## 3. 后端与数据库集成
 
@@ -120,7 +121,7 @@ Activity 隐藏时保留状态和 DOM、清理 Effects，显示时重新建立 E
 >
 > **代价与退路：** 研发负责保持模块边界；独立业务函数可在未来框架调整时复用。
 
-运行与接口约定由[后端说明](../server/README.md)维护。业务请求和响应继续使用 TypeBox，从 schema 推导类型并生成 OpenAPI；返回数据按响应字段筛选。错误处理统一关联请求标识，日志记录一次并脱敏。配置集中在 `server/src/config/` 加载，新增变量同步示例和说明，业务模块不直接读取环境变量。
+运行与接口约定由[后端说明](../apps/server/README.md)维护。业务请求和响应继续使用 TypeBox，从 schema 推导类型并生成 OpenAPI；返回数据按响应字段筛选。错误处理统一关联请求标识，日志记录一次并脱敏。配置集中在 `apps/server/src/platform/config/` 加载，新增变量同步示例和说明，业务模块不直接读取环境变量。
 
 > **Why & What - 保留 PostgreSQL、Drizzle 与 pg**
 >
@@ -132,7 +133,7 @@ Activity 隐藏时保留状态和 DOM、清理 Effects，显示时重新建立 E
 >
 > **代价与退路：** Drizzle 仍要求理解 SQL、审查迁移并管理并发一致性。复杂查询可在明确 repository 内使用参数化 SQL，不必为此整体迁移 ORM。
 
-依据：[Drizzle relations 与外键边界](https://orm.drizzle.team/docs/relations)、[Prisma ORM](https://www.prisma.io/docs/orm)。数据库建模规则以 [AGENTS.md](../AGENTS.md#postgresql-数据库规范)为准，执行方式以[数据库说明](../server/docs/database.md)为准。
+依据：[Drizzle relations 与外键边界](https://orm.drizzle.team/docs/relations)、[Prisma ORM](https://www.prisma.io/docs/orm)。数据库建模规则以 [AGENTS.md](../AGENTS.md#postgresql-数据库规范)为准，执行方式以[数据库说明](architecture/database.md)为准。
 
 新增业务 repository 使用现有应用 Drizzle 实例，认证适配器也复用该实例，避免每个模块私建连接池。必须共同成功的写入在同一短事务内执行，外部 HTTP 调用放在事务外。无外键关联的新增与删除需锁定同一父记录或采用等效并发方案，检查更新行数，并用真实数据库测试竞态。
 
@@ -156,7 +157,7 @@ Better Auth 是内置认证主方案，负责会话和所启用的登录能力�
 
 ### 4.1 模块、协议与会话接入
 
-建议在 `server/src/modules/auth/` 创建认证实例工厂和 Fastify 插件，由应用组装入口传入已校验配置及 Drizzle 实例。工厂不监听端口，不持有进程全局可变实例，测试可使用独立数据库和配置创建。按已核对文档，拟新增 better-auth、@better-auth/drizzle-adapter，React 客户端使用 better-auth/react；实施定版时复核该版本的包名与导出。
+建议在 `apps/server/src/modules/identity/` 创建认证实例工厂和 Fastify 插件，由应用组装入口传入已校验配置及 Drizzle 实例。工厂不监听端口，不持有进程全局可变实例，测试可使用独立数据库和配置创建。按已核对文档，拟新增 better-auth、@better-auth/drizzle-adapter，React 客户端使用 better-auth/react；实施定版时复核该版本的包名与导出。
 
 统一认证基础路径为 `/api/v1/auth`，服务端 basePath、客户端 basePath 和路由挂载保持一致。baseURL 使用配置提供的对外 origin，避免其中额外路径覆盖 basePath。浏览器通过现有 `/api` 开发代理和部署网关同源访问；前端使用 Better Auth React 客户端，原始令牌不写入 localStorage。[配置说明](https://better-auth.com/docs/reference/options)
 
@@ -231,17 +232,19 @@ Better Auth test-utils 仅在独立测试配置使用，可辅助创建用户和
 
 ### 6.1 检查命令与执行状态
 
-下列命令已在项目脚本中定义，适用于后续对应实现变更；本次纯文档交付未运行这些命令。
+下列应用命令用于局部检查；首次运行前先在根目录执行 `pnpm prepare:clients`。完整工程检查使用根目录 `pnpm check`，包含契约生成、全部构建、依赖检查和跨应用联通；真实数据库验证使用 `pnpm test:db`。
 
 | 命令（仓库根目录执行） | 覆盖内容 | 接入后的补充要求 |
 | --- | --- | --- |
 | `pnpm --dir apps/web lint` | 前端静态检查 | 包含新组件与测试文件 |
+| `pnpm --dir apps/web test` | Vitest、Testing Library、MSW | 按页面补充表单、身份隔离及更新失效测试 |
+| `pnpm --dir apps/web check` | 前端 lint、test、build | 持续检查入口 |
 | `pnpm --dir apps/web build` | 前端类型检查与构建 | 验证路由、表单和认证客户端类型 |
-| `pnpm --dir server check` | 后端类型、静态与非数据库测试 | 补充权限和认证协议的适当用例 |
-| `pnpm --dir server build` | 后端生产构建 | 验证认证与适配器的 ESM 和类型兼容性 |
-| `pnpm --dir server test:db` | 真实数据库集成测试 | 增加认证迁移、会话、约束与关联竞态 |
+| `pnpm --dir apps/server check` | 后端类型、静态与非数据库测试 | 补充权限和认证协议的适当用例 |
+| `pnpm --dir apps/server build` | 后端生产构建 | 验证认证与适配器的 ESM 和类型兼容性 |
+| `pnpm --dir apps/server test:db` | 真实数据库集成测试 | 增加认证迁移、会话、约束与关联竞态 |
 
-前端组件测试、端到端和 CI 容器脚本尚未建立。实现时新增相应脚本和锁文件并接入持续检查，不将未定义的命令列为可执行步骤。文档交付只检查内容、链接、命令定义、变更范围及敏感信息；集成实验和运行结果需要研发在实施时另行记录。
+前端组件测试已建立，尚未配置仓库内的 Playwright 端到端与 CI 容器脚本。后续新增相应脚本并接入持续检查，不将未定义的命令列为可执行步骤。认证、表单、业务写入及数据库兼容实验仍按后续实施范围验证。
 
 ## 7. 待补齐内容与实施顺序
 
@@ -249,10 +252,10 @@ Better Auth test-utils 仅在独立测试配置使用，可辅助创建用户和
 
 | 顺序与工作项 | 当前状态 | 建议接入位置 | 前置条件 | 完成标准 |
 | --- | --- | --- | --- | --- |
-| 1. 路由与应用布局 | 模板页面 | 前端 app、业务页面 | 确认首版导航及原型对应关系 | 嵌套布局、404、错误页、刷新和前进后退均可操作 |
-| 1. UI 与表单基础 | 只有模板样式和 Tailwind | components/ui、表单页面 | 确认主题及实际字段 | 首批控件、键盘与焦点行为可测试，表单能展示服务端失败 |
-| 1. 请求与缓存 | 无统一业务客户端 | lib、业务查询定义 | 业务 API 契约 | 超时取消、数据校验、隔离键及更新失效通过测试 |
-| 1. 前端测试环境 | 无测试脚本 | 前端测试配置与夹具 | 上述基础组件 | Vitest、Testing Library、MSW 可在无生产服务时执行 |
+| 1. 路由与应用布局 | 基础已完成：嵌套布局、两页、懒加载、404、错误页和移动导航 | 前端 app、业务页面 | 业务导航仍需按需求扩展 | 嵌套布局、404、错误页、刷新和前进后退均可操作 |
+| 1. UI 与表单基础 | 基础 UI 与状态组件已接入；业务表单未实现 | shared/ui、表单页面 | 确认主题及实际字段 | 首批控件、键盘与焦点行为可测试，表单能展示服务端失败 |
+| 1. 请求与缓存 | 薄 GET 层、Query Provider 和真实就绪查询已接入 | lib、业务查询定义 | 后续业务 API 契约 | 超时取消、数据校验、身份隔离键及更新失效通过测试；后两项待业务接入 |
+| 1. 前端测试环境 | Vitest、Testing Library、MSW 及检查脚本已接入 | 前端测试配置与夹具 | 随页面扩充用例 | 测试可在无生产服务时执行 |
 | 2. 认证与数据库实验 | Better Auth 尚未接入 | 后端 auth、config、db 与迁移 | 选定受维护版本；完成第 4.2 节设计 | 每项兼容条件有实际证据，空库和升级均可运行 |
 | 3. 身份与权限 | 无业务身份和权限模块 | auth、成员及业务 service | 维护者确认登录、邀请、恢复和可见范围 | 真实会话、成员状态与角色生效；越权、撤销及并发管理员保护通过 |
 | 3. 首个业务流程 | 无业务表和真实 React 页面 | 项目、需求或 Bug 模块 | 权限、状态和字段规则确定 | 从页面提交到 API 和持久化可追溯，刷新后数据一致 |
@@ -270,6 +273,6 @@ Better Auth test-utils 仅在独立测试配置使用，可辅助创建用户和
 | 认证 ID、字段映射和事务兼容性 | 研发提出验证结果，项目维护者确定可接受成本 | 认证业务接入前；验证失败时不能放宽数据库规范 |
 | 新组件定版、升级与部署配置 | 研发 | 依赖安装前核对运行时和 peer dependencies；部署前确认网关、Cookie 与来源 |
 
-shadcn/ui 的本地代码、认证库升级和数据库迁移都需要持续维护。引入这些组件不会消除表单业务规则、无外键一致性或授权撤销设计；现有独立依赖管理方式也继续保留，出现实际共享包需求时再评估根级 workspace。
+shadcn/ui 的本地代码、认证库升级和数据库迁移都需要持续维护。引入这些组件不会消除表单业务规则、无外键一致性或授权撤销设计；工作区共用锁文件，接口类型与运行时校验由后端契约生成；应用和工程工具的依赖兼容性需分别验证。
 
 实施中若遇到适配器限制，应保留失败证据并修订对应接入设计。不能以关闭校验、吞掉异常、绕过权限或返回演示数据满足验收；未执行的测试和未支持的能力继续显式标记。

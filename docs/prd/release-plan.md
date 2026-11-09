@@ -8,7 +8,7 @@
 | 负责人 | 项目维护者，兼产品范围与版本验收负责人 |
 | 读者 | 项目维护者、参与开发与核对需求的 AI |
 | 范围 | 模块边界、功能优先级、版本范围、依赖、验收及待决策事项 |
-| 关联 | [产品需求](mvp.md)、[交互原型说明](../../.mobile-workspace/design/interactive-prototype-v1/README.md)、[后端技术规划](../../server/docs/architecture.md) |
+| 关联 | [产品需求](mvp.md)、[交互原型说明](../../.mobile-workspace/design/interactive-prototype-v1/README.md)、[后端技术规划](../architecture/server-foundation.md) |
 
 ## 1. 规划结论
 
@@ -38,9 +38,9 @@
 | --- | --- | --- |
 | 产品范围 | 已覆盖项目研发、Bot 协作、交付、运维、凭据等；部分业务规则仍待定 | [需求第 1 至 12 章](mvp.md) |
 | 原型 | 使用本地演示数据，AI 回复、执行轨迹和外部操作为模拟 | [原型说明](../../.mobile-workspace/design/interactive-prototype-v1/README.md)、[模拟对话实现](../../.mobile-workspace/design/interactive-prototype-v1/modules/ai-chat.js) |
-| Web | 当前应用仍为模板页面，正式业务页面尚未迁入 | [App.tsx](../../apps/web/src/App.tsx) |
-| 后端 | 已组装配置、日志、错误响应、OpenAPI、数据库和健康检查，未注册业务模块 | [应用入口](../../server/src/app.ts) |
-| 数据库 | 已定义基础 schema，业务表尚未建立 | [schema.ts](../../server/src/db/schema.ts)、[数据库说明](../../server/docs/database.md) |
+| Web | 工作台与系统状态已接入，正式业务页面尚未实现 | [应用 Provider](../../apps/web/src/app/providers/application.tsx) |
+| 后端 | 已组装配置、日志、错误响应、OpenAPI、数据库和健康检查，未注册业务模块 | [应用入口](../../apps/server/src/bootstrap/create-http-app.ts) |
+| 数据库 | 已定义基础 schema，业务表尚未建立 | [database-schema.ts](../../apps/server/src/bootstrap/database-schema.ts)、[数据库说明](../architecture/database.md) |
 | CLI | 已提供帮助、版本、健康检查，业务命令尚未实现 | [CLI 入口逻辑](../../apps/cli/src/cli.ts)、[CLI 说明](../../apps/cli/README.md) |
 
 原型用于确认页面和交互，正式功能完成情况以服务端业务、持久化、权限和真实外部结果为准。本文不将原型演示列为已完成业务功能。

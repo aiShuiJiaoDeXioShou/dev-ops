@@ -1,0 +1,23 @@
+import type { RouteObject } from 'react-router'
+import { AppLayout } from '@/app/layouts/app-layout'
+import { PageLoading } from '@/shared/ui/page-state'
+import { NotFoundPage } from '@/pages/not-found'
+import { RouteErrorPage } from './route-error'
+
+/**
+ * 创建应用路由，业务页面按需加载，共用布局和错误边界。
+ * @returns 可交给浏览器或内存路由器的配置；调用本身不发起 API 请求。
+ */
+export function createAppRoutes(): RouteObject[] {
+  return [{
+    path: '/',
+    Component: AppLayout,
+    ErrorBoundary: RouteErrorPage,
+    HydrateFallback: PageLoading,
+    children: [
+      { index: true, lazy: () => import('@/pages/overview') },
+      { path: 'system/status', lazy: () => import('@/pages/system-status') },
+      { path: '*', Component: NotFoundPage },
+    ],
+  }]
+}

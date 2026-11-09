@@ -50,7 +50,6 @@ function parseHealthOptions(server: string, timeout: string | undefined) {
     || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS) {
     throw new Error(`超时必须是 1-${MAX_TIMEOUT_MS} 之间的整数毫秒`)
   }
-  url.pathname = `${url.pathname.replace(/\/+$/, '')}/api/v1/health`
   return { url, timeoutMs }
 }
 
