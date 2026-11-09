@@ -654,3 +654,9 @@
 .nav-btn:hover {
   text-decoration: none;
 }
+
+/* 原型 badge 补充危险态，用于失效引用和需复核状态。 */
+.badge.red {
+  color: var(--red);
+  background: #fff0f0;
+}

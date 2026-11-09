@@ -1,5 +1,5 @@
 import type { ApiSuccessData } from '@dev-ops/api-client'
-import { Badge } from '@/shared/ui/controls/badge'
+import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 
 type CodeReference = ApiSuccessData<'/api/v1/requirements/{requirementId}', 'get'>['linkedCodeReferences'][number]
@@ -20,9 +20,7 @@ export function CodeReferenceCard({
         {reference.title || reference.remoteId}
       </a>
       <div className="flex items-center gap-2">
-        <Badge variant={reference.lastCheckStatus === 'ok' ? 'secondary' : 'destructive'}>
-          {reference.lastCheckStatus}
-        </Badge>
+        <Tag variant={reference.lastCheckStatus === 'ok' ? 'green' : 'red'}>{reference.lastCheckStatus}</Tag>
         <Button size="xs" variant="ghost" onClick={onRefresh} disabled={refreshing}>
           刷新
         </Button>

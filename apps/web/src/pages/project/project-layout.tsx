@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { projectQueryOptions, projectStatsQueryOptions } from '@/features/projects/public'
 import { describeRequestError } from '@/shared/api/errors'
-import { Badge } from '@/shared/ui/controls/badge'
+import { Tag } from '@/shared/ui/tag'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
 
 const STATUS_LABELS = { active: '进行中', paused: '暂停', ended: '已结束' } as const
@@ -50,7 +50,7 @@ export function Component() {
           <div className="project-title">
             <PrototypeIcon name="repo" />
             <span className="project-select-like">{detail.name}</span>
-            <Badge variant="outline">{STATUS_LABELS[detail.status]}</Badge>
+            <Tag>{STATUS_LABELS[detail.status]}</Tag>
           </div>
           <div className="row header-actions">
             <span className="small quiet">

@@ -7,7 +7,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { formatDateTime } from '@/shared/lib/format'
-import { Badge } from '@/shared/ui/controls/badge'
+import { Tag } from '@/shared/ui/tag'
 import {
   availableRepositoriesQueryOptions,
   gitConnectionsQueryOptions,
@@ -93,7 +93,7 @@ export function RepositoryPicker({
                 <a className="text-primary hover:underline" href={repo.webUrl} target="_blank" rel="noreferrer">
                   {repo.namespace}/{repo.name}
                 </a>
-                <Badge variant="outline">{repo.status}</Badge>
+                <Tag variant={repo.status === 'available' ? 'green' : 'red'}>{repo.status}</Tag>
               </li>
             ))}
           </ul>
@@ -130,7 +130,8 @@ export function RepositoryPicker({
                   className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
                 >
                   <span>
-                    {connection.name} · {connection.providerKey} · <Badge variant="outline">{connection.status}</Badge>
+                    {connection.name} · {connection.providerKey} ·{' '}
+                    <Tag variant={connection.status === 'ok' ? 'green' : 'red'}>{connection.status}</Tag>
                   </span>
                   <span className="text-xs text-muted-foreground">检查 {formatDateTime(connection.lastCheckedAt)}</span>
                   <Button

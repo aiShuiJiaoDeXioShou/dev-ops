@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
-import { Badge } from '@/shared/ui/controls/badge'
+import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Select } from '@/shared/ui/controls/select'
@@ -113,9 +113,9 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
                     </Select>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={member.status === 'active' ? 'secondary' : 'destructive'}>
+                    <Tag variant={member.status === 'active' ? 'green' : 'red'}>
                       {member.status === 'active' ? '正常' : '已停用'}
-                    </Badge>
+                    </Tag>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDateTime(member.joinedAt)}</TableCell>
                   <TableCell className="text-right">

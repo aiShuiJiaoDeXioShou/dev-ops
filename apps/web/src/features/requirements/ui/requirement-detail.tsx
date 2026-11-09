@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
-import { Badge } from '@/shared/ui/controls/badge'
+import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { ActivityTimeline, CommentForm, CommentList } from '@/features/collaboration/public'
@@ -78,9 +78,9 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               <p className="text-xs text-muted-foreground">需求 #{detail.number}</p>
               <h2 className="mt-1 text-lg font-semibold leading-6">{detail.title}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline">{REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}</Badge>
+                <Tag>{REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}</Tag>
                 <span>更新 {formatDateTime(detail.updatedAt)}</span>
-                {detail.needsReview && <Badge variant="destructive">存在未解决 Bug，需复核</Badge>}
+                {detail.needsReview && <Tag variant="red">存在未解决 Bug，需复核</Tag>}
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={onClose}>

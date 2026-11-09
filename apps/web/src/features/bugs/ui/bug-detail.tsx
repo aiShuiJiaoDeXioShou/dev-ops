@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
-import { Badge } from '@/shared/ui/controls/badge'
+import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { ActivityTimeline, CommentForm, CommentList } from '@/features/collaboration/public'
@@ -83,7 +83,7 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
               <p className="text-xs text-muted-foreground">Bug #{bug.number}</p>
               <h2 className="mt-1 text-lg font-semibold leading-6">{bug.title}</h2>
               <div className="mt-2 flex flex-wrap gap-2">
-                <Badge variant="outline">{BUG_STATUS_LABELS[bug.status]}</Badge>
+                <Tag>{BUG_STATUS_LABELS[bug.status]}</Tag>
                 <span className="text-xs text-muted-foreground">更新 {formatDateTime(bug.updatedAt)}</span>
               </div>
             </div>
@@ -157,9 +157,7 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
                   ? bug.linkedCodeReferences.map((item) => (
                       <div key={item.id} className="flex items-center gap-2">
                         <span>{item.title || item.remoteId}</span>
-                        <Badge variant={item.lastCheckStatus === 'ok' ? 'secondary' : 'destructive'}>
-                          {item.lastCheckStatus}
-                        </Badge>
+                        <Tag variant={item.lastCheckStatus === 'ok' ? 'green' : 'red'}>{item.lastCheckStatus}</Tag>
                         <Button size="xs" variant="ghost" onClick={() => refreshCode.mutate(item.id)}>
                           刷新
                         </Button>
