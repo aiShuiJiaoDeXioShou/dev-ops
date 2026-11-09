@@ -646,3 +646,11 @@
   padding-inline: 20px;
   font-size: 14px;
 }
+
+/* 侧栏导航是链接但不是文本链接，hover 不显示下划线。 */
+.brand,
+.nav-btn,
+.brand:hover,
+.nav-btn:hover {
+  text-decoration: none;
+}
