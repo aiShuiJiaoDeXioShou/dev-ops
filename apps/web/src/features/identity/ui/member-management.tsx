@@ -64,7 +64,12 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
         <div className="section-heading">
           <h2>成员</h2>
           <span className="spacer" />
-          <Button type="button" onClick={() => setInviteOpen(true)} disabled={!canManage}>
+          <Button
+            type="button"
+            className="team-invite-button"
+            onClick={() => setInviteOpen(true)}
+            disabled={!canManage}
+          >
             邀请成员
           </Button>
         </div>

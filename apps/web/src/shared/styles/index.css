@@ -629,3 +629,20 @@
 .nav-btn.active {
   color: var(--blue);
 }
+
+/* 成员表格的表头不响应行 hover；各管理分组之间保留明确间距。 */
+[data-slot='table-header'] [data-slot='table-row']:hover {
+  background: transparent;
+}
+.team-admin-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* 团队管理主操作使用固定 px 尺寸，避免根字号 14px 让 rem 按钮偏小。 */
+.team-invite-button {
+  height: 40px;
+  padding-inline: 20px;
+  font-size: 14px;
+}
