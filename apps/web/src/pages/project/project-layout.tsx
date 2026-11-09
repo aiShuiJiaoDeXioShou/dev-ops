@@ -1,7 +1,7 @@
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
-import { projectQueryOptions, projectStatsQueryOptions } from '@/features/projects/public'
+import { projectQueryOptions } from '@/features/projects/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { Tag } from '@/shared/ui/tag'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
@@ -13,13 +13,12 @@ const tabs = [
   { slug: 'code', label: '代码' },
 ]
 
-/** 项目内布局：项目头部、页签与事项统计。 */
+/** 项目内布局：项目头部、页签与内容出口。 */
 export function Component() {
   const { projectId = '' } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
   const project = useQuery(projectQueryOptions(projectId))
-  const stats = useQuery(projectStatsQueryOptions(projectId))
   if (project.isPending) return <PageSkeleton />
   if (project.isError || !project.data) {
     const described = describeRequestError(project.error)
@@ -53,10 +52,6 @@ export function Component() {
             <Tag>{STATUS_LABELS[detail.status]}</Tag>
           </div>
           <div className="row header-actions">
-            <span className="small quiet">
-              未完成需求 {stats.data?.data.openRequirements ?? detail.counts.openRequirements} · 未解决 Bug{' '}
-              {stats.data?.data.openBugs ?? detail.counts.openBugs}
-            </span>
             <button
               type="button"
               className="icon-btn"
