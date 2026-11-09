@@ -1,8 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { resetPassword } from '@/features/identity/public'
-import { Button } from '@/shared/ui/controls/button'
-import { Input } from '@/shared/ui/controls/input'
 
 /** 使用重置令牌设置新密码。 */
 export function Component() {
@@ -30,41 +28,52 @@ export function Component() {
     }
   }
   return (
-    <main className="grid min-h-svh place-items-center bg-muted/40 p-6">
-      <form className="w-full max-w-sm space-y-4 rounded-2xl border bg-card p-7 shadow-sm" onSubmit={submit}>
-        <h1 className="text-xl font-semibold">设置新密码</h1>
-        <Input
-          type="password"
-          placeholder="新密码"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-        <Input
-          type="password"
-          placeholder="确认新密码"
-          value={confirm}
-          onChange={(event) => setConfirm(event.target.value)}
-        />
-        {message && (
-          <p role="status" className="text-sm text-success">
-            {message}
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? '提交中…' : '更新密码'}
-        </Button>
-        <p className="text-center text-sm">
-          <a className="text-primary hover:underline" href="/login">
-            返回登录
-          </a>
+    <div className="auth-shell">
+      <main className="auth-card">
+        <a className="auth-brand" href="/login" aria-label="返回登录">
+          <img src="/prototype/brand.svg" width={29} height={29} alt="" />
+          DevOps
+        </a>
+        <h1>设置新密码</h1>
+        <p className="auth-sub">设置新的登录密码后返回工作台。</p>
+        <form className="auth-form" onSubmit={submit}>
+          <label className="field">
+            新密码
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="new-password"
+            />
+          </label>
+          <label className="field">
+            确认密码
+            <input
+              type="password"
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+              autoComplete="new-password"
+            />
+          </label>
+          {message && (
+            <p className="field-success" role="status">
+              {message}
+            </p>
+          )}
+          {error && (
+            <p className="field-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button type="submit" className="login-submit" disabled={pending}>
+            {pending ? '提交中…' : '更新密码'}
+          </button>
+        </form>
+        <p className="auth-footer">
+          <Link to="/login">返回登录</Link>
         </p>
-      </form>
-    </main>
+      </main>
+    </div>
   )
 }
 

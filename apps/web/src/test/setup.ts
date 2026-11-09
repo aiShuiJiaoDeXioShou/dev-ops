@@ -12,3 +12,13 @@ afterEach(() => {
   server.resetHandlers()
 })
 afterAll(() => server.close())
+
+// jsdom 未实现原生 dialog 的模态方法；测试中回退为设置 open 属性。
+if (typeof HTMLDialogElement !== 'undefined' && typeof HTMLDialogElement.prototype.showModal !== 'function') {
+  HTMLDialogElement.prototype.showModal = function showModal() {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close = function close() {
+    this.removeAttribute('open')
+  }
+}

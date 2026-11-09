@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { describeRequestError } from '@/shared/api/errors'
 import { createIdempotencyKey, isBusinessError, type ApiBody } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -27,6 +28,7 @@ interface RequirementFormProps {
 /** 创建或编辑需求；仅管理员/开发者可提交。 */
 export function RequirementForm({ projectId, teamId, open, onOpenChange, requirement, onSaved }: RequirementFormProps) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
   const [title, setTitle] = useState('')
   const [contentMode, setContentMode] = useState<'markdown' | 'external_link'>('markdown')
@@ -81,8 +83,11 @@ export function RequirementForm({ projectId, teamId, open, onOpenChange, require
       onOpenChange(false)
       onSaved?.(result.data.id)
     },
-    onError: (cause: unknown) =>
-      setError(isBusinessError(cause) ? describeRequestError(cause).description : '保存失败，请稍后重试。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? describeRequestError(cause).description : '保存失败，请稍后重试。'
+      setError(message)
+      showToast(message)
+    },
   })
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -96,7 +101,7 @@ export function RequirementForm({ projectId, teamId, open, onOpenChange, require
   const memberList = members.data?.data ?? []
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(720px,calc(100vw-32px))]">
+      <DialogContent className="w-[min(640px,calc(100vw-32px))]">
         <form className="space-y-4" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>

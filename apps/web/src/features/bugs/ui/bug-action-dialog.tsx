@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createIdempotencyKey, isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -36,6 +37,7 @@ export function BugActionDialog({
   onDone?: () => void
 }) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
   const [fixSummary, setFixSummary] = useState('')
   const [verifierUserId, setVerifierUserId] = useState('')
@@ -87,7 +89,11 @@ export function BugActionDialog({
       onOpenChange(false)
       onDone?.()
     },
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '操作失败，请稍后重试。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? cause.message : '操作失败，请稍后重试。'
+      setError(message)
+      showToast(message)
+    },
   })
   if (!action) return null
   const submit = () => {

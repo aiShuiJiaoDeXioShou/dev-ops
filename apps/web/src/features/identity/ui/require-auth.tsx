@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { PageLoading } from '@/shared/ui/page-state'
+import { AppShellSkeleton } from '@/shared/ui/page-skeleton'
 import { sessionQueryOptions } from '../api/queries'
 import { SessionProvider } from '../model/session'
 
@@ -11,7 +11,7 @@ import { SessionProvider } from '../model/session'
 export function RequireAuth() {
   const location = useLocation()
   const session = useQuery(sessionQueryOptions)
-  if (session.isPending) return <PageLoading />
+  if (session.isPending) return <AppShellSkeleton />
   if (!session.data) {
     const redirect = `${location.pathname}${location.search}`
     return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />

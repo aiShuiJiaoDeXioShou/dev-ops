@@ -1,7 +1,6 @@
 import { Link } from 'react-router'
+import { FileQuestion } from 'lucide-react'
 import { EmptyState } from '@/shared/ui/page-state'
-import { Button } from '@/shared/ui/controls/button'
-import { Card, CardContent } from '@/shared/ui/controls/card'
 
 /**
  * 展示未匹配路径的恢复入口。
@@ -9,18 +8,22 @@ import { Card, CardContent } from '@/shared/ui/controls/card'
  */
 export function NotFoundPage() {
   return (
-    <Card>
-      <CardContent>
-        <EmptyState
-          title="页面不存在"
-          description="这个地址没有对应的页面，请检查链接或返回工作台。"
-          action={
-            <Button asChild>
-              <Link to="/">返回工作台</Link>
-            </Button>
-          }
-        />
-      </CardContent>
-    </Card>
+    <div className="catalog">
+      <EmptyState
+        icon={<FileQuestion />}
+        title="页面不存在"
+        description="这个地址没有对应的页面。你可以检查链接，或回到项目列表继续工作。"
+        action={
+          <Link className="btn primary" to="/projects">
+            返回项目列表
+          </Link>
+        }
+        secondaryAction={
+          <Link className="btn" to="/settings/team">
+            团队管理
+          </Link>
+        }
+      />
+    </div>
   )
 }

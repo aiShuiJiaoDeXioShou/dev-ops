@@ -1,75 +1,91 @@
-import { NavLink, Outlet, useParams } from 'react-router'
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
+import { PrototypeIcon } from '@/prototype/icons/icon'
 import { projectQueryOptions, projectStatsQueryOptions } from '@/features/projects/public'
 import { describeRequestError } from '@/shared/api/errors'
-import { formatDateTime } from '@/shared/lib/format'
 import { Badge } from '@/shared/ui/controls/badge'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
-import { cn } from '@/shared/lib/utils'
+import { PageSkeleton } from '@/shared/ui/page-skeleton'
 
 const STATUS_LABELS = { active: '进行中', paused: '暂停', ended: '已结束' } as const
 const tabs = [
-  { segment: 'requirements', label: '需求' },
-  { segment: 'bugs', label: 'Bug' },
-  { segment: 'settings', label: '项目设置' },
+  { slug: 'requirements', label: '需求' },
+  { slug: 'bugs', label: 'Bug' },
+  { slug: 'code', label: '代码' },
 ]
 
-/** 项目内布局：项目上下文、标签页与事项统计。 */
+/** 项目内布局：项目头部、页签与事项统计。 */
 export function Component() {
   const { projectId = '' } = useParams()
+  const location = useLocation()
+  const navigate = useNavigate()
   const project = useQuery(projectQueryOptions(projectId))
   const stats = useQuery(projectStatsQueryOptions(projectId))
-  if (project.isPending) return <PageLoading />
-  if (project.isError) {
+  if (project.isPending) return <PageSkeleton />
+  if (project.isError || !project.data) {
     const described = describeRequestError(project.error)
     return (
-      <PageError
-        title="项目加载失败"
-        description={described.description}
-        requestId={described.requestId}
-        onRetry={() => void project.refetch()}
-      />
+      <div className="empty">
+        <PrototypeIcon name="warning" />
+        <h3>项目加载失败</h3>
+        <p>{described.description}</p>
+        <button type="button" className="btn" onClick={() => void project.refetch()}>
+          重新加载
+        </button>
+      </div>
     )
   }
   const detail = project.data.data
+  const activeTab = tabs.find((tab) => location.pathname.endsWith(`/${tab.slug}`))?.slug ?? 'requirements'
   return (
-    <section className="space-y-6">
-      <header className="space-y-4 border-b pb-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">项目</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{detail.name}</h1>
-            {detail.description && <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{detail.description}</p>}
+    <>
+      <header className="project-header">
+        <div className="breadcrumb">
+          <button type="button" className="muted" onClick={() => navigate('/projects')}>
+            项目
+          </button>
+          <span>/</span>
+          <span>{detail.name}</span>
+        </div>
+        <div className="row spread">
+          <div className="project-title">
+            <PrototypeIcon name="repo" />
+            <span className="project-select-like">{detail.name}</span>
+            <Badge variant="outline">{STATUS_LABELS[detail.status]}</Badge>
           </div>
-          <Badge variant="outline">{STATUS_LABELS[detail.status]}</Badge>
+          <div className="row header-actions">
+            <span className="small quiet">
+              未完成需求 {stats.data?.data.openRequirements ?? detail.counts.openRequirements} · 未解决 Bug{' '}
+              {stats.data?.data.openBugs ?? detail.counts.openBugs}
+            </span>
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="项目设置"
+              onClick={() => navigate(`/projects/${projectId}/settings`)}
+            >
+              <PrototypeIcon name="settings" />
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-5 text-sm text-muted-foreground">
-          <span>负责人 {detail.owner.name}</span>
-          <span>未完成需求 {stats.data?.data.openRequirements ?? detail.counts.openRequirements}</span>
-          <span>未解决 Bug {stats.data?.data.openBugs ?? detail.counts.openBugs}</span>
-          <span>更新于 {formatDateTime(detail.updatedAt)}</span>
-        </div>
-        <nav aria-label="项目功能" className="flex gap-1 overflow-x-auto">
+        <div className="tabs" role="tablist" aria-label="项目功能">
           {tabs.map((tab) => (
-            <NavLink
-              key={tab.segment}
-              to={tab.segment}
-              className={({ isActive }) =>
-                cn(
-                  'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )
-              }
+            <button
+              key={tab.slug}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.slug}
+              className={`tab ${activeTab === tab.slug ? 'active' : ''}`}
+              onClick={() => navigate(`/projects/${projectId}/${tab.slug}`)}
             >
               {tab.label}
-            </NavLink>
+            </button>
           ))}
-        </nav>
+        </div>
       </header>
-      <Outlet />
-    </section>
+      <div className="content">
+        <Outlet />
+      </div>
+    </>
   )
 }
 

@@ -1,0 +1,9 @@
+/* 将原型样式放在 base 之后、components/utilities 之前：
+   - 高于 Tailwind preflight，保留 .btn/.card 等原型组件样式；
+   - 低于 shadcn/Tailwind utilities，避免覆盖正式控件。 */
+@layer theme, base, prototype, components, utilities;
+@import './styles.css' layer(prototype);
+@import './workspace.css' layer(prototype);
+@import './product.css' layer(prototype);
+@import './markdown.css' layer(prototype);
+@import './v01.css' layer(prototype);

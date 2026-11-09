@@ -1,24 +1,23 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Badge } from '@/shared/ui/controls/badge'
-import { Button } from '@/shared/ui/controls/button'
-import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { SearchX } from 'lucide-react'
+import { PrototypeIcon } from '@/prototype/icons/icon'
+import { EmptyState } from '@/shared/ui/page-state'
+import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { parseListState, toSearchParams, updateListState } from '@/shared/lib/list-state'
 import { projectQueryOptions } from '@/features/projects/public'
+import type { BugListStatus } from '../api/queries'
 import { canWriteBugs } from '../api/mutations'
 import { bugListQueryOptions } from '../api/queries'
-import { BUG_STATUS_LABELS, BUG_STATUS_OPTIONS } from '../model/labels'
+import { BUG_STATUS_LABELS } from '../model/labels'
 import { BugDetailPane } from './bug-detail'
 import { BugForm } from './bug-form'
 
-/** 项目 Bug 列表与详情。 */
+/** 项目 Bug 列表与右侧详情；结构与事项页一致。 */
 export function BugList({ projectId }: { projectId: string }) {
   const { role } = useSession()
   const project = useQuery(projectQueryOptions(projectId))
@@ -27,7 +26,7 @@ export function BugList({ projectId }: { projectId: string }) {
   const query = useQuery(
     bugListQueryOptions(projectId, {
       search: state.search || undefined,
-      status: (state.status || undefined) as import('../api/queries').BugListStatus | undefined,
+      status: (state.status || undefined) as BugListStatus | undefined,
       page: state.page,
       pageSize: state.pageSize,
     }),
@@ -35,115 +34,134 @@ export function BugList({ projectId }: { projectId: string }) {
   const [createOpen, setCreateOpen] = useState(false)
   const canWrite = canWriteBugs(role)
   const update = (patch: Partial<typeof state>) => setParams(toSearchParams(updateListState(state, patch)))
-  if (query.isPending) return <PageLoading />
+  if (query.isPending) return <PageSkeleton />
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (
-      <PageError
-        title="Bug 列表加载失败"
-        description={described.description}
-        requestId={described.requestId}
-        onRetry={() => void query.refetch()}
-      />
+      <div className="empty">
+        <PrototypeIcon name="warning" />
+        <h3>Bug 列表加载失败</h3>
+        <p>{described.description}</p>
+        <button type="button" className="btn" onClick={() => void query.refetch()}>
+          重新加载
+        </button>
+      </div>
     )
   }
   const items = query.data.data.items
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            aria-label="搜索 Bug"
-            placeholder="搜索标题或编号"
-            className="w-48"
-            value={state.search}
-            onChange={(event) => update({ search: event.target.value })}
-          />
-          <Select
+    <div className="row items-workspace" style={{ alignItems: 'flex-start', minHeight: 0 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="section-heading">
+          <h2>项目 Bug</h2>
+          <span className="counter">{query.data.data.total}</span>
+        </div>
+        <div className="filters">
+          <select
+            className="filter-select"
             aria-label="Bug 状态"
             value={state.status}
             onChange={(event) => update({ status: event.target.value })}
           >
             <option value="">全部状态</option>
-            {BUG_STATUS_OPTIONS.map(([value, label]) => (
+            {Object.entries(BUG_STATUS_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
-          </Select>
-          <span className="flex-1" />
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)} disabled={!canWrite}>
-            创建 Bug
-          </Button>
+          </select>
+          <label className="search">
+            <PrototypeIcon name="search" />
+            <input
+              aria-label="搜索 Bug"
+              placeholder="搜索标题或编号"
+              value={state.search}
+              onChange={(event) => update({ search: event.target.value })}
+            />
+          </label>
+          <button type="button" className="btn primary" disabled={!canWrite} onClick={() => setCreateOpen(true)}>
+            <PrototypeIcon name="plus" />
+            新建 Bug
+          </button>
         </div>
         {items.length === 0 ? (
           <EmptyState
-            title={state.search || state.status ? '没有匹配的 Bug' : '还没有 Bug'}
+            mascot={state.search || state.status ? undefined : 'signal'}
+            icon={state.search || state.status ? <SearchX /> : undefined}
+            title={state.search || state.status ? '没有符合条件的Bug' : '还没有Bug'}
             description={
-              state.search || state.status ? '调整搜索或状态筛选后重试。' : '创建第一条 Bug，记录现象、预期与复现信息。'
+              state.search || state.status
+                ? '当前搜索或状态筛选没有找到Bug，可以清除筛选后重新查看。'
+                : '创建第一条Bug，把负责人、状态流转与协作记录放进同一个事项。'
+            }
+            action={
+              canWrite && !state.search && !state.status ? (
+                <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+                  新建Bug
+                </button>
+              ) : state.search || state.status ? (
+                <button type="button" className="btn" onClick={() => setParams(new URLSearchParams())}>
+                  清除筛选
+                </button>
+              ) : undefined
             }
           />
         ) : (
-          <div className="rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>编号</TableHead>
-                  <TableHead>标题</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>修复负责人</TableHead>
-                  <TableHead>更新时间</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>事项</th>
+                  <th>负责人</th>
+                  <th>业务进度</th>
+                  <th>更新时间</th>
+                </tr>
+              </thead>
+              <tbody>
                 {items.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer"
-                    onClick={() => update({ openId: item.id })}
-                    aria-selected={state.openId === item.id}
-                  >
-                    <TableCell className="text-muted-foreground">#{item.number}</TableCell>
-                    <TableCell className="font-medium">{item.title}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{BUG_STATUS_LABELS[item.status] ?? item.status}</Badge>
-                    </TableCell>
-                    <TableCell>{item.fixOwner?.name ?? '未指定'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatDateTime(item.updatedAt)}</TableCell>
-                  </TableRow>
+                  <tr key={item.id} className={state.openId === item.id ? 'selected' : undefined}>
+                    <td>
+                      <div className="item-cell">
+                        <PrototypeIcon name="bug" />
+                        <button type="button" className="item-title" onClick={() => update({ openId: item.id })}>
+                          <span className="item-id">BUG-{item.number}</span>
+                          {item.title}
+                        </button>
+                      </div>
+                    </td>
+                    <td>{item.fixOwner?.name ?? '未指定'}</td>
+                    <td>
+                      <span className="badge">{BUG_STATUS_LABELS[item.status] ?? item.status}</span>
+                    </td>
+                    <td className="quiet">{formatDateTime(item.updatedAt)}</td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>共 {query.data.data.total} 条</span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={state.page <= 1}
-              onClick={() => update({ page: state.page - 1 })}
-            >
-              上一页
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={state.page * state.pageSize >= query.data.data.total}
-              onClick={() => update({ page: state.page + 1 })}
-            >
-              下一页
-            </Button>
-          </div>
+        <div className="pagination">
+          <span className="quiet">共 {query.data.data.total} 条</span>
+          <button
+            type="button"
+            className="btn"
+            disabled={state.page <= 1}
+            onClick={() => update({ page: state.page - 1 })}
+          >
+            上一页
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={state.page * state.pageSize >= query.data.data.total}
+            onClick={() => update({ page: state.page + 1 })}
+          >
+            下一页
+          </button>
         </div>
-      </section>
-      {state.openId ? (
+      </div>
+      {state.openId && (
         <BugDetailPane key={state.openId} bugId={state.openId} onClose={() => update({ openId: null })} />
-      ) : (
-        <aside className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          选择一条 Bug 查看详情、回归历史与流程动作。
-        </aside>
       )}
       {project.data?.data && (
         <BugForm

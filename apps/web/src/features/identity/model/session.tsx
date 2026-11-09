@@ -16,6 +16,8 @@ interface SessionContextValue {
   currentTeam: TeamSummary | null
   role: TeamRole
   setCurrentTeam: (teamId: string) => void
+  /** 团队列表是否已解析，页面应等就绪后再渲染，避免空状态闪现。 */
+  isReady: boolean
 }
 const SessionContext = createContext<SessionContextValue | null>(null)
 
@@ -47,7 +49,16 @@ export function SessionProvider({ initialUser, children }: { initialUser: AuthUs
     localStorage.setItem('dev-ops.current-team', teamId)
   }
   return (
-    <SessionContext.Provider value={{ user, teams, currentTeam, role: currentTeam?.role ?? 'viewer', setCurrentTeam }}>
+    <SessionContext.Provider
+      value={{
+        user,
+        teams,
+        currentTeam,
+        role: currentTeam?.role ?? 'viewer',
+        setCurrentTeam,
+        isReady: !teamsQuery.isPending,
+      }}
+    >
       {children}
     </SessionContext.Provider>
   )

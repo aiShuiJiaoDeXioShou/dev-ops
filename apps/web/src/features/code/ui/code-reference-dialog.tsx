@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
+import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -24,6 +25,7 @@ export function CodeReferenceDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const repositories = useQuery(projectRepositoriesQueryOptions(projectId))
   const [repositoryId, setRepositoryId] = useState('')
   const [objectType, setObjectType] = useState<'commit' | 'issue' | 'change_request'>('issue')
@@ -52,8 +54,11 @@ export function CodeReferenceDialog({
       })
       onOpenChange(false)
     },
-    onError: (cause: unknown) =>
-      setError(isBusinessError(cause) ? describeRequestError(cause).description : '代码引用核对失败。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? describeRequestError(cause).description : '代码引用核对失败。'
+      setError(message)
+      showToast(message)
+    },
   })
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

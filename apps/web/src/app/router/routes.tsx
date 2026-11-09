@@ -2,6 +2,7 @@ import { Navigate, type RouteObject } from 'react-router'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { RequireAuth } from '@/features/identity/public'
 import { PageLoading } from '@/shared/ui/page-state'
+import { AppShellSkeleton, PageSkeleton } from '@/shared/ui/page-skeleton'
 import { NotFoundPage } from '@/pages/not-found'
 import { RouteErrorPage } from './route-error'
 
@@ -21,45 +22,46 @@ export function createAppRoutes(): RouteObject[] {
     { path: '/reset-password', lazy: () => import('@/pages/auth/reset-password-page'), HydrateFallback: PageLoading },
     {
       element: <RequireAuth />,
-      HydrateFallback: PageLoading,
+      HydrateFallback: AppShellSkeleton,
       children: [
         {
           path: '/',
           Component: AppLayout,
           ErrorBoundary: RouteErrorPage,
-          HydrateFallback: PageLoading,
+          HydrateFallback: PageSkeleton,
           children: [
             { index: true, element: <Navigate to="/projects" replace /> },
             {
               path: 'projects',
               lazy: () => import('@/pages/projects/project-list-page'),
-              HydrateFallback: PageLoading,
+              HydrateFallback: PageSkeleton,
             },
             {
               path: 'projects/:projectId',
               lazy: () => import('@/pages/project/project-layout'),
-              HydrateFallback: PageLoading,
+              HydrateFallback: PageSkeleton,
               children: [
                 { index: true, element: <Navigate to="requirements" replace /> },
                 {
                   path: 'requirements',
                   lazy: () => import('@/pages/project/requirements-page'),
-                  HydrateFallback: PageLoading,
+                  HydrateFallback: PageSkeleton,
                 },
-                { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: PageLoading },
+                { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: PageSkeleton },
+                { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: PageSkeleton },
                 {
                   path: 'settings',
                   lazy: () => import('@/pages/project/project-settings-page'),
-                  HydrateFallback: PageLoading,
+                  HydrateFallback: PageSkeleton,
                 },
               ],
             },
             {
               path: 'settings/team',
               lazy: () => import('@/pages/settings/team-settings-page'),
-              HydrateFallback: PageLoading,
+              HydrateFallback: PageSkeleton,
             },
-            { path: 'system/status', lazy: () => import('@/pages/system-status'), HydrateFallback: PageLoading },
+            { path: 'system/status', lazy: () => import('@/pages/system-status'), HydrateFallback: PageSkeleton },
             { path: '*', Component: NotFoundPage },
           ],
         },

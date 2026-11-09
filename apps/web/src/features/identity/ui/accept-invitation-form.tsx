@@ -3,8 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
-import { Button } from '@/shared/ui/controls/button'
-import { Input } from '@/shared/ui/controls/input'
 import { PageLoading } from '@/shared/ui/page-state'
 import { sessionQueryOptions } from '../api/queries'
 
@@ -56,26 +54,26 @@ export function AcceptInvitationForm() {
     mutation.mutate()
   }
   return (
-    <form className="space-y-4" onSubmit={submit} noValidate>
-      <div className="rounded-lg bg-muted p-3 text-sm">
+    <form className="auth-form" onSubmit={submit} noValidate>
+      <div className="info-box">
         加入团队 <strong>{invitation.data.data.teamName}</strong>，角色：{invitation.data.data.role}
       </div>
-      <label className="block space-y-1.5 text-sm font-medium">
+      <label className="field">
         显示名称
-        <Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+        <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
       </label>
-      <label className="block space-y-1.5 text-sm font-medium">
+      <label className="field">
         设置密码
-        <Input
+        <input
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           autoComplete="new-password"
         />
       </label>
-      <label className="block space-y-1.5 text-sm font-medium">
+      <label className="field">
         确认密码
-        <Input
+        <input
           type="password"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
@@ -83,13 +81,13 @@ export function AcceptInvitationForm() {
         />
       </label>
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p className="field-error" role="alert">
           {error}
         </p>
       )}
-      <Button type="submit" className="w-full" disabled={mutation.isPending}>
+      <button type="submit" className="login-submit" disabled={mutation.isPending}>
         {mutation.isPending ? '加入中…' : '加入团队'}
-      </Button>
+      </button>
     </form>
   )
 }

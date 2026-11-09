@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
@@ -24,6 +25,7 @@ export function RepositoryPicker({
   canManage: boolean
 }) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const projectRepos = useQuery(projectRepositoriesQueryOptions(projectId))
   const available = useQuery(availableRepositoriesQueryOptions(projectId))
   const connections = useQuery(gitConnectionsQueryOptions(teamId))
@@ -42,7 +44,11 @@ export function RepositoryPicker({
   const link = useMutation({
     mutationFn: () => apiClient.linkRepository(projectId, { repositoryId }),
     onSuccess: invalidate,
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '仓库关联失败。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? cause.message : '仓库关联失败。'
+      setError(message)
+      showToast(message)
+    },
   })
   const createGithub = useMutation({
     mutationFn: () => apiClient.createGitConnection(teamId, { providerKey: 'github' as const, name: 'GitHub' }),
@@ -50,7 +56,11 @@ export function RepositoryPicker({
       if ('authorizationUrl' in result.data) window.location.assign(result.data.authorizationUrl)
       else await invalidate()
     },
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : 'GitHub 连接创建失败。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? cause.message : 'GitHub 连接创建失败。'
+      setError(message)
+      showToast(message)
+    },
   })
   const createConnection = useMutation({
     mutationFn: () =>
@@ -66,7 +76,11 @@ export function RepositoryPicker({
       setName('')
       await invalidate()
     },
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '连接创建失败。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? cause.message : '连接创建失败。'
+      setError(message)
+      showToast(message)
+    },
   })
   return (
     <div className="space-y-5">

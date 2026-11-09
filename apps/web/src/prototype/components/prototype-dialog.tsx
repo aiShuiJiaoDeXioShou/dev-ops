@@ -37,9 +37,20 @@ export function PrototypeDialog({
   useEffect(() => {
     const element = ref.current
     if (!element) return
-    if (open && !element.open) element.showModal()
+    if (open && !element.open) {
+      if (typeof element.showModal === 'function') element.showModal()
+      else element.setAttribute('open', '')
+    }
     if (!open && element.open) element.close()
   }, [open])
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, onClose])
 
   return (
     <dialog

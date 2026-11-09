@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -21,6 +22,7 @@ export function InviteMemberDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<TeamRole>('developer')
   const [error, setError] = useState('')
@@ -31,7 +33,11 @@ export function InviteMemberDialog({
       setEmail('')
       onOpenChange(false)
     },
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '邀请失败，请稍后重试。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? cause.message : '邀请失败，请稍后重试。'
+      setError(message)
+      showToast(message)
+    },
   })
   const submit = (event: FormEvent) => {
     event.preventDefault()

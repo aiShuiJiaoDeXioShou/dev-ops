@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { Badge } from '@/shared/ui/controls/badge'
+import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Select } from '@/shared/ui/controls/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
@@ -18,6 +19,7 @@ const ROLE_LABELS: Record<TeamRole, string> = { admin: '管理员', developer: '
 /** 成员与邀请管理；仅管理员页面使用。 */
 export function MemberManagement({ teamId, canManage }: { teamId: string; canManage: boolean }) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
   const invitations = useQuery(teamInvitationsQueryOptions(teamId))
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -29,14 +31,20 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
       setError('')
       await queryClient.invalidateQueries({ queryKey: ['identity', 'members', teamId] })
     },
-    onError: (cause: unknown) =>
-      setError(isBusinessError(cause) ? describeRequestError(cause).description : '成员更新失败。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? describeRequestError(cause).description : '成员更新失败。'
+      setError(message)
+      showToast(message)
+    },
   })
   const revoke = useMutation({
     mutationFn: (invitationId: string) => apiClient.revokeInvitation(teamId, invitationId),
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['identity', 'invitations', teamId] }),
-    onError: (cause: unknown) =>
-      setError(isBusinessError(cause) ? describeRequestError(cause).description : '撤销邀请失败。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? describeRequestError(cause).description : '撤销邀请失败。'
+      setError(message)
+      showToast(message)
+    },
   })
   if (members.isPending) return <PageLoading />
   if (members.isError) {
@@ -51,10 +59,11 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
     )
   }
   return (
-    <div className="space-y-6">
+    <div className="team-admin-content">
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">成员</h2>
+        <div className="section-heading">
+          <h2>成员</h2>
+          <span className="spacer" />
           <Button type="button" onClick={() => setInviteOpen(true)} disabled={!canManage}>
             邀请成员
           </Button>

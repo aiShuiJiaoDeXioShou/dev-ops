@@ -33,18 +33,18 @@ function DialogContent({
 }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/25 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[#101828]/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 grid max-h-[85svh] w-[min(540px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border bg-background p-6 shadow-2xl outline-none',
+          'fixed top-1/2 left-1/2 z-50 grid max-h-[85svh] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 gap-6 overflow-y-auto rounded-xl border border-border bg-background p-6 shadow-[0_24px_80px_-20px_rgba(15,23,42,0.35)] outline-none',
           className,
         )}
         {...props}
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close className="absolute top-5 right-5 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
+          <DialogPrimitive.Close className="absolute top-4 right-4 grid size-8 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50">
             <XIcon className="size-4" aria-hidden="true" />
             <span className="sr-only">关闭</span>
           </DialogPrimitive.Close>
@@ -60,7 +60,7 @@ function DialogContent({
  * @returns 顶部标题与可选副标题。
  */
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="dialog-header" className={cn('flex flex-col gap-1.5 pr-8 text-left', className)} {...props} />
+  return <div data-slot="dialog-header" className={cn('flex flex-col gap-2.5 pr-8 text-left', className)} {...props} />
 }
 
 /** 渲染对话框底部操作区域。 */
@@ -68,7 +68,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-footer"
-      className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
+      className={cn('flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end', className)}
       {...props}
     />
   )
@@ -81,7 +81,11 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
  */
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
-    <DialogPrimitive.Title data-slot="dialog-title" className={cn('text-lg font-semibold', className)} {...props} />
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
+      className={cn('text-[17px] leading-6 font-semibold tracking-[-0.01em]', className)}
+      {...props}
+    />
   )
 }
 
@@ -94,7 +98,7 @@ function DialogDescription({ className, ...props }: React.ComponentProps<typeof 
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-[13px] leading-6 text-muted-foreground', className)}
       {...props}
     />
   )

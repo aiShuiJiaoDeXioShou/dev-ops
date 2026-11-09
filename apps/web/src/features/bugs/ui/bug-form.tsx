@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { describeRequestError } from '@/shared/api/errors'
 import { createIdempotencyKey, isBusinessError, type ApiBody } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -33,6 +34,7 @@ export function BugForm({
   onSaved?: (bugId: string) => void
 }) {
   const queryClient = useQueryClient()
+  const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
   const [title, setTitle] = useState('')
   const [phenomenon, setPhenomenon] = useState('')
@@ -80,8 +82,11 @@ export function BugForm({
       onOpenChange(false)
       onSaved?.(result.data.id)
     },
-    onError: (cause: unknown) =>
-      setError(isBusinessError(cause) ? describeRequestError(cause).description : '保存失败，请稍后重试。'),
+    onError: (cause: unknown) => {
+      const message = isBusinessError(cause) ? describeRequestError(cause).description : '保存失败，请稍后重试。'
+      setError(message)
+      showToast(message)
+    },
   })
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -94,7 +99,7 @@ export function BugForm({
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(720px,calc(100vw-32px))]">
+      <DialogContent className="w-[min(640px,calc(100vw-32px))]">
         <form className="space-y-4" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>{bug ? '编辑 Bug' : '创建 Bug'}</DialogTitle>

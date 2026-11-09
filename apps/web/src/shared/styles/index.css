@@ -105,3 +105,488 @@
     min-height: 100svh;
   }
 }
+
+/* 工作区账号区：用户名与当前团队压缩为两行，避免团队状态占用侧栏顶部。 */
+.user-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--quiet);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* 公共空状态：统一使用品牌 Bot 吉祥物或线性图标，避免各页面各自拼装。 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 24px;
+  text-align: center;
+}
+.empty-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 190px;
+  height: 150px;
+  margin-bottom: 22px;
+}
+.empty-art::before {
+  position: absolute;
+  width: 158px;
+  height: 158px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(65, 118, 230, 0.12) 0%, rgba(65, 118, 230, 0.03) 52%, transparent 72%);
+  content: '';
+}
+.empty-art img {
+  position: relative;
+  z-index: 1;
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 10px 16px rgba(23, 36, 43, 0.08));
+}
+.empty-state .empty-orbit {
+  position: absolute;
+  width: 156px;
+  height: 62px;
+  border: 1px dashed rgba(65, 118, 230, 0.24);
+  border-radius: 50%;
+  transform: rotate(-14deg);
+}
+.empty-state .empty-orbit-dot {
+  position: absolute;
+  top: 43px;
+  right: 16px;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 4px rgba(65, 118, 230, 0.1);
+}
+.empty-art-icon .empty-mark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border: 1px solid rgba(65, 118, 230, 0.14);
+  border-radius: 20px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  transform: rotate(-4deg);
+}
+.empty-art-icon .empty-mark svg {
+  width: 28px;
+  height: 28px;
+}
+.empty-art-group {
+  width: 224px;
+  height: 164px;
+}
+.empty-art-group .empty-orbit {
+  width: 190px;
+  height: 72px;
+  top: 54px;
+}
+.empty-art-group .bot-main {
+  position: absolute;
+  bottom: 2px;
+  left: 68px;
+  z-index: 2;
+  width: 88px;
+  height: 88px;
+}
+.empty-art-group .bot-side {
+  position: absolute;
+  z-index: 1;
+  width: 54px;
+  height: 54px;
+  opacity: 0.9;
+}
+.empty-art-group .bot-side.left {
+  left: 12px;
+  bottom: 22px;
+  transform: rotate(-8deg);
+}
+.empty-art-group .bot-side.right {
+  right: 10px;
+  bottom: 16px;
+  transform: rotate(8deg);
+}
+.empty-art-project {
+  width: 264px;
+  height: 176px;
+}
+.empty-art-project .empty-orbit {
+  width: 224px;
+  height: 84px;
+  top: 52px;
+}
+.empty-art-project > .bot-main {
+  position: absolute;
+  bottom: 4px;
+  left: 14px;
+  z-index: 2;
+  width: 84px;
+  height: 84px;
+}
+.empty-project-preview {
+  position: absolute;
+  top: 12px;
+  right: 4px;
+  z-index: 3;
+  width: 164px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(23, 36, 43, 0.1);
+  transform: rotate(3deg);
+}
+.empty-project-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.empty-project-row:last-child {
+  border-bottom: 0;
+}
+.empty-project-folder {
+  width: 18px;
+  height: 13px;
+  border: 1.5px solid var(--blue);
+  border-radius: 3px;
+  background: var(--blue-soft);
+  flex-shrink: 0;
+}
+.empty-project-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c3c8d1;
+  flex-shrink: 0;
+}
+.empty-project-dot.green {
+  background: var(--green);
+}
+.empty-project-dot.blue {
+  background: var(--blue);
+}
+.empty-project-dot.amber {
+  background: var(--amber);
+}
+.empty-project-bar {
+  width: 72px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e9edf3;
+}
+.empty-project-bar.long {
+  width: 88px;
+}
+.empty-project-bar.short {
+  width: 54px;
+}
+.empty-state h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.empty-state p {
+  max-width: 520px;
+  margin: 10px 0 22px;
+  color: var(--quiet);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.empty-state .empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.empty-state .empty-actions .btn {
+  min-width: 104px;
+}
+@media (max-width: 640px) {
+  .empty-state {
+    padding: 40px 18px;
+  }
+  .empty-art {
+    width: 160px;
+    height: 130px;
+    margin-bottom: 12px;
+  }
+  .empty-art::before {
+    width: 132px;
+    height: 132px;
+  }
+  .empty-art img {
+    width: 82px;
+    height: 82px;
+  }
+  .empty-state .empty-orbit {
+    width: 132px;
+    height: 54px;
+  }
+  .empty-state .empty-orbit-dot {
+    top: 34px;
+    right: 8px;
+  }
+}
+
+/* 页面骨架屏：首屏与懒加载路由共用，保持与最终布局同尺寸。 */
+.skeleton-line,
+.skeleton-block {
+  background: linear-gradient(90deg, #f1f3f6 25%, #e7ebf1 37%, #f1f3f6 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.5s ease infinite;
+  border-radius: 6px;
+}
+.skeleton-line {
+  display: block;
+  height: 10px;
+}
+.skeleton-mark {
+  width: 29px;
+  height: 29px;
+  border-radius: 8px;
+}
+.skeleton-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 13px;
+}
+.skeleton-brand-text {
+  width: 88px;
+  height: 15px;
+}
+.skeleton-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-nav-item {
+  width: 100%;
+  height: 43px;
+  border-radius: 9px;
+}
+.skeleton-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+}
+.skeleton-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+.skeleton-user-name {
+  width: 92px;
+  height: 11px;
+}
+.skeleton-page-head {
+  padding: 32px 28px 25px;
+  border-bottom: 1px solid var(--line);
+}
+.skeleton-title {
+  width: 164px;
+  height: 24px;
+}
+.skeleton-subtitle {
+  width: 270px;
+  height: 11px;
+  margin-top: 12px;
+}
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 28px;
+}
+.skeleton-card {
+  height: 142px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.skeleton-card-title {
+  width: 45%;
+  height: 16px;
+  margin-bottom: 20px;
+}
+.skeleton-card-line {
+  width: 82%;
+  height: 10px;
+  margin-bottom: 10px;
+}
+.skeleton-card-line.short {
+  width: 56%;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line,
+  .skeleton-block {
+    animation: none;
+  }
+}
+
+/* 无团队/空项目引导占满内容区并垂直居中。 */
+.empty-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+@media (max-width: 640px) {
+  .empty-art-group {
+    width: 180px;
+    height: 140px;
+  }
+  .empty-art-group .bot-main {
+    left: 50px;
+    width: 78px;
+    height: 78px;
+  }
+  .empty-art-group .bot-side {
+    width: 44px;
+    height: 44px;
+  }
+  .empty-art-group .empty-orbit {
+    width: 150px;
+  }
+  .empty-art-project {
+    width: 224px;
+    height: 156px;
+  }
+  .empty-art-project > .bot-main {
+    width: 68px;
+    height: 68px;
+  }
+  .empty-project-preview {
+    width: 142px;
+    right: 0;
+  }
+}
+
+/* 退出登录使用侧栏导航的图标主色，避免填充图标继承正文黑色。 */
+.logout-btn .icon {
+  color: var(--blue);
+}
+
+/* 图标与文字使用 grid 两列对齐，避免 flex 基线与中文字体行高造成上下偏移。 */
+.btn {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  justify-content: center;
+  column-gap: 7px;
+  line-height: 1.2;
+}
+.nav-btn {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 13px;
+}
+.btn > .icon,
+.nav-btn > .icon {
+  display: block;
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* 登录页只保留忘记密码入口时靠右对齐，避免无意义占位文案。 */
+.auth-row-end {
+  justify-content: flex-end;
+}
+
+/* 账号区角色徽标不参与压缩，避免侧栏较窄时文字被挤没。 */
+.user .badge {
+  flex-shrink: 0;
+}
+
+/* 弹窗内控件统一放大；原型根字号为 14px，这里使用 px 保证视觉尺寸稳定。 */
+[data-slot='dialog-content'] {
+  gap: 24px;
+  padding: 24px;
+}
+[data-slot='dialog-header'] {
+  gap: 10px;
+}
+[data-slot='dialog-content'] input:not([type='checkbox']):not([type='radio']),
+[data-slot='dialog-content'] select {
+  height: 44px;
+  font-size: 14px;
+}
+[data-slot='dialog-content'] textarea {
+  min-height: 120px;
+  font-size: 14px;
+}
+[data-slot='dialog-content'] [data-slot='button'] {
+  height: 44px;
+  min-width: 120px;
+  padding-inline: 20px;
+  font-size: 14px;
+}
+[data-slot='dialog-content'] [data-slot='dialog-footer'] {
+  padding-top: 2px;
+}
+
+/* 原型与 Tailwind 都定义了 --muted 等变量；工作区/认证容器内恢复原型 token，
+   避免 shadcn theme 的低对比度 --muted 让原型文字和徽标变浅。 */
+.shell,
+.login-shell,
+.auth-shell {
+  --blue: #4176e6;
+  --blue-soft: #edf3fe;
+  --side: #f9fafb;
+  --soft: #f5f6f7;
+  --selected: #ebeef2;
+  --ink: #0f1115;
+  --muted: #61666b;
+  --quiet: #81858c;
+  --line: rgba(0, 0, 0, 0.08);
+  --green: #269650;
+  --amber: #c98719;
+  --red: #ce5252;
+}
+
+/* 弹窗表单字段：标签与输入框保持 8px 间距，避免中文标签直接贴住控件。 */
+[data-slot='dialog-content'] form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+[data-slot='dialog-content'] form label > :not(:first-child) {
+  margin-top: 0;
+}

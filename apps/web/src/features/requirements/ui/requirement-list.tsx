@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Badge } from '@/shared/ui/controls/badge'
-import { Button } from '@/shared/ui/controls/button'
-import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { SearchX } from 'lucide-react'
+import { PrototypeIcon } from '@/prototype/icons/icon'
+import { EmptyState } from '@/shared/ui/page-state'
+import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
@@ -14,19 +12,16 @@ import { parseListState, toSearchParams, updateListState } from '@/shared/lib/li
 import { projectQueryOptions } from '@/features/projects/public'
 import { canWriteRequirements } from '../api/mutations'
 import { requirementListQueryOptions } from '../api/queries'
-import { REQUIREMENT_STATUS_LABELS, REQUIREMENT_STATUS_OPTIONS } from '../model/labels'
+import { REQUIREMENT_STATUS_LABELS } from '../model/labels'
 import { RequirementDetailPane } from './requirement-detail'
 import { RequirementForm } from './requirement-form'
 
-/** 项目需求列表与右侧详情。 */
+/** 项目需求列表与右侧详情；结构与事项页一致。 */
 export function RequirementList({ projectId }: { projectId: string }) {
   const { role } = useSession()
   const project = useQuery(projectQueryOptions(projectId))
   const [params, setParams] = useSearchParams()
-  const state = parseListState(params, {
-    defaultPageSize: 20,
-    statuses: Object.keys(REQUIREMENT_STATUS_LABELS),
-  })
+  const state = parseListState(params, { statuses: Object.keys(REQUIREMENT_STATUS_LABELS) })
   const query = useQuery(
     requirementListQueryOptions(projectId, {
       search: state.search || undefined,
@@ -38,118 +33,139 @@ export function RequirementList({ projectId }: { projectId: string }) {
   const [createOpen, setCreateOpen] = useState(false)
   const canWrite = canWriteRequirements(role)
   const update = (patch: Partial<typeof state>) => setParams(toSearchParams(updateListState(state, patch)))
-  const selectedId = state.openId
-  if (query.isPending) return <PageLoading />
+  if (query.isPending) return <PageSkeleton />
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (
-      <PageError
-        title="需求列表加载失败"
-        description={described.description}
-        requestId={described.requestId}
-        onRetry={() => void query.refetch()}
-      />
+      <div className="empty">
+        <PrototypeIcon name="warning" />
+        <h3>需求列表加载失败</h3>
+        <p>{described.description}</p>
+        <button type="button" className="btn" onClick={() => void query.refetch()}>
+          重新加载
+        </button>
+      </div>
     )
   }
   const items = query.data.data.items
   return (
-    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            aria-label="搜索需求"
-            placeholder="搜索标题或编号"
-            className="w-48"
-            value={state.search}
-            onChange={(event) => update({ search: event.target.value })}
-          />
-          <Select
+    <div className="row items-workspace" style={{ alignItems: 'flex-start', minHeight: 0 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="section-heading">
+          <h2>需求列表</h2>
+          <span className="counter">{query.data.data.total}</span>
+        </div>
+        <div className="filters">
+          <select
+            className="filter-select"
             aria-label="需求状态"
             value={state.status}
             onChange={(event) => update({ status: event.target.value })}
           >
             <option value="">全部状态</option>
-            {REQUIREMENT_STATUS_OPTIONS.map(([value, label]) => (
+            {Object.entries(REQUIREMENT_STATUS_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
             ))}
-          </Select>
-          <span className="flex-1" />
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)} disabled={!canWrite}>
-            创建需求
-          </Button>
+          </select>
+          <label className="search">
+            <PrototypeIcon name="search" />
+            <input
+              aria-label="搜索需求"
+              placeholder="搜索标题或编号"
+              value={state.search}
+              onChange={(event) => update({ search: event.target.value })}
+            />
+          </label>
+          <button type="button" className="btn primary" disabled={!canWrite} onClick={() => setCreateOpen(true)}>
+            <PrototypeIcon name="plus" />
+            新建需求
+          </button>
         </div>
         {items.length === 0 ? (
           <EmptyState
-            title={state.search || state.status ? '没有匹配的需求' : '还没有需求'}
+            mascot={state.search || state.status ? undefined : 'prism'}
+            icon={state.search || state.status ? <SearchX /> : undefined}
+            title={state.search || state.status ? '没有符合条件的需求' : '还没有需求'}
             description={
               state.search || state.status
-                ? '调整搜索或状态筛选后重试。'
-                : '创建第一条需求，开始记录范围、负责人和验收标准。'
+                ? '当前搜索或状态筛选没有找到需求，可以清除筛选后重新查看。'
+                : '创建第一条需求，把负责人、状态流转与协作记录放进同一个事项。'
+            }
+            action={
+              canWrite && !state.search && !state.status ? (
+                <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+                  <PrototypeIcon name="plus" />
+                  新建需求
+                </button>
+              ) : state.search || state.status ? (
+                <button type="button" className="btn" onClick={() => setParams(new URLSearchParams())}>
+                  清除筛选
+                </button>
+              ) : undefined
             }
           />
         ) : (
-          <div className="rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>编号</TableHead>
-                  <TableHead>标题</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>研发负责人</TableHead>
-                  <TableHead>更新时间</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>事项</th>
+                  <th>负责人</th>
+                  <th>业务进度</th>
+                  <th>更新时间</th>
+                </tr>
+              </thead>
+              <tbody>
                 {items.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer"
-                    onClick={() => update({ openId: item.id })}
-                    aria-selected={selectedId === item.id}
-                  >
-                    <TableCell className="text-muted-foreground">#{item.number}</TableCell>
-                    <TableCell className="font-medium">{item.title}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}</Badge>
-                    </TableCell>
-                    <TableCell>{item.devOwner?.name ?? '未指定'}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatDateTime(item.updatedAt)}</TableCell>
-                  </TableRow>
+                  <tr key={item.id} className={state.openId === item.id ? 'selected' : undefined}>
+                    <td>
+                      <div className="item-cell">
+                        <PrototypeIcon name="file" />
+                        <button type="button" className="item-title" onClick={() => update({ openId: item.id })}>
+                          <span className="item-id">#{item.number}</span>
+                          {item.title}
+                        </button>
+                      </div>
+                    </td>
+                    <td>{item.devOwner?.name ?? '未指定'}</td>
+                    <td>
+                      <span className="badge">{REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}</span>
+                    </td>
+                    <td className="quiet">{formatDateTime(item.updatedAt)}</td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>共 {query.data.data.total} 条</span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={state.page <= 1}
-              onClick={() => update({ page: state.page - 1 })}
-            >
-              上一页
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={state.page * state.pageSize >= query.data.data.total}
-              onClick={() => update({ page: state.page + 1 })}
-            >
-              下一页
-            </Button>
-          </div>
+        <div className="pagination">
+          <span className="quiet">共 {query.data.data.total} 条</span>
+          <button
+            type="button"
+            className="btn"
+            disabled={state.page <= 1}
+            onClick={() => update({ page: state.page - 1 })}
+          >
+            上一页
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={state.page * state.pageSize >= query.data.data.total}
+            onClick={() => update({ page: state.page + 1 })}
+          >
+            下一页
+          </button>
         </div>
-      </section>
-      {selectedId ? (
-        <RequirementDetailPane key={selectedId} requirementId={selectedId} onClose={() => update({ openId: null })} />
-      ) : (
-        <aside className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          选择一条需求查看详情、评论与流程动作。
-        </aside>
+      </div>
+      {state.openId && (
+        <RequirementDetailPane
+          key={state.openId}
+          requirementId={state.openId}
+          onClose={() => update({ openId: null })}
+        />
       )}
       {project.data?.data && (
         <RequirementForm
