@@ -732,3 +732,21 @@
 .connection-form .form-grid {
   margin-top: 16px;
 }
+
+/* 项目卡片：与原型一致的设置按钮、两列指标和进入项目入口。 */
+.project-settings-button {
+  margin-left: auto;
+  color: var(--quiet);
+}
+.project-metrics.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.project-card-footer .text-btn {
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.project-card-footer .text-btn:hover {
+  text-decoration: none;
+}
