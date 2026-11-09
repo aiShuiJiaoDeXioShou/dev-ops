@@ -48,58 +48,60 @@ export function RequirementList({ projectId }: { projectId: string }) {
     )
   }
   const items = query.data.data.items
+  const isEmpty = items.length === 0
+  const filtered = Boolean(state.search || state.status)
   return (
     <div className="row items-workspace" style={{ alignItems: 'flex-start', minHeight: 0 }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="section-heading">
           <h2>需求列表</h2>
-          <span className="counter">{query.data.data.total}</span>
+          {query.data.data.total > 0 && <span className="counter">{query.data.data.total}</span>}
+          <span className="spacer" />
+          {canWrite && (
+            <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+              <PrototypeIcon name="plus" />
+              新建需求
+            </button>
+          )}
         </div>
-        <div className="filters">
-          <select
-            className="filter-select"
-            aria-label="需求状态"
-            value={state.status}
-            onChange={(event) => update({ status: event.target.value })}
-          >
-            <option value="">全部状态</option>
-            {Object.entries(REQUIREMENT_STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <label className="search">
-            <PrototypeIcon name="search" />
-            <input
-              aria-label="搜索需求"
-              placeholder="搜索标题或编号"
-              value={state.search}
-              onChange={(event) => update({ search: event.target.value })}
-            />
-          </label>
-          <button type="button" className="btn primary" disabled={!canWrite} onClick={() => setCreateOpen(true)}>
-            <PrototypeIcon name="plus" />
-            新建需求
-          </button>
-        </div>
-        {items.length === 0 ? (
+        {(!isEmpty || filtered) && (
+          <div className="filters">
+            <select
+              className="filter-select"
+              aria-label="需求状态"
+              value={state.status}
+              onChange={(event) => update({ status: event.target.value })}
+            >
+              <option value="">全部状态</option>
+              {Object.entries(REQUIREMENT_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <label className="search">
+              <PrototypeIcon name="search" />
+              <input
+                aria-label="搜索需求"
+                placeholder="搜索标题或编号"
+                value={state.search}
+                onChange={(event) => update({ search: event.target.value })}
+              />
+            </label>
+          </div>
+        )}
+        {isEmpty ? (
           <EmptyState
-            mascot={state.search || state.status ? undefined : 'prism'}
-            icon={state.search || state.status ? <SearchX /> : undefined}
-            title={state.search || state.status ? '没有符合条件的需求' : '还没有需求'}
+            mascot={filtered ? undefined : 'prism'}
+            icon={filtered ? <SearchX /> : undefined}
+            title={filtered ? '没有符合条件的需求' : '还没有需求'}
             description={
-              state.search || state.status
+              filtered
                 ? '当前搜索或状态筛选没有找到需求，可以清除筛选后重新查看。'
                 : '创建第一条需求，把负责人、状态流转与协作记录放进同一个事项。'
             }
             action={
-              canWrite && !state.search && !state.status ? (
-                <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-                  <PrototypeIcon name="plus" />
-                  新建需求
-                </button>
-              ) : state.search || state.status ? (
+              filtered ? (
                 <button type="button" className="btn" onClick={() => setParams(new URLSearchParams())}>
                   清除筛选
                 </button>
@@ -140,25 +142,27 @@ export function RequirementList({ projectId }: { projectId: string }) {
             </table>
           </div>
         )}
-        <div className="pagination">
-          <span className="quiet">共 {query.data.data.total} 条</span>
-          <button
-            type="button"
-            className="btn"
-            disabled={state.page <= 1}
-            onClick={() => update({ page: state.page - 1 })}
-          >
-            上一页
-          </button>
-          <button
-            type="button"
-            className="btn"
-            disabled={state.page * state.pageSize >= query.data.data.total}
-            onClick={() => update({ page: state.page + 1 })}
-          >
-            下一页
-          </button>
-        </div>
+        {!isEmpty && (
+          <div className="pagination">
+            <span className="quiet">共 {query.data.data.total} 条</span>
+            <button
+              type="button"
+              className="btn"
+              disabled={state.page <= 1}
+              onClick={() => update({ page: state.page - 1 })}
+            >
+              上一页
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={state.page * state.pageSize >= query.data.data.total}
+              onClick={() => update({ page: state.page + 1 })}
+            >
+              下一页
+            </button>
+          </div>
+        )}
       </div>
       {state.openId && (
         <RequirementDetailPane
