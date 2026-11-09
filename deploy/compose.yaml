@@ -1,6 +1,21 @@
 name: dev-ops
 
 services:
+  mailpit:
+    image: axllent/mailpit:v1.27.0
+    environment:
+      MP_MAX_MESSAGES: '500'
+      MP_SMTP_AUTH_ACCEPT_ANY: '1'
+      MP_SMTP_AUTH_ALLOW_INSECURE: '1'
+    ports:
+      - '127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025'
+      - '127.0.0.1:${MAILPIT_WEB_PORT:-8025}:8025'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8025/api/v1/info']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   postgres:
     image: postgres:18-alpine
     environment:
@@ -11,12 +26,12 @@ services:
       MIGRATION_DATABASE_PASSWORD: ${MIGRATION_DATABASE_PASSWORD:?缺少迁移数据库密码}
       TZ: UTC
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+      - '127.0.0.1:${POSTGRES_PORT:-5433}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d dev_ops"]
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U postgres -d dev_ops']
       interval: 2s
       timeout: 3s
       retries: 30
