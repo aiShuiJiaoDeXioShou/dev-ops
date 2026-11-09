@@ -1,0 +1,5 @@
+export { createBugsService } from './bugs.service.js'
+export type { BugDetail, BugListItem, BugsService, LinkedRequirementView, RegressionView } from './bugs.service.js'
+export type { BugStatus, CloseReason } from './bugs.rules.js'
+export type { BugSummaryForRequirement } from './bugs.repository.js'
+export { findBugById } from './bugs.repository.js'

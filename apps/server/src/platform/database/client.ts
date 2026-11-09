@@ -22,7 +22,9 @@ export function createDatabase(config: AppConfig, onIdleError: (code: string | u
     options: '-c timezone=UTC',
     application_name: 'dev-ops-api',
   })
-  pool.on('error', (error) => { onIdleError('code' in error ? String(error.code) : undefined) })
+  pool.on('error', (error) => {
+    onIdleError('code' in error ? String(error.code) : undefined)
+  })
   const db = drizzle(pool)
 
   return {

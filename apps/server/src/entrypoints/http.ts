@@ -26,8 +26,12 @@ async function shutdown(signal: string) {
   }
 }
 
-process.once('SIGINT', () => { void shutdown('SIGINT') })
-process.once('SIGTERM', () => { void shutdown('SIGTERM') })
+process.once('SIGINT', () => {
+  void shutdown('SIGINT')
+})
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM')
+})
 
 try {
   await app.listen({ port: config.PORT, host: config.HOST })

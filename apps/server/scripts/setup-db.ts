@@ -13,8 +13,10 @@ try {
     const adminPassword = randomBytes(24).toString('hex')
     const appPassword = randomBytes(24).toString('hex')
     const migrationPassword = randomBytes(24).toString('hex')
-    const runtime = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
-      .replace('dev_ops_app:replace_me', `dev_ops_app:${appPassword}`)
+    const runtime = readFileSync(new URL('../.env.example', import.meta.url), 'utf8').replace(
+      'dev_ops_app:replace_me',
+      `dev_ops_app:${appPassword}`,
+    )
     const database = [
       '# 本地开发配置，不得提交或复用到生产环境。',
       'POSTGRES_PORT=5433',

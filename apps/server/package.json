@@ -23,15 +23,21 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "node --env-file-if-exists=.env.database --import tsx src/entrypoints/migrate.ts",
     "test:db": "node --env-file=.env --env-file=.env.database --import tsx --test test/integration/*.test.ts",
-    "api:export": "node --import tsx scripts/export-openapi.ts"
+    "api:export": "node --import tsx scripts/export-openapi.ts",
+    "seed:root": "node --env-file-if-exists=.env --import tsx scripts/seed-root.ts"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.18",
     "@fastify/swagger": "^9.9.3",
     "@fastify/swagger-ui": "^5.2.6",
     "@fastify/type-provider-typebox": "^6.3.0",
+    "@octokit/auth-app": "8.3.1",
+    "@octokit/rest": "22.0.1",
+    "better-auth": "1.7.18",
     "drizzle-orm": "0.45.4",
     "env-schema": "^8.0.1",
     "fastify": "^5.12.8",
+    "nodemailer": "10.4.0",
     "pg": "8.23.1",
     "typebox": "^1.4.3"
   },
