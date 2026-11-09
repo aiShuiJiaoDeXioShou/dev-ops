@@ -29,7 +29,9 @@ export function RouteErrorPage() {
             onRetry={reloadPage}
             retryLabel="重新加载"
           />
-          <Button variant="ghost" asChild><Link to="/">返回工作台</Link></Button>
+          <Button variant="ghost" asChild>
+            <Link to="/">返回工作台</Link>
+          </Button>
         </CardContent>
       </Card>
     </main>

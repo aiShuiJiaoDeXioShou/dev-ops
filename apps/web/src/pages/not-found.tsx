@@ -14,7 +14,11 @@ export function NotFoundPage() {
         <EmptyState
           title="页面不存在"
           description="这个地址没有对应的页面，请检查链接或返回工作台。"
-          action={<Button asChild><Link to="/">返回工作台</Link></Button>}
+          action={
+            <Button asChild>
+              <Link to="/">返回工作台</Link>
+            </Button>
+          }
         />
       </CardContent>
     </Card>

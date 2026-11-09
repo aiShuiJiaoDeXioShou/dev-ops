@@ -37,9 +37,11 @@ export default function ConnectionStatus() {
         {query.isError && (
           <PageError
             title="连接检查失败"
-            description={requestError?.status === 503
-              ? '数据库尚未就绪，请检查数据库服务和迁移。'
-              : requestError?.message ?? '暂时无法读取系统状态，请稍后重试。'}
+            description={
+              requestError?.status === 503
+                ? '数据库尚未就绪，请检查数据库服务和迁移。'
+                : (requestError?.message ?? '暂时无法读取系统状态，请稍后重试。')
+            }
             requestId={requestError?.requestId}
             onRetry={refreshStatus}
             retrying={query.isFetching}
@@ -53,10 +55,16 @@ export default function ConnectionStatus() {
                 <p role="status" aria-live="polite" className="text-sm font-medium">
                   {query.isFetching ? '正在更新连接状态…' : '已联通：前端 → API 代理 → 后端 → PostgreSQL'}
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">最近检查：{new Date(query.dataUpdatedAt).toLocaleTimeString('zh-CN', { hour12: false })}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  最近检查：{new Date(query.dataUpdatedAt).toLocaleTimeString('zh-CN', { hour12: false })}
+                </p>
               </div>
             </div>
-            {query.data.requestId && <p className="break-all rounded-lg bg-muted/60 px-3 py-2 font-mono text-xs text-muted-foreground">请求标识：{query.data.requestId}</p>}
+            {query.data.requestId && (
+              <p className="break-all rounded-lg bg-muted/60 px-3 py-2 font-mono text-xs text-muted-foreground">
+                请求标识：{query.data.requestId}
+              </p>
+            )}
           </div>
         )}
       </CardContent>

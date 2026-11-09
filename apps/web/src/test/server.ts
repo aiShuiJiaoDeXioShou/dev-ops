@@ -35,6 +35,27 @@ export const server = setupServer(
   ),
   http.get('*/api/v1/auth/get-session', () => HttpResponse.json(sessionFixture)),
   http.get('*/api/v1/me/teams', () => success([teamFixture])),
+  http.get('*/api/v1/teams/:teamId/projects', () =>
+    success({
+      items: [
+        {
+          id: 'project-1',
+          teamId: 'team-1',
+          name: '测试项目',
+          description: '示例项目',
+          owner: { userId: 'user-1', name: '测试用户' },
+          status: 'active',
+          counts: { openRequirements: 2, openBugs: 1 },
+          version: 1,
+          createdAt: '2026-11-10T00:00:00.000Z',
+          updatedAt: '2026-11-10T00:00:00.000Z',
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    }),
+  ),
   http.get('*/api/v1/teams/:teamId/members', () => success([memberFixture])),
   http.get('*/api/v1/git-providers', () =>
     success([

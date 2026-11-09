@@ -35,7 +35,14 @@ interface PageErrorProps {
  * @param props 错误标题、安全说明、可选请求标识及重试状态和回调。
  * @returns 错误提示和可选重试入口；点击重试时调用提供的回调。
  */
-export function PageError({ title, description, requestId, retrying = false, retryLabel = '重新检查', onRetry }: PageErrorProps) {
+export function PageError({
+  title,
+  description,
+  requestId,
+  retrying = false,
+  retryLabel = '重新检查',
+  onRetry,
+}: PageErrorProps) {
   return (
     <div className="space-y-4">
       <Alert variant="destructive">
@@ -46,7 +53,11 @@ export function PageError({ title, description, requestId, retrying = false, ret
           {requestId && <p className="break-all text-xs">请求标识：{requestId}</p>}
         </AlertDescription>
       </Alert>
-      {onRetry && <Button variant="outline" onClick={onRetry} disabled={retrying}>{retrying ? '检查中…' : retryLabel}</Button>}
+      {onRetry && (
+        <Button variant="outline" onClick={onRetry} disabled={retrying}>
+          {retrying ? '检查中…' : retryLabel}
+        </Button>
+      )}
     </div>
   )
 }
@@ -56,11 +67,7 @@ export function PageError({ title, description, requestId, retrying = false, ret
  * @param props 标题、说明及可选操作，内容由具体页面提供。
  * @returns 可复用的空状态区域，不推断业务数据是否存在。
  */
-export function EmptyState({ title, description, action }: {
-  title: string
-  description: string
-  action?: ReactNode
-}) {
+export function EmptyState({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center px-6 py-14 text-center">
       <div className="mb-5 rounded-2xl border bg-muted/50 p-4">

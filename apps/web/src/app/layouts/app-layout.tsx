@@ -1,7 +1,9 @@
-import { Activity, ArrowUpRight, FlaskConical, LayoutDashboard, Menu } from 'lucide-react'
-import { NavLink, Outlet, useNavigation } from 'react-router'
+import { Activity, FlaskConical, FolderKanban, LogOut, Menu, Settings, Users } from 'lucide-react'
+import { NavLink, Outlet, useNavigate, useNavigation } from 'react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
+import { Select } from '@/shared/ui/controls/select'
 import { Separator } from '@/shared/ui/controls/separator'
 import {
   Sheet,
@@ -13,27 +15,30 @@ import {
   SheetTrigger,
 } from '@/shared/ui/controls/sheet'
 import { cn } from '@/shared/lib/utils'
+import { signOut, useSession } from '@/features/identity/public'
 
-const navigationItems = [
-  { to: '/', label: '工作台', icon: LayoutDashboard },
-  { to: '/system/status', label: '系统状态', icon: Activity },
-  ...(import.meta.env.DEV ? [{ to: '/prototype/projects', label: '交互原型', icon: FlaskConical }] : []),
-]
+const ROLE_LABELS = { admin: '管理员', developer: '开发者', viewer: '浏览者' } as const
 
 /**
  * 渲染桌面与移动端共用的导航项。
- * @param props.closeOnNavigate 是否在选择页面后关闭移动导航抽屉。
- * @returns 带当前页标识的导航；关闭抽屉时恢复触发器焦点。
+ * @param props.closeOnNavigate 选择后是否关闭移动导航抽屉。
+ * @returns 当前页面高亮的导航。
  */
 function Navigation({ closeOnNavigate = false }: { closeOnNavigate?: boolean }) {
+  const { currentTeam, role } = useSession()
+  const items = [
+    { to: '/projects', label: '项目', icon: FolderKanban },
+    ...(!currentTeam || role === 'admin' ? [{ to: '/settings/team', label: '团队管理', icon: Users }] : []),
+    { to: '/system/status', label: '系统状态', icon: Activity },
+    ...(import.meta.env.DEV ? [{ to: '/prototype/projects', label: '交互原型', icon: FlaskConical }] : []),
+  ]
   return (
     <nav aria-label="主导航" className="space-y-1 px-3">
-      {navigationItems.map((item) => {
+      {items.map((item) => {
         const link = (
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/'}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
@@ -57,45 +62,73 @@ function Navigation({ closeOnNavigate = false }: { closeOnNavigate?: boolean }) 
   )
 }
 
-/**
- * 渲染导航区品牌标识。
- * @returns 静态工作区标识，不代表已登录的团队身份。
- */
+/** 工作区品牌与当前团队切换。 */
 function WorkspaceBrand() {
   return (
     <div className="flex items-center gap-3 px-6 py-7">
       <img src="/prototype/brand.svg" width={32} height={32} alt="" aria-hidden="true" />
       <div>
         <p className="text-sm font-semibold tracking-tight">项目开发平台</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">本地工作区</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">研发协作工作区</p>
       </div>
     </div>
   )
 }
 
-/**
- * 提供响应式应用布局、键盘跳转入口及嵌套路由出口。
- * @returns 应用外壳；路由加载时播报状态，业务页面保留自身标题。
- */
+/** 渲染受保护的应用外壳、团队切换与导航。 */
 export function AppLayout() {
   const navigation = useNavigation()
-
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { user, teams, currentTeam, role, setCurrentTeam } = useSession()
+  const logout = async () => {
+    await signOut().catch(() => undefined)
+    queryClient.clear()
+    navigate('/login', { replace: true })
+  }
   return (
     <div className="min-h-svh bg-background text-foreground">
       <a
         href="#main-content"
-        className="sr-only z-50 rounded-md bg-background p-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        className="sr-only z-50 rounded-md bg-background p-3 focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
       >
         跳到主要内容
       </a>
       <aside className="fixed inset-y-0 left-0 hidden w-60 flex-col border-r bg-card md:flex">
         <WorkspaceBrand />
-        <p className="px-6 pb-3 text-xs font-medium tracking-wide text-muted-foreground">工作区</p>
         <Navigation />
-        <div className="mt-auto p-5">
+        <div className="mt-auto space-y-3 p-5">
+          {teams.length > 1 ? (
+            <Select
+              aria-label="切换团队"
+              value={currentTeam?.id ?? ''}
+              onChange={(event) => setCurrentTeam(event.target.value)}
+            >
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <p className="text-xs text-muted-foreground">{currentTeam?.name ?? '未加入团队'}</p>
+          )}
           <div className="rounded-xl border bg-muted/40 p-4">
-            <p className="text-xs font-medium">基础工作区</p>
-            <p className="mt-2 text-xs leading-5 text-muted-foreground">业务功能将按需求逐步开放。</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-medium">{user.name}</p>
+              <Badge variant="outline">{ROLE_LABELS[role]}</Badge>
+            </div>
+            <p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-3 w-full justify-start"
+              onClick={() => void logout()}
+            >
+              <LogOut className="size-4" />
+              退出登录
+            </Button>
           </div>
         </div>
       </aside>
@@ -105,7 +138,7 @@ export function AppLayout() {
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="md:hidden" aria-label="打开导航">
-                  <Menu className="size-5" aria-hidden="true" />
+                  <Menu className="size-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-0">
@@ -117,15 +150,20 @@ export function AppLayout() {
                 <Navigation closeOnNavigate />
               </SheetContent>
             </Sheet>
-            <span className="text-sm font-medium">工作区</span>
+            <span className="text-sm font-medium">{currentTeam?.name ?? '工作区'}</span>
             <Separator orientation="vertical" className="h-4" />
             {import.meta.env.DEV && <Badge variant="secondary">开发环境</Badge>}
           </div>
-          <Button variant="ghost" size="sm" asChild>
-            <a href="/api/v1/health" target="_blank" rel="noreferrer">
-              API 状态 <ArrowUpRight className="size-3.5" aria-hidden="true" />
-            </a>
-          </Button>
+          <div className="flex items-center gap-2">
+            {(!currentTeam || role === 'admin') && (
+              <Button variant="ghost" size="sm" asChild>
+                <a href="/settings/team">
+                  <Settings className="size-4" />
+                  团队设置
+                </a>
+              </Button>
+            )}
+          </div>
         </header>
         {navigation.state !== 'idle' && (
           <div role="status" className="border-b bg-primary/5 px-6 py-2 text-xs text-primary">

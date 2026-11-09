@@ -15,7 +15,9 @@ export function Component() {
       </div>
       <ConnectionStatus />
       <Card>
-        <CardHeader><CardTitle>检查范围</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>检查范围</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
           <p>就绪检查通过同源 API 验证后端、数据库连接及业务 schema 的访问权限。</p>
           <p>结果显示最近一次检查状态，不代表持续监控。需要确认当前状态时，请重新检查。</p>
