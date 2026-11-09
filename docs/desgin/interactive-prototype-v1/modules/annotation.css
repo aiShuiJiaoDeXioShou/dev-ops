@@ -1,0 +1,376 @@
+/* 页面框选批注遮罩：沿用原型中性表面与强调蓝 #4176e6，避免影响业务页面既有样式。 */
+
+.annotation-overlay {
+  --annotation-blue: #4176e6;
+  --annotation-blue-soft: #edf3fe;
+  --annotation-ink: #111827;
+  --annotation-line: rgba(0, 0, 0, 0.08);
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(16, 24, 40, 0.28);
+  cursor: crosshair;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--annotation-ink);
+  font-size: 13px;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.annotation-overlay [hidden] {
+  display: none !important;
+}
+
+/* 顶部覆盖式提示：深色胶囊，避免与白色页面内容混在一起。 */
+.annotation-hint {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 8px 8px 14px;
+  transform: translateX(-50%);
+  border-radius: 10px;
+  background: #101828;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.28);
+  pointer-events: none;
+}
+
+.annotation-hint-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-kbd {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font: 11px/1.5 inherit;
+}
+
+.annotation-hint-cancel {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.annotation-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.annotation-close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+/* 悬停高亮：1.5px 虚线蓝，使用渐变描边实现流动虚线；减少动态效果时关闭动画。 */
+.annotation-hover {
+  position: fixed;
+  z-index: 1001;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(65, 118, 230, 0.95) 0 7px, transparent 7px 14px),
+    repeating-linear-gradient(90deg, rgba(65, 118, 230, 0.95) 0 7px, transparent 7px 14px),
+    repeating-linear-gradient(0deg, rgba(65, 118, 230, 0.95) 0 7px, transparent 7px 14px),
+    repeating-linear-gradient(0deg, rgba(65, 118, 230, 0.95) 0 7px, transparent 7px 14px);
+  background-repeat: no-repeat;
+  background-size:
+    100% 1.5px,
+    100% 1.5px,
+    1.5px 100%,
+    1.5px 100%;
+  background-position:
+    0 0,
+    0 100%,
+    0 0,
+    100% 0;
+  animation: annotation-march 0.6s linear infinite;
+}
+
+.annotation-hover-label {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  max-width: min(360px, calc(100vw - 24px));
+  margin-bottom: 4px;
+  padding: 2px 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #111827;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-hover.is-below .annotation-hover-label {
+  top: 100%;
+  bottom: auto;
+  margin-top: 4px;
+  margin-bottom: 0;
+}
+
+@keyframes annotation-march {
+  to {
+    background-position:
+      14px 0,
+      14px 100%,
+      0 14px,
+      100% 14px;
+  }
+}
+
+/* 选框：1.5px 实线蓝 + 四角手柄 + 实时尺寸标签。 */
+.annotation-rect {
+  position: fixed;
+  z-index: 1001;
+  border: 1.5px solid var(--annotation-blue);
+  border-radius: 2px;
+  background: rgba(65, 118, 230, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
+
+.annotation-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--annotation-blue);
+  border-radius: 2px;
+  background: #fff;
+}
+
+.annotation-handle.is-top-left {
+  top: -5px;
+  left: -5px;
+}
+
+.annotation-handle.is-top-right {
+  top: -5px;
+  right: -5px;
+}
+
+.annotation-handle.is-bottom-left {
+  bottom: -5px;
+  left: -5px;
+}
+
+.annotation-handle.is-bottom-right {
+  right: -5px;
+  bottom: -5px;
+}
+
+.annotation-size {
+  position: absolute;
+  right: -1.5px;
+  bottom: -27px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--annotation-blue);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.annotation-rect.is-above .annotation-size {
+  top: -27px;
+  bottom: auto;
+}
+
+/* 批注气泡：白底、12px 圆角、细边框与柔和阴影，固定定位由脚本 clamp。 */
+.annotation-popover {
+  position: fixed;
+  z-index: 1003;
+  width: min(340px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid var(--annotation-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.22);
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.annotation-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+  min-width: 0;
+}
+
+.annotation-target {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 7px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--annotation-ink);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.annotation-input {
+  display: block;
+  width: 100%;
+  min-height: 82px;
+  max-height: 220px;
+  padding: 9px 10px;
+  border: 1px solid #dfe3e9;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--annotation-ink);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.annotation-input:focus {
+  border-color: var(--annotation-blue);
+  box-shadow: 0 0 0 3px #4176e633;
+}
+
+.annotation-input::placeholder {
+  color: #9aa0aa;
+}
+
+.annotation-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.annotation-shortcut {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  color: #9aa0aa;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-cancel,
+.annotation-send {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.annotation-cancel {
+  background: transparent;
+  color: #61666b;
+}
+
+.annotation-cancel:hover {
+  background: #f5f6f7;
+}
+
+.annotation-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--annotation-blue);
+  color: #fff;
+}
+
+.annotation-send-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.annotation-send:hover:not(:disabled) {
+  background: #3569d6;
+}
+
+.annotation-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.annotation-cancel:focus-visible,
+.annotation-send:focus-visible,
+.annotation-close:focus-visible {
+  outline: 2px solid var(--annotation-blue);
+  outline-offset: 2px;
+}
+
+/* 窄屏：提示收敛为一行并省略，气泡始终保留 12px 视口边距。 */
+@media (max-width: 480px) {
+  .annotation-hint {
+    gap: 6px;
+    padding: 7px 7px 7px 11px;
+    font-size: 11px;
+  }
+
+  .annotation-hint-cancel {
+    display: none;
+  }
+
+  .annotation-popover {
+    padding: 11px;
+  }
+
+  .annotation-shortcut {
+    display: none;
+  }
+
+  .annotation-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .annotation-hover {
+    animation: none;
+  }
+
+  .annotation-popover {
+    transition: none;
+  }
+}

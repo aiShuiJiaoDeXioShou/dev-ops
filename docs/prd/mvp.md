@@ -336,13 +336,13 @@ CI/CD 接入遵守第 6 章，平台通过独立运维操作对接执行系统�
 
 ## 14. 设计与交互原型
 
-[HTML 交互原型](../../.mobile-workspace/design/interactive-prototype-v1/index.html)用于核对第 3 章的布局与主要操作，参考[项目需求页设计图](../../.mobile-workspace/design/project-requirements-v6/project-requirements.png)。原型包含协作群组、任务交接、运维事件与计划、环境配置、记忆，以及项目、需求、Bug、代码、PR、Bot、Skills 与模板页面，支持本地交互及演示数据重置。
+[HTML 交互原型](../desgin/interactive-prototype-v1/index.html)用于核对第 3 章的布局与主要操作，参考[项目需求页设计图](../desgin/project-requirements-v6/project-requirements.png)。原型包含协作群组、任务交接、运维事件与计划、环境配置、记忆，以及项目、需求、Bug、代码、PR、Bot、Skills 与模板页面，支持本地交互及演示数据重置。
 
-图标使用本地 GitHub Octicons，并绘制独立品牌标记与角色式 Bot 头像；预览见[图标展示页](../../.mobile-workspace/design/interactive-prototype-v1/icons.html)。
+图标使用本地 GitHub Octicons，并绘制独立品牌标记与角色式 Bot 头像；预览见[图标展示页](../desgin/interactive-prototype-v1/icons.html)。
 
-原型使用演示数据，不连接真实代码平台、模型、流水线或数据库。文档中的待定方案不会因原型提供控件而成为已确认业务需求。实际完成的验证与原型使用方式见[原型说明](../../.mobile-workspace/design/interactive-prototype-v1/README.md)。
+原型使用演示数据，不连接真实代码平台、模型、流水线或数据库。文档中的待定方案不会因原型提供控件而成为已确认业务需求。实际完成的验证与原型使用方式见[原型说明](../desgin/interactive-prototype-v1/README.md)。
 
-模块交互的原型实现、操作路径与验证结果见[交互审查清单](../../.mobile-workspace/design/interactive-prototype-v1/INTERACTION-AUDIT.md)。真实代码平台、公开文档服务和模型执行仍受第 11、12 章边界约束。
+模块交互的原型实现、操作路径与验证结果见[交互审查清单](../desgin/interactive-prototype-v1/INTERACTION-AUDIT.md)。真实代码平台、公开文档服务和模型执行仍受第 11、12 章边界约束。
 
 ### 页面空间使用约定
 

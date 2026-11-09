@@ -11,6 +11,7 @@
     "dev": "pnpm prepare:clients && pnpm --parallel --filter @dev-ops/web --filter @dev-ops/server dev",
     "dev:web": "pnpm prepare:clients && pnpm --filter @dev-ops/web dev",
     "dev:server": "pnpm --filter @dev-ops/server dev",
+    "dev:prototype": "pnpm --filter @dev-ops/web exec vite ../../docs/desgin/interactive-prototype-v1 --host 127.0.0.1 --port 4178 --strictPort",
     "cli": "pnpm --filter @dev-ops/cli dev",
     "api:generate": "pnpm --filter @dev-ops/server api:export && node tooling/scripts/generate-api-client.mjs",
     "prepare:clients": "pnpm api:generate && pnpm --filter @dev-ops/api-client build",

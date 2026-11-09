@@ -13,3 +13,8 @@ work
 draft_*
 .artifacts/
 packages/api-client/src/generated/
+.agents
+.vscode
+.dsh
+.specify
+specs

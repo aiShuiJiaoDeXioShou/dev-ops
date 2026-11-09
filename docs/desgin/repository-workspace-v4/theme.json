@@ -1,0 +1,59 @@
+{
+  "version": "repository-workspace-v4",
+  "source": "https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/client/ui-theme/src/styles/design-platform.css",
+  "colors": {
+    "accent": {
+      "value": "#4176E6",
+      "sourceToken": "--dsw-static-deepseek-500",
+      "uses": [
+        "主操作",
+        "链接",
+        "活动标签"
+      ]
+    },
+    "content": {
+      "value": "#FFFFFF",
+      "sourceToken": "--dsw-alias-bg-base"
+    },
+    "sidebar": {
+      "value": "#F9FAFB",
+      "sourceToken": "--dsw-specific-sidebar-fill"
+    },
+    "module": {
+      "value": "#F5F6F7",
+      "sourceToken": "--dsw-alias-bg-module-platform"
+    },
+    "selectedNeutral": {
+      "value": "#EBEEF2",
+      "sourceToken": "--dsw-specific-sidebar-nav-item-active"
+    },
+    "selectedAccent": {
+      "value": "#E4EDFD",
+      "sourceToken": "--dsw-specific-sidebar-nav-item-active-accent"
+    },
+    "textPrimary": {
+      "value": "#0F1115",
+      "sourceToken": "--dsw-alias-label-primary"
+    },
+    "textSecondary": {
+      "value": "#61666B",
+      "sourceToken": "--dsw-alias-label-secondary"
+    },
+    "textTertiary": {
+      "value": "#81858C",
+      "sourceToken": "--dsw-alias-label-tertiary"
+    },
+    "border": {
+      "value": "rgba(0, 0, 0, 0.10)",
+      "sourceToken": "--dsw-alias-border-l2"
+    }
+  },
+  "radius": {
+    "small": 8,
+    "medium": 12,
+    "large": 16,
+    "extraLarge": 20
+  },
+  "hairlineCssPx": 0.5,
+  "note": "主要操作色按用户要求映射至 DeepSeek 的蓝色 info 按钮；这不是官方默认近黑色 primary 按钮的原样映射。数值为设计目标，生成图片不保证逐像素符合。"
+}

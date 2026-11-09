@@ -10,9 +10,13 @@
 
 全新的工作区结构、Web 与 Server 模块边界及搭建范围见[目标架构方案](docs/architecture/system-design.md)，目标方案已确认，工作区和基础工程已搭建，业务模块按实际需求加入。
 
+GitHub App 授权、成员与 Bot 的权限和凭据、统一 Git 接口及执行流程见[外部仓库集成架构](docs/architecture/external-repositories.md)。首批适配范围为 GitHub、Gitea，GitLab、Gitee、Codeup 预留扩展；当前为待实施验证的架构设计。
+
 前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。前端路由、查询缓存与基础 UI 已接入，认证和业务流程仍待实现。
 
-界面与主要操作可查看 [HTML 交互原型](.mobile-workspace/design/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](.mobile-workspace/design/interactive-prototype-v1/README.md)。
+界面与主要操作可查看 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](docs/desgin/interactive-prototype-v1/README.md)。
+
+安装依赖后，在仓库根目录运行 `pnpm dev:prototype`，然后访问 http://127.0.0.1:4178/；按 `Ctrl+C` 停止服务。
 
 前端位于 [apps/web](apps/web/README.md)，后端位于 [apps/server](apps/server/README.md)，命令行工具位于 [apps/cli](apps/cli/README.md)。应用各自声明依赖，共用根目录工作区与锁文件，协作规则见 [AGENTS.md](AGENTS.md)。
 

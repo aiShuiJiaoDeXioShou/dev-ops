@@ -290,6 +290,8 @@ public.ts 导出业务能力，不导出 repository、表定义或内部可变�
 
 Git 读取接口由 code 模块定义，GitHub 和 Gitea 适配器实现该接口。code 使用传入的能力，不直接选择具体实现。integrations 保存连接实例、状态和执行节点配置；业务读取与修改规则继续由 code、tasks、operations 等所属模块维护。
 
+连接授权、仓库与变更请求读取、事件和受控 Git 执行分别使用小接口，具体边界及成员、Bot 身份规则见[外部仓库集成架构](external-repositories.md)。GitHub 使用 App 安装授权，Gitea 使用受控服务身份；首批仅实现这两个提供方，GitLab、Gitee、Codeup 后续通过相同契约扩展，不预建插件运行时。
+
 ```text
 entrypoints → bootstrap → 模块构造入口、workflows、adapters、platform
 workflows → modules/*/public

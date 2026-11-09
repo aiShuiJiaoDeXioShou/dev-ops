@@ -28,7 +28,7 @@
 | 前端基础 | 已接入 React、TypeScript、Vite、Tailwind 和 React Compiler，提供响应式工作台和系统状态页 | [应用 Provider](../apps/web/src/app/providers/application.tsx)、[Vite 配置](../apps/web/vite.config.ts)、[样式入口](../apps/web/src/shared/styles/index.css) |
 | 路由、查询缓存及 UI 组件 | 已接入 React Router Data Mode、TanStack Query 和首批 shadcn/ui 控件；已有 Vitest、Testing Library、MSW 测试 | [路由](../apps/web/src/app/router/routes.tsx)、[查询配置](../apps/web/src/shared/api/query-client.ts)、[前端依赖与脚本](../apps/web/package.json) |
 | 表单 | React Hook Form 与 Zod 尚未接入，等待真实表单需求 | [前端依赖](../apps/web/package.json) |
-| 交互原型 | 独立 HTML/CSS/JS 原型，尚未迁入 React | [原型说明](../.mobile-workspace/design/interactive-prototype-v1/README.md) |
+| 交互原型 | 独立 HTML/CSS/JS 原型，尚未迁入 React | [原型说明](desgin/interactive-prototype-v1/README.md) |
 | API 基础 | 已接入 Fastify、TypeBox、配置校验、日志、统一错误和 OpenAPI；模块只有健康检查 | [应用组装](../apps/server/src/bootstrap/create-http-app.ts)、[健康检查](../apps/server/src/modules/health/health.routes.ts)、[错误处理](../apps/server/src/platform/http/errors.ts) |
 | 数据库基础 | 已接入 PostgreSQL、Drizzle、pg 连接池；正式迁移仅建立 app schema 与权限，没有业务表 | [连接实现](../apps/server/src/platform/database/client.ts)、[schema](../apps/server/src/bootstrap/database-schema.ts)、[基础迁移](../apps/server/drizzle/0000_initialize_app_schema.sql) |
 | 认证、成员与项目权限 | 尚未实现，Better Auth 尚未加入依赖 | [应用组装](../apps/server/src/bootstrap/create-http-app.ts)、[后端依赖](../apps/server/package.json) |

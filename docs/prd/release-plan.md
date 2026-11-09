@@ -8,7 +8,7 @@
 | 负责人 | 项目维护者，兼产品范围与版本验收负责人 |
 | 读者 | 项目维护者、参与开发与核对需求的 AI |
 | 范围 | 模块边界、功能优先级、版本范围、依赖、验收及待决策事项 |
-| 关联 | [产品需求](mvp.md)、[交互原型说明](../../.mobile-workspace/design/interactive-prototype-v1/README.md)、[后端技术规划](../architecture/server-foundation.md) |
+| 关联 | [产品需求](mvp.md)、[交互原型说明](../desgin/interactive-prototype-v1/README.md)、[后端技术规划](../architecture/server-foundation.md) |
 
 ## 1. 规划结论
 
@@ -37,7 +37,7 @@
 | 对象 | 核对结果 | 依据 |
 | --- | --- | --- |
 | 产品范围 | 已覆盖项目研发、Bot 协作、交付、运维、凭据等；部分业务规则仍待定 | [需求第 1 至 12 章](mvp.md) |
-| 原型 | 使用本地演示数据，AI 回复、执行轨迹和外部操作为模拟 | [原型说明](../../.mobile-workspace/design/interactive-prototype-v1/README.md)、[模拟对话实现](../../.mobile-workspace/design/interactive-prototype-v1/modules/ai-chat.js) |
+| 原型 | 使用本地演示数据，AI 回复、执行轨迹和外部操作为模拟 | [原型说明](../desgin/interactive-prototype-v1/README.md)、[模拟对话实现](../desgin/interactive-prototype-v1/modules/ai-chat.js) |
 | Web | 工作台与系统状态已接入，正式业务页面尚未实现 | [应用 Provider](../../apps/web/src/app/providers/application.tsx) |
 | 后端 | 已组装配置、日志、错误响应、OpenAPI、数据库和健康检查，未注册业务模块 | [应用入口](../../apps/server/src/bootstrap/create-http-app.ts) |
 | 数据库 | 已定义基础 schema，业务表尚未建立 | [database-schema.ts](../../apps/server/src/bootstrap/database-schema.ts)、[数据库说明](../architecture/database.md) |
@@ -275,7 +275,7 @@ V1.0 是完整 MVP 的验收标签，不承接没有定义的新功能。以[需
 | --- | --- | --- |
 | 项目协作是否能发送或使用输入区 `@` | 需求第 3 章要求项目协作只读，第 13 章仍有“在项目会话用 `@` 选择执行者”的表述 | 项目入口保持只读；发送、管理及执行者选择在全局协作完成，并能返回同一会话 |
 | Bot 任务验收是否代表需求完成 | 原型说明写有“验收通过后才将关联事项标记完成”；需求第 5、12 章仍要求确定业务完成判定 | 明确任务验收与业务测试、正式交付的独立条件，不能由统一“完成”动作覆盖全部状态 |
-| 有项目的任务是否都必须提交开发产物 | [原型任务表单](../../.mobile-workspace/design/interactive-prototype-v1/workspace.js)按是否有关联项目选择开发交付，并要求产物；需求第 10.5 节区分通用结果与代码交付，涉及构建才附产物 | 按任务性质要求结果，有项目的资料调查仍可提交文本；开发交付仅在涉及构建时要求对应产物 |
+| 有项目的任务是否都必须提交开发产物 | [原型任务表单](../desgin/interactive-prototype-v1/workspace.js)按是否有关联项目选择开发交付，并要求产物；需求第 10.5 节区分通用结果与代码交付，涉及构建才附产物 | 按任务性质要求结果，有项目的资料调查仍可提交文本；开发交付仅在涉及构建时要求对应产物 |
 | 原型中的增强交互是否全部进入 MVP | 原型还展示朗读、点赞点踩、页面框选批注等；需求正文未逐项确认其业务规则 | 单独登记为候选增强项，确认价值和验收规则后再安排版本；不自动扩大首版范围 |
 
 ## 8. 范围管理与版本验收

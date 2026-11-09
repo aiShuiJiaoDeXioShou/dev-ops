@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AGENTS.md · 预览</title><style>
+*{box-sizing:border-box}body{margin:0;background:#f9fafb;color:#20242b;font:14px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}main{max-width:900px;margin:50px auto;padding:0 25px}header{display:flex;gap:12px;align-items:center;flex-wrap:wrap}h1{font-size:24px;margin-right:auto}button{background:white;border:1px solid #dde1e8;border-radius:8px;padding:9px 15px;cursor:pointer;color:inherit}button:disabled{opacity:.5;cursor:not-allowed}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;border:1px solid #e5e7eb;border-radius:14px;padding:28px;font:13px/1.9 monospace;min-height:280px}p{font-size:12px;color:#858b95;line-height:1.8}#feedback{min-height:22px;color:#4176e6}textarea{width:100%;min-height:200px}a{color:#4176e6}
+</style></head><body><main><header><h1 id="name">AGENTS.md</h1><button id="copy" disabled>复制内容</button><button id="download" disabled>下载 AGENTS.md</button></header><p id="meta">文档快照预览</p><pre id="content">正在读取链接内容…</pre><p id="feedback" role="status"></p><p>此页显示分享时的版本快照，后续编辑不会改变本链接的内容。本机地址不代表文档已发布到公网。</p></main><script>
+'use strict';
+let documentContent = '';
+try {
+  const value = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+  if (!value || typeof value.name !== 'string' || typeof value.content !== 'string' || value.content.length > 20000) throw new Error('无效文档');
+  documentContent = value.content;
+  document.getElementById('name').textContent = value.name + ' · AGENTS.md';
+  document.getElementById('meta').textContent = 'v' + String(value.version || 1) + ' · 分享时的快照';
+  document.getElementById('content').textContent = documentContent;
+  document.querySelectorAll('button').forEach(button => button.disabled = false);
+} catch (error) { document.getElementById('content').textContent = '预览链接无效或不完整，请回到模板管理重新复制链接。'; }
+/** 复制快照正文；失败时显示可手动复制的文本。@returns {Promise<void>} 不修改文档。 */
+async function copyDocument() {
+  try { await navigator.clipboard.writeText(documentContent); document.getElementById('feedback').textContent = '已复制'; }
+  catch (error) { const input = document.createElement('textarea'); input.value = documentContent; input.readOnly = true; input.setAttribute('aria-label','手动复制内容'); document.getElementById('content').replaceChildren(input); input.select(); document.getElementById('feedback').textContent = '请手动复制选中的内容'; }
+}
+/** 下载同一版本快照。@returns {void} 触发本地文本下载。 */
+function downloadDocument() { const url = URL.createObjectURL(new Blob([documentContent],{type:'text/plain;charset=utf-8'})); const link = document.createElement('a'); link.href = url; link.download = 'AGENTS.md'; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000); }
+document.getElementById('copy').addEventListener('click',copyDocument);
+document.getElementById('download').addEventListener('click',downloadDocument);
+</script></body></html>
