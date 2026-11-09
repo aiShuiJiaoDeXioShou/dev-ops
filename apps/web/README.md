@@ -1,6 +1,6 @@
 # 前端开发说明
 
-前端使用 React、TypeScript、Vite、Tailwind CSS 4、React Compiler，已接入 React Router Data Mode、TanStack Query 和 shadcn/ui。当前提供工作台和系统状态页面，尚未实现登录与项目业务流程。整体方向见[技术选型方案](../../docs/technical-selection.md)。
+前端使用 React、TypeScript、Vite、Tailwind CSS 4、React Compiler、React Router Data Mode、TanStack Query 与 shadcn/ui。V0.1 已接入登录/邀请、团队管理、项目、需求、Bug、评论/活动与代码引用页面；系统状态页保留用于排查后端和数据库联通。
 
 ## 本地运行与检查
 
@@ -9,65 +9,66 @@
 ```bash
 nvm use
 pnpm install --frozen-lockfile
+pnpm prepare:clients
 pnpm dev:web
 ```
 
-单独执行本应用检查前先在根目录运行 `pnpm prepare:clients`。默认地址为 http://localhost:5173。按[根目录说明](../../README.md)启动 PostgreSQL、执行迁移并启动后端；Vite 将同源 `/api` 请求代理至 `http://127.0.0.1:3001`。启动进程可通过 `DEV_OPS_API_TARGET` 指定其他代理目标，例如 `DEV_OPS_API_TARGET=http://127.0.0.1:4001 pnpm dev:web`。前端测试使用 MSW，不需要后端或数据库在线。
+默认地址为 http://localhost:5173。请按[根目录说明](../../README.md)启动 PostgreSQL、执行迁移并启动后端；Vite 将同源 `/api` 请求代理至 `http://127.0.0.1:3001`。启动进程可通过 `DEV_OPS_API_TARGET` 指定其他代理目标；本目录 `.env` 也会被 Vite 读取，`.env.example` 提供示例。
 
-| 命令（仓库根目录执行） | 用途 |
-| --- | --- |
-| `pnpm --dir apps/web lint` | Oxlint 静态检查 |
-| `pnpm --dir apps/web test` | Vitest、React Testing Library 与 MSW 测试 |
-| `pnpm --dir apps/web test:watch` | 监听测试文件变化 |
-| `pnpm --dir apps/web build` | TypeScript 检查与生产构建 |
-| `pnpm --dir apps/web check` | 依次执行 lint、typecheck、test |
-| `pnpm --dir apps/web preview` | 本地预览构建产物 |
+| 命令（仓库根目录执行）           | 用途                                      |
+| -------------------------------- | ----------------------------------------- |
+| `pnpm --dir apps/web lint`       | Oxlint 静态检查                           |
+| `pnpm --dir apps/web test`       | Vitest、React Testing Library 与 MSW 测试 |
+| `pnpm --dir apps/web test:watch` | 监听测试文件变化                          |
+| `pnpm --dir apps/web build`      | TypeScript 检查与生产构建                 |
+| `pnpm --dir apps/web check`      | 依次执行 lint、typecheck、test            |
+| `pnpm --dir apps/web preview`    | 本地预览构建产物                          |
 
-`/api` 代理仅在 Vite 开发服务中配置；生产部署和独立构建预览需另外提供 API 同源转发。生产网关应先处理 `/api`，再将前端页面路径回退到 `index.html`，使深链接刷新可用。
+根目录 `pnpm lint`/`pnpm format:check` 是仓库统一质量门禁。前端测试使用 MSW，不需要后端或数据库在线。
 
-## 路由与目录
+## 路由与页面结构
 
-| 位置 | 职责 |
-| --- | --- |
-| [main.tsx](src/main.tsx)、[应用 Provider](src/app/providers/application.tsx) | 入口在 React 渲染前创建浏览器路由；App 持有稳定的 QueryClient，组装 Provider |
-| [app/router/routes.tsx](src/app/router/routes.tsx) | 嵌套路由、页面懒加载、初始化加载占位及路由错误边界 |
-| [app/layouts/app-layout.tsx](src/app/layouts/app-layout.tsx) | 桌面侧栏、移动导航抽屉、导航加载提示及内容出口 |
-| [shared/ui/page-state.tsx](src/shared/ui/page-state.tsx) | PageLoading、PageError、EmptyState |
-| [shared/ui/controls](src/shared/ui/controls) | 按需纳入的 shadcn/ui 控件 |
-| [共享 API 客户端](../../packages/api-client/src/index.ts) | 超时、取消、JSON 解析与安全错误转换 |
-| [shared/api/query-client.ts](src/shared/api/query-client.ts) | 统一缓存生命周期与重试策略 |
-| [features/system/api/queries.ts](src/features/system/api/queries.ts) | 就绪查询键及查询函数，契约校验由共享客户端完成 |
-| [pages](src/pages) | 页面内容；懒加载页面导出 `Component` |
-| [test](src/test) | MSW 服务与测试生命周期 |
+| 路由                                  | 页面     | 说明                                   |
+| ------------------------------------- | -------- | -------------------------------------- |
+| `/login`                              | 登录     | 邮箱密码登录，成功后回跳原页面         |
+| `/accept-invitation?token=…`          | 接受邀请 | 设置姓名/密码并加入团队                |
+| `/forgot-password`、`/reset-password` | 找回密码 | 调用认证库协议端点                     |
+| `/projects`                           | 项目列表 | 登录后首页；按当前团队筛选/创建项目    |
+| `/projects/:projectId/requirements`   | 需求     | 列表、详情、评论、活动、提测/测试流程  |
+| `/projects/:projectId/bugs`           | Bug      | 列表、详情、回归历史、关闭/重开        |
+| `/projects/:projectId/settings`       | 项目设置 | 项目资料、Git 连接、仓库关联           |
+| `/settings/team`                      | 团队管理 | 管理员管理成员与邀请；无团队时创建团队 |
+| `/system/status`                      | 系统状态 | 后端/数据库就绪检查                    |
+| `/prototype/*`                        | 交互原型 | 仅开发环境注册，不进入生产构建         |
 
-当前路由为 `/`（工作台）、`/system/status`（系统状态）；未匹配地址显示 404 与返回入口。页面模块加载或渲染失败进入安全兜底页，可重新加载或返回工作台。导航通过 Link/NavLink 完成，浏览器前进后退保留 URL 语义。
+`RequireAuth` 保护所有业务路由并在布局内提供 `SessionProvider`；未登录跳转 `/login?redirect=…`。当前团队保存在本地存储，切换团队后查询键包含团队/项目范围。页面懒加载并导出 `Component`，加载/渲染失败由路由错误边界兜底。
 
-新增页面时在路由表注册并复用 AppLayout。页面分别展示加载、失败和空结果；查询失败由页面提供重试，未处理的路由故障由根错误边界兜底。后续需要 loader 预取时复用同一组 Query 定义，避免维护第二份服务端数据缓存。
+目录：
 
-## 查询与请求约定
+- `features/identity`：认证请求、会话上下文、登录/邀请/成员管理。
+- `features/projects`、`requirements`、`bugs`、`code`：按功能组织 `api/`、`model/`、`ui/` 与 `public.ts`。
+- `features/collaboration`：通用评论与活动时间线。
+- `shared/api`：页面使用的 API 单例、QueryClient 与业务错误文案。
+- `shared/lib`：Markdown 安全渲染、日期/编号格式化、列表 URL 状态。
+- `shared/ui`：加载/失败/空状态与 shadcn 控件。
 
-工作台和系统状态使用同一查询键 `['system', 'readiness']` 读取 `/api/v1/ready`，验证后端和数据库。数据在 30 秒内视为新鲜，不活跃缓存保留 5 分钟；过期后可因重新挂载、窗口聚焦或网络恢复触发刷新，也可手动检查。状态是最近一次采样，不能代替持续监控。
+## 请求、缓存与业务错误
 
-每次请求超时为 5 秒，并传递 Query 的取消信号；离开最后一个使用该查询的页面后，未完成请求会被取消。网络异常、超时及 HTTP 5xx 最多自动重试一次，间隔 500 毫秒；HTTP 4xx、非法 JSON 和契约错误不自动重试，写操作默认不重试。自动重试会增加总等待时间。
+- 业务请求统一使用 [共享 API 客户端](../../packages/api-client/src/index.ts)；页面不手拼 `/api/v1` 地址、不直接解析响应的 `success/code`。
+- 响应必须是统一信封；`success:false` 转为 `RequestError`，页面通过 `describeRequestError` 展示安全文案与 `requestId`，不显示服务端原始正文。
+- 创建、评论、提测等写操作携带 `Idempotency-Key`；重复提交返回 `IDEMPOTENCY_CONFLICT` 时保留未提交输入并提示刷新。
+- 查询 30 秒内视为新鲜，缓存保留 5 分钟；网络/超时/5xx 最多自动重试一次，业务错误、权限错误与契约错误不重试；写操作默认不重试。
+- 退出登录调用认证端点并清空 QueryClient；切换团队后列表查询按团队/项目重新取数。
+- Markdown 通过 `shared/lib/markdown.tsx` 的 react-markdown + rehype-sanitize 渲染，只允许安全协议，禁止脚本和事件属性。
 
-响应先作为 unknown 校验再使用。错误提示保留安全说明、HTTP 状态和可用的 `x-request-id`，不透传原始错误体或堆栈。当前请求层仅实现实际使用的 GET；后续写入按真实契约扩展，成功后失效相关查询。
+## UI 与依赖
 
-公共就绪查询不包含身份信息。新增用户、团队或项目查询时，查询键必须包含其资源范围；认证接入时需取消并清理退出用户的缓存。本次未添加认证、缓存持久化、页面保活或全局客户端 store。
+shadcn/ui 使用 Radix 基础控件和 nova 样式，配置见 [components.json](components.json)。已纳入 Button、Input、Textarea、Select、Dialog、Tabs、Table、Badge、Alert、Card、Sheet 等；主题变量在 [shared/styles/index.css](src/shared/styles/index.css)，`@/` 指向 `src/`。
 
-## UI 维护
-
-shadcn/ui 使用 Radix 基础控件和 nova 样式，配置见 [components.json](components.json)。已纳入 Button、Card、Alert、Badge、Skeleton、Separator、Sheet；Tailwind 与主题变量统一在 [shared/styles/index.css](src/shared/styles/index.css)，`@/` 指向 `src/`。字体随本地包构建，不依赖外部字体服务。
-
-后续可在仓库根目录按需添加控件，例如：
-
-```bash
-pnpm --dir apps/web exec shadcn add input
-```
-
-生成后检查差异并补充中文 JSDoc、用户可见文案与交互测试，避免覆盖本地调整。优先使用现有控件；有实际表单页面时再引入 React Hook Form 与 Zod。不要恢复 Vite 模板中未分层的全局样式，以免覆盖 Tailwind 工具类。
+表单依赖 `react-hook-form`、`zod`、`@hookform/resolvers`；Markdown 依赖 `react-markdown`、`rehype-sanitize`。新增控件仍按需生成并检查差异、补中文 JSDoc 与交互测试，避免覆盖本地主题。
 
 ## 验证范围
 
-现有自动化测试覆盖首次加载、导航与缓存复用、深链接、404、路由渲染异常、HTTP 与响应契约错误、取消、重试策略及失败恢复。每个测试独立创建路由和 QueryClient，MSW 拦截请求，结束后清理缓存和处理器。
+测试覆盖登录失败与本地校验、路由保护/回跳、项目列表、项目表单校验、需求/Bug 权限与流程对话框校验、代码仓库空状态、Markdown 安全、统一错误/重试、深链接、404、移动导航抽屉与路由错误边界。每个用例独立创建 QueryClient 和路由，MSW 拦截请求并清理处理器。
 
-2026-11-09 接入验证已执行 lint、组件测试和生产构建，并通过浏览器检查真实后端联通、深链接刷新、缓存复用、移动端导航、Escape 关闭与焦点恢复。仓库跨应用脚本验证真实 API 代理、深链接响应和 CLI 联通，尚未自动化浏览器操作；登录、业务表单和权限场景随对应功能补充。
+手工验收仍需按 [quickstart](../specs/001-v01-rd-workflow/quickstart.md) 使用真实后端、邮箱与 Git 资源执行；自动化测试不替代真实 SMTP、GitHub/Gitea 网络与权限验收。

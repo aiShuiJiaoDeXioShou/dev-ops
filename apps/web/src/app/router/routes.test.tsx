@@ -20,8 +20,15 @@ const disposers: Array<() => void> = []
 function renderApplication(path = '/', routes = createAppRoutes()) {
   const client = createQueryClient()
   const router = createMemoryRouter(routes, { initialEntries: [path] })
-  disposers.push(() => { router.dispose(); client.clear() })
-  render(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>)
+  disposers.push(() => {
+    router.dispose()
+    client.clear()
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
   return router
 }
 
@@ -30,37 +37,67 @@ afterEach(() => {
 })
 
 describe('工作区路由与数据状态', () => {
-  it('请求未完成时显示加载占位，并阻止重复检查', async () => {
-    let releaseResponse: () => void = () => { throw new Error('测试响应尚未初始化') }
-    const pending = new Promise<void>(resolve => { releaseResponse = resolve })
-    server.use(http.get('http://localhost/api/v1/ready', async () => {
-      await pending
-      return HttpResponse.json({ status: 'ok', database: 'ok' })
-    }))
-    renderApplication()
-    try {
-      expect(await screen.findByText('正在检查后端与数据库…')).toBeVisible()
-      expect(screen.getByRole('button', { name: '检查中…' })).toBeDisabled()
-    } finally {
-      releaseResponse()
-    }
-    expect(await screen.findByText('已联通：前端 → API 代理 → 后端 → PostgreSQL')).toBeVisible()
+  it('已登录时进入项目列表', async () => {
+    renderApplication('/projects')
+    expect(await screen.findByRole('heading', { name: '项目', level: 1 })).toBeVisible()
+    expect(await screen.findByText('测试项目')).toBeVisible()
+  })
+
+  it('空项目列表与浏览者只读状态', async () => {
+    server.use(
+      http.get('*/api/v1/me/teams', () =>
+        HttpResponse.json({
+          success: true,
+          code: 'OK',
+          message: 'ok',
+          requestId: 'trace',
+          data: [{ id: 'team-1', name: '测试团队', role: 'viewer', status: 'active' }],
+        }),
+      ),
+      http.get('*/api/v1/teams/:teamId/projects', () =>
+        HttpResponse.json({
+          success: true,
+          code: 'OK',
+          message: 'ok',
+          requestId: 'trace',
+          data: { items: [], page: 1, pageSize: 20, total: 0 },
+        }),
+      ),
+    )
+    renderApplication('/projects')
+    expect(await screen.findByText('还没有项目，创建第一个项目开始协作。')).toBeVisible()
+    expect(screen.getByRole('button', { name: '创建项目' })).toBeDisabled()
+  })
+
+  it('未登录访问受保护页面时跳转登录页', async () => {
+    server.use(http.get('*/api/v1/auth/get-session', () => HttpResponse.json(null)))
+    renderApplication('/projects')
+    expect(await screen.findByRole('heading', { name: '登录工作区', level: 1 })).toBeVisible()
   })
 
   it('导航到系统状态复用缓存，支持返回与直接访问深链接', async () => {
     let requests = 0
-    server.use(http.get('http://localhost/api/v1/ready', () => {
-      requests += 1
-      return HttpResponse.json({ status: 'ok', database: 'ok' })
-    }))
-    const router = renderApplication()
-    await screen.findByText('已联通：前端 → API 代理 → 后端 → PostgreSQL')
+    server.use(
+      http.get('http://localhost/api/v1/ready', () => {
+        requests += 1
+        return HttpResponse.json({
+          success: true,
+          code: 'OK',
+          message: 'ok',
+          requestId: 'test-request',
+          data: { status: 'ok', database: 'ok' },
+        })
+      }),
+    )
+    const router = renderApplication('/projects')
+    await screen.findByRole('heading', { name: '项目', level: 1 })
     await userEvent.click(screen.getByRole('link', { name: '系统状态' }))
     expect(await screen.findByRole('heading', { name: '系统状态', level: 1 })).toBeVisible()
+    expect(await screen.findByText('已联通：前端 → API 代理 → 后端 → PostgreSQL')).toBeVisible()
     expect(router.state.location.pathname).toBe('/system/status')
     expect(requests).toBe(1)
     await act(() => router.navigate(-1))
-    expect(await screen.findByRole('heading', { name: '工作台', level: 1 })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: '项目', level: 1 })).toBeVisible()
     expect(requests).toBe(1)
   })
 
@@ -71,14 +108,28 @@ describe('工作区路由与数据状态', () => {
   })
 
   it('数据库失败有明确提示，恢复后能手动重试', async () => {
-    server.use(http.get('http://localhost/api/v1/ready', () => HttpResponse.json(
-      { code: 'DATABASE_UNAVAILABLE' },
-      { status: 503, headers: { 'x-request-id': 'database-failure' } },
-    )))
+    server.use(
+      http.get('http://localhost/api/v1/ready', () =>
+        HttpResponse.json(
+          { code: 'DATABASE_UNAVAILABLE' },
+          { status: 503, headers: { 'x-request-id': 'database-failure' } },
+        ),
+      ),
+    )
     renderApplication('/system/status')
     expect(await screen.findByRole('alert')).toHaveTextContent('数据库尚未就绪')
     expect(screen.getByText('请求标识：database-failure')).toBeVisible()
-    server.use(http.get('http://localhost/api/v1/ready', () => HttpResponse.json({ status: 'ok', database: 'ok' })))
+    server.use(
+      http.get('http://localhost/api/v1/ready', () =>
+        HttpResponse.json({
+          success: true,
+          code: 'OK',
+          message: 'ok',
+          requestId: 'test-request',
+          data: { status: 'ok', database: 'ok' },
+        }),
+      ),
+    )
     await userEvent.click(screen.getByRole('button', { name: '重新检查' }))
     expect(await screen.findByText('已联通：前端 → API 代理 → 后端 → PostgreSQL')).toBeVisible()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
@@ -88,11 +139,12 @@ describe('工作区路由与数据状态', () => {
     renderApplication('/unknown-page')
     expect(await screen.findByRole('heading', { name: '页面不存在' })).toBeVisible()
     await userEvent.click(screen.getByRole('link', { name: '返回工作台' }))
-    expect(await screen.findByRole('heading', { name: '工作台', level: 1 })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: '项目', level: 1 })).toBeVisible()
   })
 
   it('导航抽屉可通过键盘关闭并恢复触发器焦点', async () => {
-    renderApplication()
+    renderApplication('/projects')
+    await screen.findByRole('heading', { name: '项目', level: 1 })
     const user = userEvent.setup()
     const trigger = await screen.findByRole('button', { name: '打开导航' })
     await user.click(trigger)
@@ -106,11 +158,14 @@ describe('工作区路由与数据状态', () => {
     // 此用例主动触发 React 错误边界，预期的控制台输出由测试接管。
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const routes = createAppRoutes()
-    const root = routes[0]
+    const protectedRoute = routes.find((route) => route.children?.some((child) => child.path === '/'))
+    const root = protectedRoute?.children?.find((child) => child.path === '/')
     if (!root?.children) throw new Error('缺少根路由配置')
     root.children.unshift({
       path: 'broken-page',
-      Component: () => { throw new Error('内部数据库凭据不得展示') },
+      Component: () => {
+        throw new Error('内部数据库凭据不得展示')
+      },
     })
     renderApplication('/broken-page', routes)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('页面暂时无法加载'))
