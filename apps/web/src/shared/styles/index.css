@@ -610,3 +610,14 @@
 #toast[data-variant='error'] .toast-icon {
   color: #ffb4b4;
 }
+
+/* 接受邀请时说明已有账号需要原密码，避免把登录密码误认为新密码。 */
+.field-hint {
+  margin-top: -4px;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.field-hint a {
+  margin: 0 2px;
+}

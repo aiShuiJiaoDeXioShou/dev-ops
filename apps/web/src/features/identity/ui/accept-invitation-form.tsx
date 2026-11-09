@@ -1,10 +1,34 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { describeRequestError } from '@/shared/api/errors'
 import { PageLoading } from '@/shared/ui/page-state'
 import { sessionQueryOptions } from '../api/queries'
+
+/**
+ * 将接受邀请的失败原因转换成用户可执行的说明。
+ * @param cause 请求异常。
+ * @returns 针对已有账号、邀请失效和密码问题的具体提示。
+ */
+function invitationAcceptErrorMessage(cause: unknown): string {
+  if (!isBusinessError(cause)) return '接受邀请失败，请检查网络后重试。'
+  switch (cause.serverCode) {
+    case 'UNAUTHENTICATED':
+      return '该邮箱已有账号，请填写原账号密码；如果忘记密码，请先通过“忘记密码”重置。'
+    case 'INVITATION_ALREADY_ACCEPTED':
+      return '该邀请已被接受，或该邮箱已经是团队成员。'
+    case 'INVITATION_INVALID':
+      return '邀请无效或已过期，请联系团队管理员重新发送。'
+    case 'VALIDATION_ERROR':
+      return describeRequestError(cause).description
+    case 'PRECONDITION_FAILED':
+      return '账号创建失败，请确认邮箱是否已有账号；如果已有账号，请填写原密码后重试。'
+    default:
+      return describeRequestError(cause).description
+  }
+}
 
 /** 接受邀请并设置首次密码；邀请页面公开访问。 */
 export function AcceptInvitationForm() {
@@ -29,7 +53,7 @@ export function AcceptInvitationForm() {
       navigate('/projects', { replace: true })
     },
     onError: (cause: unknown) => {
-      setError(isBusinessError(cause) ? `无法加入团队：${cause.message}` : '接受邀请失败，请稍后重试。')
+      setError(invitationAcceptErrorMessage(cause))
     },
   })
   if (!token)
@@ -63,14 +87,18 @@ export function AcceptInvitationForm() {
         <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
       </label>
       <label className="field">
-        设置密码
+        密码
         <input
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          autoComplete="new-password"
+          autoComplete="current-password"
         />
       </label>
+      <p className="field-hint">
+        已有账号请填写原账号密码；新账号会使用该密码创建。忘记密码可
+        <Link to="/forgot-password">先找回密码</Link>。
+      </p>
       <label className="field">
         确认密码
         <input

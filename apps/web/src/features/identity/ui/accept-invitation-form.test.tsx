@@ -32,6 +32,36 @@ describe('AcceptInvitationForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('邀请无效或已过期')
   })
 
+  it('已有账号密码错误时提示使用原账号密码而不是通用失败', async () => {
+    server.use(
+      http.get('*/api/v1/invitations/existing-token', () =>
+        HttpResponse.json({
+          success: true,
+          code: 'OK',
+          message: 'ok',
+          requestId: 'trace',
+          data: { ...invitation, accountExists: true },
+        }),
+      ),
+      http.post('*/api/v1/invitations/existing-token/accept', () =>
+        HttpResponse.json({ success: false, code: 'UNAUTHENTICATED', message: '邮箱或密码不正确', requestId: 'trace' }),
+      ),
+    )
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <MemoryRouter initialEntries={['/accept-invitation?token=existing-token']}>
+          <AcceptInvitationForm />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await userEvent.type(await screen.findByLabelText('显示名称'), '已有账号')
+    await userEvent.type(screen.getByLabelText('密码'), 'wrong-password')
+    await userEvent.type(screen.getByLabelText('确认密码'), 'wrong-password')
+    await userEvent.click(screen.getByRole('button', { name: '加入团队' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('该邮箱已有账号，请填写原账号密码')
+    expect(screen.queryByText('操作未完成，请稍后重试。')).not.toBeInTheDocument()
+  })
+
   it('接受邀请成功后进入项目页', async () => {
     server.use(
       http.get('*/api/v1/invitations/good-token', () =>
@@ -58,7 +88,7 @@ describe('AcceptInvitationForm', () => {
       </QueryClientProvider>,
     )
     await userEvent.type(await screen.findByLabelText('显示名称'), '新成员')
-    await userEvent.type(screen.getByLabelText('设置密码'), 'password-123')
+    await userEvent.type(screen.getByLabelText('密码'), 'password-123')
     await userEvent.type(screen.getByLabelText('确认密码'), 'password-123')
     await userEvent.click(screen.getByRole('button', { name: '加入团队' }))
     expect(await screen.findByRole('heading', { name: '项目首页' })).toBeInTheDocument()
