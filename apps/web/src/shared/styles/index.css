@@ -660,3 +660,75 @@
   color: var(--red);
   background: #fff0f0;
 }
+
+/* 代码仓库设置：卡片分组、行式仓库/连接列表，避免表单和按钮挤成一排。 */
+.repo-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.repo-settings .card {
+  padding: 20px;
+}
+.repo-settings .section-heading {
+  margin-bottom: 10px;
+}
+.repo-list {
+  margin-top: 6px;
+}
+.repo-row,
+.connection-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.repo-row:last-child,
+.connection-item:last-child {
+  border-bottom: 0;
+}
+.repo-name {
+  color: var(--blue);
+  font-weight: 500;
+}
+.repo-name:hover {
+  text-decoration: underline;
+}
+.repo-link-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.repo-select {
+  flex: 1;
+  min-width: 240px;
+  max-width: 420px;
+}
+.repo-select select {
+  height: 38px;
+}
+.connection-item {
+  align-items: flex-start;
+}
+.connection-item p {
+  margin-top: 5px;
+}
+.connection-item .btn {
+  min-height: 32px;
+  font-size: 12px;
+}
+.connection-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.connection-form summary {
+  cursor: pointer;
+  color: var(--blue);
+  font-size: 13px;
+}
+.connection-form .form-grid {
+  margin-top: 16px;
+}

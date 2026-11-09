@@ -24,7 +24,7 @@ describe('RepositoryPicker', () => {
         <RepositoryPicker projectId="project-1" teamId="team-1" canManage={false} />
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('尚未关联仓库。')).toBeInTheDocument()
+    expect(await screen.findByText(/尚未关联仓库/)).toBeInTheDocument()
   })
 
   it('展示连接状态与检查、同步操作', async () => {

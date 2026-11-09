@@ -28,9 +28,6 @@ export function Component() {
   }
   return (
     <div className="catalog">
-      <div className="section-heading">
-        <h2>代码</h2>
-      </div>
       <RepositoryPicker
         projectId={projectId}
         teamId={project.data.data.teamId}
