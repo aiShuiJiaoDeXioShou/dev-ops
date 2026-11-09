@@ -15,9 +15,9 @@
     "README.md"
   ],
   "scripts": {
-    "dev": "node --import tsx src/index.ts",
+    "dev": "node --env-file-if-exists=.env --import tsx src/index.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
+    "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "test": "node --import tsx --test test/*.test.ts",

@@ -1,7 +1,4 @@
 {
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts"
-  ],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "extends": "../../tooling/typescript/node.json"
 }
