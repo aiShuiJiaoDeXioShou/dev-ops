@@ -115,6 +115,18 @@
 4. 在线创建大表索引时评估 `CREATE INDEX CONCURRENTLY`。该操作不能放在事务块中，迁移需显式处理事务边界、失败后的无效索引及重试策略。参见[并发创建索引](https://www.postgresql.org/docs/18/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY)。
 5. 使用连接池，设置连接、语句与锁等待超时。异常路径必须回滚并释放连接，避免空闲事务长期持锁；应用账号仅授予业务所需权限，结构迁移使用独立授权。
 
+## 格式化、静态检查与提交
+
+1. 统一使用根目录 Prettier 配置：无分号、单引号、2 空格、行宽 120、尾随逗号；提交前运行 `pnpm format`。CI/交付检查运行 `pnpm format:check`，不得以编辑器自动格式化结果代替。
+2. 统一使用根目录 ESLint flat config；`pnpm lint` 必须通过，禁止用 `eslint-disable` 绕过规则，确需例外时在紧邻位置说明原因并缩小范围。各应用原有的 oxlint 脚本保留为快速检查，不作为唯一质量门禁。
+3. 新增或修改 TypeScript 必须通过类型检查；禁止 `any`、非空断言和强制类型转换掩盖问题。完成后运行对应应用的 check/build，涉及数据库时运行 `pnpm --dir apps/server test:db`。
+4. 每实现一个可独立验收的功能，必须提交对应 Git 文件，提交前确认：
+   - 功能代码、接口契约、测试和相关配置一并纳入，不把无关 UI 或他人未完成改动混入；
+   - 通过 `pnpm lint`、`pnpm format:check` 及相关测试；
+   - 不提交 `.env`、密钥、真实凭据、生成产物和本地验收文件；
+   - 提交消息使用 `feat(module): 中文说明` 等约定格式，一个提交只表达一个功能或一个明确修复。
+5. 并发协作时先确认工作区文件归属；不得提交或回退其他线程尚未完成的 UI、样式和原型改动。跨端功能按“后端/共享客户端/前端”拆分提交，便于独立回滚。
+
 ## 验证与交付
 
 1. 完整工程检查在仓库根目录运行 `pnpm check`，包含契约生成、全部构建、依赖边界、应用测试和联通测试。局部检查前先运行 `pnpm prepare:clients`；命令以各项目 `package.json` 为准。前端代码变更运行 `pnpm --dir apps/web lint` 和 `pnpm --dir apps/web build`；后端代码变更运行 `pnpm --dir apps/server check` 和 `pnpm --dir apps/server build`；CLI 代码变更运行 `pnpm --dir apps/cli check` 和 `pnpm --dir apps/cli build`。
