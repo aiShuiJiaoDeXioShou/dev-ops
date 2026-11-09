@@ -9,8 +9,7 @@ import { RequestError } from '@dev-ops/api-client'
  */
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
   if (failureCount >= 1 || !(error instanceof RequestError)) return false
-  return error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT' ||
-    (error.status !== null && error.status >= 500)
+  return error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT' || (error.status !== null && error.status >= 500)
 }
 
 /**
