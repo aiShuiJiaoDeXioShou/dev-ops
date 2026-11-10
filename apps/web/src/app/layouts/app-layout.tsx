@@ -81,7 +81,9 @@ export function AppLayout() {
             </NavLink>
           )}
           <div className="user">
-            <span className="avatar">{user.name.slice(0, 1)}</span>
+            <span className="avatar-slot">
+              <span className="avatar">{user.name.slice(0, 1)}</span>
+            </span>
             <span className="user-copy">
               <span className="user-name">{user.name}</span>
               <span className="user-team">

@@ -875,18 +875,32 @@
 }
 
 /* 账号行与上方导航文字对齐：15px 左内边距 + 头像 26 + 5px 间距 = 导航文字起点。 */
+.side-bottom {
+  gap: 6px;
+}
 .user {
-  padding: 8px 15px;
-  gap: 5px;
+  min-height: 42px;
+  padding: 0 15px;
+  gap: 0;
 }
 .user-copy {
   flex: 1;
+  padding-right: 4px;
+}
+.user .avatar-slot {
+  width: 22px;
+  flex-shrink: 0;
+  display: flex;
+  margin-right: 9px;
 }
 .user .avatar {
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
+  font-size: 11px;
 }
 .user .badge {
-  margin-left: 4px;
+  margin-left: 2px;
 }
 
 /* Markdown 预览：md-body 提供正文/行内代码样式，这里补齐 fenced code block。 */
