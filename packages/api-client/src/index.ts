@@ -412,6 +412,20 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 读取团队项目首页活动晴雨表与项目摘要。 */
+    async getProjectActivity(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/project-activity', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/project-activity', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/project-activity`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+
     /** 读取团队邀请。 */
     async listTeamInvitations(
       teamId: string,
