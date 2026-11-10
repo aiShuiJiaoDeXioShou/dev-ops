@@ -35,7 +35,7 @@ function safeUrl(url: string): string {
  */
 export function Markdown({ children }: { children: string }) {
   return (
-    <div className="markdown-body">
+    <div className="md-body">
       <ReactMarkdown rehypePlugins={[[rehypeSanitize, schema]]} components={components} urlTransform={safeUrl}>
         {children}
       </ReactMarkdown>

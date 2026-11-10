@@ -888,3 +888,84 @@
 .user .badge {
   margin-left: 4px;
 }
+
+/* Markdown 预览：md-body 提供正文/行内代码样式，这里补齐 fenced code block。 */
+.md-body pre {
+  margin: 16px 0;
+  padding: 16px;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--md-soft, #f9fafb);
+  color: var(--md-ink, #0f1115);
+  font: 11px/19px var(--md-code-font, ui-monospace, monospace);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.md-body pre code {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+}
+
+/* 需求/Bug 筛选下拉统一自定义箭头，避免浏览器默认控件差异。 */
+.filter-select {
+  appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+}
+
+/* 代码分支触发器和下拉菜单按 GitHub 风格收敛。 */
+.git-branch-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 5px;
+}
+.git-branch-button:hover {
+  background: var(--soft);
+}
+.git-branch-button .icon {
+  width: 15px;
+  height: 15px;
+}
+.git-branch-menu [data-slot='dropdown-menu-item'] {
+  gap: 8px;
+  font-size: 12px;
+}
+.git-branch-menu .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--quiet);
+}
+
+/* 其余原生 select 统一箭头与右侧留白；shadcn Select 已有自绘 Chevron，不重复处理。 */
+.project-select {
+  appearance: none;
+  padding-right: 22px;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 2px center;
+}
+.git-strip select {
+  appearance: none;
+  padding-right: 20px;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 2px center;
+}
+.field select:not([data-slot='select']) {
+  appearance: none;
+  padding-right: 30px;
+  background: #fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+}

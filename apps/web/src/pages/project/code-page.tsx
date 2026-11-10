@@ -13,6 +13,14 @@ import { describeRequestError } from '@/shared/api/errors'
 import { PageError } from '@/shared/ui/page-state'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { useToast } from '@/shared/ui/toast'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/ui/controls/dropdown-menu'
 import { Markdown } from '@/shared/lib/markdown'
 import { highlightCode } from '@/shared/lib/highlight'
 import 'highlight.js/styles/github.css'
@@ -126,6 +134,26 @@ function FileTree({
 }
 
 /**
+ * 根据代码平台生成文件链接。
+ */
+function fileUrlFor(provider: string, webUrl: string, branch: string, path: string): string {
+  const base = webUrl.replace(/\/$/, '')
+  const encoded = path
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')
+  if (provider === 'gitea') return `${base}/src/branch/${encodeURIComponent(branch)}/${encoded}`
+  return `${base}/blob/${encodeURIComponent(branch)}/${encoded}`
+}
+
+/** 生成仓库 ZIP 下载链接。 */
+function archiveUrlFor(provider: string, webUrl: string, branch: string): string {
+  const base = webUrl.replace(/\/$/, '')
+  if (provider === 'github') return `${base}/archive/refs/heads/${encodeURIComponent(branch)}.zip`
+  return `${base}/archive/${encodeURIComponent(branch)}.zip`
+}
+
+/**
  * 项目代码页：按原型的 Git 信息条和文件浏览器展示远端仓库内容。
  * @returns 代码阅读界面；未关联仓库时显示仓库管理。
  */
@@ -214,24 +242,57 @@ export function Component() {
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }
+  const copyText = async (text: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      showToast(successMessage, 'success')
+    } catch {
+      showToast('浏览器拒绝剪贴板权限，请手动复制', 'error')
+    }
+  }
+  const currentBranch = tree.data?.data.branch ?? branch ?? ''
+  const fileLink =
+    currentBranch && activePath ? fileUrlFor(repository.providerKey, repository.webUrl, currentBranch, activePath) : ''
+  const archiveLink = currentBranch
+    ? archiveUrlFor(repository.providerKey, repository.webUrl, currentBranch)
+    : repository.webUrl
   return (
     <div className="code-page">
       <div className="git-strip">
-        <PrototypeIcon name="branch" />
-        <select
-          aria-label="代码分支"
-          value={tree.data?.data.branch ?? branch ?? ''}
-          onChange={(event) => {
-            setSelectedBranch(event.target.value)
-            setSelectedPath('')
-          }}
-        >
-          {branchOptions.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" className="git-branch-button" aria-label="切换代码分支">
+              <PrototypeIcon name="branch" />
+              <span>{currentBranch || '默认分支'}</span>
+              <PrototypeIcon name="down" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="git-branch-menu" align="start">
+            <DropdownMenuLabel>切换分支</DropdownMenuLabel>
+            {branchOptions.map((item) => (
+              <DropdownMenuItem
+                key={item}
+                onSelect={() => {
+                  setSelectedBranch(item)
+                  setSelectedPath('')
+                }}
+              >
+                <PrototypeIcon name={item === currentBranch ? 'check' : 'branch'} />
+                {item}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void copyText(currentBranch, '分支名已复制')}>
+              复制分支名
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void copyText(repository.webUrl, '仓库链接已复制')}>
+              复制仓库链接
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => window.open(archiveLink, '_blank', 'noopener,noreferrer')}>
+              下载 ZIP
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <span className="divider" />
         <PrototypeIcon name="repo" />
         {linkedRepositories.length > 1 ? (
@@ -257,8 +318,7 @@ export function Component() {
         )}
         <span className="spacer" />
         <a className="btn" href={repository.webUrl} target="_blank" rel="noreferrer">
-          <PrototypeIcon name="external" />
-          在远端打开
+          <PrototypeIcon name="external" />在 {providerLabel} 打开
         </a>
       </div>
       <div className="section-heading">
@@ -323,6 +383,14 @@ export function Component() {
               <span className="row">
                 <button type="button" className="text-btn" disabled={!file.data} onClick={() => void copyContent()}>
                   复制内容
+                </button>
+                <button
+                  type="button"
+                  className="text-btn"
+                  disabled={!fileLink}
+                  onClick={() => void copyText(fileLink, '文件链接已复制')}
+                >
+                  复制文件链接
                 </button>
                 <button type="button" className="text-btn" disabled={!file.data} onClick={downloadContent}>
                   下载文件
