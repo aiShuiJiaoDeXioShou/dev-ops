@@ -22,3 +22,12 @@ export { idempotencyRecord } from '../platform/database/idempotency.tables.ts'
 export { secret } from '../modules/configuration/configuration.tables.ts'
 export { gitConnection } from '../modules/integrations/integrations.tables.ts'
 export { gitRepository, projectRepository, codeReference } from '../modules/code/code.tables.ts'
+
+export {
+  skill,
+  skillVersion,
+  agentTemplate,
+  agentTemplateVersion,
+  projectTemplateSelection,
+  templateSnapshotLink,
+} from '../modules/knowledge/knowledge.tables.ts'

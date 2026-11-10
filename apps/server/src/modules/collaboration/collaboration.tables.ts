@@ -45,7 +45,7 @@ export const activity = appSchema.table(
     primaryKey({ name: 'pk_activity_id', columns: [table.id] }),
     check(
       'ck_activity_entity_type',
-      sql`${table.entity_type} in ('project', 'requirement', 'bug', 'code_reference', 'team_member')`,
+      sql`${table.entity_type} in ('project', 'requirement', 'bug', 'code_reference', 'team_member', 'skill', 'agent_template')`,
     ),
     index('idx_activity_entity').on(table.entity_type, table.entity_id, table.created_at, table.id),
     index('idx_activity_team').on(table.team_id, table.created_at),

@@ -16,6 +16,7 @@ import { bugRoutes } from '../modules/bugs/bugs.routes.ts'
 import type { MailSender } from '../adapters/mail/mail.types.ts'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
 import { codeRoutes } from '../modules/code/code.routes.ts'
+import { knowledgeRoutes } from '../modules/knowledge/knowledge.routes.ts'
 import { integrationsRoutes } from '../modules/integrations/integrations.routes.ts'
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
@@ -98,6 +99,7 @@ export function createHttpApp(
   app.register(requirementRoutes, { prefix: '/api/v1', auth: services.auth, service: services.requirements })
   app.register(bugRoutes, { prefix: '/api/v1', auth: services.auth, service: services.bugs })
   app.register(codeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.code })
+  app.register(knowledgeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.knowledge })
   app.register(integrationsRoutes, {
     prefix: '/api/v1',
     auth: services.auth,

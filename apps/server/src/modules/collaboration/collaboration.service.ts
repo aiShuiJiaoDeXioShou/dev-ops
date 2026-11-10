@@ -19,6 +19,8 @@ const ACTIVITY_ENTITY_TYPES: ReadonlySet<string> = new Set([
   'bug',
   'code_reference',
   'team_member',
+  'skill',
+  'agent_template',
 ])
 
 export interface CommentView {

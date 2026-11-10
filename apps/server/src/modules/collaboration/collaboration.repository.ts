@@ -7,7 +7,7 @@ type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type DatabaseExecutor = Pick<Database, 'insert' | 'select'> | TransactionDatabase
 
 export type CommentEntityType = 'project' | 'requirement' | 'bug'
-export type ActivityEntityType = CommentEntityType | 'code_reference' | 'team_member'
+export type ActivityEntityType = CommentEntityType | 'code_reference' | 'team_member' | 'skill' | 'agent_template'
 
 export interface NewComment {
   id: string

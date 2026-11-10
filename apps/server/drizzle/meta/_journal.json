@@ -92,6 +92,13 @@
       "when": 1794255052281,
       "tag": "0012_add_list_updated_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794291689058,
+      "tag": "0013_knowledge_skills_agents",
+      "breakpoints": true
     }
   ]
 }

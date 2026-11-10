@@ -3,6 +3,7 @@ import { createDatabase } from '../platform/database/client.ts'
 import { createIdentityAuth } from '../modules/identity/identity.auth.ts'
 import { createIdentityService } from '../modules/identity/identity.service.ts'
 import { createProjectsService } from '../modules/projects/projects.service.ts'
+import { createKnowledgeService } from '../modules/knowledge/knowledge.service.ts'
 import { createRequirementsService } from '../modules/requirements/requirements.service.ts'
 import { createBugsService } from '../modules/bugs/bugs.service.ts'
 import { createCodeService } from '../modules/code/code.service.ts'
@@ -109,10 +110,13 @@ export function createServices(
     },
   })
 
+  const knowledge = createKnowledgeService({ db: database.db })
+
   return {
     database,
     auth,
     identity,
+    knowledge,
     requirements,
     bugs,
     configuration,
