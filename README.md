@@ -8,6 +8,8 @@
 
 首版功能清单、业务流程、验收标准和待确认问题见 [V0.1 需求细化](docs/prd/v0.1.md)。
 
+平台内置流水线的整体方案、执行节点架构、版本安排与待确认决策见[流水线功能规划草案](docs/prd/pipeline-plan.md)，当前为规划草案。
+
 全新的工作区结构、Web 与 Server 模块边界及搭建范围见[目标架构方案](docs/architecture/system-design.md)，目标方案已确认，工作区和基础工程已搭建，业务模块按实际需求加入。
 
 GitHub App 授权、成员与 Bot 的权限和凭据、统一 Git 接口及执行流程见[外部仓库集成架构](docs/architecture/external-repositories.md)。首批适配范围为 GitHub、Gitea，GitLab、Gitee、Codeup 预留扩展；当前为待实施验证的架构设计。

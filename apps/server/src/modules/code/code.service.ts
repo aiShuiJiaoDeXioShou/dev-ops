@@ -13,9 +13,11 @@ import {
   deleteCodeReference,
   deleteProjectRepository,
   findAvailableRepositories,
+  findChangeRequestRemoteIdsForTarget,
   findCodeReferenceById,
   findCodeReferencesForTarget,
   findConnectionRepositories,
+  findLinkedRepository,
   findProjectRepositories,
   findProjectRepositoryLink,
   findRepositoryById,
@@ -71,6 +73,64 @@ export interface GitFileContentPort {
   content: string
   truncated: boolean
 }
+/** 归一化 PR 状态；来源缺省时为 unknown，不得猜测。 */
+export type PullRequestState = 'open' | 'closed' | 'merged' | 'unknown'
+/** 归一化 PR 评审状态；来源不提供时为 unknown。 */
+export type PullRequestReviewStatus = 'pending' | 'approved' | 'changes_requested' | 'unknown'
+/** 归一化变更文件状态；来源额外状态收窄为固定枚举。 */
+export type PullRequestFileStatus = 'added' | 'modified' | 'removed' | 'renamed' | 'unknown'
+/** PR 列表状态筛选；merged 在来源 API 中属于 closed。 */
+export type PullRequestStateFilter = 'open' | 'closed' | 'all'
+
+/** 代码读取端口返回的提交摘要，与接口提交列表项字段一致。 */
+export interface GitCommitSummaryPort {
+  sha: string
+  title: string
+  authorName: string
+  committedAt: string
+  url: string | null
+}
+export interface GitCommitFilePort {
+  path: string
+  status: PullRequestFileStatus
+  additions: number
+  deletions: number
+}
+export interface GitCommitDetailPort extends GitCommitSummaryPort {
+  files: GitCommitFilePort[]
+  filesTruncated: boolean
+  filesUnsupported: boolean
+}
+export interface GitPullRequestSummaryPort {
+  number: number
+  title: string
+  authorName: string
+  sourceBranch: string
+  targetBranch: string
+  state: PullRequestState
+  reviewStatus: PullRequestReviewStatus
+  createdAt: string
+  updatedAt: string
+  mergedAt: string | null
+  url: string | null
+}
+export interface GitPullRequestFilePort {
+  path: string
+  status: PullRequestFileStatus
+  additions: number
+  deletions: number
+  patch: string | null
+  binary: boolean
+  truncated: boolean
+}
+export interface GitPullRequestDetailPort extends GitPullRequestSummaryPort {
+  files: GitPullRequestFilePort[]
+  truncated: boolean
+}
+export interface GitPullRequestDiffPort {
+  patch: string
+  truncated: boolean
+}
 export interface GitReadPort {
   getObject(input: {
     repository: { namespace: string; name: string }
@@ -84,6 +144,28 @@ export interface GitReadPort {
     path: string
   }): Promise<GitFileContentPort>
   listBranches?(input: { repository: { namespace: string; name: string } }): Promise<string[]>
+  listCommits?(input: {
+    repository: { namespace: string; name: string }
+    ref?: string
+    page: number
+    pageSize: number
+  }): Promise<GitCommitSummaryPort[]>
+  getCommit?(input: { repository: { namespace: string; name: string }; ref: string }): Promise<GitCommitDetailPort>
+  listPullRequests?(input: {
+    repository: { namespace: string; name: string }
+    state?: PullRequestStateFilter
+    author?: string
+    page: number
+    pageSize: number
+  }): Promise<GitPullRequestSummaryPort[]>
+  getPullRequest?(input: {
+    repository: { namespace: string; name: string }
+    number: number
+  }): Promise<GitPullRequestDetailPort>
+  getPullRequestDiff?(input: {
+    repository: { namespace: string; name: string }
+    number: number
+  }): Promise<GitPullRequestDiffPort>
 }
 
 export interface RepositoryView {
@@ -110,6 +192,62 @@ export interface CodeReferenceView {
   lastCheckStatus: string
   lastErrorCode: string | null
   lastCheckedAt: string | null
+}
+/** 提交列表项视图；lastCheckedAt 为本次从来源读取的时间。 */
+export interface CommitSummaryView {
+  sha: string
+  title: string
+  authorName: string
+  committedAt: string
+  url: string | null
+  lastCheckedAt: string
+}
+/** 提交变更文件视图；只包含数量信息，不返回补丁。 */
+export interface CommitFileView {
+  path: string
+  status: PullRequestFileStatus
+  additions: number
+  deletions: number
+}
+/** 提交详情视图；filesUnsupported 表示来源不提供变更文件，filesTruncated 表示超过读取上限。 */
+export interface CommitView extends CommitSummaryView {
+  files: CommitFileView[]
+  filesTruncated: boolean
+  filesUnsupported: boolean
+}
+/** PR 变更文件视图；patch 为 null 表示来源不提供或超过截断上限。 */
+export interface PullRequestFileView {
+  path: string
+  status: PullRequestFileStatus
+  additions: number
+  deletions: number
+  patch: string | null
+  binary: boolean
+  truncated: boolean
+}
+/** PR 视图；列表接口不加载变更文件，files 为空且 truncated 为 false。 */
+export interface PullRequestView {
+  number: number
+  title: string
+  authorName: string
+  sourceBranch: string
+  targetBranch: string
+  state: PullRequestState
+  reviewStatus: PullRequestReviewStatus
+  createdAt: string
+  updatedAt: string
+  mergedAt: string | null
+  url: string | null
+  lastCheckedAt: string
+  files: PullRequestFileView[]
+  truncated: boolean
+}
+/** 代码读取接口的稳定分页结果；total 为已读到的下限，来源不提供总数时可能低估。 */
+export interface CodeReadPage<T> {
+  items: T[]
+  page: number
+  pageSize: number
+  total: number
 }
 export type GitAdapterResolver = (connectionId: string) => Promise<GitReadPort>
 export type ActiveConnectionReader = (teamId: string) => Promise<string[]>
@@ -151,6 +289,91 @@ function referenceView(row: Awaited<ReturnType<typeof findCodeReferenceById>> & 
   }
 }
 
+/** 只传递适配器读取所需仓库标识，避免把团队、URL 等内部字段交给适配器。 */
+function repositoryRef(repository: { namespace: string; name: string }): { namespace: string; name: string } {
+  return { namespace: repository.namespace, name: repository.name }
+}
+
+function commitSummaryView(item: GitCommitSummaryPort, checkedAt: string): CommitSummaryView {
+  return {
+    sha: item.sha,
+    title: item.title,
+    authorName: item.authorName,
+    committedAt: item.committedAt,
+    url: item.url,
+    lastCheckedAt: checkedAt,
+  }
+}
+
+function commitDetailView(item: GitCommitDetailPort, checkedAt: string): CommitView {
+  return {
+    ...commitSummaryView(item, checkedAt),
+    files: item.files.map((file) => ({
+      path: file.path,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+    })),
+    filesTruncated: item.filesTruncated,
+    filesUnsupported: item.filesUnsupported,
+  }
+}
+
+function pullRequestFileView(item: GitPullRequestFilePort): PullRequestFileView {
+  return {
+    path: item.path,
+    status: item.status,
+    additions: item.additions,
+    deletions: item.deletions,
+    patch: item.patch,
+    binary: item.binary,
+    truncated: item.truncated,
+  }
+}
+
+function pullRequestBaseView(item: GitPullRequestSummaryPort, checkedAt: string) {
+  return {
+    number: item.number,
+    title: item.title,
+    authorName: item.authorName,
+    sourceBranch: item.sourceBranch,
+    targetBranch: item.targetBranch,
+    state: item.state,
+    reviewStatus: item.reviewStatus,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    mergedAt: item.mergedAt,
+    url: item.url,
+    lastCheckedAt: checkedAt,
+  }
+}
+
+/** 列表接口不读取变更文件，明确返回空文件列表而不是伪造内容。 */
+function pullRequestListView(item: GitPullRequestSummaryPort, checkedAt: string): PullRequestView {
+  return { ...pullRequestBaseView(item, checkedAt), files: [], truncated: false }
+}
+
+function pullRequestDetailView(item: GitPullRequestDetailPort, checkedAt: string): PullRequestView {
+  return {
+    ...pullRequestBaseView(item, checkedAt),
+    files: item.files.map(pullRequestFileView),
+    truncated: item.truncated,
+  }
+}
+
+/**
+ * 估算列表总数。
+ * @param itemCount 当前页条数。
+ * @param page 当前页码。
+ * @param pageSize 每页条数。
+ * @returns 已读到的数量；满页时多计 1，表示来源可能还有下一页。
+ * @remarks 提供方列表接口不返回总数，只能按页推断；客户端以实际条数判断末页。
+ */
+function pagedTotal(itemCount: number, page: number, pageSize: number): number {
+  const consumed = (page - 1) * pageSize + itemCount
+  return itemCount === pageSize ? consumed + 1 : consumed
+}
+
 function isUniqueError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false
   if ('code' in error && error.code === '23505') return true
@@ -171,6 +394,13 @@ function gitErrorToCheckStatus(error: unknown): { status: string; errorCode: str
     return { status, errorCode: error.code }
   }
   return { status: 'unavailable', errorCode: 'unavailable' }
+}
+
+/** 提取适配器错误码；非适配器错误或未约定错误码返回 null。 */
+function gitAdapterErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null
+  const code = error.code
+  return typeof code === 'string' && GIT_ERROR_CODES.has(code) ? code : null
 }
 
 /**
@@ -196,9 +426,8 @@ export function createCodeService(deps: CodeServiceDeps) {
 
   async function requireLinkedRepository(actor: SessionUser, projectId: string, repositoryId: string) {
     const project = await requireProject(actor, projectId)
-    const link = await findProjectRepositoryLink(db, projectId, repositoryId)
-    const repository = await findRepositoryById(db, repositoryId)
-    if (!link || !repository || repository.team_id !== project.teamId) {
+    const repository = await findLinkedRepository(db, projectId, repositoryId)
+    if (!repository || repository.team_id !== project.teamId) {
       throw new ApiError(ERROR_CODES.NOT_FOUND, '项目仓库关联不存在')
     }
     const connectionIds = await deps.listActiveConnectionIds(project.teamId)
@@ -208,17 +437,28 @@ export function createCodeService(deps: CodeServiceDeps) {
     return { project, repository, adapter: await deps.resolveAdapter(repository.connection_id) }
   }
 
+  /**
+   * 把适配器读取失败映射为业务错误码。
+   * @param error 适配器抛出的错误，约定带有 code 字段。
+   * @throws 总是抛出 ApiError：授权失败、不存在、能力不支持、超时与不可用分别可区分，
+   * 不允许把失败吞掉后返回空数据。
+   */
   function repositoryReadError(error: unknown): never {
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error && error.code === 'auth_failed'
-        ? ERROR_CODES.EXTERNAL_AUTH_FAILED
-        : ERROR_CODES.EXTERNAL_UNAVAILABLE
-    throw new ApiError(code, '读取远端仓库失败，请检查连接状态后重试')
+    const code = gitAdapterErrorCode(error)
+    if (code === 'auth_failed') {
+      throw new ApiError(ERROR_CODES.EXTERNAL_AUTH_FAILED, 'Git 来源授权不可用，请检查连接授权后重试')
+    }
+    if (code === 'not_found') throw new ApiError(ERROR_CODES.NOT_FOUND, '远端记录不存在')
+    if (code === 'unsupported') throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 来源不支持该读取能力')
+    if (code === 'timeout') throw new ApiError(ERROR_CODES.EXTERNAL_UNAVAILABLE, '读取 Git 来源超时，请稍后重试')
+    throw new ApiError(ERROR_CODES.EXTERNAL_UNAVAILABLE, '读取 Git 来源失败，请检查连接状态后重试')
   }
 
   async function listRepositoryBranches(actor: SessionUser, projectId: string, repositoryId: string) {
     const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
-    if (!adapter.listBranches) return repository.default_branch ? [repository.default_branch] : []
+    if (!adapter.listBranches) {
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持浏览分支')
+    }
     try {
       return await adapter.listBranches({ repository: { namespace: repository.namespace, name: repository.name } })
     } catch (error) {
@@ -533,6 +773,189 @@ export function createCodeService(deps: CodeServiceDeps) {
     return { items: rows.map(repositoryView), page, pageSize, total }
   }
 
+  /**
+   * 读取提交列表。
+   * @param actor 当前用户；任一正常项目成员（含浏览者）可读。
+   * @param projectId 项目标识。
+   * @param repositoryId 项目已关联仓库标识。
+   * @param input 分支/提交标识与分页参数；ref 缺省使用仓库默认分支。
+   * @returns 当前页提交摘要与分页元数据；每项带本次读取的 lastCheckedAt。
+   * @throws 未认证、无项目权限、仓库未关联、连接不可用或来源读取失败时抛出 ApiError。
+   */
+  async function listRepositoryCommits(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: { ref?: string; page?: number; pageSize?: number },
+  ): Promise<CodeReadPage<CommitSummaryView>> {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.listCommits) {
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持读取提交')
+    }
+    const page = input.page ?? 1
+    const pageSize = input.pageSize ?? 20
+    validatePage(page, pageSize)
+    const ref = (input.ref?.trim() || repository.default_branch || '').trim()
+    if (!ref) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库没有可用分支')
+    try {
+      const items = await adapter.listCommits({ repository: repositoryRef(repository), ref, page, pageSize })
+      const checkedAt = new Date().toISOString()
+      return {
+        items: items.map((item) => commitSummaryView(item, checkedAt)),
+        page,
+        pageSize,
+        total: pagedTotal(items.length, page, pageSize),
+      }
+    } catch (error) {
+      repositoryReadError(error)
+    }
+  }
+
+  /**
+   * 读取提交详情。
+   * @param actor 当前用户；任一正常项目成员（含浏览者）可读。
+   * @param projectId 项目标识。
+   * @param repositoryId 项目已关联仓库标识。
+   * @param ref 分支、标签或提交标识；必须是来源稳定标识。
+   * @returns 提交详情（含变更文件摘要与来源能力标记）。
+   * @throws 来源不存在时为 NOT_FOUND，其余来源失败按类别映射。
+   */
+  async function getRepositoryCommit(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    ref: string,
+  ): Promise<CommitView> {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.getCommit) throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持读取提交')
+    const trimmedRef = ref.trim()
+    if (!trimmedRef) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '提交标识不能为空')
+    try {
+      return commitDetailView(
+        await adapter.getCommit({ repository: repositoryRef(repository), ref: trimmedRef }),
+        new Date().toISOString(),
+      )
+    } catch (error) {
+      repositoryReadError(error)
+    }
+  }
+
+  /**
+   * 读取 PR 列表。
+   * @param actor 当前用户；任一正常项目成员（含浏览者）可读。
+   * @param projectId 项目标识。
+   * @param repositoryId 项目已关联仓库标识。
+   * @param input 状态、作者、关联事项筛选与分页参数。
+   * @returns 当前页 PR 摘要；列表不读取变更文件，files 为空，每项带本次读取的 lastCheckedAt。
+   * @remarks 关联事项筛选先在平台内查已有代码引用，再按远端编号过滤；
+   * 带关联事项筛选且未指定状态时默认返回全部状态，避免已合并 PR 被 open 条件遗漏。
+   * 作者与关联事项过滤都发生在已读取页内，total 与分页为近似值。
+   * @throws 未认证、无项目权限、仓库未关联、连接不可用或来源读取失败时抛出 ApiError。
+   */
+  async function listRepositoryPullRequests(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: {
+      state?: PullRequestStateFilter
+      author?: string
+      linkedTargetId?: string
+      page?: number
+      pageSize?: number
+    },
+  ): Promise<CodeReadPage<PullRequestView>> {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.listPullRequests) {
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持读取 PR')
+    }
+    const page = input.page ?? 1
+    const pageSize = input.pageSize ?? 20
+    validatePage(page, pageSize)
+    const author = input.author?.trim() || undefined
+    const linkedTargetId = input.linkedTargetId?.trim() || undefined
+    let linkedRemoteIds: Set<string> | null = null
+    if (linkedTargetId) {
+      linkedRemoteIds = new Set(await findChangeRequestRemoteIdsForTarget(db, projectId, repositoryId, linkedTargetId))
+      // 平台内没有关联记录时结果确实为空，无需请求来源，但已在前面完成权限与能力校验。
+      if (linkedRemoteIds.size === 0) return { items: [], page, pageSize, total: 0 }
+    }
+    try {
+      const items = await adapter.listPullRequests({
+        repository: repositoryRef(repository),
+        state: input.state ?? (linkedTargetId ? 'all' : 'open'),
+        author,
+        page,
+        pageSize,
+      })
+      const matchedItems = linkedRemoteIds ? items.filter((item) => linkedRemoteIds.has(String(item.number))) : items
+      const checkedAt = new Date().toISOString()
+      return {
+        items: matchedItems.map((item) => pullRequestListView(item, checkedAt)),
+        page,
+        pageSize,
+        total: pagedTotal(matchedItems.length, page, pageSize),
+      }
+    } catch (error) {
+      repositoryReadError(error)
+    }
+  }
+
+  /**
+   * 读取 PR 详情与变更文件。
+   * @param actor 当前用户；任一正常项目成员（含浏览者）可读。
+   * @param projectId 项目标识。
+   * @param repositoryId 项目已关联仓库标识。
+   * @param number 来源 PR 编号。
+   * @returns PR 详情；差异超限或来源截断时 truncated 为 true。
+   * @throws 来源不存在时为 NOT_FOUND，能力不支持为 EXTERNAL_UNSUPPORTED。
+   */
+  async function getRepositoryPullRequest(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    number: number,
+  ): Promise<PullRequestView> {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.getPullRequest) {
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持读取 PR 详情')
+    }
+    try {
+      return pullRequestDetailView(
+        await adapter.getPullRequest({ repository: repositoryRef(repository), number }),
+        new Date().toISOString(),
+      )
+    } catch (error) {
+      repositoryReadError(error)
+    }
+  }
+
+  /**
+   * 读取 PR 合并差异文本。
+   * @param actor 当前用户；任一正常项目成员（含浏览者）可读。
+   * @param projectId 项目标识。
+   * @param repositoryId 项目已关联仓库标识。
+   * @param number 来源 PR 编号。
+   * @returns 差异文本前缀与截断标记；来源不提供差异时返回 EXTERNAL_UNSUPPORTED。
+   * @throws 来源不存在时为 NOT_FOUND，其余来源失败按类别映射。
+   */
+  async function getRepositoryPullRequestDiff(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    number: number,
+  ): Promise<{ patch: string; truncated: boolean }> {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.getPullRequestDiff) {
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持读取 PR 差异')
+    }
+    try {
+      const diff = await adapter.getPullRequestDiff({ repository: repositoryRef(repository), number })
+      return { patch: diff.patch, truncated: diff.truncated }
+    } catch (error) {
+      repositoryReadError(error)
+    }
+  }
+
   return {
     listProjectRepositories,
     listRepositoryBranches,
@@ -547,6 +970,11 @@ export function createCodeService(deps: CodeServiceDeps) {
     listReferences,
     listReferencesForTarget,
     listConnectionRepositories: listConnectionRepositoriesForActor,
+    listRepositoryCommits,
+    getRepositoryCommit,
+    listRepositoryPullRequests,
+    getRepositoryPullRequest,
+    getRepositoryPullRequestDiff,
   }
 }
 

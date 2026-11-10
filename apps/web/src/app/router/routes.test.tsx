@@ -32,11 +32,11 @@ function renderApplication(path = '/', routes = createAppRoutes()) {
   return router
 }
 
-afterEach(() => {
-  for (const dispose of disposers.splice(0)) dispose()
-})
-
 describe('工作区路由与数据状态', () => {
+  afterEach(() => {
+    for (const dispose of disposers.splice(0)) dispose()
+  })
+
   it('已登录时进入项目列表', async () => {
     renderApplication('/projects')
     expect(await screen.findByRole('heading', { name: '项目', level: 1 })).toBeVisible()
@@ -193,6 +193,26 @@ describe('工作区路由与数据状态', () => {
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(trigger).toHaveFocus()
+  })
+
+  it('点击头像进入个人页面并显示 API Token 区域', async () => {
+    server.use(
+      http.get('*/api/v1/me/tokens', () =>
+        HttpResponse.json({
+          success: true,
+          code: 'OK',
+          message: 'ok',
+          requestId: 'trace',
+          data: { items: [] },
+        }),
+      ),
+    )
+    renderApplication('/projects')
+    const user = userEvent.setup()
+    const avatarLink = await screen.findByRole('link', { name: '打开测试用户的个人页面' })
+    await user.click(avatarLink)
+    expect(await screen.findByRole('heading', { name: '个人页面', level: 1 })).toBeVisible()
+    expect(await screen.findByText('还没有 API Token')).toBeVisible()
   })
 
   it('页面渲染异常进入路由边界，不显示内部异常文本', async () => {

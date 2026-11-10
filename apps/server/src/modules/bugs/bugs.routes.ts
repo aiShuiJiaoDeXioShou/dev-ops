@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import { requireSessionUser } from '../identity/identity.session.ts'
+import { requireActor } from '../identity/identity.actor.ts'
 import type { IdentityAuth } from '../identity/identity.auth.ts'
 import type { BugsService } from './bugs.service.ts'
 import {
@@ -43,7 +43,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.listBugs(user, request.params.projectId, request.query), request.id)
     },
   )
@@ -54,7 +54,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: projectBugParamsSchema, body: createBugBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.createBug(user, request.params.projectId, request.body), request.id)
     },
   )
@@ -65,7 +65,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.getBug(user, request.params.bugId), request.id)
     },
   )
@@ -76,7 +76,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: updateBugBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.updateBug(user, request.params.bugId, request.body), request.id)
     },
   )
@@ -87,7 +87,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: startFixBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.startFix(user, request.params.bugId, request.body), request.id)
     },
   )
@@ -102,7 +102,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.submitRegression(user, request.params.bugId, request.body), request.id)
     },
   )
@@ -113,7 +113,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: withdrawRegressionBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.withdrawRegression(user, request.params.bugId, request.body), request.id)
     },
   )
@@ -124,7 +124,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: recordRegressionBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.recordRegression(user, request.params.bugId, request.body), request.id)
     },
   )
@@ -135,7 +135,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: closeBugBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.closeBug(user, request.params.bugId, request.body), request.id)
     },
   )
@@ -146,7 +146,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: reopenBugBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.reopenBug(user, request.params.bugId, request.body), request.id)
     },
   )
@@ -157,7 +157,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: linkRequirementBodySchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.linkRequirement(
           user,
@@ -180,7 +180,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.removeRequirementLink(
           user,
@@ -200,7 +200,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, querystring: pageQuerySchema, response: { 200: commentPageResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listComments(
           user,
@@ -219,7 +219,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, body: commentBodySchema, response: { 200: commentResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.addComment(user, request.params.bugId, request.body.bodyMarkdown),
         request.id,
@@ -233,7 +233,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
       schema: { params: bugParamsSchema, querystring: pageQuerySchema, response: { 200: activityPageResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listActivities(
           user,

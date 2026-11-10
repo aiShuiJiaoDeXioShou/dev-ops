@@ -10,21 +10,25 @@ import { createServices } from './create-services.ts'
 import type { IdentityAuth } from '../modules/identity/identity.auth.ts'
 import { identityAuthRoutes } from '../modules/identity/identity.routes.ts'
 import { identityTeamRoutes } from '../modules/identity/identity.team.routes.ts'
+import { identityTokenRoutes } from '../modules/identity/identity.tokens.routes.ts'
 import { projectRoutes } from '../modules/projects/projects.routes.ts'
 import { requirementRoutes } from '../modules/requirements/requirements.routes.ts'
 import { bugRoutes } from '../modules/bugs/bugs.routes.ts'
 import type { MailSender } from '../adapters/mail/mail.types.ts'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
 import { codeRoutes } from '../modules/code/code.routes.ts'
+import { deliveryRoutes } from '../modules/delivery/delivery.routes.ts'
+import { configurationRoutes } from '../modules/configuration/configuration.routes.ts'
 import { integrationsRoutes } from '../modules/integrations/integrations.routes.ts'
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
-import { getSessionUser } from '../modules/identity/identity.session.ts'
+import { resolveActor } from '../modules/identity/identity.actor.ts'
 
 declare module 'fastify' {
   interface FastifyInstance {
     db: Database
     auth: IdentityAuth
+    tokenService: import('../modules/identity/identity.tokens.ts').TokenService
   }
 }
 
@@ -65,6 +69,7 @@ export function createHttpApp(
   )
   app.decorate('db', services.database.db)
   app.decorate('auth', services.auth)
+  app.decorate('tokenService', services.tokens)
   app.addHook('onClose', async () => {
     await services.close()
   })
@@ -75,7 +80,7 @@ export function createHttpApp(
 
   const idempotency = createIdempotencyHooks({
     db: services.database.db,
-    getUserId: async (headers) => (await getSessionUser(services.auth, headers))?.id ?? null,
+    getUserId: async (headers) => (await resolveActor(services.auth, services.tokens, headers))?.user.id ?? null,
   })
   app.addHook('preHandler', idempotency.preHandler)
   app.addHook('onSend', idempotency.onSend)
@@ -94,10 +99,15 @@ export function createHttpApp(
   app.register(healthRoutes, { prefix: '/api/v1', checkDatabase: services.database.check })
   app.register(identityAuthRoutes, { prefix: '/api/v1', auth: services.auth, origin: config.APP_ORIGIN })
   app.register(identityTeamRoutes, { prefix: '/api/v1', auth: services.auth, service: services.identity })
+  app.register(identityTokenRoutes, { prefix: '/api/v1', tokenService: services.tokens, service: services.identity })
   app.register(projectRoutes, { prefix: '/api/v1', auth: services.auth, service: services.projects })
   app.register(requirementRoutes, { prefix: '/api/v1', auth: services.auth, service: services.requirements })
   app.register(bugRoutes, { prefix: '/api/v1', auth: services.auth, service: services.bugs })
   app.register(codeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.code })
+  app.register(deliveryRoutes, { prefix: '/api/v1', service: services.delivery })
+  if (services.configuration) {
+    app.register(configurationRoutes, { prefix: '/api/v1', service: services.configuration })
+  }
   app.register(integrationsRoutes, {
     prefix: '/api/v1',
     auth: services.auth,

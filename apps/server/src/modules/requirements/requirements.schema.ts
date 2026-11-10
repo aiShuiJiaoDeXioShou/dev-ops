@@ -10,7 +10,12 @@ const statusSchema = Type.Union([
   Type.Literal('passed'),
   Type.Literal('cancelled'),
 ])
-const ownerSchema = Type.Object({ userId: uuidSchema, name: Type.String() })
+const ownerSchema = Type.Object({
+  userId: uuidSchema,
+  name: Type.String(),
+  status: Type.Union([Type.Literal('active'), Type.Literal('disabled'), Type.Literal('missing')]),
+  available: Type.Boolean(),
+})
 const requirementItemSchema = Type.Object({
   id: uuidSchema,
   projectId: uuidSchema,
@@ -21,6 +26,7 @@ const requirementItemSchema = Type.Object({
   testOwner: Type.Union([ownerSchema, Type.Null()]),
   version: Type.Integer(),
   updatedAt: Type.String(),
+  needsReview: Type.Boolean(),
 })
 const codeReferenceSchema = Type.Object({
   id: uuidSchema,
@@ -94,6 +100,7 @@ export const requirementsQuerySchema = Type.Object({
   search: Type.Optional(Type.String({ maxLength: 200 })),
   status: Type.Optional(statusSchema),
   ownerId: Type.Optional(uuidSchema),
+  ownerUnavailable: Type.Optional(Type.Boolean()),
   page: Type.Optional(Type.Integer({ minimum: 1 })),
   pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
 })

@@ -22,6 +22,11 @@ try {
     stderr: (message) => {
       process.stderr.write(message)
     },
+    readStdin: async () => {
+      let value = ''
+      for await (const chunk of process.stdin) value += chunk
+      return value
+    },
   })
 } catch {
   process.stderr.write('错误：CLI 启动失败，请检查安装是否完整。\n')

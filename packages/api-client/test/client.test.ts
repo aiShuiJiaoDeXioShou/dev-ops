@@ -105,3 +105,30 @@ test('无效配置在网络请求前被拒绝', () => {
     assert.throws(() => createApiClient({ baseUrl: 'https://example.test', timeoutMs }))
   }
 })
+
+test('API Token 以 Bearer 头发送，未提供时不发送 Authorization', async () => {
+  for (const token of [undefined, 'devops_pat_test']) {
+    let authorization: string | null = null
+    const client = createApiClient({
+      baseUrl: 'https://example.test',
+      ...(token === undefined ? {} : { token }),
+      fetch: async (_input, init) => {
+        authorization = new Headers(init?.headers).get('authorization')
+        return Response.json(successBody({ status: 'ok' }))
+      },
+    })
+    await client.health()
+    assert.equal(authorization, token === undefined ? null : `Bearer ${token}`)
+  }
+})
+
+test('业务响应字段不符合生成契约时返回 INVALID_RESPONSE', async () => {
+  const client = createApiClient({
+    baseUrl: 'https://example.test',
+    fetch: async () => Response.json(successBody([{ id: 'team-1' }]), { headers: { 'x-request-id': 'trace' } }),
+  })
+  await assert.rejects(
+    client.listMyTeams(),
+    (error: unknown) => error instanceof RequestError && error.code === 'INVALID_RESPONSE',
+  )
+})

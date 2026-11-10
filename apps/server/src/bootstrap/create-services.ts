@@ -2,6 +2,7 @@ import type { AppConfig } from '../platform/config/env.ts'
 import { createDatabase } from '../platform/database/client.ts'
 import { createIdentityAuth } from '../modules/identity/identity.auth.ts'
 import { createIdentityService } from '../modules/identity/identity.service.ts'
+import { createTokenService } from '../modules/identity/identity.tokens.ts'
 import { createProjectsService } from '../modules/projects/projects.service.ts'
 import { createRequirementsService } from '../modules/requirements/requirements.service.ts'
 import { createBugsService } from '../modules/bugs/bugs.service.ts'
@@ -14,6 +15,7 @@ import { createGitHubAppAdapter } from '../adapters/git/github.adapter.ts'
 import { createGiteaAdapter } from '../adapters/git/gitea.adapter.ts'
 import { findGitConnectionById } from '../modules/integrations/integrations.repository.ts'
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
+import { createDeliveryService } from '../modules/delivery/delivery.service.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createIntegrationsService, type GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createSmtpMailer } from '../adapters/mail/smtp-mailer.ts'
@@ -39,6 +41,7 @@ export function createServices(
   const auth = createIdentityAuth(database.db, config)
   const mailer = options.mailer ?? createSmtpMailer(config)
   const identity = createIdentityService({ db: database.db, auth, config, mailer })
+  const tokens = createTokenService({ db: database.db })
   const configuration = config.GIT_CREDENTIAL_ENCRYPTION_KEY
     ? createConfigurationService({ db: database.db, cipher: createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY) })
     : null
@@ -90,6 +93,7 @@ export function createServices(
     bugs: bugs.listLinkedBugs,
     codeReferences: code.listReferencesForTarget,
   })
+  const delivery = createDeliveryService({ db: database.db })
   const projects = createProjectsService({
     db: database.db,
     counts: async (projectIds) => {
@@ -113,11 +117,13 @@ export function createServices(
     database,
     auth,
     identity,
+    tokens,
     requirements,
     bugs,
     configuration,
     integrations,
     code,
+    delivery,
     projects,
     async close() {
       await database.close()

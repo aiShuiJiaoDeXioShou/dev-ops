@@ -111,6 +111,9 @@ export const team = appSchema.table(
   {
     id: uuid('id').notNull(),
     name: text('name').notNull(),
+    icon_text: text('icon_text'),
+    description: text('description'),
+    version: integer('version').notNull().default(1),
     created_by_user_id: uuid('created_by_user_id').notNull(),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
@@ -172,5 +175,29 @@ export const invitation = appSchema.table(
       .where(sql`${table.status} = 'pending'`),
     index('idx_invitation_team_status').on(table.team_id, table.status),
     index('idx_invitation_expires_at').on(table.expires_at),
+  ],
+)
+
+/** 个人 API Token；仅保存摘要，明文只在创建响应出现一次。 */
+export const personalAccessToken = appSchema.table(
+  'personal_access_token',
+  {
+    id: uuid('id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    name: text('name').notNull(),
+    token_hash: text('token_hash').notNull(),
+    token_prefix: text('token_prefix').notNull(),
+    expires_at: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    revoked_at: timestamp('revoked_at', { withTimezone: true, mode: 'date' }),
+    last_used_at: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
+    created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: 'pk_personal_access_token_id', columns: [table.id] }),
+    unique('uk_personal_access_token_hash').on(table.token_hash),
+    unique('uk_personal_access_token_user_name').on(table.user_id, table.name),
+    index('idx_personal_access_token_user_id').on(table.user_id),
+    index('idx_personal_access_token_expires_at').on(table.expires_at),
   ],
 )

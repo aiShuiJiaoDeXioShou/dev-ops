@@ -125,3 +125,14 @@ apps/server/
 - 代码：项目仓库关联/移除、可关联仓库、代码引用创建/刷新/移除。
 - 所有自研业务接口只注册 GET/POST，返回 HTTP 200 信封；未知 API 路径也返回 200 + `NOT_FOUND`。未处理异常才返回 500。
 - root 初始化：`pnpm --dir apps/server seed:root`；本地 SMTP 可使用 Mailpit（`SMTP_URL=smtp://127.0.0.1:1025`）。
+
+## V0.2 实现说明（进行中）
+
+- 新增 `delivery` 模块：构建记录、产物引用、构建事项关联与更正历史；路由 `POST /api/v1/projects/:projectId/builds`、`GET /api/v1/builds/:buildId` 等，全部只使用 GET/POST 与统一信封。
+- `projects` 增加服务与环境目录表定义；`configuration` 复用加密凭据能力；团队表增加图标标识/说明/版本字段；活动表扩展 V0.2 对象类型。
+- V0.2 未新增环境变量：通用凭据复用既有加密密钥；产物只保存引用，不配置对象存储；不建本地仓库克隆/缓存。
+- 迁移从 0014 起；交付上报按「项目＋来源＋构建标识」幂等，更正保留历史，不改变需求/Bug/提测状态。
+
+## API Token 与 CLI（2026-11-10）
+
+服务端新增 `personal_access_token` 表与 `/api/v1/me`、`/api/v1/me/tokens*` 接口；业务接口同时接受现有 Better Auth Cookie 会话和 `Authorization: Bearer devops_pat_...`。Token 只保存 SHA-256 摘要、明文仅在创建响应返回一次，管理接口只允许登录会话。CLI 使用说明见 [apps/cli/README.md](../cli/README.md)。

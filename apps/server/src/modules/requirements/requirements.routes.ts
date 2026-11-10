@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import { requireSessionUser } from '../identity/identity.session.ts'
+import { requireActor } from '../identity/identity.actor.ts'
 import type { IdentityAuth } from '../identity/identity.auth.ts'
 import type { RequirementsService } from './requirements.service.ts'
 import {
@@ -45,7 +45,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.listRequirements(user, request.params.projectId, request.query), request.id)
     },
   )
@@ -60,7 +60,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.createRequirement(user, request.params.projectId, request.body), request.id)
     },
   )
@@ -71,7 +71,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: requirementParamsSchema, response: { 200: requirementResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.getRequirement(user, request.params.requirementId), request.id)
     },
   )
@@ -86,7 +86,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.updateRequirement(user, request.params.requirementId, request.body),
         request.id,
@@ -104,7 +104,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listComments(
           user,
@@ -127,7 +127,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.addComment(user, request.params.requirementId, request.body.bodyMarkdown),
         request.id,
@@ -145,7 +145,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.startDevelopment(user, request.params.requirementId, request.body),
         request.id,
@@ -163,7 +163,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       const idempotencyKey =
         typeof request.headers['idempotency-key'] === 'string' ? request.headers['idempotency-key'] : undefined
       return success(
@@ -183,7 +183,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.startTest(user, request.params.requirementId, request.body), request.id)
     },
   )
@@ -198,7 +198,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.withdrawTest(user, request.params.requirementId, request.body), request.id)
     },
   )
@@ -213,7 +213,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.returnToDevelopment(user, request.params.requirementId, request.body),
         request.id,
@@ -227,7 +227,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: requirementParamsSchema, response: { 200: eligibilityResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.testPassEligibility(user, request.params.requirementId), request.id)
     },
   )
@@ -242,7 +242,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.passTest(user, request.params.requirementId, request.body), request.id)
     },
   )
@@ -257,7 +257,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.reopenDevelopment(user, request.params.requirementId, request.body),
         request.id,
@@ -275,7 +275,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.cancelRequirement(user, request.params.requirementId, request.body),
         request.id,
@@ -293,7 +293,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.restoreRequirement(user, request.params.requirementId, request.body),
         request.id,
@@ -311,7 +311,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listTestSubmissions(
           user,
@@ -334,7 +334,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listActivities(
           user,

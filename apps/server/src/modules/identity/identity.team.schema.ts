@@ -27,9 +27,22 @@ const memberSchema = Type.Object({
 const teamSummarySchema = Type.Object({
   id: uuidSchema,
   name: Type.String(),
+  iconText: Type.Union([Type.String(), Type.Null()]),
+  description: Type.Union([Type.String(), Type.Null()]),
+  version: Type.Integer(),
   role: roleSchema,
   status: Type.String(),
 })
+export const updateTeamBodySchema = Type.Object(
+  {
+    version: Type.Integer({ minimum: 1 }),
+    name: Type.Optional(Type.String({ minLength: 1, maxLength: 120 })),
+    iconText: Type.Optional(Type.Union([Type.String({ maxLength: 4 }), Type.Null()])),
+    description: Type.Optional(Type.Union([Type.String({ maxLength: 500 }), Type.Null()])),
+  },
+  { additionalProperties: false },
+)
+export const updateTeamResponseSchema = apiResponseSchema(teamSummarySchema)
 const invitationPublicSchema = Type.Object({
   teamName: Type.String(),
   email: Type.String(),

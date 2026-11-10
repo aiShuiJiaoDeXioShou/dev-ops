@@ -9,9 +9,10 @@ export {
   team,
   teamMember,
   invitation,
+  personalAccessToken,
 } from '../modules/identity/identity.tables.ts'
 export { comment, activity } from '../modules/collaboration/collaboration.tables.ts'
-export { project } from '../modules/projects/projects.tables.ts'
+export { project, projectService, projectServiceRepository } from '../modules/projects/projects.tables.ts'
 export {
   requirement,
   requirementCollaborator,
@@ -19,6 +20,25 @@ export {
 } from '../modules/requirements/requirements.tables.ts'
 export { bug, bugRequirementLink, bugRegression } from '../modules/bugs/bugs.tables.ts'
 export { idempotencyRecord } from '../platform/database/idempotency.tables.ts'
-export { secret } from '../modules/configuration/configuration.tables.ts'
+export {
+  secret,
+  credential,
+  credentialVersion,
+  credentialProjectGrant,
+  projectEnvVar,
+  credentialUsage,
+} from '../modules/configuration/configuration.tables.ts'
 export { gitConnection } from '../modules/integrations/integrations.tables.ts'
 export { gitRepository, projectRepository, codeReference } from '../modules/code/code.tables.ts'
+export {
+  buildRecord,
+  buildRecordCorrection,
+  buildArtifact,
+  buildRecordTarget,
+  serviceRunVersion,
+  serviceRunVersionChange,
+  pipelineRun,
+  pipelineRunStatus,
+  externalReview,
+  releaseResult,
+} from '../modules/delivery/delivery.tables.ts'

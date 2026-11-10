@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { AppConfig } from '../../platform/config/env.ts'
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
+import { appendActivity } from '../collaboration/collaboration.service.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import type { IdentityAuth } from './identity.auth.ts'
 import {
@@ -22,6 +23,7 @@ import {
   lockTeam,
   updateInvitation,
   updateTeamMember,
+  updateTeamProfile,
 } from './identity.repository.ts'
 import { requirePlatformAdmin, requireTeamMember, type SessionUser, type TeamRole } from './identity.session.ts'
 import {
@@ -35,6 +37,24 @@ import {
   normalizeTeamName,
   wouldRemoveLastAdmin,
 } from './identity.rules.ts'
+
+/** 校验团队图标标识：1–4 个字符，空字符串按未设置处理。 */
+function normalizeIconText(value: string | null): string | null {
+  if (value === null) return null
+  const trimmed = value.trim()
+  if (trimmed.length === 0) return null
+  if (trimmed.length > 4) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '团队图标标识最多 4 个字符')
+  return trimmed
+}
+
+/** 校验团队说明：最多 500 个字符，空字符串按未设置处理。 */
+function normalizeTeamDescription(value: string | null): string | null {
+  if (value === null) return null
+  const trimmed = value.trim()
+  if (trimmed.length === 0) return null
+  if (trimmed.length > 500) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '团队说明不能超过 500 个字符')
+  return trimmed
+}
 
 export interface InvitationView {
   id: string
@@ -369,6 +389,55 @@ export function createIdentityService(deps: IdentityServiceDeps) {
     return { userId, teamId: teamRow.id, teamName: teamRow.name, role: toTeamRole(invitationRow.role), cookies }
   }
 
+  async function updateTeam(
+    actor: SessionUser,
+    teamId: string,
+    input: { version: number; name?: string; iconText?: string | null; description?: string | null },
+  ) {
+    if (!Number.isSafeInteger(input.version) || input.version < 1) {
+      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '版本参数不合法')
+    }
+    const membership = await requireTeamMember(db, actor.id, teamId, ['admin'])
+    const current = await findTeamById(db, teamId)
+    if (!current) throw new ApiError(ERROR_CODES.NOT_FOUND, '团队不存在')
+    const name = input.name === undefined ? undefined : normalizeTeamName(input.name)
+    const iconText = input.iconText === undefined ? undefined : normalizeIconText(input.iconText)
+    const description = input.description === undefined ? undefined : normalizeTeamDescription(input.description)
+    if (name !== undefined && name !== current.name && (await findTeamByName(db, name))) {
+      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '团队名称已存在')
+    }
+    const changes: Record<string, unknown> = {}
+    if (name !== undefined && name !== current.name) changes.name = [current.name, name]
+    if (iconText !== undefined && iconText !== current.icon_text) changes.iconText = [current.icon_text, iconText]
+    if (description !== undefined && description !== current.description) {
+      changes.description = [current.description, description]
+    }
+    const row = await db.transaction(async (tx) => {
+      const updated = await updateTeamProfile(tx, teamId, input.version, { name, iconText, description })
+      if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '团队资料已被修改，请刷新后重试')
+      if (Object.keys(changes).length > 0) {
+        await appendActivity(tx, {
+          teamId,
+          entityType: 'team',
+          entityId: teamId,
+          action: 'team_updated',
+          actorUserId: actor.id,
+          changes,
+        })
+      }
+      return updated
+    })
+    return {
+      id: row.id,
+      name: row.name,
+      iconText: row.icon_text,
+      description: row.description,
+      version: row.version,
+      role: toTeamRole(membership.role),
+      status: membership.status,
+    }
+  }
+
   async function listMyTeams(user: SessionUser) {
     const rows = await listTeamsForUser(db, user.id)
     return rows.map((row) => ({ ...row, role: toTeamRole(row.role) }))
@@ -385,6 +454,7 @@ export function createIdentityService(deps: IdentityServiceDeps) {
     getInvitationByToken,
     acceptInvitation,
     listMyTeams,
+    updateTeam,
   }
 }
 

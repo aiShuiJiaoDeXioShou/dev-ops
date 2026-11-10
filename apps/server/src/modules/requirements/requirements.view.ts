@@ -1,5 +1,5 @@
-import type { UserRef } from '../identity/identity.display.ts'
-import { userRefOf } from '../identity/identity.display.ts'
+import type { OwnerRef } from '../identity/identity.display.ts'
+import { ownerRefOf } from '../identity/identity.display.ts'
 import { toContentMode, toRequirementStatus } from './requirements.rules.ts'
 import type { RequirementListRow, RequirementRow, RequirementSubmissionRow } from './requirements.repository.ts'
 import type {
@@ -13,7 +13,8 @@ import type {
 /** 需求列表项映射输入。 */
 export interface RequirementListMapping {
   row: RequirementListRow
-  refs: Map<string, UserRef>
+  refs: Map<string, OwnerRef>
+  needsReview?: boolean
 }
 
 /** 需求详情映射输入；关联数据由 service 批量加载后传入。 */
@@ -23,7 +24,8 @@ export interface RequirementDetailMapping {
   latestSubmission: RequirementSubmissionRow | null
   linkedBugs: LinkedBugView[]
   linkedCodeReferences: LinkedCodeReferenceView[]
-  refs: Map<string, UserRef>
+  refs: Map<string, OwnerRef>
+  needsReview?: boolean
 }
 
 /**
@@ -32,17 +34,18 @@ export interface RequirementDetailMapping {
  * @returns 需求列表项。
  */
 export function toRequirementListItem(input: RequirementListMapping): RequirementListItem {
-  const { row, refs } = input
+  const { row, refs, needsReview = false } = input
   return {
     id: row.id,
     projectId: row.project_id,
     number: row.number,
     title: row.title,
     status: toRequirementStatus(row.status),
-    devOwner: userRefOf(row.dev_owner_user_id, refs),
-    testOwner: userRefOf(row.test_owner_user_id, refs),
+    devOwner: ownerRefOf(row.dev_owner_user_id, refs),
+    testOwner: ownerRefOf(row.test_owner_user_id, refs),
     version: row.version,
     updatedAt: row.updated_at.toISOString(),
+    needsReview,
   }
 }
 
@@ -83,10 +86,10 @@ export function toRequirementDetail(input: RequirementDetailMapping): Requiremen
     externalUrl: row.external_url,
     externalSummary: row.external_summary,
     acceptanceCriteria: row.acceptance_criteria,
-    collaborators: collaborators.map((item) => ({
-      userId: item.userId,
-      name: userRefOf(item.userId, refs)?.name ?? '未知用户',
-    })),
+    collaborators: collaborators.map(
+      (item) =>
+        ownerRefOf(item.userId, refs) ?? { userId: item.userId, name: '未知用户', status: 'missing', available: false },
+    ),
     latestTestSubmission: latestSubmission === null ? null : toTestSubmissionView(latestSubmission),
     linkedBugs,
     needsReview,

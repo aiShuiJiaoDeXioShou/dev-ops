@@ -83,3 +83,103 @@ export const removeReferenceBodySchema = Type.Object(
 )
 export const codeReferenceResponseSchema = apiResponseSchema(referenceSchema)
 export const removedResponseSchema = apiResponseSchema(Type.Object({ removed: Type.Boolean() }))
+
+// 分支、标签或提交标识的稳定字符集：必须由字母数字开头，避免把相对路径或命令行参数传入来源。
+const refPattern = '^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,199}$'
+const refSchema = Type.String({ minLength: 1, maxLength: 200, pattern: refPattern })
+const pageQuery = {
+  page: Type.Optional(Type.Integer({ minimum: 1 })),
+  pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+}
+const commitStateSchema = Type.Union([
+  Type.Literal('open'),
+  Type.Literal('closed'),
+  Type.Literal('merged'),
+  Type.Literal('unknown'),
+])
+const reviewStatusSchema = Type.Union([
+  Type.Literal('pending'),
+  Type.Literal('approved'),
+  Type.Literal('changes_requested'),
+  Type.Literal('unknown'),
+])
+const fileStatusSchema = Type.Union([
+  Type.Literal('added'),
+  Type.Literal('modified'),
+  Type.Literal('removed'),
+  Type.Literal('renamed'),
+  Type.Literal('unknown'),
+])
+const commitSummarySchema = Type.Object({
+  sha: Type.String(),
+  title: Type.String(),
+  authorName: Type.String(),
+  committedAt: Type.String(),
+  url: Type.Union([Type.String(), Type.Null()]),
+  lastCheckedAt: Type.String(),
+})
+const commitFileSchema = Type.Object({
+  path: Type.String(),
+  status: fileStatusSchema,
+  additions: Type.Integer(),
+  deletions: Type.Integer(),
+})
+const commitDetailSchema = Type.Object({
+  ...commitSummarySchema.properties,
+  files: Type.Array(commitFileSchema),
+  filesTruncated: Type.Boolean(),
+  filesUnsupported: Type.Boolean(),
+})
+const pullRequestFileSchema = Type.Object({
+  path: Type.String(),
+  status: fileStatusSchema,
+  additions: Type.Integer(),
+  deletions: Type.Integer(),
+  patch: Type.Union([Type.String(), Type.Null()]),
+  binary: Type.Boolean(),
+  truncated: Type.Boolean(),
+})
+const pullRequestSchema = Type.Object({
+  number: Type.Integer(),
+  title: Type.String(),
+  authorName: Type.String(),
+  sourceBranch: Type.String(),
+  targetBranch: Type.String(),
+  state: commitStateSchema,
+  reviewStatus: reviewStatusSchema,
+  createdAt: Type.String(),
+  updatedAt: Type.String(),
+  mergedAt: Type.Union([Type.String(), Type.Null()]),
+  url: Type.Union([Type.String(), Type.Null()]),
+  lastCheckedAt: Type.String(),
+  files: Type.Array(pullRequestFileSchema),
+  truncated: Type.Boolean(),
+})
+export const commitListQuerySchema = Type.Object({ ref: Type.Optional(refSchema), ...pageQuery })
+export const pullRequestListQuerySchema = Type.Object({
+  state: Type.Optional(Type.Union([Type.Literal('open'), Type.Literal('closed'), Type.Literal('all')])),
+  author: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
+  linkedTargetId: Type.Optional(uuidSchema),
+  ...pageQuery,
+})
+export const commitRefParamsSchema = Type.Object({
+  projectId: uuidSchema,
+  repositoryId: uuidSchema,
+  ref: refSchema,
+})
+export const pullRequestParamsSchema = Type.Object({
+  projectId: uuidSchema,
+  repositoryId: uuidSchema,
+  number: Type.Integer({ minimum: 1, maximum: 2_147_483_647 }),
+})
+export const commitListResponseSchema = apiResponseSchema(
+  Type.Object({ items: Type.Array(commitSummarySchema), ...pageMeta }),
+)
+export const pullRequestListResponseSchema = apiResponseSchema(
+  Type.Object({ items: Type.Array(pullRequestSchema), ...pageMeta }),
+)
+export const commitResponseSchema = apiResponseSchema(commitDetailSchema)
+export const pullRequestResponseSchema = apiResponseSchema(pullRequestSchema)
+export const pullRequestDiffResponseSchema = apiResponseSchema(
+  Type.Object({ patch: Type.String(), truncated: Type.Boolean() }),
+)

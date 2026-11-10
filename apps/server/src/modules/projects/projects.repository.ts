@@ -1,6 +1,7 @@
-import { and, count, desc, eq, ilike, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, notExists, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
-import { project } from './projects.tables.ts'
+import { project, projectService, projectServiceRepository } from './projects.tables.ts'
+import { teamMember } from '../identity/identity.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type ProjectExecutor = Database | TransactionDatabase
@@ -8,6 +9,7 @@ export type ProjectExecutor = Database | TransactionDatabase
 export interface ProjectListFilters {
   search?: string
   status?: string
+  ownerUnavailable?: boolean
   page: number
   pageSize: number
 }
@@ -64,6 +66,22 @@ export async function findProjects(db: Database, teamId: string, filters: Projec
     if (searchCondition) conditions.push(searchCondition)
   }
   if (filters.status) conditions.push(eq(project.status, filters.status))
+  if (filters.ownerUnavailable) {
+    conditions.push(
+      notExists(
+        db
+          .select({ one: sql`1` })
+          .from(teamMember)
+          .where(
+            and(
+              eq(teamMember.team_id, project.team_id),
+              eq(teamMember.user_id, project.owner_user_id),
+              eq(teamMember.status, 'active'),
+            ),
+          ),
+      ),
+    )
+  }
   const where = and(...conditions)
   const [rows, [total]] = await Promise.all([
     db
@@ -137,4 +155,132 @@ export async function updateProject(
     .where(and(eq(project.id, projectId), eq(project.version, expectedVersion)))
     .returning()
   return row
+}
+
+/** 按标识查找项目服务。 */
+export async function findProjectServiceById(db: Database, serviceId: string) {
+  const [row] = await db.select().from(projectService).where(eq(projectService.id, serviceId)).limit(1)
+  return row
+}
+
+/** 查询项目服务列表。 */
+export async function findProjectServices(db: Database, projectId: string) {
+  return db
+    .select()
+    .from(projectService)
+    .where(eq(projectService.project_id, projectId))
+    .orderBy(desc(projectService.updated_at), desc(projectService.id))
+}
+
+/** 按项目与名称查找服务。 */
+export async function findProjectServiceByName(db: Database, projectId: string, name: string) {
+  const [row] = await db
+    .select({ id: projectService.id })
+    .from(projectService)
+    .where(and(eq(projectService.project_id, projectId), eq(projectService.name, name)))
+    .limit(1)
+  return row
+}
+
+/** 插入项目服务。 */
+export async function insertProjectService(
+  executor: ProjectExecutor,
+  input: {
+    id: string
+    teamId: string
+    projectId: string
+    name: string
+    description: string | null
+    createdByUserId: string
+  },
+) {
+  const [row] = await executor
+    .insert(projectService)
+    .values({
+      id: input.id,
+      team_id: input.teamId,
+      project_id: input.projectId,
+      name: input.name,
+      description: input.description,
+      created_by_user_id: input.createdByUserId,
+    })
+    .returning()
+  if (!row) throw new Error('项目服务写入失败')
+  return row
+}
+
+/**
+ * 按版本条件更新项目服务。
+ * @returns 更新行；版本不匹配返回 undefined。
+ */
+export async function updateProjectService(
+  executor: ProjectExecutor,
+  serviceId: string,
+  expectedVersion: number,
+  fields: { name?: string; description?: string | null; status?: string },
+) {
+  const [row] = await executor
+    .update(projectService)
+    .set({
+      ...(fields.name === undefined ? {} : { name: fields.name }),
+      ...(fields.description === undefined ? {} : { description: fields.description }),
+      ...(fields.status === undefined ? {} : { status: fields.status }),
+      version: expectedVersion + 1,
+      updated_at: new Date(),
+    })
+    .where(and(eq(projectService.id, serviceId), eq(projectService.version, expectedVersion)))
+    .returning()
+  return row
+}
+
+/** 查询服务的仓库映射标识集合。 */
+export async function findServiceRepositoryIds(db: Database, serviceId: string) {
+  const rows = await db
+    .select({ repositoryId: projectServiceRepository.repository_id })
+    .from(projectServiceRepository)
+    .where(eq(projectServiceRepository.service_id, serviceId))
+  return new Set(rows.map((row) => row.repositoryId))
+}
+
+/** 插入服务与仓库映射。 */
+export async function insertServiceRepository(
+  executor: ProjectExecutor,
+  input: {
+    id: string
+    teamId: string
+    projectId: string
+    serviceId: string
+    repositoryId: string
+    createdByUserId: string
+  },
+) {
+  const [row] = await executor
+    .insert(projectServiceRepository)
+    .values({
+      id: input.id,
+      team_id: input.teamId,
+      project_id: input.projectId,
+      service_id: input.serviceId,
+      repository_id: input.repositoryId,
+      created_by_user_id: input.createdByUserId,
+    })
+    .returning()
+  if (!row) throw new Error('服务仓库映射写入失败')
+  return row
+}
+
+/** 删除服务与仓库映射；返回受影响行数。 */
+export async function deleteServiceRepository(executor: ProjectExecutor, serviceId: string, repositoryId: string) {
+  const rows = await executor
+    .delete(projectServiceRepository)
+    .where(
+      and(eq(projectServiceRepository.service_id, serviceId), eq(projectServiceRepository.repository_id, repositoryId)),
+    )
+    .returning()
+  return rows.length
+}
+
+/** 查询团队内全部服务仓库映射，供列表批量补齐。 */
+export async function findServiceRepositoryLinks(db: Database, projectId: string) {
+  return db.select().from(projectServiceRepository).where(eq(projectServiceRepository.project_id, projectId))
 }

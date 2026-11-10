@@ -7,6 +7,9 @@ export type TeamRole = 'admin' | 'developer' | 'viewer'
 export interface TeamSummary {
   id: string
   name: string
+  iconText?: string | null
+  description?: string | null
+  version?: number
   role: TeamRole
   status: string
 }

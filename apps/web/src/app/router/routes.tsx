@@ -49,7 +49,23 @@ export function createAppRoutes(): RouteObject[] {
                 },
                 { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: PageSkeleton },
                 { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: PageSkeleton },
+                { path: 'prs', lazy: () => import('@/pages/project/prs-page'), HydrateFallback: PageSkeleton },
+                {
+                  path: 'pipelines',
+                  lazy: () => import('@/pages/project/pipelines-page'),
+                  HydrateFallback: PageSkeleton,
+                },
+                {
+                  path: 'artifacts',
+                  lazy: () => import('@/pages/project/artifacts-page'),
+                  HydrateFallback: PageSkeleton,
+                },
               ],
+            },
+            {
+              path: 'settings/profile',
+              lazy: () => import('@/pages/settings/profile-page'),
+              HydrateFallback: PageSkeleton,
             },
             {
               path: 'settings/team',

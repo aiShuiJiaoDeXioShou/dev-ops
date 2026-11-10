@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
-import { CreateTeamDialog, MemberManagement, useSession } from '@/features/identity/public'
+import { CreateTeamDialog, MemberManagement, TeamProfileForm, useSession } from '@/features/identity/public'
 import { EmptyState } from '@/shared/ui/page-state'
 
 /** 团队设置页；成员管理仅对管理员开放。 */
@@ -30,6 +30,7 @@ export function Component() {
   return (
     <div className="catalog team-admin">
       <h1 className="sr-only">团队管理</h1>
+      <TeamProfileForm />
       {role === 'admin' ? (
         <MemberManagement teamId={currentTeam.id} canManage />
       ) : (

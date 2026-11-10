@@ -2,14 +2,36 @@ import {
   GitAdapterError,
   type GitAdapter,
   type GitAdapterInput,
+  type GitCommitDetail,
+  type GitCommitInput,
+  type GitCommitListInput,
+  type GitCommitSummary,
+  type GitFileContent,
+  type GitFileInput,
   type GitObjectInput,
   type GitObjectSnapshot,
+  type GitPullRequestDiff,
+  type GitPullRequestInput,
+  type GitPullRequestListInput,
+  type GitPullRequestSummary,
   type GitRemoteRepository,
+  type GitReviewStatus,
   type GitTreeEntry,
   type GitTreeInput,
-  type GitFileInput,
-  type GitFileContent,
 } from './git.types.ts'
+import {
+  GIT_READ_LIMITS,
+  aggregateReviewStatus,
+  buildPullRequestDetail,
+  filterPullRequestsByAuthor,
+  normalizePageInput,
+  parseGiteaCommit,
+  parseGiteaCommitDetail,
+  parseGiteaPullRequest,
+  parseGiteaPullRequestFile,
+  parseGiteaReviewFact,
+  truncateDiffText,
+} from './git.normalize.ts'
 
 const TIMEOUT_MS = 10_000
 const MAX_PAGES = 10
@@ -25,8 +47,18 @@ function classifyStatus(status: number): GitAdapterError {
   if (status === 401 || status === 403) return new GitAdapterError('auth_failed', 'Gitea 授权不可用')
   if (status === 404) return new GitAdapterError('not_found', '远端记录不存在')
   if (status === 408 || status === 504) return new GitAdapterError('timeout', 'Gitea 请求超时')
-  if (status >= 500) return new GitAdapterError('unavailable', 'Gitea 暂时不可用')
+  if (status === 429 || status >= 500) return new GitAdapterError('unavailable', 'Gitea 暂时不可用或被限流')
   return new GitAdapterError('unavailable', 'Gitea 请求失败')
+}
+
+/** 识别 fetch 超时；其余网络错误统一视为不可用，保留失败分类供接口映射。 */
+function classifyFetchError(error: unknown): GitAdapterError {
+  if (error instanceof GitAdapterError) return error
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    const name = error.name
+    if (name === 'TimeoutError' || name === 'AbortError') return new GitAdapterError('timeout', 'Gitea 请求超时')
+  }
+  return new GitAdapterError('unavailable', 'Gitea 暂时不可用')
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -49,8 +81,8 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
         headers: { Authorization: `token ${options.token}`, Accept: 'application/json' },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
-    } catch {
-      throw new GitAdapterError('unavailable', 'Gitea 暂时不可用')
+    } catch (error) {
+      throw classifyFetchError(error)
     }
     if (!response.ok) throw classifyStatus(response.status)
     try {
@@ -58,6 +90,100 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     } catch {
       throw new GitAdapterError('invalid_response', 'Gitea 返回了无法解析的数据')
     }
+  }
+
+  /** 读取差异等文本响应；非 2xx 按状态分类，读取失败不返回空文本冒充成功。 */
+  async function requestText(path: string): Promise<string> {
+    let response: Response
+    try {
+      response = await fetchImpl(`${baseUrl}/api/v1${path}`, {
+        headers: { Authorization: `token ${options.token}`, Accept: 'text/plain' },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+    } catch (error) {
+      throw classifyFetchError(error)
+    }
+    if (!response.ok) throw classifyStatus(response.status)
+    try {
+      return await response.text()
+    } catch {
+      throw new GitAdapterError('invalid_response', 'Gitea 返回了无法解析的差异内容')
+    }
+  }
+
+  async function listCommits(input: GitCommitListInput): Promise<GitCommitSummary[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const { page, pageSize } = normalizePageInput(input)
+    const sha = input.ref ? `&sha=${encodeURIComponent(input.ref)}` : ''
+    const data = await request<unknown>(`/repos/${slug}/commits?page=${page}&limit=${pageSize}${sha}`)
+    if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'Gitea 提交列表不合法')
+    return data.map((item) => parseGiteaCommit(item))
+  }
+
+  async function getCommit(input: GitCommitInput): Promise<GitCommitDetail> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const data = await request<unknown>(`/repos/${slug}/git/commits/${encodeURIComponent(input.ref)}`)
+    return parseGiteaCommitDetail(data)
+  }
+
+  async function listPullRequests(input: GitPullRequestListInput): Promise<GitPullRequestSummary[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const { page, pageSize } = normalizePageInput(input)
+    const state = encodeURIComponent(input.state ?? 'open')
+    const data = await request<unknown>(`/repos/${slug}/pulls?state=${state}&page=${page}&limit=${pageSize}`)
+    if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'Gitea PR 列表不合法')
+    // 列表接口不携带评审信息，reviewStatus 保持 unknown；详情读取时再按评审记录推导。
+    return filterPullRequestsByAuthor(
+      data.map((item) => parseGiteaPullRequest(item)),
+      input.author,
+    )
+  }
+
+  /** 读取 PR 评审状态；来源缺少评审接口时记 unknown，其他失败必须向上传递。 */
+  async function loadReviewStatus(slug: string, pullNumber: number): Promise<GitReviewStatus> {
+    try {
+      const data = await request<unknown>(`/repos/${slug}/pulls/${pullNumber}/reviews?limit=100&page=1`)
+      if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'Gitea 评审列表不合法')
+      return aggregateReviewStatus(data.map((item) => parseGiteaReviewFact(item)))
+    } catch (error) {
+      if (error instanceof GitAdapterError && error.code === 'not_found') return 'unknown'
+      throw error
+    }
+  }
+
+  /**
+   * 读取 PR 变更文件；旧版 Gitea 没有该接口时返回 unsupported，
+   * 因为此时 PR 详情已读取成功，404 只可能是能力缺失而非记录不存在。
+   */
+  async function loadChangedFiles(slug: string, pullNumber: number): Promise<{ items: unknown[]; hasMore: boolean }> {
+    try {
+      const data = await request<unknown>(
+        `/repos/${slug}/pulls/${pullNumber}/files?limit=${GIT_READ_LIMITS.maxChangedFiles}&page=1`,
+      )
+      if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'Gitea 变更文件列表不合法')
+      return { items: data, hasMore: data.length >= GIT_READ_LIMITS.maxChangedFiles }
+    } catch (error) {
+      if (error instanceof GitAdapterError && error.code === 'not_found') {
+        throw new GitAdapterError('unsupported', 'Gitea 版本不支持读取 PR 变更文件')
+      }
+      throw error
+    }
+  }
+
+  async function getPullRequest(input: GitPullRequestInput) {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const data = await request<unknown>(`/repos/${slug}/pulls/${input.number}`)
+    const [reviewStatus, changedFiles] = await Promise.all([
+      loadReviewStatus(slug, input.number),
+      loadChangedFiles(slug, input.number),
+    ])
+    const summary = parseGiteaPullRequest(data, reviewStatus)
+    return buildPullRequestDetail(summary, changedFiles.items, parseGiteaPullRequestFile, changedFiles.hasMore)
+  }
+
+  async function getPullRequestDiff(input: GitPullRequestInput): Promise<GitPullRequestDiff> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    return truncateDiffText(await requestText(`/repos/${slug}/pulls/${input.number}.diff`))
   }
 
   async function getObject(input: GitObjectInput): Promise<GitObjectSnapshot> {
@@ -157,5 +283,10 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     listTree,
     getFile,
     listBranches,
+    listCommits,
+    getCommit,
+    listPullRequests,
+    getPullRequest,
+    getPullRequestDiff,
   }
 }

@@ -80,7 +80,12 @@ export function AppLayout() {
               团队管理
             </NavLink>
           )}
-          <div className="user">
+          <Link
+            className="user"
+            to="/settings/profile"
+            aria-label={`打开${user.name}的个人页面`}
+            onClick={() => setMenuOpen(false)}
+          >
             <span className="avatar-slot">
               <span className="avatar">{user.name.slice(0, 1)}</span>
             </span>
@@ -92,7 +97,7 @@ export function AppLayout() {
               </span>
             </span>
             <span className="badge">{ROLE_LABELS[role]}</span>
-          </div>
+          </Link>
           <button type="button" className="nav-btn logout-btn" onClick={() => setLogoutOpen(true)}>
             <PrototypeIcon name="logout" />
             退出登录

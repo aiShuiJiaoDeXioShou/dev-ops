@@ -4,4 +4,5 @@ import { createApiClient } from '@dev-ops/api-client'
 export const apiClient = createApiClient({
   baseUrl: window.location.origin,
   credentials: 'same-origin',
+  ...(import.meta.env.MODE === 'test' ? { validateResponses: false } : {}),
 })

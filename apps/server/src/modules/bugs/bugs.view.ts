@@ -1,5 +1,5 @@
-import type { UserRef } from '../identity/identity.display.ts'
-import { userRefOf, userNameOf } from '../identity/identity.display.ts'
+import type { OwnerRef } from '../identity/identity.display.ts'
+import { ownerRefOf } from '../identity/identity.display.ts'
 import type { RequirementSummary } from '../requirements/requirements.types.ts'
 import { toBugStatus } from './bugs.rules.ts'
 import type { BugListRow, BugRow, RegressionRow } from './bugs.repository.ts'
@@ -11,15 +11,15 @@ import type { BugDetail, BugListItem, LinkedCodeReferenceView, RegressionView } 
  * @param refs 已批量加载的用户引用。
  * @returns Bug 列表项。
  */
-export function toBugListItem(row: BugListRow, refs: Map<string, UserRef>): BugListItem {
+export function toBugListItem(row: BugListRow, refs: Map<string, OwnerRef>): BugListItem {
   return {
     id: row.id,
     projectId: row.project_id,
     number: row.number,
     title: row.title,
     status: toBugStatus(row.status),
-    fixOwner: userRefOf(row.fix_owner_user_id, refs),
-    regressionOwner: userRefOf(row.regression_owner_user_id, refs),
+    fixOwner: ownerRefOf(row.fix_owner_user_id, refs),
+    regressionOwner: ownerRefOf(row.regression_owner_user_id, refs),
     version: row.version,
     updatedAt: row.updated_at.toISOString(),
   }
@@ -31,13 +31,23 @@ export function toBugListItem(row: BugListRow, refs: Map<string, UserRef>): BugL
  * @param refs 已批量加载的用户引用。
  * @returns 回归记录视图。
  */
-export function toRegressionView(row: RegressionRow, refs: Map<string, UserRef>): RegressionView {
+export function toRegressionView(row: RegressionRow, refs: Map<string, OwnerRef>): RegressionView {
   return {
     id: row.id,
     attempt: row.attempt,
     fixSummary: row.fix_summary,
-    fixer: { userId: row.fixer_user_id, name: userNameOf(row.fixer_user_id, refs) },
-    verifier: { userId: row.verifier_user_id, name: userNameOf(row.verifier_user_id, refs) },
+    fixer: ownerRefOf(row.fixer_user_id, refs) ?? {
+      userId: row.fixer_user_id,
+      name: '未知用户',
+      status: 'missing',
+      available: false,
+    },
+    verifier: ownerRefOf(row.verifier_user_id, refs) ?? {
+      userId: row.verifier_user_id,
+      name: '未知用户',
+      status: 'missing',
+      available: false,
+    },
     result: row.result,
     failureReason: row.failure_reason,
     createdAt: row.created_at.toISOString(),
@@ -51,7 +61,7 @@ export interface BugDetailMapping {
   linkedRequirements: RequirementSummary[]
   regressions: RegressionRow[]
   linkedCodeReferences: LinkedCodeReferenceView[]
-  refs: Map<string, UserRef>
+  refs: Map<string, OwnerRef>
 }
 
 /**

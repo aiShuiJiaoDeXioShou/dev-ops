@@ -12,6 +12,9 @@ const tabs = [
   { slug: 'requirements', label: '需求' },
   { slug: 'bugs', label: 'Bug' },
   { slug: 'code', label: '代码' },
+  { slug: 'prs', label: 'PR' },
+  { slug: 'pipelines', label: '流水线' },
+  { slug: 'artifacts', label: '产物与版本' },
 ]
 
 /** 项目内布局：项目头部、页签与内容出口。 */

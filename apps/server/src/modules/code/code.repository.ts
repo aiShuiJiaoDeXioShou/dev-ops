@@ -92,6 +92,24 @@ export async function findProjectRepositoryLink(db: Database, projectId: string,
   return row
 }
 
+/**
+ * 查询项目已关联的仓库记录。
+ * @param db 数据库连接。
+ * @param projectId 项目标识。
+ * @param repositoryId 仓库标识。
+ * @returns 仓库记录；项目未关联该仓库时返回 undefined。
+ * @remarks 一次 join 同时校验关联与仓库存在，代码读取前据此确认资源归属。
+ */
+export async function findLinkedRepository(db: Database, projectId: string, repositoryId: string) {
+  const [row] = await db
+    .select({ repository: gitRepository })
+    .from(projectRepository)
+    .innerJoin(gitRepository, eq(gitRepository.id, projectRepository.repository_id))
+    .where(and(eq(projectRepository.project_id, projectId), eq(projectRepository.repository_id, repositoryId)))
+    .limit(1)
+  return row?.repository
+}
+
 /** 建立项目仓库关联。 */
 export async function insertProjectRepository(
   db: CodeExecutor,
@@ -175,6 +193,36 @@ export async function findCodeReferencesForTarget(db: Database, targetType: stri
     .from(codeReference)
     .where(and(eq(codeReference.target_type, targetType), eq(codeReference.target_id, targetId)))
     .orderBy(desc(codeReference.created_at), desc(codeReference.id))
+}
+
+/**
+ * 查询事项已关联的 PR 远端编号。
+ * @param db 数据库连接。
+ * @param projectId 项目标识。
+ * @param repositoryId 仓库标识。
+ * @param targetId 需求或 Bug 标识。
+ * @returns 该事项在该仓库已关联的 change_request 远端编号；无关联时为空数组。
+ * @remarks 同时限定项目与仓库，避免跨项目关联影响结果；不校验事项是否存在，
+ * 由调用方把空集合解释为“没有匹配的 PR”而不是读取失败。
+ */
+export async function findChangeRequestRemoteIdsForTarget(
+  db: Database,
+  projectId: string,
+  repositoryId: string,
+  targetId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ remoteId: codeReference.remote_id })
+    .from(codeReference)
+    .where(
+      and(
+        eq(codeReference.project_id, projectId),
+        eq(codeReference.repository_id, repositoryId),
+        eq(codeReference.target_id, targetId),
+        eq(codeReference.object_type, 'change_request'),
+      ),
+    )
+  return rows.map((row) => row.remoteId)
 }
 
 /** 统计事项代码引用数量。 */

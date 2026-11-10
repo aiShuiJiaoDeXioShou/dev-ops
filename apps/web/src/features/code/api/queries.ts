@@ -86,3 +86,12 @@ export function repositoryBranchesQueryOptions(projectId: string, repositoryId: 
     enabled: Boolean(projectId && repositoryId),
   })
 }
+
+/** 项目已关联仓库列表。 */
+export function listProjectRepositoriesQueryOptions(projectId: string) {
+  return queryOptions({
+    queryKey: ['code', 'repositories', projectId],
+    queryFn: ({ signal }) => apiClient.listProjectRepositories(projectId, { signal }),
+    enabled: Boolean(projectId),
+  })
+}

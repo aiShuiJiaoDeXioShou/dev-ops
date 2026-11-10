@@ -2,6 +2,7 @@ import type { components, paths } from './generated/api.ts'
 import validateHealth from './generated/health.mjs'
 import validateReadiness from './generated/readiness.mjs'
 import validateError from './generated/error.mjs'
+import { validateResponse } from './generated/response-validators.mjs'
 
 export type { components, paths } from './generated/api.ts'
 
@@ -131,6 +132,10 @@ export interface ApiClientOptions {
   baseUrl: string | URL
   timeoutMs?: number
   credentials?: RequestCredentials
+  /** API Token；CLI 使用 Bearer，浏览器不设置。 */
+  token?: string
+  /** 是否按生成契约校验业务响应；测试可显式关闭，运行时默认开启。 */
+  validateResponses?: boolean
   fetch?: typeof fetch
 }
 
@@ -193,6 +198,7 @@ export function createApiClient(options: ApiClientOptions) {
     throw new Error('请求超时必须是 1 至 300000 之间的整数毫秒')
   }
   const fetchRequest = options.fetch
+  const validateResponses = options.validateResponses !== false
 
   /**
    * 发起请求并完成传输层解析；不判断业务信封。
@@ -225,6 +231,7 @@ export function createApiClient(options: ApiClientOptions) {
         credentials: options.credentials ?? 'omit',
         headers: {
           accept: 'application/json',
+          ...(options.token === undefined ? {} : { authorization: `Bearer ${options.token}` }),
           ...(idempotencyKey === undefined ? {} : { 'idempotency-key': idempotencyKey }),
           ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         },
@@ -316,6 +323,12 @@ export function createApiClient(options: ApiClientOptions) {
     if (!isSuccessEnvelope(payload)) {
       throw new RequestError('后端响应不符合接口契约。', { code: 'INVALID_RESPONSE', requestId: headerRequestId })
     }
+    if (validateResponses && !validateResponse(method, path, payload)) {
+      throw new RequestError('后端响应不符合接口契约。', {
+        code: 'INVALID_RESPONSE',
+        requestId: headerRequestId ?? payload.requestId,
+      })
+    }
     return { data: payload.data as T, requestId: headerRequestId ?? payload.requestId }
   }
 
@@ -339,6 +352,28 @@ export function createApiClient(options: ApiClientOptions) {
     async ready(signal?: AbortSignal) {
       const result = await getEnvelope<ReadinessResponse>('/api/v1/ready', validateReadiness, signal)
       return { ...result, data: { status: result.data.status, database: result.data.database } }
+    },
+
+    /** 读取当前身份与可用团队（API Token 或 Cookie 会话均可）。 */
+    async me(options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/me', 'get'>>('/api/v1/me', 'GET', undefined, options)
+    },
+    /** 读取当前账号的 API Token 元数据。 */
+    async listApiTokens(options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/me/tokens', 'get'>>('/api/v1/me/tokens', 'GET', undefined, options)
+    },
+    /** 创建 API Token；响应中的明文只出现一次。 */
+    async createApiToken(body: ApiBody<'/api/v1/me/tokens', 'post'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/me/tokens', 'post'>>('/api/v1/me/tokens', 'POST', body, options)
+    },
+    /** 撤销指定 API Token。 */
+    async revokeApiToken(tokenId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/me/tokens/{tokenId}/revoke', 'post'>>(
+        `/api/v1/me/tokens/${segment(tokenId)}/revoke`,
+        'POST',
+        undefined,
+        options,
+      )
     },
 
     /** 读取当前用户加入的团队。 */
@@ -498,6 +533,95 @@ export function createApiClient(options: ApiClientOptions) {
         `/api/v1/projects/${segment(projectId)}/stats`,
         'GET',
         undefined,
+        options,
+      )
+    },
+
+    /** 上报构建与产物引用（CLI/Web 共用）。 */
+    async reportBuild(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/builds', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/builds', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/builds`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取项目构建记录列表。 */
+    async listBuilds(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/builds', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/builds', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/builds`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取构建记录详情。 */
+    async getBuild(buildId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/builds/{buildId}', 'get'>>(
+        `/api/v1/builds/${segment(buildId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 更正构建记录。 */
+    async correctBuild(
+      buildId: string,
+      body: ApiBody<'/api/v1/builds/{buildId}/correct', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/builds/{buildId}/correct', 'post'>>(
+        `/api/v1/builds/${segment(buildId)}/correct`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 补报构建产物引用。 */
+    async addBuildArtifact(
+      buildId: string,
+      body: ApiBody<'/api/v1/builds/{buildId}/artifacts', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/builds/{buildId}/artifacts', 'post'>>(
+        `/api/v1/builds/${segment(buildId)}/artifacts`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 关联构建与需求/Bug。 */
+    async linkBuildTarget(
+      buildId: string,
+      body: ApiBody<'/api/v1/builds/{buildId}/targets', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/builds/{buildId}/targets', 'post'>>(
+        `/api/v1/builds/${segment(buildId)}/targets`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 解除构建与需求/Bug 的关联。 */
+    async unlinkBuildTarget(
+      buildId: string,
+      targetId: string,
+      body: ApiBody<'/api/v1/builds/{buildId}/targets/{targetId}/remove', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/builds/{buildId}/targets/{targetId}/remove', 'post'>>(
+        `/api/v1/builds/${segment(buildId)}/targets/${segment(targetId)}/remove`,
+        'POST',
+        body,
         options,
       )
     },
@@ -1104,6 +1228,474 @@ export function createApiClient(options: ApiClientOptions) {
         `/api/v1/git-connections/${segment(connectionId)}/revoke`,
         'POST',
         body,
+        options,
+      )
+    },
+
+    /** 更新团队资料（名称/图标标识/说明）。 */
+    async updateTeam(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/update', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+
+    /** 读取项目服务目录。 */
+    async listProjectServices(projectId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/services', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/services`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取项目服务详情。 */
+    async getProjectService(projectId: string, serviceId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/services/{serviceId}', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/services/${segment(serviceId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 创建项目服务并可选关联仓库。 */
+    async createProjectService(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/services', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/services', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/services`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 更新项目服务资料或状态。 */
+    async updateProjectService(
+      projectId: string,
+      serviceId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/services/{serviceId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/services/{serviceId}/update', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/services/${segment(serviceId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 为服务关联仓库。 */
+    async addServiceRepository(
+      projectId: string,
+      serviceId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/services/{serviceId}/repositories', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/services/{serviceId}/repositories', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/services/${segment(serviceId)}/repositories`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 解除服务与仓库关联。 */
+    async removeServiceRepository(
+      projectId: string,
+      serviceId: string,
+      repositoryId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/services/{serviceId}/repositories/{repositoryId}/remove', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/projects/{projectId}/services/{serviceId}/repositories/{repositoryId}/remove', 'post'>
+      >(
+        `/api/v1/projects/${segment(projectId)}/services/${segment(serviceId)}/repositories/${segment(repositoryId)}/remove`,
+        'POST',
+        body,
+        options,
+      )
+    },
+
+    /** 读取项目产物入口。 */
+    async listProjectArtifacts(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/artifacts', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/artifacts', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/artifacts`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取服务各环境运行版本。 */
+    async listRunVersions(projectId: string, serviceId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/services/{serviceId}/run-versions', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/services/${segment(serviceId)}/run-versions`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取运行版本历史。 */
+    async listRunVersionHistory(
+      projectId: string,
+      serviceId: string,
+      environment: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/services/{serviceId}/run-versions/{environment}/history', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/projects/{projectId}/services/{serviceId}/run-versions/{environment}/history', 'get'>
+      >(
+        `/api/v1/projects/${segment(projectId)}/services/${segment(serviceId)}/run-versions/${segment(environment)}/history`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 确认或更正服务运行版本。 */
+    async confirmRunVersion(
+      projectId: string,
+      serviceId: string,
+      environment: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/services/{serviceId}/run-versions/{environment}/confirm', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/projects/{projectId}/services/{serviceId}/run-versions/{environment}/confirm', 'post'>
+      >(
+        `/api/v1/projects/${segment(projectId)}/services/${segment(serviceId)}/run-versions/${segment(environment)}/confirm`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 上报流水线运行。 */
+    async reportPipelineRun(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/pipeline-runs', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-runs', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/pipeline-runs`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取项目流水线运行列表。 */
+    async listPipelineRuns(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/pipeline-runs', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-runs', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/pipeline-runs`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取流水线运行详情。 */
+    async getPipelineRun(runId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-runs/{runId}', 'get'>>(
+        `/api/v1/pipeline-runs/${segment(runId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 创建外部提审记录。 */
+    async createReview(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/reviews', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/reviews', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/reviews`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 更新审核状态。 */
+    async updateReview(
+      reviewId: string,
+      body: ApiBody<'/api/v1/reviews/{reviewId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/reviews/{reviewId}/update', 'post'>>(
+        `/api/v1/reviews/${segment(reviewId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取项目提审列表。 */
+    async listReviews(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/reviews', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/reviews', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/reviews`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取提审详情。 */
+    async getReview(reviewId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/reviews/{reviewId}', 'get'>>(
+        `/api/v1/reviews/${segment(reviewId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 记录实际发布结果。 */
+    async createRelease(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/releases', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/releases', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/releases`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取发布结果列表。 */
+    async listReleases(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/releases', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/releases', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/releases`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+
+    /** 读取团队凭据列表。 */
+    async listCredentials(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/credentials', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/credentials', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/credentials`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取凭据详情。 */
+    async getCredential(teamId: string, credentialId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/credentials/{credentialId}', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/credentials/${segment(credentialId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 创建团队凭据。 */
+    async createCredential(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/credentials', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/credentials', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/credentials`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 轮换凭据。 */
+    async rotateCredential(
+      credentialId: string,
+      body: ApiBody<'/api/v1/credentials/{credentialId}/rotate', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/credentials/{credentialId}/rotate', 'post'>>(
+        `/api/v1/credentials/${segment(credentialId)}/rotate`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 撤销凭据。 */
+    async revokeCredential(
+      credentialId: string,
+      body: ApiBody<'/api/v1/credentials/{credentialId}/revoke', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/credentials/{credentialId}/revoke', 'post'>>(
+        `/api/v1/credentials/${segment(credentialId)}/revoke`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 授权凭据给项目。 */
+    async grantCredential(
+      credentialId: string,
+      body: ApiBody<'/api/v1/credentials/{credentialId}/grants', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/credentials/{credentialId}/grants', 'post'>>(
+        `/api/v1/credentials/${segment(credentialId)}/grants`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 撤销凭据的项目授权。 */
+    async revokeCredentialGrant(
+      credentialId: string,
+      projectId: string,
+      body: ApiBody<'/api/v1/credentials/{credentialId}/grants/{projectId}/revoke', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/credentials/{credentialId}/grants/{projectId}/revoke', 'post'>>(
+        `/api/v1/credentials/${segment(credentialId)}/grants/${segment(projectId)}/revoke`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取凭据使用记录。 */
+    async listCredentialUsage(
+      credentialId: string,
+      query?: ApiQuery<'/api/v1/credentials/{credentialId}/usage', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/credentials/{credentialId}/usage', 'get'>>(
+        `/api/v1/credentials/${segment(credentialId)}/usage`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取项目环境变量。 */
+    async listEnvVariables(projectId: string, environment: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/environments/{environment}/variables', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/environments/${segment(environment)}/variables`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 创建项目环境变量或密钥引用。 */
+    async createEnvVariable(
+      projectId: string,
+      environment: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/environments/{environment}/variables', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/environments/{environment}/variables', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/environments/${segment(environment)}/variables`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 更新项目环境变量。 */
+    async updateEnvVariable(
+      variableId: string,
+      body: ApiBody<'/api/v1/project-variables/{variableId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/project-variables/{variableId}/update', 'post'>>(
+        `/api/v1/project-variables/${segment(variableId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 删除项目环境变量。 */
+    async removeEnvVariable(
+      variableId: string,
+      body: ApiBody<'/api/v1/project-variables/{variableId}/remove', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/project-variables/{variableId}/remove', 'post'>>(
+        `/api/v1/project-variables/${segment(variableId)}/remove`,
+        'POST',
+        body,
+        options,
+      )
+    },
+
+    /** 读取仓库提交列表。 */
+    async listCommits(
+      projectId: string,
+      repositoryId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/repositories/{repositoryId}/commits', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/commits', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/commits`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取提交详情。 */
+    async getCommit(projectId: string, repositoryId: string, ref: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/commits/{ref}', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/commits/${segment(ref)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取仓库 PR 列表。 */
+    async listPullRequests(
+      projectId: string,
+      repositoryId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/repositories/{repositoryId}/pull-requests', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/pull-requests', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/pull-requests`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取 PR 详情。 */
+    async getPullRequest(projectId: string, repositoryId: string, number: string, options: ApiCallOptions = {}) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/pull-requests/{number}', 'get'>
+      >(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/pull-requests/${segment(number)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取 PR 差异文本。 */
+    async getPullRequestDiff(projectId: string, repositoryId: string, number: string, options: ApiCallOptions = {}) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/pull-requests/{number}/diff', 'get'>
+      >(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/pull-requests/${segment(number)}/diff`,
+        'GET',
+        undefined,
         options,
       )
     },

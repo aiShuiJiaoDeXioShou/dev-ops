@@ -1,3 +1,4 @@
+import type { OwnerRef } from '../identity/identity.display.ts'
 import type { RequirementStatus } from './requirements.rules.ts'
 
 /** 需求摘要读模型：列表与跨模块关联展示所需的最小字段，不包含正文。 */
@@ -17,10 +18,11 @@ export interface RequirementListItem {
   number: number
   title: string
   status: RequirementStatus
-  devOwner: { userId: string; name: string } | null
-  testOwner: { userId: string; name: string } | null
+  devOwner: OwnerRef | null
+  testOwner: OwnerRef | null
   version: number
   updatedAt: string
+  needsReview: boolean
 }
 
 /** 关联 Bug 摘要。 */
@@ -78,7 +80,7 @@ export interface RequirementDetail extends RequirementListItem {
   externalUrl: string | null
   externalSummary: string | null
   acceptanceCriteria: string | null
-  collaborators: Array<{ userId: string; name: string }>
+  collaborators: OwnerRef[]
   latestTestSubmission: TestSubmissionView | null
   linkedBugs: LinkedBugView[]
   needsReview: boolean

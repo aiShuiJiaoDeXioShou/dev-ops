@@ -1,16 +1,25 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import { requireSessionUser } from '../identity/identity.session.ts'
+import { requireActor } from '../identity/identity.actor.ts'
 import type { IdentityAuth } from '../identity/identity.auth.ts'
 import type { CodeService } from './code.service.ts'
 import {
   availableRepositoryListResponseSchema,
   codeReferenceParamsSchema,
   codeReferenceResponseSchema,
+  commitListQuerySchema,
+  commitListResponseSchema,
+  commitRefParamsSchema,
+  commitResponseSchema,
   createReferenceBodySchema,
   linkRepositoryBodySchema,
   projectParamsSchema,
   projectRepositoryParamsSchema,
+  pullRequestDiffResponseSchema,
+  pullRequestListQuerySchema,
+  pullRequestListResponseSchema,
+  pullRequestParamsSchema,
+  pullRequestResponseSchema,
   removeReferenceBodySchema,
   removedResponseSchema,
   repositoryFileQuerySchema,
@@ -34,7 +43,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       schema: { params: projectParamsSchema, response: { 200: repositoryListResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.listProjectRepositories(user, request.params.projectId), request.id)
     },
   )
@@ -49,7 +58,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listAvailableRepositories(user, request.params.projectId, request.query),
         request.id,
@@ -63,7 +72,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       schema: { params: projectRepositoryParamsSchema, response: { 200: repositoryBranchesResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         {
           branches: await options.service.listRepositoryBranches(
@@ -87,7 +96,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listRepositoryTree(
           user,
@@ -110,12 +119,124 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.getRepositoryFile(user, request.params.projectId, request.params.repositoryId, {
           branch: request.query.branch,
           path: request.query.path,
         }),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/commits',
+    {
+      schema: {
+        params: projectRepositoryParamsSchema,
+        querystring: commitListQuerySchema,
+        response: { 200: commitListResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireActor(request)
+      return success(
+        await options.service.listRepositoryCommits(
+          user,
+          request.params.projectId,
+          request.params.repositoryId,
+          request.query,
+        ),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/commits/:ref',
+    {
+      schema: {
+        params: commitRefParamsSchema,
+        response: { 200: commitResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireActor(request)
+      return success(
+        await options.service.getRepositoryCommit(
+          user,
+          request.params.projectId,
+          request.params.repositoryId,
+          request.params.ref,
+        ),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/pull-requests',
+    {
+      schema: {
+        params: projectRepositoryParamsSchema,
+        querystring: pullRequestListQuerySchema,
+        response: { 200: pullRequestListResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireActor(request)
+      return success(
+        await options.service.listRepositoryPullRequests(
+          user,
+          request.params.projectId,
+          request.params.repositoryId,
+          request.query,
+        ),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/pull-requests/:number',
+    {
+      schema: {
+        params: pullRequestParamsSchema,
+        response: { 200: pullRequestResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireActor(request)
+      return success(
+        await options.service.getRepositoryPullRequest(
+          user,
+          request.params.projectId,
+          request.params.repositoryId,
+          request.params.number,
+        ),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/pull-requests/:number/diff',
+    {
+      schema: {
+        params: pullRequestParamsSchema,
+        response: { 200: pullRequestDiffResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireActor(request)
+      return success(
+        await options.service.getRepositoryPullRequestDiff(
+          user,
+          request.params.projectId,
+          request.params.repositoryId,
+          request.params.number,
+        ),
         request.id,
       )
     },
@@ -131,7 +252,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.linkRepository(user, request.params.projectId, request.body.repositoryId),
         request.id,
@@ -149,7 +270,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.unlinkRepository(
           user,
@@ -172,7 +293,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.createReference(user, request.params.projectId, request.body), request.id)
     },
   )
@@ -183,7 +304,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       schema: { params: codeReferenceParamsSchema, response: { 200: codeReferenceResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.refreshReference(user, request.params.codeReferenceId), request.id)
     },
   )
@@ -198,7 +319,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       await options.service.removeReference(user, request.params.codeReferenceId, request.body.reason)
       return success({ removed: true }, request.id)
     },

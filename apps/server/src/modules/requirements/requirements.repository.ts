@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { and, count, desc, eq, ilike, inArray, max, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, inArray, isNotNull, max, notExists, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { requirement, requirementCollaborator, requirementTestSubmission } from './requirements.tables.ts'
 import type { RequirementSummary } from './requirements.types.ts'
+import { bug, bugRequirementLink } from '../bugs/bugs.tables.ts'
+import { teamMember } from '../identity/identity.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type RequirementExecutor = Database | TransactionDatabase
@@ -18,6 +20,7 @@ export interface RequirementListFilters {
   search?: string
   status?: string
   ownerId?: string
+  ownerUnavailable?: boolean
   page: number
   pageSize: number
 }
@@ -59,6 +62,27 @@ export async function findRequirements(db: Database, projectId: string, filters:
   }
   if (filters.status) conditions.push(eq(requirement.status, filters.status))
   if (filters.ownerId) conditions.push(eq(requirement.dev_owner_user_id, filters.ownerId))
+  if (filters.ownerUnavailable) {
+    const activeOwner = (ownerColumn: typeof requirement.dev_owner_user_id | typeof requirement.test_owner_user_id) =>
+      notExists(
+        db
+          .select({ one: sql`1` })
+          .from(teamMember)
+          .where(
+            and(
+              eq(teamMember.team_id, requirement.team_id),
+              eq(teamMember.user_id, ownerColumn),
+              eq(teamMember.status, 'active'),
+            ),
+          ),
+      )
+    conditions.push(
+      or(
+        and(isNotNull(requirement.dev_owner_user_id), activeOwner(requirement.dev_owner_user_id)),
+        and(isNotNull(requirement.test_owner_user_id), activeOwner(requirement.test_owner_user_id)),
+      )!,
+    )
+  }
   const where = and(...conditions)
   const [rows, [total]] = await Promise.all([
     db
@@ -346,4 +370,25 @@ export async function findTestSubmissions(db: Database, requirementId: string, p
     db.select({ value: count() }).from(requirementTestSubmission).where(where),
   ])
   return { rows, total: total?.value ?? 0 }
+}
+
+/**
+ * 批量查询存在未解决关联 Bug 的需求标识，用于列表 needsReview。
+ * @param db 数据库连接。
+ * @param requirementIds 需求标识集合。
+ * @returns 需要复核的需求标识集合。
+ */
+export async function findNeedsReviewRequirementIds(db: Database, requirementIds: string[]): Promise<Set<string>> {
+  if (requirementIds.length === 0) return new Set()
+  const rows = await db
+    .select({ requirementId: bugRequirementLink.requirement_id })
+    .from(bugRequirementLink)
+    .innerJoin(bug, eq(bug.id, bugRequirementLink.bug_id))
+    .where(
+      and(
+        inArray(bugRequirementLink.requirement_id, [...new Set(requirementIds)]),
+        sql`${bug.status} not in ('resolved', 'closed')`,
+      ),
+    )
+  return new Set(rows.map((row) => row.requirementId))
 }

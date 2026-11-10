@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import { requireSessionUser } from '../identity/identity.session.ts'
+import { requireActor } from '../identity/identity.actor.ts'
 import type { IdentityAuth } from '../identity/identity.auth.ts'
 import type { IntegrationsService } from './integrations.service.ts'
 import {
@@ -32,7 +32,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       schema: { response: { 200: providerListResponseSchema } },
     },
     async (request) => {
-      await requireSessionUser(options.auth, request.headers)
+      await requireActor(request)
       return success(options.service.providers(), request.id)
     },
   )
@@ -43,7 +43,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: teamParamsSchema, response: { 200: connectionListResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.listConnections(user, request.params.teamId), request.id)
     },
   )
@@ -58,7 +58,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.createConnection(user, request.params.teamId, request.body), request.id)
     },
   )
@@ -70,7 +70,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
     },
     async (request, reply) => {
       try {
-        const user = await requireSessionUser(options.auth, request.headers)
+        const user = await requireActor(request)
         const connection = await options.service.completeAuthorization(
           user,
           request.params.providerKey,
@@ -90,7 +90,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: connectionParamsSchema, response: { 200: checkConnectionResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.checkConnection(user, request.params.connectionId), request.id)
     },
   )
@@ -101,7 +101,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: connectionParamsSchema, response: { 200: syncRepositoriesResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.syncRepositories(user, request.params.connectionId), request.id)
     },
   )
@@ -116,7 +116,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listRepositories(user, request.params.connectionId, request.query),
         request.id,
@@ -134,7 +134,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.revokeConnection(user, request.params.connectionId, request.body.reason),
         request.id,

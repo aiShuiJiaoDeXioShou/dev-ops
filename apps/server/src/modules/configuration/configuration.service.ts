@@ -3,7 +3,9 @@ import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
+import { createCredentialsService } from './configuration.credentials.service.ts'
 import type { SecretCipher } from './configuration.crypto.ts'
+import { createEnvironmentVariablesService } from './configuration.environment-variables.service.ts'
 import { findSecretForDecrypt, insertSecret, listSecrets, revokeSecret } from './configuration.repository.ts'
 
 const SECRET_KINDS = new Set(['git_token', 'github_app_private_key'])
@@ -29,6 +31,9 @@ export interface ConfigurationServiceDeps {
  */
 export function createConfigurationService(deps: ConfigurationServiceDeps) {
   const { db } = deps
+  // 凭据库与环境变量复用同一 AES-256-GCM 加解密器；Git 连接凭据仍走 V0.1 受控存储。
+  const credentials = createCredentialsService(deps)
+  const environmentVariables = createEnvironmentVariablesService({ db })
 
   async function requireAdmin(actor: SessionUser, teamId: string) {
     await requireTeamMember(db, actor.id, teamId, ['admin'])
@@ -108,6 +113,8 @@ export function createConfigurationService(deps: ConfigurationServiceDeps) {
     listSecrets: listTeamSecrets,
     revokeSecret: revokeTeamSecret,
     decryptSecret: decryptTeamSecret,
+    credentials,
+    environmentVariables,
   }
 }
 

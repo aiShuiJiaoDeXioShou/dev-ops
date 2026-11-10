@@ -12,7 +12,7 @@ import {
   type PageResult,
 } from '../collaboration/collaboration.service.ts'
 import { isActiveTeamMember } from '../identity/identity.repository.ts'
-import { loadUserRefs } from '../identity/identity.display.ts'
+import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
@@ -101,7 +101,7 @@ export function createBugsService(deps: BugsServiceDeps) {
         db,
         requirementIds.map((item) => item.requirementId),
       ),
-      loadUserRefs(db, ownerUserIds),
+      loadOwnerRefs(db, row.team_id, ownerUserIds),
     ])
     return toBugDetail({ row, linkedRequirements, regressions, linkedCodeReferences, refs })
   }
@@ -109,9 +109,16 @@ export function createBugsService(deps: BugsServiceDeps) {
   async function listBugs(
     actor: SessionUser,
     projectId: string,
-    filters: { search?: string; status?: string; ownerId?: string; page?: number; pageSize?: number },
+    filters: {
+      search?: string
+      status?: string
+      ownerId?: string
+      ownerUnavailable?: boolean
+      page?: number
+      pageSize?: number
+    },
   ) {
-    await requireProjectAccess(actor, projectId)
+    const project = await requireProjectAccess(actor, projectId)
     const page = filters.page ?? 1
     const pageSize = filters.pageSize ?? 20
     validatePage(page, pageSize)
@@ -120,13 +127,14 @@ export function createBugsService(deps: BugsServiceDeps) {
       search: filters.search?.trim() || undefined,
       status: filters.status,
       ownerId: filters.ownerId,
+      ownerUnavailable: filters.ownerUnavailable,
       page,
       pageSize,
     })
     const ownerUserIds = rows.flatMap((row) =>
       [row.fix_owner_user_id, row.regression_owner_user_id].filter((userId): userId is string => userId !== null),
     )
-    const ownerRefs = await loadUserRefs(db, ownerUserIds)
+    const ownerRefs = await loadOwnerRefs(db, project.teamId, ownerUserIds)
     const items = rows.map((row) => toBugListItem(row, ownerRefs))
     return { items, page, pageSize, total }
   }
@@ -355,7 +363,10 @@ export function createBugsService(deps: BugsServiceDeps) {
       })
       return { updated, regression, activityId: activity.id }
     })
-    const regressionNames = await loadUserRefs(db, [row.regression.fixer_user_id, row.regression.verifier_user_id])
+    const regressionNames = await loadOwnerRefs(db, row.updated.team_id, [
+      row.regression.fixer_user_id,
+      row.regression.verifier_user_id,
+    ])
     return {
       bug: await detail(row.updated),
       regression: toRegressionView(row.regression, regressionNames),

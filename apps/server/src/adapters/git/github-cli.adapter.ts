@@ -4,18 +4,43 @@ import {
   GitAdapterError,
   type GitAdapter,
   type GitAdapterInput,
+  type GitCommitDetail,
+  type GitCommitInput,
+  type GitCommitListInput,
+  type GitCommitSummary,
+  type GitFileContent,
+  type GitFileInput,
   type GitObjectInput,
   type GitObjectSnapshot,
+  type GitPullRequestDiff,
+  type GitPullRequestInput,
+  type GitPullRequestListInput,
+  type GitPullRequestSummary,
   type GitRemoteRepository,
+  type GitRepositoryRef,
+  type GitReviewStatus,
   type GitTreeEntry,
   type GitTreeInput,
-  type GitFileInput,
-  type GitFileContent,
 } from './git.types.ts'
+import {
+  GIT_READ_LIMITS,
+  aggregateReviewStatus,
+  buildPullRequestDetail,
+  filterPullRequestsByAuthor,
+  normalizePageInput,
+  parseGitHubCommit,
+  parseGitHubCommitDetail,
+  parseGitHubPullRequest,
+  parseGitHubPullRequestFile,
+  parseGitHubReviewFact,
+  truncateDiffText,
+} from './git.normalize.ts'
 
 const execFileAsync = promisify(execFile)
 const DEFAULT_TIMEOUT_MS = 10_000
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000
+// 差异文本允许读取到上限的四倍再主动截断，避免来源输出略超上限时直接失败而不是标记截断。
+const MAX_DIFF_OUTPUT_BYTES = GIT_READ_LIMITS.maxDiffBytes * 4
 
 export interface GhCommandResult {
   stdout: string
@@ -79,7 +104,7 @@ function createRunner(options: GitHubCliAdapterOptions): GhExecFile {
     try {
       const result = await execFileAsync('gh', args, {
         timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-        maxBuffer: options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
+        maxBuffer: Math.max(options.maxOutputBytes ?? 0, DEFAULT_MAX_OUTPUT_BYTES, MAX_DIFF_OUTPUT_BYTES),
         encoding: 'utf8',
         env: { ...process.env, GH_PROMPT_DISABLED: '1' },
       })
@@ -88,6 +113,16 @@ function createRunner(options: GitHubCliAdapterOptions): GhExecFile {
       throw classify(error)
     }
   }
+}
+
+/** 拼装查询字符串；值为 undefined 的参数省略，避免把缺省条件传给来源。 */
+function buildQuery(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value))
+  }
+  const query = search.toString()
+  return query.length > 0 ? `?${query}` : ''
 }
 
 /**
@@ -101,17 +136,103 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
   if (allowed.length === 0) throw new Error('GITHUB_ALLOWED_REPOS 至少配置一个仓库')
   const exec = createRunner(options)
 
-  async function run(args: string[]): Promise<string> {
+  async function run(args: string[], limitBytes = options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES): Promise<string> {
     let result: GhCommandResult
     try {
       result = await exec(args)
     } catch (error) {
       throw classify(error)
     }
-    if (result.stdout.length > (options.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES)) {
+    if (Buffer.byteLength(result.stdout, 'utf8') > limitBytes) {
       throw new GitAdapterError('invalid_response', 'GitHub CLI 输出超出上限')
     }
     return result.stdout
+  }
+
+  /** 校验仓库 allowlist 并返回 owner/repo 组合；不在范围内的仓库不发起来源请求。 */
+  function requireAllowed(input: { repository: GitRepositoryRef }): string {
+    const slug = repoSlug(input)
+    if (!isAllowlisted(slug, allowed)) throw new GitAdapterError('unsupported', '仓库不在允许范围内')
+    return slug
+  }
+
+  async function listCommits(input: GitCommitListInput): Promise<GitCommitSummary[]> {
+    const slug = requireAllowed(input)
+    const { page, pageSize } = normalizePageInput(input)
+    const query = buildQuery({ sha: input.ref, per_page: pageSize, page })
+    const data = parseJson<unknown>(await run(['api', `repos/${slug}/commits${query}`]))
+    if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'GitHub 提交列表不合法')
+    return data.map((item) => parseGitHubCommit(item))
+  }
+
+  async function getCommit(input: GitCommitInput): Promise<GitCommitDetail> {
+    const slug = requireAllowed(input)
+    const data = parseJson<unknown>(await run(['api', `repos/${slug}/commits/${encodeURIComponent(input.ref)}`]))
+    return parseGitHubCommitDetail(data)
+  }
+
+  async function listPullRequests(input: GitPullRequestListInput): Promise<GitPullRequestSummary[]> {
+    const slug = requireAllowed(input)
+    const { page, pageSize } = normalizePageInput(input)
+    const query = buildQuery({
+      state: input.state ?? 'open',
+      per_page: pageSize,
+      page,
+      sort: 'updated',
+      direction: 'desc',
+    })
+    const data = parseJson<unknown>(await run(['api', `repos/${slug}/pulls${query}`]))
+    if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'GitHub PR 列表不合法')
+    // 列表接口不携带评审信息，reviewStatus 保持 unknown；详情读取时再按评审记录推导。
+    return filterPullRequestsByAuthor(
+      data.map((item) => parseGitHubPullRequest(item)),
+      input.author,
+    )
+  }
+
+  /** 读取 PR 评审状态；来源缺少评审能力时记 unknown，其他失败必须向上传递。 */
+  async function loadReviewStatus(slug: string, pullNumber: number): Promise<GitReviewStatus> {
+    try {
+      const data = parseJson<unknown>(
+        await run([
+          'api',
+          `repos/${slug}/pulls/${pullNumber}/reviews${buildQuery({ per_page: GIT_READ_LIMITS.maxPageSize })}`,
+        ]),
+      )
+      if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'GitHub 评审列表不合法')
+      return aggregateReviewStatus(data.map((item) => parseGitHubReviewFact(item)))
+    } catch (error) {
+      if (error instanceof GitAdapterError && error.code === 'not_found') return 'unknown'
+      throw error instanceof GitAdapterError ? error : classify(error)
+    }
+  }
+
+  /** 读取 PR 变更文件；达到来源单页上限时标记可能存在更多文件。 */
+  async function loadChangedFiles(slug: string, pullNumber: number): Promise<{ items: unknown[]; hasMore: boolean }> {
+    const query = buildQuery({ per_page: GIT_READ_LIMITS.maxChangedFiles, page: 1 })
+    const data = parseJson<unknown>(await run(['api', `repos/${slug}/pulls/${pullNumber}/files${query}`]))
+    if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'GitHub 变更文件列表不合法')
+    return { items: data, hasMore: data.length >= GIT_READ_LIMITS.maxChangedFiles }
+  }
+
+  async function getPullRequest(input: GitPullRequestInput) {
+    const slug = requireAllowed(input)
+    const data = parseJson<unknown>(await run(['api', `repos/${slug}/pulls/${input.number}`]))
+    const [reviewStatus, changedFiles] = await Promise.all([
+      loadReviewStatus(slug, input.number),
+      loadChangedFiles(slug, input.number),
+    ])
+    const summary = parseGitHubPullRequest(data, reviewStatus)
+    return buildPullRequestDetail(summary, changedFiles.items, parseGitHubPullRequestFile, changedFiles.hasMore)
+  }
+
+  async function getPullRequestDiff(input: GitPullRequestInput): Promise<GitPullRequestDiff> {
+    const slug = requireAllowed(input)
+    const text = await run(
+      ['api', '--header', 'Accept: application/vnd.github.v3.diff', `repos/${slug}/pulls/${input.number}`],
+      MAX_DIFF_OUTPUT_BYTES,
+    )
+    return truncateDiffText(text)
   }
 
   async function getObject(input: GitObjectInput): Promise<GitObjectSnapshot> {
@@ -215,5 +336,10 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
     listTree,
     getFile,
     listBranches,
+    listCommits,
+    getCommit,
+    listPullRequests,
+    getPullRequest,
+    getPullRequestDiff,
   }
 }

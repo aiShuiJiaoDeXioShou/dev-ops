@@ -1,4 +1,4 @@
-import type { UserRef } from '../identity/identity.display.ts'
+import type { OwnerRef } from '../identity/identity.display.ts'
 
 /** Bug 摘要读模型：列表与跨模块关联展示所需的最小字段，不包含现象与复现正文。 */
 export interface BugSummary {
@@ -19,7 +19,7 @@ export interface BugSummaryForRequirement {
 }
 
 /** Bug 负责人展示引用。 */
-export type OwnerView = UserRef
+export type OwnerView = OwnerRef
 
 /** Bug 列表项。 */
 export interface BugListItem {

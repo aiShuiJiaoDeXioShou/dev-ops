@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { and, count, desc, eq, ilike, inArray, max, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, inArray, isNotNull, max, notExists, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { bug, bugRegression, bugRequirementLink } from './bugs.tables.ts'
 import type { BugSummary, BugSummaryForRequirement } from './bugs.types.ts'
+import { teamMember } from '../identity/identity.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type BugExecutor = Database | TransactionDatabase
@@ -18,6 +19,7 @@ export interface BugListFilters {
   search?: string
   status?: string
   ownerId?: string
+  ownerUnavailable?: boolean
   page: number
   pageSize: number
 }
@@ -76,6 +78,27 @@ export async function findBugs(db: Database, projectId: string, filters: BugList
   }
   if (filters.status) conditions.push(eq(bug.status, filters.status))
   if (filters.ownerId) conditions.push(eq(bug.fix_owner_user_id, filters.ownerId))
+  if (filters.ownerUnavailable) {
+    const activeOwner = (ownerColumn: typeof bug.fix_owner_user_id | typeof bug.regression_owner_user_id) =>
+      notExists(
+        db
+          .select({ one: sql`1` })
+          .from(teamMember)
+          .where(
+            and(
+              eq(teamMember.team_id, bug.team_id),
+              eq(teamMember.user_id, ownerColumn),
+              eq(teamMember.status, 'active'),
+            ),
+          ),
+      )
+    conditions.push(
+      or(
+        and(isNotNull(bug.fix_owner_user_id), activeOwner(bug.fix_owner_user_id)),
+        and(isNotNull(bug.regression_owner_user_id), activeOwner(bug.regression_owner_user_id)),
+      )!,
+    )
+  }
   const where = and(...conditions)
   const [rows, [total]] = await Promise.all([
     db

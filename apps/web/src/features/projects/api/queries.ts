@@ -34,3 +34,12 @@ export function projectStatsQueryOptions(projectId: string) {
     enabled: Boolean(projectId),
   })
 }
+
+/** 项目服务目录查询。 */
+export function projectServicesQueryOptions(projectId: string) {
+  return queryOptions({
+    queryKey: ['projects', 'services', projectId],
+    queryFn: ({ signal }) => apiClient.listProjectServices(projectId, { signal }),
+    enabled: Boolean(projectId),
+  })
+}

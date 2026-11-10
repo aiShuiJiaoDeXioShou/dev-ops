@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectQueryOptions } from '../api/queries'
 import { ProjectSettingsForm } from './project-settings-form'
+import { ServiceManagement } from './service-management'
 
 /**
  * 项目设置弹窗；项目头部齿轮入口使用，不再跳转独立页面。
@@ -51,6 +52,10 @@ export function ProjectSettingsDialog({
               <div className="settings-divider" />
               <h3 className="settings-section-title">代码仓库</h3>
               <RepositoryPicker projectId={projectId} teamId={project.data.data.teamId} canManage={canManage} />
+            </section>
+            <section>
+              <div className="settings-divider" />
+              <ServiceManagement projectId={projectId} />
             </section>
           </div>
         )}

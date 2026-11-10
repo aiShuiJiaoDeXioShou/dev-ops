@@ -39,7 +39,13 @@ test('真实 Server、Web 代理及编译后的 CLI 共用现有接口', { timeo
   const cli = await execute(process.execPath, ['apps/cli/dist/index.js', 'health', '--server', address, '--json'], {
     cwd: root,
   })
-  assert.deepEqual(JSON.parse(cli.stdout), { status: 'ok' })
+  assert.deepEqual(JSON.parse(cli.stdout), {
+    success: true,
+    code: 'OK',
+    message: 'OK',
+    requestId: JSON.parse(cli.stdout).requestId,
+    data: { status: 'ok' },
+  })
   assert.equal(cli.stderr, '')
 
   const requireWeb = createRequire(new URL('../../apps/web/package.json', import.meta.url))

@@ -23,7 +23,7 @@ flowchart LR
     research --- m03["M03 需求管理 · V0.1"]
     research --- m04["M04 Bug 与回归 · V0.1 内部流程"]
     research --- m05["M05 Git 与代码关联 · V0.1 关联"]
-    research --- m06["M06 交付、流水线结果与版本 · V0.2"]
+    research --- m06["M06 交付、流水线与版本 · V0.2／V0.4a"]
     collaboration --- m08["M08 会话、群组与工作标签 · V0.3"]
     collaboration --- m09["M09 任务、运行与结果验收 · V0.3"]
     collaboration --- m15["M15 通知与待处理汇总 · V0.3"]
@@ -44,7 +44,7 @@ flowchart LR
     class m06,m07,m08,m09,m10,m13,m14,m15 later
 ```
 
-V0.1 先完成团队、项目、需求、内部 Bug、真实 Git 关联及人工提测回归。服务与环境、完整代码浏览和交付在 V0.2 补齐；Bot 协作在 V0.3，受控执行在 V0.4，事件值守与外部协作在 V0.5，V1.0 核对完整 MVP。凭据保护和权限校验随首次接入交付，不等待完整管理页面。
+V0.1 先完成团队、项目、需求、内部 Bug、真实 Git 关联及人工提测回归。服务与环境、完整代码浏览和交付在 V0.2 补齐；Bot 协作在 V0.3，受控执行与内置流水线在 V0.4，事件值守与外部协作在 V0.5，V1.0 核对完整 MVP。凭据保护和权限校验随首次接入交付，不等待完整管理页面。
 
 ## 2. 功能分解图
 
@@ -144,7 +144,7 @@ flowchart TB
         direction LR
         git["GitHub / Gitea"]
         models["模型服务 / Bot 运行环境"]
-        pipelines["外部 CI/CD / 部署执行器"]
+        nodes["自托管执行节点"]
         observability["日志 / 监控系统"]
         channels["邮件服务 / 飞书"]
     end
@@ -168,7 +168,7 @@ flowchart TB
 
     adapters <-->|"授权读取与写入"| git
     adapters <-->|"模型调用与任务执行结果"| models
-    adapters <-->|"结果采集与独立授权调用"| pipelines
+    adapters <-->|"任务下发与结果回传"| nodes
     observability -->|"异常事件与证据"| adapters
     adapters -->|"邀请邮件与通知"| channels
 
@@ -179,7 +179,7 @@ flowchart TB
     class access boundary
     class projectDomain,collaborationDomain,operationsDomain business
     class botKnowledge,credentials,notifications,adapters shared
-    class git,models,pipelines,observability,channels external
+    class git,models,nodes,observability,channels external
 ```
 
 访问控制与审计覆盖每次操作，包括 Bot 工具调用和外部结果上报。M12 表示接入职责，不代表必须建设通用插件系统。加密凭据存储是安全职责边界，不预设独立服务部署；产物存文件还是存引用仍按需求待定项确认。技术方案见[技术选型与集成方案](../technical-selection.md)和[后端架构](../architecture/server-foundation.md)。
@@ -190,5 +190,5 @@ flowchart TB
 - **最新产物与运行版本分别记录。** 服务可独立交付；运行版本需有实际依据。
 - **开发验收与发布放行分开。** 变更需绑定具体计划，执行后验证健康与实际版本；数据库变更、服务器清理和云资源调整遵守同一框架，具体连接器另行确认。
 - **聊天与任务分开。** 普通发言不自动变成任务；项目标签和资源引用不扩大会话、项目或凭据权限。
-- **外部系统保留职责。** Git 系统托管代码，研发配置流水线；外部商店与小程序平台由成员人工提审，平台记录审核及发布结果。
+- **外部系统保留职责。** Git 系统托管代码；平台解析仓库内 YAML 定义的流水线并在自托管执行节点运行；外部商店与小程序平台由成员人工提审，平台记录审核及发布结果。
 - **已确认规则与待定细节分开。** 邮箱邀请及邮箱密码登录已确定；root 初始化、邀请有效期、资料必填项等继续在 V0.1 文档逐项确认。

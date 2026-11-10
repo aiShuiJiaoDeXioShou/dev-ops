@@ -1,4 +1,4 @@
-import { findUserSummariesByIds, type IdentityExecutor } from './identity.repository.ts'
+import { findTeamMemberStatuses, findUserSummariesByIds, type IdentityExecutor } from './identity.repository.ts'
 
 const UNKNOWN_USER_NAME = '未知用户'
 
@@ -40,4 +40,55 @@ export function userRefOf(userId: string | null, refs: Map<string, UserRef>): Us
  */
 export function userNameOf(userId: string, refs: Map<string, UserRef>): string {
   return refs.get(userId)?.name ?? UNKNOWN_USER_NAME
+}
+
+/** 负责人展示状态：正常、已停用或不在团队/用户不存在。 */
+export type OwnerStatus = 'active' | 'disabled' | 'missing'
+
+/** 带可用性标记的负责人引用。 */
+export interface OwnerRef extends UserRef {
+  status: OwnerStatus
+  available: boolean
+}
+
+/**
+ * 批量加载负责人姓名与团队可用性，避免每个负责人单独查库。
+ * @param executor 数据库连接或事务。
+ * @param teamId 负责人所属团队。
+ * @param userIds 用户标识集合。
+ * @returns 用户标识到负责人引用的 Map。
+ */
+export async function loadOwnerRefs(
+  executor: IdentityExecutor,
+  teamId: string,
+  userIds: string[],
+): Promise<Map<string, OwnerRef>> {
+  const [refs, statuses] = await Promise.all([
+    loadUserRefs(executor, userIds),
+    findTeamMemberStatuses(executor, teamId, userIds),
+  ])
+  return new Map(
+    [...new Set(userIds)].map((userId) => {
+      const ref = refs.get(userId)
+      const memberStatus = statuses.get(userId)
+      const status: OwnerStatus = memberStatus ?? 'missing'
+      return [
+        userId,
+        {
+          userId,
+          name: ref?.name ?? UNKNOWN_USER_NAME,
+          status,
+          available: status === 'active',
+        },
+      ]
+    }),
+  )
+}
+
+/**
+ * 读取单个负责人可用性引用；无用户时返回 null，缺失用户使用 missing。
+ */
+export function ownerRefOf(userId: string | null, refs: Map<string, OwnerRef>): OwnerRef | null {
+  if (userId === null) return null
+  return refs.get(userId) ?? { userId, name: UNKNOWN_USER_NAME, status: 'missing', available: false }
 }

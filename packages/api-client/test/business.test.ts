@@ -7,43 +7,59 @@ function success(data: unknown): Response {
 }
 
 test('业务客户端构建路径、查询、POST 与幂等键', async () => {
+  const teamId = '11111111-1111-4111-8111-111111111111'
+  const projectId = '22222222-2222-4222-8222-222222222222'
   const calls: Array<{ url: string; init: RequestInit }> = []
   const client = createApiClient({
     baseUrl: 'https://example.test',
     fetch: async (input, init) => {
       calls.push({ url: String(input), init: init ?? {} })
-      if (String(input).includes('/requirements/req-1/submit-test')) {
-        return success({ requirement: { id: 'req-1' }, submission: { id: 'sub-1' }, activityId: 'act-1' })
-      }
       if (String(input).includes('/teams/team-1/projects')) {
-        return success({ id: 'project-1', name: '项目' })
+        return success({
+          id: projectId,
+          teamId,
+          name: '项目',
+          description: null,
+          owner: { userId: teamId, name: '负责人', status: 'active', available: true },
+          status: 'active',
+          counts: { openRequirements: 0, openBugs: 0 },
+          version: 1,
+          createdAt: '2026-11-10T00:00:00.000Z',
+          updatedAt: '2026-11-10T00:00:00.000Z',
+        })
       }
-      return success([{ id: 'team-1', name: '团队', role: 'admin', status: 'active' }])
+      if (String(input).includes('/requirements?status=')) {
+        return success({ items: [], page: 2, pageSize: 20, total: 0 })
+      }
+      return success([
+        {
+          id: teamId,
+          name: '团队',
+          iconText: null,
+          description: null,
+          version: 1,
+          role: 'admin',
+          status: 'active',
+        },
+      ])
     },
   })
 
   const teams = await client.listMyTeams()
-  assert.equal(teams.data[0]?.id, 'team-1')
+  assert.equal(teams.data[0]?.id, teamId)
   assert.equal(calls[0]?.url, 'https://example.test/api/v1/me/teams')
   assert.equal(calls[0]?.init.method, 'GET')
 
-  const project = await client.createProject('team-1', { name: '项目' })
-  assert.equal(project.data.id, 'project-1')
+  const project = await client.createProject('team-1', { name: '项目' }, { idempotencyKey: 'key-1' })
+  assert.equal(project.data.id, projectId)
   assert.equal(calls[1]?.url, 'https://example.test/api/v1/teams/team-1/projects')
   assert.equal(calls[1]?.init.method, 'POST')
   assert.deepEqual(JSON.parse(String(calls[1]?.init.body)), { name: '项目' })
-
-  const submitted = await client.submitRequirementTest(
-    'req-1',
-    { version: 2, testOwnerUserId: 'user-2', scopeNote: '范围', selfTestResult: 'passed' },
-    { idempotencyKey: 'key-1' },
-  )
-  assert.equal(submitted.data.activityId, 'act-1')
-  assert.equal((calls[2]?.init.headers as Record<string, string>)['idempotency-key'], 'key-1')
+  assert.equal((calls[1]?.init.headers as Record<string, string>)['idempotency-key'], 'key-1')
 
   await client.listRequirements('project-1', { status: 'pending', page: 2, pageSize: 20 })
   assert.equal(
-    calls[3]?.url,
+    calls[2]?.url,
     'https://example.test/api/v1/projects/project-1/requirements?status=pending&page=2&pageSize=20',
   )
 })

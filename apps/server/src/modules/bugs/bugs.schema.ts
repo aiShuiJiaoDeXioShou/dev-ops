@@ -9,7 +9,12 @@ const statusSchema = Type.Union([
   Type.Literal('resolved'),
   Type.Literal('closed'),
 ])
-const ownerSchema = Type.Object({ userId: uuidSchema, name: Type.String() })
+const ownerSchema = Type.Object({
+  userId: uuidSchema,
+  name: Type.String(),
+  status: Type.Union([Type.Literal('active'), Type.Literal('disabled'), Type.Literal('missing')]),
+  available: Type.Boolean(),
+})
 const bugItemSchema = Type.Object({
   id: uuidSchema,
   projectId: uuidSchema,
@@ -91,6 +96,7 @@ export const bugsQuerySchema = Type.Object({
   search: Type.Optional(Type.String({ maxLength: 200 })),
   status: Type.Optional(statusSchema),
   ownerId: Type.Optional(uuidSchema),
+  ownerUnavailable: Type.Optional(Type.Boolean()),
   page: Type.Optional(Type.Integer({ minimum: 1 })),
   pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
 })

@@ -10,6 +10,7 @@ const app = createHttpApp(
     DOCS_ENABLED: 'true',
     DATABASE_URL: 'postgresql://contract@127.0.0.1:1/contract',
     AUTH_SECRET: 'contract-export-secret-at-least-32-characters',
+    GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
   }),
 )
 try {

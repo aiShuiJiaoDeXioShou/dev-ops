@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import { requireSessionUser } from './identity.session.ts'
+import { requireActor } from './identity.actor.ts'
 import type { IdentityService } from './identity.service.ts'
 import type { IdentityAuth } from './identity.auth.ts'
 import {
@@ -20,6 +20,8 @@ import {
   memberUpdateBodySchema,
   teamParamsSchema,
   teamSummaryListResponseSchema,
+  updateTeamBodySchema,
+  updateTeamResponseSchema,
   tokenParamsSchema,
 } from './identity.team.schema.ts'
 
@@ -39,8 +41,23 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       schema: { response: { 200: teamSummaryListResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.listMyTeams(user), request.id)
+    },
+  )
+
+  app.post(
+    '/teams/:teamId/update',
+    {
+      schema: {
+        params: teamParamsSchema,
+        body: updateTeamBodySchema,
+        response: { 200: updateTeamResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireActor(request)
+      return success(await options.service.updateTeam(user, request.params.teamId, request.body), request.id)
     },
   )
 
@@ -53,7 +70,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.createTeamAsRoot(user, request.body), request.id)
     },
   )
@@ -64,7 +81,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: teamParamsSchema, response: { 200: memberListResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.listMembers(user, request.params.teamId), request.id)
     },
   )
@@ -79,7 +96,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       const member = await options.service.updateMember(
         user,
         request.params.teamId,
@@ -100,7 +117,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.listTeamInvitations(user, request.params.teamId, request.query.status),
         request.id,
@@ -118,7 +135,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(await options.service.inviteMember(user, request.params.teamId, request.body), request.id)
     },
   )
@@ -129,7 +146,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: invitationParamsSchema, response: { 200: invitationResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.resendInvitation(user, request.params.teamId, request.params.invitationId),
         request.id,
@@ -143,7 +160,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: invitationParamsSchema, response: { 200: invitationResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireActor(request)
       return success(
         await options.service.revokeInvitation(user, request.params.teamId, request.params.invitationId),
         request.id,

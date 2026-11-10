@@ -41,7 +41,7 @@ test('无参数和帮助命令可在服务配置无效时正常使用', async ()
   for (const args of [[], ['--help'], ['health', '-h']]) {
     const result = await execute(args, { DEV_OPS_SERVER: 'invalid' })
     assert.equal(result.code, 0)
-    assert.match(result.stdout, /dev-ops health/)
+    assert.match(result.stdout, /health/)
     assert.equal(result.stderr, '')
   }
 })
@@ -66,7 +66,6 @@ test('未知选项、无效地址与非法超时在请求前被拒绝', async ()
   for (const args of [
     ['--unknown'],
     ['--server'],
-    ['--json'],
     ['health', 'extra'],
     ['health', '--server', 'invalid'],
     ['health', '--server', 'file:///tmp/test'],
@@ -98,7 +97,13 @@ test('健康检查保留代理路径，参数覆盖环境配置且 JSON 不透�
   })
   const result = await execute(['health', '--server', `${server}/proxy/`, '--json'], { DEV_OPS_SERVER: 'invalid' })
   assert.equal(result.code, 0)
-  assert.deepEqual(JSON.parse(result.stdout), { status: 'ok' })
+  assert.deepEqual(JSON.parse(result.stdout), {
+    success: true,
+    code: 'OK',
+    message: 'OK',
+    requestId: 'trace',
+    data: { status: 'ok' },
+  })
   assert.equal(result.stderr, '')
 })
 

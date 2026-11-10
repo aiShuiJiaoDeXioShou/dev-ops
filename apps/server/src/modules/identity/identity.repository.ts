@@ -166,6 +166,9 @@ export async function listTeamsForUser(db: Database, userId: string) {
     .select({
       id: team.id,
       name: team.name,
+      iconText: team.icon_text,
+      description: team.description,
+      version: team.version,
       role: teamMember.role,
       status: teamMember.status,
     })
@@ -355,4 +358,52 @@ export async function findActiveTeamMemberIds(
 export async function isActiveTeamMember(executor: IdentityExecutor, teamId: string, userId: string): Promise<boolean> {
   const activeIds = await findActiveTeamMemberIds(executor, teamId, [userId])
   return activeIds.has(userId)
+}
+
+/**
+ * 按版本条件更新团队资料。
+ * @param executor 数据库连接或事务。
+ * @param teamId 团队标识。
+ * @param expectedVersion 期望版本。
+ * @param fields 允许更新的名称、图标标识与说明。
+ * @returns 更新后的团队行；版本不匹配返回 undefined。
+ */
+export async function updateTeamProfile(
+  executor: IdentityExecutor,
+  teamId: string,
+  expectedVersion: number,
+  fields: { name?: string; iconText?: string | null; description?: string | null },
+) {
+  const [row] = await executor
+    .update(team)
+    .set({
+      ...(fields.name === undefined ? {} : { name: fields.name }),
+      ...(fields.iconText === undefined ? {} : { icon_text: fields.iconText }),
+      ...(fields.description === undefined ? {} : { description: fields.description }),
+      version: expectedVersion + 1,
+      updated_at: new Date(),
+    })
+    .where(and(eq(team.id, teamId), eq(team.version, expectedVersion)))
+    .returning()
+  return row
+}
+
+/**
+ * 批量读取团队内成员的当前状态，用于展示负责人是否可用。
+ * @param executor 数据库连接或事务。
+ * @param teamId 团队标识。
+ * @param userIds 待查询用户标识集合；重复项会去重。
+ * @returns 用户标识到团队状态的 Map；不在团队中的用户不出现在结果里。
+ */
+export async function findTeamMemberStatuses(
+  executor: IdentityExecutor,
+  teamId: string,
+  userIds: string[],
+): Promise<Map<string, 'active' | 'disabled'>> {
+  if (userIds.length === 0) return new Map()
+  const rows = await executor
+    .select({ userId: teamMember.user_id, status: teamMember.status })
+    .from(teamMember)
+    .where(and(eq(teamMember.team_id, teamId), inArray(teamMember.user_id, [...new Set(userIds)])))
+  return new Map(rows.map((row) => [row.userId, row.status === 'active' ? 'active' : 'disabled'] as const))
 }

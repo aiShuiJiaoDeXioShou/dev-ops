@@ -13,7 +13,7 @@ import {
   type PageResult,
 } from '../collaboration/collaboration.service.ts'
 import { findActiveTeamMemberIds, isActiveTeamMember } from '../identity/identity.repository.ts'
-import { loadUserRefs } from '../identity/identity.display.ts'
+import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
@@ -24,6 +24,7 @@ import {
   findRequirementById,
   findRequirements,
   findLatestSubmission,
+  findNeedsReviewRequirementIds,
   findTestSubmissions,
   insertRequirement,
   insertTestSubmission,
@@ -91,7 +92,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       ...(row.test_owner_user_id === null ? [] : [row.test_owner_user_id]),
       ...collaboratorRows.map((item) => item.userId),
     ]
-    const refs = await loadUserRefs(db, ownerUserIds)
+    const refs = await loadOwnerRefs(db, row.team_id, ownerUserIds)
     return toRequirementDetail({
       row,
       collaborators: collaboratorRows,
@@ -130,9 +131,16 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   async function listRequirements(
     actor: SessionUser,
     projectId: string,
-    filters: { search?: string; status?: string; ownerId?: string; page?: number; pageSize?: number },
+    filters: {
+      search?: string
+      status?: string
+      ownerId?: string
+      ownerUnavailable?: boolean
+      page?: number
+      pageSize?: number
+    },
   ) {
-    await requireProjectAccess(actor, projectId)
+    const project = await requireProjectAccess(actor, projectId)
     const page = filters.page ?? 1
     const pageSize = filters.pageSize ?? 20
     validatePage(page, pageSize)
@@ -141,6 +149,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       search: filters.search?.trim() || undefined,
       status: filters.status,
       ownerId: filters.ownerId,
+      ownerUnavailable: filters.ownerUnavailable,
       page,
       pageSize,
     })
@@ -149,8 +158,16 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         ? []
         : [row.dev_owner_user_id, row.test_owner_user_id].filter((userId): userId is string => userId !== null),
     )
-    const ownerRefs = await loadUserRefs(db, ownerUserIds)
-    const items = rows.map((row) => toRequirementListItem({ row, refs: ownerRefs }))
+    const [ownerRefs, needsReviewIds] = await Promise.all([
+      loadOwnerRefs(db, project.teamId, ownerUserIds),
+      findNeedsReviewRequirementIds(
+        db,
+        rows.map((row) => row.id),
+      ),
+    ])
+    const items = rows.map((row) =>
+      toRequirementListItem({ row, refs: ownerRefs, needsReview: needsReviewIds.has(row.id) }),
+    )
     return { items, page, pageSize, total }
   }
 
