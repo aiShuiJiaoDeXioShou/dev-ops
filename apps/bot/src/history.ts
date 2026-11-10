@@ -36,7 +36,15 @@ const usage = z.object({
   }),
 })
 const messageSchema = z.discriminatedUnion('role', [
-  z.object({ role: z.literal('user'), content: z.union([z.string(), z.array(text)]), timestamp: z.number() }),
+  z.object({
+    role: z.literal('user'),
+    content: z.union([z.string(), z.array(text)]),
+    timestamp: z.number(),
+    runtimeContextKey: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u)
+      .optional(),
+  }),
   z.object({
     role: z.literal('assistant'),
     content: z.array(z.union([text, thinking, toolCall])),
@@ -63,7 +71,7 @@ const messageSchema = z.discriminatedUnion('role', [
 ])
 
 /**
- * 校验 SQLite 中的文本会话历史，只支持本应用开放的文本与记忆工具消息。
+ * 校验 SQLite 中的文本会话历史，保留工具环境指纹以隔离升级前的过时上下文。
  * @param value 反序列化后的未知数据。
  * @returns 可传给 pi 的消息数组，保留完整工具调用与结果配对。
  * @throws 持久化内容损坏或不兼容时抛出数据库数据异常。

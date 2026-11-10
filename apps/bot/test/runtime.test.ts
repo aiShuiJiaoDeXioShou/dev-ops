@@ -3,10 +3,17 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { createAssistantMessageEventStream, type AssistantMessage } from '@earendil-works/pi-ai'
+import {
+  createAssistantMessageEventStream,
+  getCurrentSystemPrompt,
+  getCurrentTools,
+  type AssistantMessage,
+} from '@earendil-works/pi-ai'
 import type { StreamFn } from '@earendil-works/pi-agent-core'
 import { chat } from '../src/bot.ts'
 import { loadConfig } from '../src/config.ts'
+import { parseHistory } from '../src/history.ts'
+import { compatibleHistory, runtimeContextKey, tagRuntimeMessages } from '../src/runtime-context.ts'
 import { createRuntime } from '../src/runtime.ts'
 import { BotStore } from '../src/storage/store.ts'
 
@@ -248,4 +255,90 @@ test('写入后模型失败只回滚对话和记忆，不声称文件操作已�
     store.close()
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+test('恢复无指纹的旧会话时隔离过时上下文，保留历史记录和长期记忆', async () => {
+  const store = new BotStore(':memory:')
+  try {
+    store.editMemories((workspace) => workspace.remember('偏好中文', true, null))
+    const legacy = store.snapshot('upgraded')
+    store.commit(
+      legacy,
+      [
+        { role: 'user', content: '能联网吗？', timestamp: 1 },
+        message([{ type: 'text', text: '我没有 web 工具，只有 search_memories、remember_memory 和 forget_memory。' }]),
+      ],
+      legacy.memories,
+    )
+    let requests = 0
+    const response = scripted([message([{ type: 'text', text: '使用本轮的工具清单' }])])
+    const runtime = createRuntime(config, (model, context, options) => {
+      requests += 1
+      const names = getCurrentTools(context.messages).map((tool) => tool.name)
+      assert.deepEqual(names, [
+        'search_memories',
+        'remember_memory',
+        'forget_memory',
+        'web_search',
+        'web_fetch',
+        'read_file',
+        'write_file',
+        'bash',
+      ])
+      const prompt = getCurrentSystemPrompt(context.messages)
+      const inventory = prompt.split('\n').find((line) => line.startsWith('本轮实际注册的工具：'))
+      assert.ok(inventory)
+      for (const name of names) assert.ok(inventory.includes(name))
+      assert.match(prompt, /历史助手.*旧版本/u)
+      assert.ok(!context.messages.some((item) => item.role === 'assistant'))
+      assert.match(prompt, /偏好中文/u)
+      return response(model, context, options)
+    })
+    await chat(store, runtime, 'upgraded', '请你使用 web 工具帮我搜索，我记得你有这个工具')
+    assert.equal(requests, 1)
+    assert.equal(store.snapshot('upgraded').messages.length, 4)
+    assert.match(JSON.stringify(store.snapshot('upgraded').messages[1]), /我没有 web 工具/u)
+    assert.equal(store.memories()[0]?.content, '偏好中文')
+  } finally {
+    store.close()
+  }
+})
+
+test('工具指纹不受注册顺序影响，契约变化会产生不同指纹', () => {
+  const memory = { name: 'search_memories', description: '记忆检索', parameters: { type: 'object' } }
+  const web = { name: 'web_search', description: '联网检索', parameters: { type: 'object' } }
+  const key = runtimeContextKey([memory, web])
+  assert.match(key, /^[a-f0-9]{64}$/u)
+  assert.equal(runtimeContextKey([web, memory]), key)
+  assert.notEqual(runtimeContextKey([memory]), key)
+  assert.notEqual(runtimeContextKey([memory, { ...web, parameters: { type: 'object', required: ['query'] } }]), key)
+})
+
+test('恢复同版本的完整轮次，升级或回退不重放更早的能力声明，元数据持久化后仍有效', () => {
+  const previousKey = runtimeContextKey([{ name: 'search_memories', description: '记忆检索', parameters: {} }])
+  const currentKey = runtimeContextKey([{ name: 'web_search', description: '联网检索', parameters: {} }])
+  const previous = tagRuntimeMessages(
+    [
+      { role: 'user', content: '查询偏好', timestamp: 1 },
+      message([{ type: 'toolCall', id: 'old-call', name: 'search_memories', arguments: { query: '中文' } }], 'toolUse'),
+      {
+        role: 'toolResult',
+        toolCallId: 'old-call',
+        toolName: 'search_memories',
+        content: [{ type: 'text', text: '偏好中文' }],
+        isError: false,
+        timestamp: 2,
+      },
+      message([{ type: 'text', text: '旧轮次' }]),
+    ],
+    previousKey,
+  )
+  const current = tagRuntimeMessages(
+    [{ role: 'user', content: '联网查询', timestamp: 3 }, message([{ type: 'text', text: '新轮次' }])],
+    currentKey,
+  )
+  const restored = parseHistory(JSON.parse(JSON.stringify([...previous, ...current])))
+  assert.deepEqual(compatibleHistory(previous, previousKey), previous)
+  assert.deepEqual(compatibleHistory(restored, currentKey), current)
+  assert.deepEqual(compatibleHistory(restored, previousKey), [])
 })
