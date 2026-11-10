@@ -2,21 +2,24 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import type { ApiBody } from '@dev-ops/api-client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { FolderUp } from 'lucide-react'
 import { describeRequestError } from '@/shared/api/errors'
 import { knowledgeMutations } from '../api/mutations'
 import { SKILL_CATEGORY_OPTIONS } from '../model/labels'
-import type { SkillDetail, SkillListItem } from '../model/types'
+import type { SkillDetail, SkillFileDraft, SkillListItem } from '../model/types'
+import { pickSkillDirectory, readSkillPackageDirectory } from '../lib/skill-package'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
+import { SkillFilesEditor } from './skill-files-editor'
 
 type CreateBody = ApiBody<'/api/v1/teams/{teamId}/skills', 'post'>
 type UpdateBody = ApiBody<'/api/v1/skills/{skillId}/update', 'post'>
 
-/** 技能发布与编辑表单。 */
+/** 技能发布与编辑表单，支持 SKILL.md 正文与资源文件包。 */
 export function SkillForm({
   teamId,
   open,
@@ -36,6 +39,7 @@ export function SkillForm({
   const [contentVersion, setContentVersion] = useState('1.0.0')
   const [summary, setSummary] = useState('')
   const [content, setContent] = useState('')
+  const [files, setFiles] = useState<SkillFileDraft[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -46,6 +50,7 @@ export function SkillForm({
     setContentVersion(skill?.contentVersion ?? '1.0.0')
     setSummary(skill?.summary ?? '')
     setContent(skill?.content ?? '')
+    setFiles((skill?.files ?? []).map((file) => ({ path: file.path, content: file.content, encoding: file.encoding })))
     setError('')
   }, [open, skill])
 
@@ -57,6 +62,7 @@ export function SkillForm({
         contentVersion: contentVersion.trim(),
         summary: summary.trim(),
         content: content.trim(),
+        files: files.map((file) => ({ path: file.path, content: file.content, encoding: file.encoding })),
       }
       if (skill) return knowledgeMutations.updateSkill(skill.id, { ...body, version: skill.version } as UpdateBody)
       return knowledgeMutations.createSkill(teamId, { ...body, identifier: identifier.trim() } as CreateBody, {
@@ -75,6 +81,21 @@ export function SkillForm({
     },
   })
 
+  const importDirectory = async () => {
+    const fileList = await pickSkillDirectory()
+    if (!fileList || fileList.length === 0) return
+    try {
+      const imported = await readSkillPackageDirectory(fileList)
+      if (imported.frontmatterName && !skill) setIdentifier(imported.frontmatterName)
+      if (imported.summary) setSummary(imported.summary)
+      setContent(imported.body)
+      setFiles(imported.files)
+      showToast(`已导入技能包：${imported.body.length} 字符正文，${imported.files.length} 个资源文件`, 'success')
+    } catch (cause: unknown) {
+      showToast(cause instanceof Error ? cause.message : '技能包导入失败。', 'error')
+    }
+  }
+
   const submit = (event: FormEvent) => {
     event.preventDefault()
     setError('')
@@ -90,17 +111,17 @@ export function SkillForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-2xl">
+      <DialogContent className="knowledge-dialog w-full max-w-3xl">
         <form className="space-y-4" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>{skill ? '编辑 Skill' : '发布团队 Skill'}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm font-medium">
+          <div className="form-grid">
+            <label className="field">
               名称
               <Input value={name} maxLength={30} onChange={(event) => setName(event.target.value)} autoFocus />
             </label>
-            <label className="space-y-1 text-sm font-medium">
+            <label className="field">
               调用标识
               <Input
                 value={identifier}
@@ -110,7 +131,7 @@ export function SkillForm({
                 onChange={(event) => setIdentifier(event.target.value)}
               />
             </label>
-            <label className="space-y-1 text-sm font-medium">
+            <label className="field">
               分类
               <Select
                 value={category}
@@ -123,7 +144,7 @@ export function SkillForm({
                 ))}
               </Select>
             </label>
-            <label className="space-y-1 text-sm font-medium">
+            <label className="field">
               内容版本
               <Input
                 value={contentVersion}
@@ -132,21 +153,31 @@ export function SkillForm({
                 onChange={(event) => setContentVersion(event.target.value)}
               />
             </label>
+            <label className="field full">
+              简述
+              <Input value={summary} maxLength={100} onChange={(event) => setSummary(event.target.value)} />
+            </label>
+            <label className="field full">
+              SKILL.md 正文
+              <Textarea
+                value={content}
+                maxLength={50000}
+                rows={12}
+                className="font-mono text-xs"
+                onChange={(event) => setContent(event.target.value)}
+              />
+            </label>
           </div>
-          <label className="block space-y-1 text-sm font-medium">
-            简述
-            <Input value={summary} maxLength={100} onChange={(event) => setSummary(event.target.value)} />
-          </label>
-          <label className="block space-y-1 text-sm font-medium">
-            SKILL.md 指令
-            <Textarea
-              value={content}
-              maxLength={6000}
-              rows={10}
-              className="font-mono text-xs"
-              onChange={(event) => setContent(event.target.value)}
-            />
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => void importDirectory()}>
+              <FolderUp className="size-4" />
+              导入技能包目录
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              支持包含 SKILL.md、scripts/、references/、assets/ 的目录；图片等二进制文件将转为可下载资源。
+            </span>
+          </div>
+          <SkillFilesEditor files={files} onChange={setFiles} />
           <p className="text-xs text-muted-foreground">请勿在技能中写入密钥、访问令牌或平台凭据；只引用凭据名称。</p>
           {error && (
             <p className="text-sm text-destructive" role="alert">

@@ -40,29 +40,31 @@ export function Component() {
     showToast(copied ? '已复制快照内容' : '浏览器未允许自动复制，请手动选择内容。', copied ? 'success' : 'info')
   }
   return (
-    <article className="space-y-4">
-      <header className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Tag>{snapshot.tag}</Tag>
-          <span className="text-xs text-muted-foreground">v{snapshot.contentVersion} 快照</span>
+    <div className="content">
+      <article className="space-y-4">
+        <header className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Tag>{snapshot.tag}</Tag>
+            <span className="text-xs text-muted-foreground">v{snapshot.contentVersion} 快照</span>
+          </div>
+          <h2 className="text-lg font-semibold">{snapshot.templateName} · AGENTS.md</h2>
+        </header>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => void copy()}>
+            复制内容
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadTextFile('AGENTS.md', snapshot.content)}>
+            下载 AGENTS.md
+          </Button>
         </div>
-        <h2 className="text-lg font-semibold">{snapshot.templateName} · AGENTS.md</h2>
-      </header>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" onClick={() => void copy()}>
-          复制内容
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => downloadTextFile('AGENTS.md', snapshot.content)}>
-          下载 AGENTS.md
-        </Button>
-      </div>
-      <pre className="overflow-auto rounded-lg border border-border bg-secondary p-4 text-xs leading-6 whitespace-pre-wrap">
-        {snapshot.content}
-      </pre>
-      <p className="text-xs text-muted-foreground">
-        此页显示分享时的版本快照，后续编辑不会改变本链接内容；仅当前团队成员登录后可访问，未发布到公网。
-      </p>
-    </article>
+        <pre className="overflow-auto rounded-lg border border-border bg-secondary p-4 text-xs leading-6 whitespace-pre-wrap">
+          {snapshot.content}
+        </pre>
+        <p className="text-xs text-muted-foreground">
+          此页显示分享时的版本快照，后续编辑不会改变本链接内容；仅当前团队成员登录后可访问，未发布到公网。
+        </p>
+      </article>
+    </div>
   )
 }
 

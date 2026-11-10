@@ -13,6 +13,7 @@ const template = {
   name: '默认协作约定',
   tag: '团队',
   description: '默认约定',
+  excerpt: '# AGENTS.md',
   contentVersion: 1,
   version: 1,
   content: '# AGENTS.md',

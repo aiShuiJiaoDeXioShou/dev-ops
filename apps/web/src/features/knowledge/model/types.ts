@@ -37,3 +37,22 @@ export type TemplateSnapshot = ApiSuccessData<'/api/v1/template-snapshot-links/{
 export type KnowledgeActivityPage = ApiSuccessData<'/api/v1/skills/{skillId}/activities', 'get'>
 /** 活动列表项。 */
 export type KnowledgeActivityItem = KnowledgeActivityPage['items'][number]
+
+/** 技能资源文件（从技能详情类型推导）。 */
+export type SkillFile = SkillDetail['files'][number]
+
+/** 技能资源文件草稿：表单编辑时使用，大小由保存时服务端计算。 */
+export interface SkillFileDraft {
+  path: string
+  content: string
+  encoding: 'utf8' | 'base64'
+  sizeBytes?: number
+}
+
+/** 技能包目录导入结果。 */
+export interface ImportedSkillPackage {
+  frontmatterName: string | null
+  summary: string | null
+  body: string
+  files: SkillFileDraft[]
+}

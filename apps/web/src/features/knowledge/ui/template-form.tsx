@@ -90,29 +90,29 @@ export function TemplateForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-3xl">
+      <DialogContent className="knowledge-dialog w-full max-w-3xl">
         <form className="space-y-4" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>
               {editing ? '编辑 AGENTS.md 模板' : duplicate ? '创建模板副本' : '新建 AGENTS.md 模板'}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-sm font-medium">
+          <div className="form-grid">
+            <label className="field">
               名称
               <Input value={name} maxLength={40} onChange={(event) => setName(event.target.value)} autoFocus />
             </label>
-            <label className="space-y-1 text-sm font-medium">
+            <label className="field">
               分类
               <Input value={tag} maxLength={30} onChange={(event) => setTag(event.target.value)} />
             </label>
           </div>
-          <label className="block space-y-1 text-sm font-medium">
+          <label className="field full">
             说明
             <Input value={description} maxLength={200} onChange={(event) => setDescription(event.target.value)} />
           </label>
           {!duplicate && (
-            <label className="block space-y-1 text-sm font-medium">
+            <label className="field full">
               AGENTS.md 正文
               <Textarea
                 value={content}

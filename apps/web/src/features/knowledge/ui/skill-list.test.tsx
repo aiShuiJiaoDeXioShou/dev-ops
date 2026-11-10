@@ -71,7 +71,7 @@ describe('SkillList', () => {
     const user = userEvent.setup()
     renderList()
     expect(await screen.findByText('还没有团队 Skill')).toBeInTheDocument()
-    await user.type(screen.getByLabelText('搜索技能'), '缺失')
+    await user.type(screen.getByLabelText('搜索团队技能'), '缺失')
     expect(await screen.findByText('没有符合条件的技能')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '清除筛选' })).toBeInTheDocument()
   })

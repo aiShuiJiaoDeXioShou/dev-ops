@@ -14,13 +14,21 @@ import { useToast } from '@/shared/ui/toast'
  * @param props.teamId 当前团队标识。
  * @param props.templateId 当前模板标识。
  */
-export function ProjectSelector({ teamId, templateId }: { teamId: string; templateId: string }) {
+export function ProjectSelector({
+  teamId,
+  templateId,
+  initialProjectId,
+}: {
+  teamId: string
+  templateId: string
+  initialProjectId?: string
+}) {
   const { role } = useSession()
   const { showToast } = useToast()
   const queryClient = useQueryClient()
   const projects = useQuery(projectListQueryOptions(teamId, { page: 1, pageSize: 100 }))
   const [projectId, setProjectId] = useState('')
-  const activeProjectId = projectId || projects.data?.data.items[0]?.id || ''
+  const activeProjectId = projectId || initialProjectId || projects.data?.data.items[0]?.id || ''
   const selection = useQuery({
     ...projectAgentTemplateQueryOptions(activeProjectId),
     enabled: Boolean(activeProjectId),
@@ -52,9 +60,9 @@ export function ProjectSelector({ teamId, templateId }: { teamId: string; templa
     )
   }
   return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <p className="text-sm font-medium">项目协作约定</p>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-2">
+      <div className="row">
+        <span className="text-sm font-medium">目标项目</span>
         <Select
           className="w-56"
           aria-label="目标项目"
@@ -81,7 +89,7 @@ export function ProjectSelector({ teamId, templateId }: { teamId: string; templa
           ? `当前选用：${current.selection.templateName} v${current.selection.contentVersion}`
           : '当前项目未选用模板'}
       </p>
-      <p className="text-xs text-muted-foreground">只建立平台内协作约定，不写入远端仓库。</p>
+      <p className="text-xs text-muted-foreground">用于项目 Bots 的协作约定，不覆盖远端仓库文件。</p>
     </div>
   )
 }

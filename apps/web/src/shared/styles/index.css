@@ -564,7 +564,8 @@
    避免 shadcn theme 的低对比度 --muted 让原型文字和徽标变浅。 */
 .shell,
 .login-shell,
-.auth-shell {
+.auth-shell,
+.knowledge-dialog {
   --blue: #4176e6;
   --blue-soft: #edf3fe;
   --side: #f9fafb;
@@ -1048,4 +1049,30 @@
 }
 .user .avatar-slot {
   transform: translateX(var(--avatar-optical-offset));
+}
+
+/* 能力模块分类筛选：与原型 .category-pills 的尺寸、间距和选中态对齐。 */
+.category-pills .category-pill {
+  height: auto;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  background: transparent;
+}
+.category-pills .category-pill:hover {
+  background: var(--soft);
+}
+.category-pills .category-pill.active {
+  background: var(--selected);
+  color: var(--ink);
+}
+
+/* 知识资产页面卡片标题与原型一致：默认墨色，悬停品牌蓝。 */
+a.skill-title {
+  color: var(--ink);
+}
+a.skill-title:hover {
+  color: var(--blue);
 }
