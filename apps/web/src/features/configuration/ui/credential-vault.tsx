@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertCircle } from 'lucide-react'
 import type { ApiBody } from '@dev-ops/api-client'
 import { useSession } from '@/features/identity/public'
 import { projectListQueryOptions } from '@/features/projects/public'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
+import { formatDateTime } from '@/shared/lib/format'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
@@ -17,6 +19,7 @@ import { credentialUsageQueryOptions, credentialsQueryOptions, type CredentialLi
 
 type CreateCredentialBody = ApiBody<'/api/v1/teams/{teamId}/credentials', 'post'>
 type CredentialKind = 'api_key' | 'account_password' | 'ssh_key'
+type CredentialSummary = CredentialList['items'][number]
 const KIND_LABELS: Record<string, string> = {
   api_key: 'API 密钥',
   account_password: '账号密码',
@@ -24,6 +27,21 @@ const KIND_LABELS: Record<string, string> = {
   active: '可用',
   revoked: '已撤销',
   expired: '已过期',
+}
+const USAGE_ACTION_LABELS: Record<string, string> = {
+  use: '使用',
+  create: '创建',
+  rotate: '轮换',
+  revoke: '撤销',
+  grant: '授权',
+  revoke_grant: '撤销授权',
+  read_metadata: '读取元数据',
+}
+const USAGE_RESULT_LABELS: Record<string, string> = {
+  success: '成功',
+  denied: '被拒绝',
+  expired: '已过期',
+  failed: '失败',
 }
 const ACTION_TITLES = { rotate: '轮换凭据', revoke: '撤销凭据', grant: '授权项目' } as const
 type ActionKind = keyof typeof ACTION_TITLES
@@ -40,8 +58,8 @@ export function CredentialVault() {
   const [kind, setKind] = useState<'' | 'api_key' | 'account_password' | 'ssh_key'>('')
   const [selectedId, setSelectedId] = useState('')
   const list = useQuery(credentialsQueryOptions(teamId, { ...(search ? { search } : {}), ...(kind ? { kind } : {}) }))
-  type CredentialSummary = CredentialList['items'][number]
-  const selected = list.data?.data.items.find((item) => item.id === selectedId) ?? list.data?.data.items[0] ?? null
+  const items = list.data?.data.items ?? []
+  const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null
   const usage = useQuery({ ...credentialUsageQueryOptions(selected?.id ?? ''), enabled: Boolean(selected?.id) })
   const projects = useQuery({
     ...projectListQueryOptions(teamId, { page: 1, pageSize: 100 }),
@@ -100,9 +118,21 @@ export function CredentialVault() {
     if (!form.value) return showToast('请填写凭据值。', 'error')
     create.mutate()
   }
-  if (!currentTeam) return <EmptyState mascot="group" title="尚未加入团队" description="加入团队后可使用凭据库。" />
+  const clearFilters = () => {
+    setSearch('')
+    setKind('')
+  }
+  const hasFilters = Boolean(search.trim() || kind)
+  if (!currentTeam) {
+    return (
+      <div className="catalog empty-page">
+        <h1 className="sr-only">凭据库</h1>
+        <EmptyState mascot="group" title="尚未加入团队" description="加入团队后可使用凭据库。" />
+      </div>
+    )
+  }
   return (
-    <div className="catalog">
+    <div className="catalog vault-page">
       <div className="row spread">
         <h1>凭据库</h1>
         {canManage ? (
@@ -111,146 +141,187 @@ export function CredentialVault() {
           </Button>
         ) : null}
       </div>
-      <div className="row">
+      <div className="row vault-filters">
         <Input
           aria-label="搜索凭据"
           placeholder="搜索名称或说明"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <Select aria-label="凭据分类" value={kind} onChange={(event) => setKind(event.target.value as typeof kind)}>
+        <Select
+          className="shrink-0"
+          aria-label="凭据分类"
+          value={kind}
+          onChange={(event) => setKind(event.target.value as typeof kind)}
+        >
           <option value="">全部分类</option>
           <option value="api_key">API 密钥</option>
           <option value="account_password">账号密码</option>
           <option value="ssh_key">SSH 密钥</option>
         </Select>
       </div>
-      <div className="row vault-layout">
-        <section aria-label="凭据列表" className="vault-list">
-          {list.isPending ? (
-            <DelayedLoading pending>
-              <PageLoading />
-            </DelayedLoading>
-          ) : list.isError ? (
-            <EmptyState title="凭据加载失败" description={describeRequestError(list.error).description} />
-          ) : list.data.data.items.length === 0 ? (
-            <EmptyState
-              mascot="prism"
-              title="凭据库还是空的"
-              description="添加团队凭据后可授权项目使用。"
-              action={
-                canManage ? (
-                  <Button type="button" onClick={() => setCreateOpen(true)}>
-                    添加凭据
-                  </Button>
-                ) : undefined
-              }
-            />
-          ) : (
+      {list.isPending ? (
+        <div className="vault-body">
+          <DelayedLoading pending>
+            <PageLoading />
+          </DelayedLoading>
+        </div>
+      ) : list.isError ? (
+        <div className="vault-body empty-page">
+          <EmptyState
+            icon={<AlertCircle />}
+            title="凭据加载失败"
+            description={describeRequestError(list.error).description}
+            action={
+              <Button type="button" variant="outline" onClick={() => void list.refetch()}>
+                重新加载
+              </Button>
+            }
+          />
+        </div>
+      ) : items.length === 0 ? (
+        <div className="vault-body empty-page">
+          <EmptyState
+            mascot="prism"
+            title={hasFilters ? '没有匹配的凭据' : '凭据库还是空的'}
+            description={
+              hasFilters ? '当前搜索或分类没有找到凭据，可以清除筛选后重新查看。' : '添加团队凭据后可授权项目使用。'
+            }
+            action={
+              hasFilters ? (
+                <Button type="button" variant="outline" onClick={clearFilters}>
+                  清除筛选
+                </Button>
+              ) : canManage ? (
+                <Button type="button" onClick={() => setCreateOpen(true)}>
+                  添加凭据
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
+      ) : (
+        <div className="vault-layout">
+          <section aria-label="凭据列表" className="vault-list">
             <ul className="plain-list">
-              {list.data.data.items.map((credential) => (
+              {items.map((credential) => (
                 <li key={credential.id}>
                   <Button
                     type="button"
                     variant={credential.id === selected?.id ? 'secondary' : 'ghost'}
+                    className="vault-item"
+                    aria-current={credential.id === selected?.id ? 'true' : undefined}
                     onClick={() => setSelectedId(credential.id)}
                   >
-                    {credential.name}
-                    <span className="muted">{KIND_LABELS[credential.kind] ?? credential.kind}</span>
-                    <span className="tag">{KIND_LABELS[credential.status] ?? credential.status}</span>
+                    <span className="vault-item-name">{credential.name}</span>
+                    <span className="vault-item-meta">
+                      {KIND_LABELS[credential.kind] ?? credential.kind}
+                      <span className="badge">{KIND_LABELS[credential.status] ?? credential.status}</span>
+                    </span>
                   </Button>
                 </li>
               ))}
             </ul>
-          )}
-        </section>
-        <section aria-label="凭据详情" className="vault-detail">
-          {selected ? (
-            <>
-              <h2>{selected.name}</h2>
-              <p className="muted">
-                {KIND_LABELS[selected.kind] ?? selected.kind} · 版本 v{selected.currentVersion} · 明文掩码{' '}
-                {selected.maskedValue}
-              </p>
-              <p>{selected.description ?? '无说明'}</p>
-              <p className="muted">过期时间：{selected.expiresAt ?? '长期有效'}</p>
-              <h3>项目授权</h3>
-              {selected.grants.length === 0 ? (
-                <p className="muted">尚未授权项目。</p>
-              ) : (
-                <ul className="plain-list">
-                  {selected.grants.map((grant) => (
-                    <li key={grant.projectId}>
-                      <span>{grant.projectId}</span>
-                      <span className="muted">{grant.expiresAt ?? '长期'}</span>
-                      <span className="tag">{grant.revokedAt ? '已撤销' : '生效中'}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {canManage ? (
-                <div className="row">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setAction({ kind: 'rotate', target: selected })
-                      setActionValue('')
-                    }}
-                  >
-                    轮换
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setAction({ kind: 'grant', target: selected })
-                      setActionValue('')
-                      setActionProjectId('')
-                    }}
-                  >
-                    授权项目
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      setAction({ kind: 'revoke', target: selected })
-                      setActionValue('')
-                    }}
-                  >
-                    撤销
-                  </Button>
+          </section>
+          <section aria-label="凭据详情" className="vault-detail">
+            {selected ? (
+              <>
+                <div className="row spread">
+                  <div className="vault-detail-identity">
+                    <h2>{selected.name}</h2>
+                    <p className="muted small">
+                      {KIND_LABELS[selected.kind] ?? selected.kind} · v{selected.currentVersion} · 掩码{' '}
+                      {selected.maskedValue}
+                    </p>
+                  </div>
+                  <span className="badge">{KIND_LABELS[selected.status] ?? selected.status}</span>
                 </div>
-              ) : null}
-              <h3>使用记录</h3>
-              {usage.isPending ? (
-                <DelayedLoading pending>
-                  <PageLoading />
-                </DelayedLoading>
-              ) : usage.isError || !usage.data ? (
-                <p className="muted">使用记录不可用。</p>
-              ) : usage.data.data.items.length === 0 ? (
-                <p className="muted">暂无使用记录。</p>
-              ) : (
-                <ul className="plain-list">
-                  {usage.data.data.items.map((item) => (
-                    <li key={item.id}>
-                      <span>{item.createdAt}</span>
-                      <span className="muted">{item.action}</span>
-                      <span className="muted">{item.result}</span>
-                      <span className="muted">v{item.credentialVersion}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : null}
-        </section>
-      </div>
+                <dl className="vault-properties">
+                  <dt>说明</dt>
+                  <dd>{selected.description ?? '无说明'}</dd>
+                  <dt>过期时间</dt>
+                  <dd>{selected.expiresAt ? formatDateTime(selected.expiresAt) : '长期有效'}</dd>
+                </dl>
+                {canManage ? (
+                  <div className="row vault-actions">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAction({ kind: 'rotate', target: selected })
+                        setActionValue('')
+                      }}
+                    >
+                      轮换
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAction({ kind: 'grant', target: selected })
+                        setActionValue('')
+                        setActionProjectId('')
+                      }}
+                    >
+                      授权项目
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        setAction({ kind: 'revoke', target: selected })
+                        setActionValue('')
+                      }}
+                    >
+                      撤销
+                    </Button>
+                  </div>
+                ) : null}
+                <h3>项目授权</h3>
+                {selected.grants.length === 0 ? (
+                  <p className="muted small">尚未授权项目。</p>
+                ) : (
+                  <ul className="plain-list vault-grants">
+                    {selected.grants.map((grant) => (
+                      <li key={grant.projectId} className="row spread">
+                        <span>{grant.projectName}</span>
+                        <span className="muted small">
+                          {grant.expiresAt ? `${formatDateTime(grant.expiresAt)} 到期` : '长期有效'}
+                        </span>
+                        <span className="badge">{grant.revokedAt ? '已撤销' : '生效中'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <h3>使用记录</h3>
+                {usage.isPending ? (
+                  <DelayedLoading pending>
+                    <PageLoading />
+                  </DelayedLoading>
+                ) : usage.isError || !usage.data ? (
+                  <p className="muted small">使用记录不可用。</p>
+                ) : usage.data.data.items.length === 0 ? (
+                  <p className="muted small">暂无使用记录。</p>
+                ) : (
+                  <ul className="plain-list vault-usage">
+                    {usage.data.data.items.map((item) => (
+                      <li key={item.id} className="row spread">
+                        <span>{formatDateTime(item.createdAt)}</span>
+                        <span className="muted small">{USAGE_ACTION_LABELS[item.action] ?? item.action}</span>
+                        <span className="muted small">{USAGE_RESULT_LABELS[item.result] ?? item.result}</span>
+                        <span className="muted small">v{item.credentialVersion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : null}
+          </section>
+        </div>
+      )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

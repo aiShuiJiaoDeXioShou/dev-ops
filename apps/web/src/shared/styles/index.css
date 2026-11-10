@@ -1157,3 +1157,97 @@ a.skill-title {
 a.skill-title:hover {
   color: var(--blue);
 }
+
+/* 凭据库：标题与筛选固定在页面上方，空状态在剩余区域居中，列表与详情在桌面分两栏。 */
+.vault-page {
+  display: flex;
+  flex-direction: column;
+}
+.vault-page .vault-filters {
+  margin-bottom: 20px;
+}
+.vault-page .vault-body {
+  flex: 1;
+  min-height: 0;
+}
+.vault-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+  min-height: 0;
+}
+.vault-list,
+.vault-detail {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background);
+}
+.vault-list {
+  padding: 8px;
+}
+.vault-list .plain-list {
+  gap: 2px;
+}
+.vault-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 5px;
+  width: 100%;
+  height: auto;
+  padding: 9px 10px;
+  text-align: left;
+  white-space: normal;
+}
+.vault-item-name {
+  font-weight: 500;
+}
+.vault-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.vault-detail {
+  padding: 20px 22px;
+}
+.vault-detail-identity {
+  min-width: 0;
+}
+.vault-detail h2 {
+  overflow-wrap: anywhere;
+}
+.vault-detail h3 {
+  margin: 22px 0 12px;
+}
+.vault-properties {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 18px 0 0;
+  font-size: 13px;
+}
+.vault-properties dt {
+  color: var(--quiet);
+}
+.vault-properties dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.vault-actions {
+  margin-top: 18px;
+}
+.vault-grants li,
+.vault-usage li {
+  gap: 12px;
+  font-size: 13px;
+}
+@media (max-width: 900px) {
+  .vault-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
