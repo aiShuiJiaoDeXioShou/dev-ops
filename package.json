@@ -17,7 +17,7 @@
     "prepare:clients": "pnpm api:generate && pnpm --filter @dev-ops/api-client build",
     "build": "pnpm api:generate && pnpm -r build",
     "check": "pnpm lint && pnpm format:check && pnpm ui:check && pnpm build && pnpm check:boundaries && pnpm test:tooling && pnpm -r check && pnpm test:e2e",
-    "check:boundaries": "depcruise --config tooling/dependency-rules.mjs apps/web/src apps/server/src apps/cli/src packages/api-client/src",
+    "check:boundaries": "depcruise --config tooling/dependency-rules.mjs apps/web/src apps/server/src apps/cli/src apps/bot/src packages/api-client/src",
     "test:tooling": "node --test tooling/test/*.test.mjs",
     "test:e2e": "node --test tests/e2e/*.test.mjs",
     "test:db": "pnpm --filter @dev-ops/server test:db",
