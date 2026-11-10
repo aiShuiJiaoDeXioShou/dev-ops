@@ -358,3 +358,15 @@ V0.4a「内置流水线执行」主体已实现，拆分为控制面、调度 Wo
 **决策与偏差**：旧 `delivery` 外部流水线上报按 A-05 下线，迁移 0020 删除旧表（本机旧表 0 行，无生产数据；共享环境升级前先导出确认）；Agent 内部协议端点不进入公开 OpenAPI，契约以 `specs/005-v04a-pipeline-runner/contracts/agent-protocol.md` 为准；日志 `afterSeq` 默认 `-1`（从 seq=0 返回）。
 
 **验证与未验证**：真实 PostgreSQL 集成测试（触发幂等、调度租约、日志、产物、取消、安全矩阵）、真实 Docker 执行与取消/超时、Agent 协议端点联调；真实 GitHub/Gitea 私有仓库拉取、非本机 Linux 节点与镜像拉取网络路径未在本次环境验证，显式标记。验收证据与未验证项见 `specs/005-v04a-pipeline-runner/evidence.md`。
+
+### 补充：V0.4a 现场验收（2026-11-10）
+
+在自动化测试之外，另起一套真实环境完成 V0.4a 现场验收并通过：本地构建并运行真实 Gitea 28.3.0（私有仓库、真实 Token），平台以 Server、Worker、Agent 三个独立进程 + 真实 PostgreSQL/Docker 运行。
+
+- 真实执行闭环：触发 → 调度 → Agent 容器执行 → 日志（首片 seq=0）→ 产物下载 SHA-256 一致；长运行（约 2 分钟）成功。
+- 取消：运行中取消后 Agent 心跳收到指令并停止容器，终态 `cancelled`；带原因取消返回原因，无原因返回 null（D10）。
+- 中断：强杀 Agent 后心跳超时，Worker 收口 `interrupted`/`NODE_OFFLINE`；遗留任务容器在 Agent 重启时被启动清理删除（D9）。
+- 节点注册的操作系统/架构在节点视图正确展示（D8）。
+- Web 经真实后端浏览器登录与三页操作通过；修复了日志首片、终态展示与「根路径/深链登录重定向」等真实联调缺陷。
+
+仍未验证：真实 GitHub 接入、非本机 Linux 生产节点、镜像联网拉取、Web 浏览者视角。详见 `specs/005-v04a-pipeline-runner/evidence.md`。
