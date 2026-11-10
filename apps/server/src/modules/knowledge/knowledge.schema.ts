@@ -70,6 +70,7 @@ const templateListItemSchema = Type.Object({
   excerpt: Type.String(),
   contentVersion: Type.Integer({ minimum: 1 }),
   version: versionSchema,
+  selectedProjectCount: Type.Integer({ minimum: 0 }),
   updatedAt: Type.String(),
 })
 const templateDetailSchema = Type.Object({

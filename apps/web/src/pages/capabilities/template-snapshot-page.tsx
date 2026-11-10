@@ -66,7 +66,7 @@ export function Component() {
         <pre className="overflow-auto rounded-lg border border-border bg-secondary p-4 text-xs leading-6 whitespace-pre-wrap">
           {snapshot.content}
         </pre>
-        <p className="text-xs text-muted-foreground">分享时的版本快照。</p>
+        <p className="text-xs text-muted-foreground">分享时的版本快照，仅当前团队成员可访问；只读且不会自动过期。</p>
       </article>
     </div>
   )

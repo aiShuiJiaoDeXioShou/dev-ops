@@ -194,7 +194,7 @@ export function SkillDetailDialog({
               )}
               <span className="flex-1" />
               <Button type="button" disabled title="Bot 协作上线后可用">
-                在 bots 中使用
+                在 bots 中使用（尚未开放）
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">最近更新 {formatDateTime(skill.updatedAt)}</p>

@@ -1393,41 +1393,6 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
-    /** 上报流水线运行。 */
-    async reportPipelineRun(
-      projectId: string,
-      body: ApiBody<'/api/v1/projects/{projectId}/pipeline-runs', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-runs', 'post'>>(
-        `/api/v1/projects/${segment(projectId)}/pipeline-runs`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 读取项目流水线运行列表。 */
-    async listPipelineRuns(
-      projectId: string,
-      query?: ApiQuery<'/api/v1/projects/{projectId}/pipeline-runs', 'get'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-runs', 'get'>>(
-        `/api/v1/projects/${segment(projectId)}/pipeline-runs`,
-        'GET',
-        undefined,
-        { ...options, query },
-      )
-    },
-    /** 读取流水线运行详情。 */
-    async getPipelineRun(runId: string, options: ApiCallOptions = {}) {
-      return callTyped<ApiSuccessData<'/api/v1/pipeline-runs/{runId}', 'get'>>(
-        `/api/v1/pipeline-runs/${segment(runId)}`,
-        'GET',
-        undefined,
-        options,
-      )
-    },
     /** 创建外部提审记录。 */
     async createReview(
       projectId: string,

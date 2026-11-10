@@ -65,6 +65,7 @@ export interface TemplateListItemView {
   excerpt: string
   contentVersion: number
   version: number
+  selectedProjectCount: number
   updatedAt: string
 }
 
@@ -187,7 +188,7 @@ export function toSkillFiles(files: SkillFileStored[]): SkillFileView[] {
 }
 
 /** 模板列表记录 → 视图。 */
-export function toTemplateListItem(row: TemplateListRecord): TemplateListItemView {
+export function toTemplateListItem(row: TemplateListRecord, selectedProjectCount = 0): TemplateListItemView {
   return {
     id: row.id,
     name: row.name,
@@ -196,14 +197,15 @@ export function toTemplateListItem(row: TemplateListRecord): TemplateListItemVie
     excerpt: row.content.length > 240 ? `${row.content.slice(0, 240)}…` : row.content,
     contentVersion: row.contentVersion,
     version: row.version,
+    selectedProjectCount,
     updatedAt: row.updatedAt.toISOString(),
   }
 }
 
 /** 模板详情记录 → 视图。 */
-export function toTemplateDetail(row: TemplateDetailRecord): TemplateDetailView {
+export function toTemplateDetail(row: TemplateDetailRecord, selectedProjectCount = 0): TemplateDetailView {
   return {
-    ...toTemplateListItem(row),
+    ...toTemplateListItem(row, selectedProjectCount),
     teamId: row.teamId,
     content: row.content,
     createdByUserId: row.createdByUserId,

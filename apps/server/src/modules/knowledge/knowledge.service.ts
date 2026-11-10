@@ -29,6 +29,7 @@ import {
   findTemplateSnapshotLinkByToken,
   findTemplateVersionById,
   findTemplateVersions,
+  countTemplateSelections,
   findTemplates,
   insertProjectTemplateSelection,
   insertSkill,
@@ -388,7 +389,16 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       page,
       pageSize,
     })
-    return { items: result.items.map(toTemplateListItem), page, pageSize, total: result.total }
+    const selectionCounts = await countTemplateSelections(
+      db,
+      result.items.map((item) => item.id),
+    )
+    return {
+      items: result.items.map((item) => toTemplateListItem(item, selectionCounts.get(item.id) ?? 0)),
+      page,
+      pageSize,
+      total: result.total,
+    }
   }
 
   /** 读取模板详情。 */
@@ -396,7 +406,8 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     await requireTemplateRead(db, actor, templateId)
     const detail = await findTemplateDetail(db, templateId)
     if (!detail) throw new Error('数据库模板当前版本缺失')
-    return toTemplateDetail(detail)
+    const counts = await countTemplateSelections(db, [templateId])
+    return toTemplateDetail(detail, counts.get(templateId) ?? 0)
   }
 
   /**

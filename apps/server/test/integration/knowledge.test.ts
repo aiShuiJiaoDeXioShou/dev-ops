@@ -7,8 +7,7 @@ import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
 import { migrateDatabase } from '../../src/platform/database/migrate.ts'
 import { createKnowledgeService } from '../../src/modules/knowledge/knowledge.service.ts'
-import { team, teamMember } from '../../src/modules/identity/identity.tables.ts'
-import { createAuthenticatedUser } from '../support/auth.ts'
+import { seedKnowledgeFixture } from '../support/knowledge-fixtures.ts'
 import { FakeMailer } from '../support/fake-mailer.ts'
 
 type Cookie = { cookie: string }
@@ -76,22 +75,7 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
     await app.close()
   })
 
-  const adminUser = await createAuthenticatedUser(app, { name: '管理员' })
-  const devUser = await createAuthenticatedUser(app, { name: '开发者' })
-  const viewerUser = await createAuthenticatedUser(app, { name: '浏览者' })
-  const otherUser = await createAuthenticatedUser(app, { name: '其他团队' })
-  const teamId = randomUUID()
-  const otherTeamId = randomUUID()
-  await app.db.insert(team).values([
-    { id: teamId, name: `team-${randomBytes(3).toString('hex')}`, created_by_user_id: adminUser.userId },
-    { id: otherTeamId, name: `team-${randomBytes(3).toString('hex')}`, created_by_user_id: otherUser.userId },
-  ])
-  await app.db.insert(teamMember).values([
-    { id: randomUUID(), team_id: teamId, user_id: adminUser.userId, role: 'admin', status: 'active' },
-    { id: randomUUID(), team_id: teamId, user_id: devUser.userId, role: 'developer', status: 'active' },
-    { id: randomUUID(), team_id: teamId, user_id: viewerUser.userId, role: 'viewer', status: 'active' },
-    { id: randomUUID(), team_id: otherTeamId, user_id: otherUser.userId, role: 'admin', status: 'active' },
-  ])
+  const { adminUser, devUser, viewerUser, otherUser, teamId, otherTeamId } = await seedKnowledgeFixture(app)
 
   async function inject(method: 'GET' | 'POST', url: string, cookie: Cookie, payload?: unknown) {
     return app.inject({
@@ -201,6 +185,17 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
   })
   assert.equal(reservedFile.json().code, 'VALIDATION_ERROR')
 
+  const sensitive = await inject('POST', `/api/v1/teams/${teamId}/skills`, devUser, {
+    name: '敏感内容',
+    identifier: 'sensitive-skill',
+    category: 'engineering',
+    contentVersion: '1.0.0',
+    summary: '不应保存',
+    content: 'api_key = sk-abcdefghijklmnopqrstuvwxyz123456',
+  })
+  assert.equal(sensitive.json().code, 'VALIDATION_ERROR')
+  assert.equal(sensitive.json().message.includes('sk-abcdefghijklmnopqrstuvwxyz123456'), false)
+
   const disabled = await inject('POST', `/api/v1/skills/${skill.id}/disable`, devUser, { version: 2 })
   assert.equal(disabled.json().data.enabled, false)
   assert.equal(disabled.json().data.version, 3)
@@ -277,6 +272,18 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
 
   const selection = await inject('GET', `/api/v1/projects/${projectId}/agent-template`, viewerUser)
   assert.equal(selection.json().data.selection.templateId, copiedTemplate.id)
+
+  const templatesWithSelection = await inject('GET', `/api/v1/teams/${teamId}/agent-templates`, viewerUser)
+  const selectedTemplateItem = templatesWithSelection
+    .json()
+    .data.items.find((item: { id: string }) => item.id === copiedTemplate.id)
+  assert.equal(selectedTemplateItem.selectedProjectCount, 1)
+  const unselectedTemplateItem = templatesWithSelection
+    .json()
+    .data.items.find((item: { id: string }) => item.id === template.id)
+  assert.equal(unselectedTemplateItem.selectedProjectCount, 0)
+  const copiedDetail = await inject('GET', `/api/v1/agent-templates/${copiedTemplate.id}`, viewerUser)
+  assert.equal(copiedDetail.json().data.selectedProjectCount, 1)
 
   const cleared = await inject('POST', `/api/v1/projects/${projectId}/agent-template/clear`, devUser, { version: 2 })
   assert.equal(cleared.json().data.selection, null)

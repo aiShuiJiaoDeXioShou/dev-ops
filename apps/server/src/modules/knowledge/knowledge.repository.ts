@@ -521,6 +521,22 @@ export async function findTemplates(db: Database, teamId: string, filters: Templ
 }
 
 /**
+ * 统计一组模板各自被多少项目选用。
+ * @param db 数据库连接。
+ * @param templateIds 模板标识集合。
+ * @returns 模板标识 → 选用项目数；未选用不出现在结果中。
+ */
+export async function countTemplateSelections(db: Database, templateIds: string[]) {
+  if (templateIds.length === 0) return new Map<string, number>()
+  const rows = await db
+    .select({ templateId: projectTemplateSelection.template_id, value: count() })
+    .from(projectTemplateSelection)
+    .where(inArray(projectTemplateSelection.template_id, templateIds))
+    .groupBy(projectTemplateSelection.template_id)
+  return new Map(rows.map((row) => [row.templateId, row.value]))
+}
+
+/**
  * 按标识读取模板当前元数据。
  * @param executor 数据库连接或事务。
  * @param templateId 模板标识。

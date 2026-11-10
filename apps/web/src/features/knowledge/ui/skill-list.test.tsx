@@ -75,4 +75,21 @@ describe('SkillList', () => {
     expect(await screen.findByText('没有符合条件的技能')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '清除筛选' })).toBeInTheDocument()
   })
+
+  it('超过一页时显示分页并保持筛选条件', async () => {
+    const requests: string[] = []
+    server.use(
+      http.get('*/api/v1/teams/team-1/skills', ({ request }) => {
+        requests.push(request.url)
+        const page = Number(new URL(request.url).searchParams.get('page') ?? '1')
+        return ok({ ...skillPage, page, total: 45 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderList()
+    expect(await screen.findByText('第 1 / 3 页')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '下一页' }))
+    expect(await screen.findByText('第 2 / 3 页')).toBeInTheDocument()
+    expect(requests.some((url) => url.includes('page=2'))).toBe(true)
+  })
 })

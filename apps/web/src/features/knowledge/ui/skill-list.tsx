@@ -9,6 +9,7 @@ import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { cn } from '@/shared/lib/utils'
+import { Pagination } from '@/shared/ui/pagination'
 import { canWriteKnowledge } from '../api/mutations'
 import { skillListQueryOptions } from '../api/queries'
 import { SKILL_CATEGORY_LABELS, SKILL_CATEGORY_OPTIONS } from '../model/labels'
@@ -36,7 +37,7 @@ export function SkillList({ teamId }: { teamId: string }) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
-    if (key !== 'skill') next.delete('page')
+    if (key !== 'skill' && key !== 'template' && key !== 'page') next.delete('page')
     setParams(next, { replace: true })
   }
   const filtered = Boolean(search || category)
@@ -164,6 +165,12 @@ export function SkillList({ teamId }: { teamId: string }) {
                 ))}
               </ul>
             )}
+            <Pagination
+              page={page}
+              pageSize={query.data.data.pageSize}
+              total={query.data.data.total}
+              onChange={(next) => updateParam('page', String(next))}
+            />
           </>
         )}
       </div>

@@ -10,6 +10,7 @@ import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Tag } from '@/shared/ui/tag'
+import { Pagination } from '@/shared/ui/pagination'
 import { useToast } from '@/shared/ui/toast'
 import { canWriteKnowledge } from '../api/mutations'
 import { templateListQueryOptions } from '../api/queries'
@@ -34,7 +35,7 @@ export function TemplateList({ teamId }: { teamId: string }) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
-    if (key !== 'template') next.delete('page')
+    if (key !== 'template' && key !== 'skill' && key !== 'page') next.delete('page')
     setParams(next, { replace: true })
   }
   const copyContent = async (templateId: string) => {
@@ -189,6 +190,12 @@ export function TemplateList({ teamId }: { teamId: string }) {
                 ))}
               </ul>
             )}
+            <Pagination
+              page={page}
+              pageSize={query.data.data.pageSize}
+              total={query.data.data.total}
+              onChange={(next) => updateParam('page', String(next))}
+            />
           </>
         )}
       </div>
