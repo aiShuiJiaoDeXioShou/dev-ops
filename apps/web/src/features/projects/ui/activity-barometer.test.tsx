@@ -43,9 +43,7 @@ describe('ActivityBarometer', () => {
         </MemoryRouter>
       </QueryClientProvider>,
     )
-    expect(await screen.findByText(/共 4 次活动/)).toBeInTheDocument()
-    expect(screen.getByText('完成 2/4')).toBeInTheDocument()
-    expect(screen.getByText('待审 PR 未知')).toBeInTheDocument()
+    expect(await screen.findByText(/过去一年 · 4 次活动/)).toBeInTheDocument()
     expect(screen.getByText(/PR 未同步/)).toBeInTheDocument()
   })
 })

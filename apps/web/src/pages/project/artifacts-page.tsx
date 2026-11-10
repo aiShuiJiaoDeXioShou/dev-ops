@@ -166,7 +166,18 @@ export function Component() {
         ) : artifacts.isError ? (
           <EmptyState title="产物加载失败" description={describeRequestError(artifacts.error).description} />
         ) : artifacts.data.data.items.length === 0 ? (
-          <EmptyState title="暂无产物" description="上报构建后，安装包、二维码或测试地址会出现在这里。" />
+          <EmptyState
+            mascot="project"
+            title="还没有构建产物"
+            description="上报构建后，安装包、二维码或测试地址会出现在这里；新构建不会覆盖正在运行的版本。"
+            action={
+              canManage ? (
+                <Button type="button" onClick={() => setReportOpen(true)}>
+                  上报构建
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <ul className="artifact-list">
             {artifacts.data.data.items.map((artifact) => (

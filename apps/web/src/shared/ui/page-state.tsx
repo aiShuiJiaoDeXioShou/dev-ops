@@ -3,7 +3,6 @@ import { AlertCircle, Inbox } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/controls/alert'
 import { Button } from '@/shared/ui/controls/button'
-import { Skeleton } from '@/shared/ui/controls/skeleton'
 
 /**
  * 展示页面或数据首次加载时的占位内容。
@@ -13,10 +12,10 @@ import { Skeleton } from '@/shared/ui/controls/skeleton'
 export function PageLoading({ message = '页面加载中…' }: { message?: string }) {
   return (
     <div role="status" aria-busy="true" className="space-y-4 py-6">
-      <p className="text-sm text-muted-foreground">{message}</p>
-      <Skeleton className="h-5 w-40" />
-      <Skeleton className="h-4 w-full max-w-md" />
-      <Skeleton className="h-4 w-2/3 max-w-xs" />
+      <p className="small quiet">{message}</p>
+      <span className="skeleton-line skeleton-title" />
+      <span className="skeleton-line skeleton-subtitle" />
+      <span className="skeleton-line skeleton-card-line" />
     </div>
   )
 }

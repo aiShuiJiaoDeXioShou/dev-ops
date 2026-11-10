@@ -22,7 +22,7 @@ describe('CredentialVault', () => {
         </SessionProvider>
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('还没有凭据')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '添加凭据' })).toBeInTheDocument()
+    expect(await screen.findByText('凭据库还是空的')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: '添加凭据' }).length).toBeGreaterThan(0)
   })
 })

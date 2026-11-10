@@ -33,7 +33,13 @@ export function Component() {
     )
   }
   if (runs.data.data.items.length === 0) {
-    return <EmptyState title="暂无流水线运行" description="外部 CI 上报运行结果后会显示在这里。" />
+    return (
+      <EmptyState
+        mascot="signal"
+        title="暂无流水线运行"
+        description="外部 CI 上报运行结果后会显示在这里；本页只记录与展示，不触发、不重跑、不取消。"
+      />
+    )
   }
   return (
     <div className="project-tab-panel">

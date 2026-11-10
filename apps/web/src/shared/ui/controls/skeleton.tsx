@@ -6,7 +6,7 @@ import { cn } from '@/shared/lib/utils'
  * @returns 仅用于展示的占位元素。
  */
 function Skeleton({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="skeleton" className={cn('animate-pulse rounded-md bg-muted', className)} {...props} />
+  return <div data-slot="skeleton" className={cn('skeleton-line', className)} {...props} />
 }
 
 export { Skeleton }

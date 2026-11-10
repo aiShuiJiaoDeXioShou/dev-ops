@@ -560,6 +560,58 @@
   padding-top: 2px;
 }
 
+/* 项目卡片指标使用链接保持原型四等分布局与浅蓝悬停。 */
+.project-metrics a,
+.project-metrics .project-metric-muted {
+  display: block;
+  padding: 3px 7px;
+  border-radius: 5px;
+  color: inherit;
+  text-decoration: none;
+}
+.project-metrics a:hover {
+  background: var(--blue-soft);
+  text-decoration: none;
+}
+.project-metrics .project-metric-muted {
+  cursor: default;
+}
+
+/* 工作区按钮悬停沿用原型浅灰；工作区 --muted 是文字色，避免 bg-muted 变深。 */
+[data-slot='button'][data-variant='ghost']:hover,
+[data-slot='button'][data-variant='outline']:hover,
+[data-slot='button'][data-variant='ghost'][aria-expanded='true'],
+[data-slot='button'][data-variant='outline'][aria-expanded='true'] {
+  background: #f0f2f5;
+}
+
+/* 晴雨表来源选择器按原型使用紧凑按钮尺寸，避免工作区通用下拉过大。 */
+.activity-heading .activity-source select {
+  height: 28px;
+  padding: 4px 26px 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+}
+.activity-heading .activity-source svg {
+  right: 8px;
+}
+
+/* 热力图日期格使用可聚焦容器，保持原型 12px 方块与悬停描边。 */
+.activity-grid .activity-day {
+  cursor: pointer;
+  border: 1px solid #1b1f2306;
+}
+.activity-grid .activity-day:hover {
+  outline: 1px solid #0f1115;
+  outline-offset: 1px;
+}
+.activity-grid .activity-day:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
+
 /* 原型与 Tailwind 都定义了 --muted 等变量；工作区/认证容器内恢复原型 token，
    避免 shadcn theme 的低对比度 --muted 让原型文字和徽标变浅。 */
 .shell,

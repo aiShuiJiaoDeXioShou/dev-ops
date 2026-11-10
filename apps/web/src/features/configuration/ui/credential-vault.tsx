@@ -131,7 +131,18 @@ export function CredentialVault() {
           ) : list.isError ? (
             <EmptyState title="凭据加载失败" description={describeRequestError(list.error).description} />
           ) : list.data.data.items.length === 0 ? (
-            <EmptyState title="还没有凭据" description="管理员添加凭据后可授权项目使用。" />
+            <EmptyState
+              mascot="prism"
+              title="凭据库还是空的"
+              description="添加团队凭据后按项目授权，环境变量即可通过引用使用密钥，明文不会回显。"
+              action={
+                canManage ? (
+                  <Button type="button" onClick={() => setCreateOpen(true)}>
+                    添加凭据
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <ul className="plain-list">
               {list.data.data.items.map((credential) => (

@@ -28,7 +28,7 @@ describe('artifacts-page', () => {
         </SessionProvider>
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('暂无产物')).toBeInTheDocument()
+    expect(await screen.findByText('还没有构建产物')).toBeInTheDocument()
   })
 
   it('展示三环境运行版本并打开确认弹窗', async () => {

@@ -139,7 +139,18 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
       </div>
       <p className="muted">环境之间不自动继承；密钥引用不保存明文。</p>
       {variables.data.data.items.length === 0 ? (
-        <EmptyState title="这个环境还没有配置" description="新增普通变量或引用团队凭据。" />
+        <EmptyState
+          mascot="prism"
+          title="这个环境还没有配置"
+          description="新增普通变量或引用团队凭据；三个环境彼此隔离，不会自动继承。"
+          action={
+            canManage ? (
+              <Button type="button" onClick={openCreate}>
+                新增配置
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <ul className="plain-list">
           {variables.data.data.items.map((item) => (
