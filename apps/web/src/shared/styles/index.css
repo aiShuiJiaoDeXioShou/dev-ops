@@ -750,3 +750,23 @@
 .project-card-footer .text-btn:hover {
   text-decoration: none;
 }
+
+/* 已关联仓库后的代码页：仓库概览 + 文件浏览占位 + 折叠管理区。 */
+.code-overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.code-overview-page .card {
+  padding: 20px;
+}
+.code-browser-placeholder .empty-state {
+  padding: 40px 20px;
+}
+.code-settings-details {
+  margin-top: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
