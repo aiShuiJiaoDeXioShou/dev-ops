@@ -1,16 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
-import { FileText, Link2, Plus, Search, SearchX } from 'lucide-react'
+import { FileText, Link2, Plus, Search } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
-import { projectListQueryOptions } from '@/features/projects/public'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
 import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
 import { canWriteKnowledge } from '../api/mutations'
@@ -27,11 +25,9 @@ export function TemplateList({ teamId }: { teamId: string }) {
   const [params, setParams] = useSearchParams()
   const search = params.get('search') ?? ''
   const selected = params.get('template')
-  const targetProject = params.get('project') ?? ''
   const page = Number(params.get('page') ?? '1')
   const [createOpen, setCreateOpen] = useState(false)
   const canWrite = canWriteKnowledge(role)
-  const projects = useQuery(projectListQueryOptions(teamId, { page: 1, pageSize: 100 }))
   const filters = useMemo(() => ({ search: search || undefined, page, pageSize: 20 }), [search, page])
   const query = useQuery(templateListQueryOptions(teamId, filters))
   const updateParam = (key: string, value: string) => {
@@ -70,7 +66,17 @@ export function TemplateList({ teamId }: { teamId: string }) {
 
   return (
     <>
-      <CapabilitiesHeader active="templates" />
+      <CapabilitiesHeader
+        active="templates"
+        action={
+          canWrite ? (
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              新建模板
+            </Button>
+          ) : undefined
+        }
+      />
       <div className="content">
         <div className="catalog">
           {query.isError ? (
@@ -84,32 +90,8 @@ export function TemplateList({ teamId }: { teamId: string }) {
             <DelayedPageSkeleton />
           ) : (
             <>
-              <div className="template-toolbar">
-                <div className="row">
-                  <span className="text-sm text-muted-foreground">目标项目</span>
-                  <Select
-                    className="w-52"
-                    aria-label="目标项目"
-                    value={targetProject}
-                    onChange={(event) => updateParam('project', event.target.value)}
-                  >
-                    <option value="">不指定项目</option>
-                    {(projects.data?.data.items ?? []).map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                {canWrite && (
-                  <Button type="button" onClick={() => setCreateOpen(true)}>
-                    <Plus className="size-4" />
-                    新建模板
-                  </Button>
-                )}
-              </div>
               <label className="search">
-                <Search className="icon" aria-hidden="true" />
+                <Search className="search-icon" aria-hidden="true" />
                 <Input
                   aria-label="搜索模板名称或分类"
                   placeholder="搜索模板名称或分类"
@@ -122,7 +104,7 @@ export function TemplateList({ teamId }: { teamId: string }) {
               {query.data.data.items.length === 0 ? (
                 search ? (
                   <EmptyState
-                    icon={<SearchX />}
+                    mascot="project"
                     title="没有符合条件的模板"
                     description="换个关键词，或清除搜索后重新查看。"
                     action={
@@ -213,12 +195,7 @@ export function TemplateList({ teamId }: { teamId: string }) {
         </div>
       </div>
       {selected && (
-        <TemplateDetailDialog
-          teamId={teamId}
-          templateId={selected}
-          targetProjectId={targetProject || undefined}
-          onClose={() => updateParam('template', '')}
-        />
+        <TemplateDetailDialog teamId={teamId} templateId={selected} onClose={() => updateParam('template', '')} />
       )}
       {createOpen && <TemplateForm teamId={teamId} open={createOpen} onOpenChange={setCreateOpen} />}
     </>

@@ -20,6 +20,7 @@ export function Component() {
       <Card>
         <CardContent>
           <EmptyState
+            mascot="project"
             title="项目功能尚未开放"
             description="项目、需求和 Bug 管理将在后续版本接入。当前可以先查看系统连接状态。"
             action={

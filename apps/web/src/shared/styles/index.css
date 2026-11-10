@@ -577,6 +577,35 @@
   cursor: default;
 }
 
+/* 工作区链接悬停不再加下划线；用户区与页签用原型浅灰背景表达悬停/选中。 */
+.shell a:hover,
+.login-shell a:hover,
+.auth-shell a:hover {
+  text-decoration: none;
+}
+.shell .user {
+  border-radius: 9px;
+  transition: background-color 0.15s;
+}
+.shell .user:hover {
+  background: #f0f2f5;
+}
+.tabs .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--quiet);
+  flex-shrink: 0;
+}
+[data-slot='dialog-close']:hover {
+  background: #f0f2f5;
+  color: var(--ink);
+}
+
 /* 工作区按钮悬停沿用原型浅灰；工作区 --muted 是文字色，避免 bg-muted 变深。 */
 [data-slot='button'][data-variant='ghost']:hover,
 [data-slot='button'][data-variant='outline']:hover,

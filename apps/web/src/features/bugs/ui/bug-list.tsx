@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { SearchX } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { EmptyState } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
@@ -93,8 +92,7 @@ export function BugList({ projectId }: { projectId: string }) {
         )}
         {isEmpty ? (
           <EmptyState
-            mascot={filtered ? undefined : 'signal'}
-            icon={filtered ? <SearchX /> : undefined}
+            mascot="signal"
             title={filtered ? '没有符合条件的 Bug' : '还没有 Bug'}
             description={
               filtered

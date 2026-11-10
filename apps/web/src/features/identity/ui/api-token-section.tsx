@@ -129,6 +129,7 @@ export function ApiTokenSection() {
 
       {tokens.data.data.items.length === 0 ? (
         <EmptyState
+          mascot="prism"
           title="还没有 API Token"
           description="创建一个 Token 后，可在终端执行 devops config set token 保存并调用平台。"
           action={

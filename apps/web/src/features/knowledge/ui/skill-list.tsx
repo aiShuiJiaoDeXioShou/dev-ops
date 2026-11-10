@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
-import { ArrowUpRight, Layers, Plus, Search, SearchX } from 'lucide-react'
+import { ArrowUpRight, Layers, Plus, Search } from 'lucide-react'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
@@ -88,7 +88,7 @@ export function SkillList({ teamId }: { teamId: string }) {
                   ))}
                 </div>
                 <label className="search">
-                  <Search className="icon" aria-hidden="true" />
+                  <Search className="search-icon" aria-hidden="true" />
                   <Input
                     aria-label="搜索团队技能"
                     placeholder="搜索团队技能"
@@ -102,7 +102,7 @@ export function SkillList({ teamId }: { teamId: string }) {
               {query.data.data.items.length === 0 ? (
                 filtered ? (
                   <EmptyState
-                    icon={<SearchX />}
+                    mascot="prism"
                     title="没有符合条件的技能"
                     description="换个关键词或分类，或清除筛选后重新查看。"
                     action={

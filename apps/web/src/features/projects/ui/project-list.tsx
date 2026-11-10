@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { SearchX } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
@@ -127,8 +126,7 @@ export function ProjectList() {
         </div>
         {projects.length === 0 ? (
           <EmptyState
-            mascot={filters.search || filters.status ? undefined : 'project'}
-            icon={filters.search || filters.status ? <SearchX /> : undefined}
+            mascot="project"
             title={filters.search || filters.status ? '没有匹配的项目' : '还没有项目'}
             description={
               filters.search || filters.status

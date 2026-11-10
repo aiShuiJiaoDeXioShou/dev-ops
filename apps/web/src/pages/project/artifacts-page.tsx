@@ -163,7 +163,6 @@ export function Component() {
       ) : null}
 
       <section aria-label="产物">
-        <h3>最新构建产物</h3>
         {artifacts.isPending ? (
           <DelayedLoading pending>
             <PageLoading />

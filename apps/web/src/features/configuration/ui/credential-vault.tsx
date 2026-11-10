@@ -100,7 +100,7 @@ export function CredentialVault() {
     if (!form.value) return showToast('请填写凭据值。', 'error')
     create.mutate()
   }
-  if (!currentTeam) return <EmptyState title="尚未加入团队" description="加入团队后可使用凭据库。" />
+  if (!currentTeam) return <EmptyState mascot="group" title="尚未加入团队" description="加入团队后可使用凭据库。" />
   return (
     <div className="catalog">
       <div className="row spread">
