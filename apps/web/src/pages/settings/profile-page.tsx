@@ -5,10 +5,7 @@ export function Component() {
   const { user, currentTeam } = useSession()
   return (
     <div className="catalog min-w-0 space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">个人页面</h1>
-        <p className="mt-1 text-sm text-muted-foreground">管理账号信息与供 CLI/自动化使用的 API Token。</p>
-      </div>
+      <h1 className="sr-only">个人页面</h1>
 
       <section className="min-w-0 space-y-4" aria-labelledby="account-title">
         <h2 id="account-title" className="text-lg font-semibold">

@@ -168,7 +168,8 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
       })
       await updateGitConnection(db, connection.id, {
         status: 'active',
-        externalIdentity: identity.identity,
+        // App 安装连接的 external_identity 保存安装 ID，适配器按它签安装令牌；不能用账号登录名覆盖。
+        ...(connection.auth_kind === 'github_app_installation' ? {} : { externalIdentity: identity.identity }),
         lastCheckedAt: checkedAt,
         lastErrorCode: null,
         repositoryScopeSyncedAt: checkedAt,

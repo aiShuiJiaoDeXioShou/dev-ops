@@ -41,7 +41,7 @@ describe('请求契约与错误策略', () => {
   it('超时中断与调用方取消使用不同错误分类', async () => {
     vi.spyOn(AbortSignal, 'timeout').mockReturnValue(AbortSignal.abort(new DOMException('超时', 'TimeoutError')))
     await expect(apiClient.ready()).rejects.toMatchObject({ code: 'TIMEOUT' })
-    expect(AbortSignal.timeout).toHaveBeenCalledWith(5_000)
+    expect(AbortSignal.timeout).toHaveBeenCalledWith(15_000)
   })
 
   it('权限和契约错误不重试，暂时性错误最多重试一次', () => {

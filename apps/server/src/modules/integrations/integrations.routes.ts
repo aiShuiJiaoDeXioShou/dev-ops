@@ -71,15 +71,15 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
     async (request, reply) => {
       try {
         const user = await requireActor(request)
-        const connection = await options.service.completeAuthorization(
+        await options.service.completeAuthorization(
           user,
           request.params.providerKey,
           request.query.state,
           Number(request.query.installation_id),
         )
-        return reply.redirect(`${options.webOrigin}/teams/${connection.teamId}/settings?git=connected`, 302)
+        return reply.redirect(`${options.webOrigin}/settings/team?git=connected`, 302)
       } catch {
-        return reply.redirect(`${options.webOrigin}/teams?git=failed`, 302)
+        return reply.redirect(`${options.webOrigin}/settings/team?git=failed`, 302)
       }
     },
   )

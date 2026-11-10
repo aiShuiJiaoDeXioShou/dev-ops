@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useParams } from 'react-router'
+import { useParams, useSearchParams } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { useSession } from '@/features/identity/public'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
@@ -25,6 +25,16 @@ const ENVIRONMENTS = [
   { value: 'test', label: '测试' },
   { value: 'production', label: '生产' },
 ] as const
+/** 页面内视图页签；构建产物与外部审核发布是两条独立链路，不在同一屏纵向堆叠。 */
+type ArtifactsTab = 'builds' | 'review'
+
+const TAB_PARAM = 'tab'
+
+const ARTIFACTS_TABS: { value: ArtifactsTab; label: string }[] = [
+  { value: 'builds', label: '构建产物' },
+  { value: 'review', label: '审核与发布' },
+]
+
 const STATUS_LABELS: Record<string, string> = {
   available: '可用',
   expired: '已失效',
@@ -37,8 +47,10 @@ const STATUS_LABELS: Record<string, string> = {
 /** 产物与版本页：按服务/环境查看最新与历史产物，并确认运行版本。 */
 export function Component() {
   const { projectId = '' } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { role } = useSession()
   const canManage = role === 'admin' || role === 'developer'
+  const tab: ArtifactsTab = searchParams.get(TAB_PARAM) === 'review' ? 'review' : 'builds'
   const [environment, setEnvironment] = useState<'development' | 'test' | 'production'>('test')
   const [selectedBuildId, setSelectedBuildId] = useState('')
   const [reportOpen, setReportOpen] = useState(false)
@@ -50,6 +62,12 @@ export function Component() {
   const runVersions = useQuery(runVersionsQueryOptions(projectId, firstServiceId))
   const queryClient = useQueryClient()
   const { showToast } = useToast()
+  const changeTab = (next: ArtifactsTab) => {
+    const params = new URLSearchParams(searchParams)
+    if (next === 'builds') params.delete(TAB_PARAM)
+    else params.set(TAB_PARAM, next)
+    setSearchParams(params)
+  }
   const [confirmTarget, setConfirmTarget] = useState<{
     environment: string
     version: number
@@ -98,117 +116,158 @@ export function Component() {
 
   return (
     <div className="project-tab-panel">
-      <div className="row spread">
-        <div className="segments" role="tablist" aria-label="环境">
-          {ENVIRONMENTS.map((item) => (
-            <Button
-              key={item.value}
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={`segment ${environment === item.value ? 'active' : ''}`}
-              role="tab"
-              aria-selected={environment === item.value}
-              onClick={() => setEnvironment(item.value)}
-            >
-              {item.label}
-            </Button>
-          ))}
-        </div>
-        {canManage ? (
-          <Button type="button" variant="default" onClick={() => setReportOpen(true)}>
-            上报构建
-          </Button>
-        ) : null}
-      </div>
-
-      {firstServiceId ? (
-        <section aria-label="运行版本" className="project-summary-section">
-          <h3>运行版本</h3>
-          {runVersions.isPending ? (
-            <DelayedLoading pending>
-              <PageLoading />
-            </DelayedLoading>
-          ) : runVersions.isError ? (
-            <p className="muted">运行版本加载失败，请重试。</p>
-          ) : (
-            <ul className="plain-list">
-              {runVersions.data.data.items.map((item) => (
-                <li key={item.environment}>
-                  <span className="muted">{ENVIRONMENTS.find((env) => env.value === item.environment)?.label}</span>
-                  <span>{item.versionLabel ?? '未知版本'}</span>
-                  <span className="tag">{STATUS_LABELS[item.verificationStatus] ?? item.verificationStatus}</span>
-                  <span className="muted">{item.confirmedAt ?? '尚未确认'}</span>
-                  {canManage ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        setConfirmTarget({
-                          environment: item.environment,
-                          version: item.version,
-                          versionLabel: item.versionLabel,
-                        })
-                      }
-                    >
-                      确认/更正
-                    </Button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : null}
-
-      <section aria-label="产物">
-        {artifacts.isPending ? (
-          <DelayedLoading pending>
-            <PageLoading />
-          </DelayedLoading>
-        ) : artifacts.isError ? (
-          <EmptyState title="产物加载失败" description={describeRequestError(artifacts.error).description} />
-        ) : artifacts.data.data.items.length === 0 ? (
-          <EmptyState
-            mascot="project"
-            title="还没有构建产物"
-            description="上报构建后，安装包、二维码或测试地址会出现在这里。"
-            action={
-              canManage ? (
-                <Button type="button" onClick={() => setReportOpen(true)}>
-                  上报构建
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <ul className="artifact-list">
-            {artifacts.data.data.items.map((artifact) => (
-              <li key={artifact.id} className="artifact-item">
-                <div>
-                  <strong>{artifact.versionLabel}</strong>
-                  <span className="muted"> {artifact.artifactType}</span>
-                </div>
-                <div className="row">
-                  {artifact.status === 'available' ? (
-                    <a href={artifact.accessUrl} target="_blank" rel="noreferrer" className="btn">
-                      打开产物
-                    </a>
-                  ) : (
-                    <span className="tag">{STATUS_LABELS[artifact.status] ?? artifact.status}</span>
-                  )}
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedBuildId(artifact.buildId)}>
-                    构建详情
-                  </Button>
-                </div>
-              </li>
+      <div className="space-y-6">
+        <div className="row spread flex-wrap">
+          <div className="segments" role="tablist" aria-label="产物视图">
+            {ARTIFACTS_TABS.map((item) => (
+              <Button
+                key={item.value}
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={`segment ${tab === item.value ? 'active' : ''}`}
+                role="tab"
+                id={`artifacts-tab-${item.value}`}
+                aria-selected={tab === item.value}
+                aria-controls={`artifacts-panel-${item.value}`}
+                onClick={() => changeTab(item.value)}
+              >
+                {item.label}
+              </Button>
             ))}
-          </ul>
-        )}
-      </section>
+          </div>
+          {tab === 'builds' && canManage ? (
+            <Button type="button" variant="default" onClick={() => setReportOpen(true)}>
+              上报构建
+            </Button>
+          ) : null}
+        </div>
 
-      <ReviewReleaseSection projectId={projectId} />
+        <div
+          role="tabpanel"
+          id={`artifacts-panel-${tab}`}
+          aria-labelledby={`artifacts-tab-${tab}`}
+          className="space-y-6"
+        >
+          {tab === 'builds' ? (
+            <>
+              <div className="segments" role="tablist" aria-label="环境">
+                {ENVIRONMENTS.map((item) => (
+                  <Button
+                    key={item.value}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className={`segment ${environment === item.value ? 'active' : ''}`}
+                    role="tab"
+                    aria-selected={environment === item.value}
+                    onClick={() => setEnvironment(item.value)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </div>
+
+              {firstServiceId ? (
+                <section aria-label="运行版本" className="project-summary-section">
+                  <h3>运行版本</h3>
+                  {runVersions.isPending ? (
+                    <DelayedLoading pending>
+                      <PageLoading />
+                    </DelayedLoading>
+                  ) : runVersions.isError ? (
+                    <p className="muted">运行版本加载失败，请重试。</p>
+                  ) : (
+                    <ul className="plain-list">
+                      {runVersions.data.data.items.map((item) => (
+                        <li key={item.environment}>
+                          <span className="muted">
+                            {ENVIRONMENTS.find((env) => env.value === item.environment)?.label}
+                          </span>
+                          <span>{item.versionLabel ?? '未知版本'}</span>
+                          <span className="tag">
+                            {STATUS_LABELS[item.verificationStatus] ?? item.verificationStatus}
+                          </span>
+                          <span className="muted">{item.confirmedAt ?? '尚未确认'}</span>
+                          {canManage ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                setConfirmTarget({
+                                  environment: item.environment,
+                                  version: item.version,
+                                  versionLabel: item.versionLabel,
+                                })
+                              }
+                            >
+                              确认/更正
+                            </Button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              ) : null}
+
+              <section aria-label="产物">
+                {artifacts.isPending ? (
+                  <DelayedLoading pending>
+                    <PageLoading />
+                  </DelayedLoading>
+                ) : artifacts.isError ? (
+                  <EmptyState title="产物加载失败" description={describeRequestError(artifacts.error).description} />
+                ) : artifacts.data.data.items.length === 0 ? (
+                  <EmptyState
+                    mascot="project"
+                    title="还没有构建产物"
+                    description="上报构建后，安装包、二维码或测试地址会出现在这里。"
+                    action={
+                      canManage ? (
+                        <Button type="button" onClick={() => setReportOpen(true)}>
+                          上报构建
+                        </Button>
+                      ) : undefined
+                    }
+                  />
+                ) : (
+                  <ul className="artifact-list">
+                    {artifacts.data.data.items.map((artifact) => (
+                      <li key={artifact.id} className="artifact-item">
+                        <div>
+                          <strong>{artifact.versionLabel}</strong>
+                          <span className="muted"> {artifact.artifactType}</span>
+                        </div>
+                        <div className="row">
+                          {artifact.status === 'available' ? (
+                            <a href={artifact.accessUrl} target="_blank" rel="noreferrer" className="btn">
+                              打开产物
+                            </a>
+                          ) : (
+                            <span className="tag">{STATUS_LABELS[artifact.status] ?? artifact.status}</span>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedBuildId(artifact.buildId)}
+                          >
+                            构建详情
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </>
+          ) : (
+            <ReviewReleaseSection projectId={projectId} />
+          )}
+        </div>
+      </div>
 
       {selectedBuildId ? (
         <section aria-label="构建详情">

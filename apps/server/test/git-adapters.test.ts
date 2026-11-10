@@ -111,7 +111,8 @@ test('GitHub App 适配器使用安装身份、过滤 allowlist 并映射错误'
   const client: GitHubAppClient = {
     async request(route) {
       routes.push(route)
-      if (route === 'GET /installation') return { data: { account: { login: 'aiShuiJiaoDeXioShou' } } }
+      if (route === 'GET /app/installations/{installation_id}')
+        return { data: { account: { login: 'aiShuiJiaoDeXioShou' } } }
       if (route === 'GET /installation/repositories') {
         return {
           data: {
@@ -145,7 +146,7 @@ test('GitHub App 适配器使用安装身份、过滤 allowlist 并映射错误'
   const repositories = await adapter.listRepositories()
   assert.equal(repositories.length, 1)
   assert.equal(repositories[0]?.name, 'dev-ops')
-  assert.equal(routes[0], 'GET /installation')
+  assert.equal(routes[0], 'GET /app/installations/{installation_id}')
 
   const failing: GitHubAppClient = {
     async request() {

@@ -113,14 +113,9 @@ export function ApiTokenSection() {
   return (
     <section className="min-w-0 space-y-4" aria-labelledby="api-token-title">
       <div className="section-heading flex-wrap items-start gap-3">
-        <div>
-          <h2 id="api-token-title" className="text-lg font-semibold">
-            API Token
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            供 `devops` 命令和自动化工具使用。Token 只显示一次，请妥善保存。
-          </p>
-        </div>
+        <h2 id="api-token-title" className="text-lg font-semibold">
+          API Token
+        </h2>
         <span className="spacer" />
         <Button type="button" onClick={() => setCreateOpen(true)}>
           新建 Token
@@ -131,7 +126,6 @@ export function ApiTokenSection() {
         <EmptyState
           mascot="prism"
           title="还没有 API Token"
-          description="创建一个 Token 后，可在终端执行 devops config set token 保存并调用平台。"
           action={
             <Button type="button" onClick={() => setCreateOpen(true)}>
               新建 Token

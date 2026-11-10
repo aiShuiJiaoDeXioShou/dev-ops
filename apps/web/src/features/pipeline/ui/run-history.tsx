@@ -75,75 +75,74 @@ export function RunHistory({
   onRetry,
 }: RunHistoryProps) {
   const filtersActive = hasRunFilters(filters)
+  /** 没有任何运行记录时不展示筛选栏，避免空页面堆一排无效控件；有记录或已选条件时保留。 */
+  const showFilters = filtersActive || isPending || total > 0 || runs.length > 0
   return (
     <section aria-label="运行历史">
-      <div className="section-heading">
-        <h2>运行历史</h2>
-        <span className="counter">{total}</span>
-      </div>
-
-      <div className="filters" role="group" aria-label="筛选运行历史">
-        <label className="row small whitespace-nowrap">
-          状态
-          <Select
-            aria-label="按状态筛选"
-            value={filters.status}
-            onChange={(event) => {
-              const value = event.target.value
-              if (value === '' || isPipelineRunStatus(value)) onFiltersChange({ ...filters, status: value })
-            }}
-          >
-            <option value="">全部状态</option>
-            {RUN_FILTER_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {runStatusLabel(status)}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label className="row small whitespace-nowrap">
-          工作流
-          <Select
-            aria-label="按工作流筛选"
-            value={filters.workflowPath}
-            onChange={(event) => onFiltersChange({ ...filters, workflowPath: event.target.value })}
-          >
-            <option value="">全部工作流</option>
-            {workflowOptions.map((option) => (
-              <option key={option.path} value={option.path}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label className="row small whitespace-nowrap">
-          开始日期
-          <Input
-            type="date"
-            aria-label="开始日期"
-            className="w-40"
-            value={filters.from}
-            max={filters.to || undefined}
-            onChange={(event) => onFiltersChange({ ...filters, from: event.target.value })}
-          />
-        </label>
-        <label className="row small whitespace-nowrap">
-          结束日期
-          <Input
-            type="date"
-            aria-label="结束日期"
-            className="w-40"
-            value={filters.to}
-            min={filters.from || undefined}
-            onChange={(event) => onFiltersChange({ ...filters, to: event.target.value })}
-          />
-        </label>
-        {filtersActive && (
-          <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
-            清除筛选
-          </Button>
-        )}
-      </div>
+      {showFilters ? (
+        <div className="filters" role="group" aria-label="筛选运行历史">
+          <label className="row small whitespace-nowrap">
+            状态
+            <Select
+              aria-label="按状态筛选"
+              value={filters.status}
+              onChange={(event) => {
+                const value = event.target.value
+                if (value === '' || isPipelineRunStatus(value)) onFiltersChange({ ...filters, status: value })
+              }}
+            >
+              <option value="">全部状态</option>
+              {RUN_FILTER_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {runStatusLabel(status)}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="row small whitespace-nowrap">
+            工作流
+            <Select
+              aria-label="按工作流筛选"
+              value={filters.workflowPath}
+              onChange={(event) => onFiltersChange({ ...filters, workflowPath: event.target.value })}
+            >
+              <option value="">全部工作流</option>
+              {workflowOptions.map((option) => (
+                <option key={option.path} value={option.path}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="row small whitespace-nowrap">
+            开始日期
+            <Input
+              type="date"
+              aria-label="开始日期"
+              className="w-40"
+              value={filters.from}
+              max={filters.to || undefined}
+              onChange={(event) => onFiltersChange({ ...filters, from: event.target.value })}
+            />
+          </label>
+          <label className="row small whitespace-nowrap">
+            结束日期
+            <Input
+              type="date"
+              aria-label="结束日期"
+              className="w-40"
+              value={filters.to}
+              min={filters.from || undefined}
+              onChange={(event) => onFiltersChange({ ...filters, to: event.target.value })}
+            />
+          </label>
+          {filtersActive && (
+            <Button type="button" variant="ghost" size="sm" onClick={onClearFilters}>
+              清除筛选
+            </Button>
+          )}
+        </div>
+      ) : null}
 
       {isPending ? (
         <DelayedLoading pending>
@@ -167,7 +166,7 @@ export function RunHistory({
           <EmptyState
             mascot="signal"
             title="还没有运行记录"
-            description="从上方工作流列表触发一次运行后，运行历史会显示在这里。"
+            description="在工作流页签触发一次运行后，运行历史会显示在这里。"
           />
         )
       ) : (

@@ -13,8 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
+import { Combobox } from '@/shared/ui/controls/combobox'
 import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
 
@@ -81,6 +81,13 @@ export function ProjectForm({ teamId, open, onOpenChange, onCreated }: ProjectFo
     setError('')
     onOpenChange(false)
   }
+  const repositoryOptions = [
+    { value: '', label: '暂不关联仓库' },
+    ...teamRepositories.repositories.map((repository) => ({
+      value: repository.id,
+      label: `${repository.namespace}/${repository.name}`,
+    })),
+  ]
   return (
     <Dialog
       open={open}
@@ -108,21 +115,19 @@ export function ProjectForm({ teamId, open, onOpenChange, onCreated }: ProjectFo
               placeholder="简要说明项目目标与范围"
             />
           </label>
-          <label className="block space-y-1.5 text-sm font-medium">
-            关联仓库（可选）
-            <Select
+          <div className="space-y-1.5">
+            <span className="block text-sm font-medium">关联仓库（可选）</span>
+            <Combobox
               value={repositoryId}
-              onChange={(event) => setRepositoryId(event.target.value)}
+              onValueChange={setRepositoryId}
+              options={repositoryOptions}
+              placeholder="暂不关联仓库"
+              searchPlaceholder="搜索仓库"
+              emptyMessage="没有匹配的仓库"
               disabled={teamRepositories.isLoading}
-            >
-              <option value="">暂不关联仓库</option>
-              {teamRepositories.repositories.map((repository) => (
-                <option key={repository.id} value={repository.id}>
-                  {repository.namespace}/{repository.name}
-                </option>
-              ))}
-            </Select>
-          </label>
+              aria-label="关联仓库（可选）"
+            />
+          </div>
           <p className="text-xs leading-5 text-muted-foreground">
             {teamRepositories.repositories.length === 0
               ? '当前团队还没有已同步的仓库。可以先创建项目，再到代码页添加 Git 连接。'

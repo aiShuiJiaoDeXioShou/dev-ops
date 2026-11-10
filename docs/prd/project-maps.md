@@ -1,12 +1,12 @@
 # DevOps 项目模块与功能图
 
-本文用三张图整理整个项目的模块职责、功能入口和逻辑区域，供需求确认与开发拆分使用。范围覆盖完整 MVP，版本分配沿用规划草案；图中的功能不代表已经实现。
+本文用三张图整理整个项目的模块职责、功能入口和逻辑区域，供需求确认与开发拆分使用。范围覆盖完整 MVP；版本分配按 2026-11-10 调整后的顺序：V0.4b 前置，Bots 后移 V0.5，运维后移 V0.6。图中的功能不代表已经实现，状态以[需求版本规划](release-plan.md)为准。
 
 业务规则以[产品需求](mvp.md)为准，模块编号和版本范围以[需求版本规划](release-plan.md)为准，首版细节见 [V0.1 需求细化](v0.1.md)。图内 Mermaid 文本可直接编辑，在支持 Mermaid 的阅读器中预览。
 
 ## 1. 模块全景图
 
-全项目分为 15 个业务模块。连线表示分类归属，不表示调用关系或开发顺序。蓝色模块在 V0.1 交付全部或部分基础功能；各节点标出的版本是规划中的首次交付版本。
+全项目分为 15 个业务模块。连线表示分类归属，不表示调用关系或开发顺序。各节点标出的版本是 2026-11-10 调整后的首次交付版本；“已交付”表示对应版本已完成，未标注的后续节点尚未实现。
 
 ```mermaid
 flowchart LR
@@ -18,21 +18,21 @@ flowchart LR
     platform --- credential["凭据配置"]
     platform --- operation["运维治理"]
 
-    organization --- m01["M01 身份、团队与权限 · V0.1 基础"]
-    research --- m02["M02 项目、服务与环境目录 · V0.1 项目"]
-    research --- m03["M03 需求管理 · V0.1"]
-    research --- m04["M04 Bug 与回归 · V0.1 内部流程"]
-    research --- m05["M05 Git 与代码关联 · V0.1 关联"]
-    research --- m06["M06 交付、流水线与版本 · V0.2／V0.4a"]
-    collaboration --- m08["M08 会话、群组与工作标签 · V0.3"]
-    collaboration --- m09["M09 任务、运行与结果验收 · V0.3"]
-    collaboration --- m15["M15 通知与待处理汇总 · V0.3"]
-    capability --- m07["M07 Bot 定义与配置 · V0.3"]
-    capability --- m10["M10 Skills、模板与记忆 · V0.3"]
-    capability --- m12["M12 连接、执行节点与项目工具 · V0.1 Git 连接"]
-    credential --- m11["M11 凭据与环境配置 · V0.1 Git 凭据保护"]
-    operation --- m13["M13 运维变更与发布 · V0.4"]
-    operation --- m14["M14 运行事件与值守 · V0.5"]
+    organization --- m01["M01 身份、团队与权限 · V0.1 已交付"]
+    research --- m02["M02 项目、服务与环境目录 · V0.1／V0.2 已交付"]
+    research --- m03["M03 需求管理 · V0.1 已交付"]
+    research --- m04["M04 Bug 与回归 · V0.1 内部流程／V0.4b 远端关联"]
+    research --- m05["M05 Git 与代码关联 · V0.1／V0.2 已交付／V0.4b 写入"]
+    research --- m06["M06 交付、流水线与版本 · V0.2／V0.4a 已交付／V0.4b 部署"]
+    collaboration --- m08["M08 会话、群组与工作标签 · V0.5"]
+    collaboration --- m09["M09 任务、运行与结果验收 · V0.5"]
+    collaboration --- m15["M15 通知与待处理汇总 · V0.5 站内／V0.6 外部"]
+    capability --- m07["M07 Bot 定义与配置 · V0.5"]
+    capability --- m10["M10 Skills、模板与记忆 · V0.3 阶段 A 已交付／V0.5"]
+    capability --- m12["M12 连接、执行节点与项目工具 · V0.1 Git／V0.4b 写操作"]
+    credential --- m11["M11 凭据与环境配置 · V0.1 Git 凭据保护／V0.5 配置请求"]
+    operation --- m13["M13 变更与发布 · V0.4b"]
+    operation --- m14["M14 运行事件与值守 · V0.6"]
 
     classDef root fill:#15324F,color:#FFFFFF,stroke:#15324F
     classDef domain fill:#F1F5F9,color:#0F172A,stroke:#94A3B8
@@ -40,11 +40,13 @@ flowchart LR
     classDef later fill:#FFFFFF,color:#334155,stroke:#94A3B8
     class platform root
     class organization,research,collaboration,capability,credential,operation domain
-    class m01,m02,m03,m04,m05,m11,m12 first
-    class m06,m07,m08,m09,m10,m13,m14,m15 later
+    class m01,m02,m03,m04,m05,m06,m10,m11,m12 first
+    class m07,m08,m09,m13,m14,m15 later
 ```
 
-V0.1 先完成团队、项目、需求、内部 Bug、真实 Git 关联及人工提测回归。服务与环境、完整代码浏览和交付在 V0.2 补齐；Bot 协作在 V0.3，受控执行与内置流水线在 V0.4，事件值守与外部协作在 V0.5，V1.0 核对完整 MVP。凭据保护和权限校验随首次接入交付，不等待完整管理页面。
+V0.1 已完成团队、项目、需求、内部 Bug、真实 Git 关联及人工提测回归。服务与环境、完整代码浏览和交付在 V0.2 补齐；内置流水线在 V0.4a 交付。2026-11-10 调整后，V0.4b 先完成流水线部署与产品发布，Bot 协作后移 V0.5，事件值守与外部协作后移 V0.6，V1.0 核对完整 MVP。凭据保护和权限校验随首次接入交付，不等待完整管理页面。
+
+2026-11-10 顺序调整：V0.4b 的发布主链路包含 M13 的变更计划、人工放行、执行与版本验证；运行事件与值守（M14）、外部通知与客户反馈后移 V0.6；Bot 相关模块（M07、M08、M09、M10 阶段 B、M15 站内）后移 V0.5。MVP 范围不变，只是交付顺序调整。
 
 ## 2. 功能分解图
 
@@ -122,15 +124,15 @@ flowchart TB
         subgraph businessZone["业务模块区"]
             direction LR
             projectDomain["项目研发 · M02 至 M06"]
-            collaborationDomain["会话与任务 · M08、M09"]
-            operationsDomain["运维与值守 · M13、M14"]
+            collaborationDomain["会话与任务 · M08、M09（V0.5）"]
+            operationsDomain["变更与值守 · M13（V0.4b）、M14（V0.6）"]
         end
 
         subgraph supportZone["共享能力区"]
             direction LR
-            botKnowledge["Bot 与知识 · M07、M10"]
+            botKnowledge["Bot 与知识 · M07（V0.5）、M10"]
             credentials["凭据与环境配置 · M11"]
-            notifications["通知与待处理 · M15"]
+            notifications["通知与待处理 · M15（V0.5 站内／V0.6 外部）"]
             adapters["连接、执行节点与项目工具 · M12"]
         end
 

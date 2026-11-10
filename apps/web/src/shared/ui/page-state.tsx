@@ -68,8 +68,8 @@ export type EmptyStateMascot = 'orbit' | 'prism' | 'signal' | 'aperture' | 'grou
 interface EmptyStateProps {
   /** 标题，说明当前空状态的原因。 */
   title: string
-  /** 引导说明，告诉用户下一步可以做什么。 */
-  description: string
+  /** 引导说明，告诉用户下一步可以做什么；不需要额外说明时可省略。 */
+  description?: string
   /** 团队/项目类场景使用的 Bot 吉祥物；与 icon 二选一。 */
   mascot?: EmptyStateMascot
   /** 搜索结果、错误等场景使用的线性图标；与 mascot 二选一。 */
@@ -129,7 +129,7 @@ export function EmptyState({ title, description, mascot, icon, action, secondary
         </div>
       )}
       <h3>{title}</h3>
-      <p>{description}</p>
+      {description ? <p>{description}</p> : null}
       {(action || secondaryAction) && (
         <div className="empty-actions">
           {action}

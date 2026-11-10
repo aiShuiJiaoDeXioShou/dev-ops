@@ -97,6 +97,11 @@ function renderPage() {
   )
 }
 
+/** 切换到运行历史页签；两个视图互斥，需要先切换再断言。 */
+async function openRunsTab() {
+  await userEvent.click(await screen.findByRole('tab', { name: /运行历史/ }))
+}
+
 describe('pipelines-page', () => {
   it('工作流加载中显示稳定占位', async () => {
     server.use(
@@ -128,12 +133,20 @@ describe('pipelines-page', () => {
     expect(screen.getByRole('button', { name: /重新检查/ })).toBeInTheDocument()
   })
 
-  it('无工作流与无运行时分开展示空状态', async () => {
+  it('默认展示工作流页签，切换页签后展示运行历史空状态', async () => {
     mockWorkflows([])
     mockRuns([])
     renderPage()
     expect(await screen.findByText('还没有流水线工作流')).toBeInTheDocument()
+    expect(screen.queryByText('还没有运行记录')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /工作流/ })).toHaveAttribute('aria-selected', 'true')
+
+    await openRunsTab()
     expect(await screen.findByText('还没有运行记录')).toBeInTheDocument()
+    expect(screen.queryByText('还没有流水线工作流')).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /运行历史/ })).toHaveAttribute('aria-selected', 'true')
+    // 没有任何运行记录时隐藏筛选栏，避免空页面出现一排无效控件。
+    expect(screen.queryByRole('combobox', { name: '按状态筛选' })).not.toBeInTheDocument()
   })
 
   it('解析失败展示文件、字段与行号，且非法工作流不可触发', async () => {
@@ -163,6 +176,7 @@ describe('pipelines-page', () => {
     mockWorkflows()
     mockRuns()
     renderPage()
+    await openRunsTab()
     const titleLink = await screen.findByRole('link', { name: 'web-build' })
     expect(titleLink).toHaveAttribute('href', '/projects/project-1/pipelines/run-1')
 
@@ -181,6 +195,7 @@ describe('pipelines-page', () => {
     mockWorkflows()
     mockRuns()
     renderPage()
+    await openRunsTab()
     await screen.findByRole('link', { name: 'web-build' })
     const fromInput = screen.getByLabelText('开始日期')
     fireEvent.change(fromInput, { target: { value: '2026-11-01' } })

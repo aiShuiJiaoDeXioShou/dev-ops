@@ -5,6 +5,7 @@ import { PrototypeIcon } from '@/prototype/icons/icon'
 import { projectQueryOptions } from '@/features/projects/public'
 import {
   CommitHistoryDialog,
+  pickDefaultPreviewPath,
   projectRepositoriesQueryOptions,
   repositoryBranchesQueryOptions,
   repositoryFileQueryOptions,
@@ -179,8 +180,8 @@ export function Component() {
   const entries = tree.data?.data.entries ?? []
   const treeNodes = buildFileTree(entries)
   const files = entries.filter((entry) => entry.type === 'file').map((entry) => entry.path)
-  const defaultPath = files.find((path) => path.toLowerCase() === 'readme.md') ?? files[0] ?? ''
-  const activePath = files.includes(selectedPath) ? selectedPath : defaultPath
+  const defaultPath = pickDefaultPreviewPath(files)
+  const activePath = selectedPath && files.includes(selectedPath) ? selectedPath : defaultPath
   const file = useQuery(repositoryFileQueryOptions(projectId, repository?.id ?? '', tree.data?.data.branch, activePath))
   useEffect(() => {
     setViewMode('preview')

@@ -338,7 +338,11 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
   return {
     async checkConnection() {
       try {
-        const data = (await client.request('GET /installation')).data as { account?: { login?: string } }
+        const data = (
+          await client.request('GET /app/installations/{installation_id}', {
+            installation_id: options.installationId,
+          })
+        ).data as { account?: { login?: string } }
         const identity = data.account?.login
         if (!identity) throw new GitAdapterError('invalid_response', 'GitHub App 未返回安装身份')
         return { identity }

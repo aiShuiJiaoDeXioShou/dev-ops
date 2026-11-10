@@ -12,18 +12,15 @@ const repository = {
   id: 'repo-1',
   name: 'web',
   namespace: 'ns',
-  provider: 'github',
+  providerKey: 'github',
   defaultBranch: 'main',
   webUrl: 'https://example.test/ns/web',
   status: 'available',
 }
-const pullRequest = {
-  number: 12,
-  title: '交付页面',
+const basePullRequest = {
   authorName: '测试用户',
   sourceBranch: 'feat/delivery',
   targetBranch: 'main',
-  state: 'open',
   reviewStatus: 'pending',
   createdAt: '2026-11-09T08:00:00.000Z',
   updatedAt: '2026-11-10T08:00:00.000Z',
@@ -32,6 +29,23 @@ const pullRequest = {
   lastCheckedAt: '2026-11-10T09:00:00.000Z',
   files: [],
   truncated: false,
+}
+const openPullRequest = { ...basePullRequest, number: 12, title: '交付页面', state: 'open' }
+const closedPullRequest = {
+  ...basePullRequest,
+  number: 13,
+  title: '修复登录',
+  state: 'closed',
+  reviewStatus: 'changes_requested',
+  updatedAt: '2026-11-09T08:00:00.000Z',
+}
+const mergedPullRequest = {
+  ...basePullRequest,
+  number: 14,
+  title: '合并发布',
+  state: 'merged',
+  reviewStatus: 'approved',
+  mergedAt: '2026-11-10T08:00:00.000Z',
 }
 
 function renderPage() {
@@ -53,24 +67,79 @@ describe('prs-page', () => {
     expect(await screen.findByText('尚未关联仓库')).toBeInTheDocument()
   })
 
-  it('展示 PR 列表并支持按状态筛选与打开详情差异', async () => {
+  it('默认请求全部状态并对单个仓库隐藏仓库选择器', async () => {
+    let requestedState = ''
+    server.use(
+      http.get('*/api/v1/projects/project-1/repositories', () => success([repository])),
+      http.get('*/api/v1/projects/project-1/repositories/repo-1/pull-requests', ({ request }) => {
+        requestedState = new URL(request.url).searchParams.get('state') ?? ''
+        return success({
+          items: [openPullRequest, closedPullRequest, mergedPullRequest],
+          page: 1,
+          pageSize: 100,
+          total: 3,
+        })
+      }),
+    )
+    renderPage()
+    expect(await screen.findByRole('button', { name: '交付页面' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /已关闭/ })).toHaveTextContent('2')
+    expect(screen.queryByRole('combobox', { name: '仓库' })).not.toBeInTheDocument()
+    expect(requestedState).toBe('all')
+
+    await userEvent.click(screen.getByRole('button', { name: /^已关闭/ }))
+    expect(screen.getByRole('button', { name: '修复登录' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '合并发布' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '交付页面' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /^打开/ }))
+    expect(screen.getByRole('button', { name: '交付页面' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '修复登录' })).not.toBeInTheDocument()
+  })
+
+  it('支持搜索、作者与评审状态筛选，并打开详情差异', async () => {
     server.use(
       http.get('*/api/v1/projects/project-1/repositories', () => success([repository])),
       http.get('*/api/v1/projects/project-1/repositories/repo-1/pull-requests', () =>
-        success({ items: [pullRequest], page: 1, pageSize: 20, total: 1 }),
+        success({
+          items: [openPullRequest, closedPullRequest, mergedPullRequest],
+          page: 1,
+          pageSize: 100,
+          total: 3,
+        }),
       ),
       http.get('*/api/v1/projects/project-1/repositories/repo-1/pull-requests/12', () =>
-        success({ ...pullRequest, files: [{ ...pullRequest.files }] }),
+        success({
+          ...openPullRequest,
+          files: [
+            {
+              path: 'src/app.tsx',
+              status: 'modified',
+              additions: 2,
+              deletions: 1,
+              patch: '+ 变更内容',
+              binary: false,
+              truncated: false,
+            },
+          ],
+        }),
       ),
       http.get('*/api/v1/projects/project-1/repositories/repo-1/pull-requests/12/diff', () =>
         success({ patch: '+ 变更内容', truncated: true }),
       ),
     )
     renderPage()
-    expect(await screen.findByText(/#12 交付页面/)).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'PR 状态' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /#12 交付页面/ }))
-    expect(await screen.findByLabelText('PR 差异')).toBeInTheDocument()
-    expect(screen.getByText(/内容已截断/)).toBeInTheDocument()
+    await screen.findByRole('button', { name: '交付页面' })
+    await userEvent.type(screen.getByLabelText('搜索 PR'), '不存在')
+    expect(await screen.findByText('没有匹配的 PR')).toBeInTheDocument()
+    const [clearButton] = screen.getAllByRole('button', { name: '清除筛选' })
+    if (!clearButton) throw new Error('缺少清除筛选按钮')
+    await userEvent.click(clearButton)
+    await userEvent.click(screen.getByRole('button', { name: '交付页面' }))
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('#12 交付页面')).toBeInTheDocument()
+    expect(screen.getByLabelText('PR 差异')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '查看完整差异' }))
+    expect(await screen.findByText(/差异已截断/)).toBeInTheDocument()
   })
 })

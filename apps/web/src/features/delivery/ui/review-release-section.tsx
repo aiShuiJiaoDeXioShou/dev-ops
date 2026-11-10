@@ -10,7 +10,7 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
-import { PageLoading } from '@/shared/ui/page-state'
+import { EmptyState, PageLoading } from '@/shared/ui/page-state'
 import { releasesQueryOptions, reviewsQueryOptions } from '../api/review-queries'
 
 const REVIEW_LABELS: Record<string, string> = {
@@ -110,10 +110,16 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
     },
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
+  const reviewItems = reviews.data?.data.items ?? []
+  const releaseItems = releases.data?.data.items ?? []
+  const isLoading = reviews.isPending || releases.isPending
+  const hasLoadError = reviews.isError || releases.isError
+  const hasAnyRecord = reviewItems.length > 0 || releaseItems.length > 0
+
   return (
-    <section aria-label="外部审核与发布" className="project-summary-section">
-      <div className="row spread">
-        <h3>外部审核与发布</h3>
+    <section aria-label="外部审核与发布" className="project-summary-section space-y-6">
+      <div className="row spread flex-wrap gap-3">
+        <p className="small quiet">审核通过不等同于已发布，两类记录分别维护。</p>
         {canManage ? (
           <div className="row">
             <Button type="button" variant="outline" size="sm" onClick={() => setReviewOpen(true)}>
@@ -125,53 +131,85 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
           </div>
         ) : null}
       </div>
-      {reviews.isPending ? (
-        <DelayedLoading pending>
-          <PageLoading />
-        </DelayedLoading>
-      ) : reviews.isError ? (
-        <p className="muted">提审记录加载失败。</p>
-      ) : reviews.data.data.items.length === 0 ? null : (
-        <ul className="plain-list">
-          {reviews.data.data.items.map((review) => (
-            <li key={review.id}>
-              <span>
-                {review.targetType === 'mini_program' ? '小程序' : '移动端应用'} {review.versionLabel}
-              </span>
-              <span className="muted">{review.reviewPlatform}</span>
-              <span className="tag">{REVIEW_LABELS[review.reviewStatus] ?? review.reviewStatus}</span>
-              <span className="muted">{review.submittedAt}</span>
-              {canManage ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setStatusTarget({ id: review.id, version: review.version })}
-                >
-                  更新审核状态
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
-      <h4>实际发布</h4>
-      {releases.isPending ? (
-        <DelayedLoading pending>
-          <PageLoading />
-        </DelayedLoading>
-      ) : releases.isError ? (
-        <p className="muted">发布记录加载失败。</p>
-      ) : releases.data.data.items.length === 0 ? null : (
-        <ul className="plain-list">
-          {releases.data.data.items.map((release) => (
-            <li key={release.id}>
-              <span>{release.versionLabel}</span>
-              <span className="tag">{RELEASE_LABELS[release.releaseStatus] ?? release.releaseStatus}</span>
-              <span className="muted">{release.releasedAt ?? '发布时间未知'}</span>
-            </li>
-          ))}
-        </ul>
+      {!isLoading && !hasLoadError && !hasAnyRecord ? (
+        <EmptyState
+          mascot="prism"
+          title="还没有审核与发布记录"
+          description="记录小程序或移动端应用的提审与发布结果，方便团队追溯上架进度。"
+          action={
+            canManage ? (
+              <Button type="button" onClick={() => setReviewOpen(true)}>
+                记录提审
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : (
+        <>
+          <section aria-label="提审记录">
+            <div className="section-heading">
+              <h3>提审记录</h3>
+              <span className="counter">{reviewItems.length}</span>
+            </div>
+            {reviews.isPending ? (
+              <DelayedLoading pending>
+                <PageLoading />
+              </DelayedLoading>
+            ) : reviews.isError ? (
+              <p className="muted">提审记录加载失败。</p>
+            ) : reviewItems.length === 0 ? (
+              <p className="muted">还没有提审记录。</p>
+            ) : (
+              <ul className="plain-list">
+                {reviewItems.map((review) => (
+                  <li key={review.id}>
+                    <span>
+                      {review.targetType === 'mini_program' ? '小程序' : '移动端应用'} {review.versionLabel}
+                    </span>
+                    <span className="muted">{review.reviewPlatform}</span>
+                    <span className="tag">{REVIEW_LABELS[review.reviewStatus] ?? review.reviewStatus}</span>
+                    <span className="muted">{review.submittedAt}</span>
+                    {canManage ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setStatusTarget({ id: review.id, version: review.version })}
+                      >
+                        更新审核状态
+                      </Button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section aria-label="实际发布">
+            <div className="section-heading">
+              <h3>实际发布</h3>
+              <span className="counter">{releaseItems.length}</span>
+            </div>
+            {releases.isPending ? (
+              <DelayedLoading pending>
+                <PageLoading />
+              </DelayedLoading>
+            ) : releases.isError ? (
+              <p className="muted">发布记录加载失败。</p>
+            ) : releaseItems.length === 0 ? (
+              <p className="muted">还没有发布记录。</p>
+            ) : (
+              <ul className="plain-list">
+                {releaseItems.map((release) => (
+                  <li key={release.id}>
+                    <span>{release.versionLabel}</span>
+                    <span className="tag">{RELEASE_LABELS[release.releaseStatus] ?? release.releaseStatus}</span>
+                    <span className="muted">{release.releasedAt ?? '发布时间未知'}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
       )}
 
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>

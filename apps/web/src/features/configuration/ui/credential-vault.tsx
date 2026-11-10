@@ -1,12 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Lock, Plus, Search } from 'lucide-react'
 import type { ApiBody } from '@dev-ops/api-client'
 import { useSession } from '@/features/identity/public'
 import { projectListQueryOptions } from '@/features/projects/public'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
+import { cn } from '@/shared/lib/utils'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
@@ -20,7 +21,16 @@ import { CredentialValueReveal } from './credential-value-dialog'
 
 type CreateCredentialBody = ApiBody<'/api/v1/teams/{teamId}/credentials', 'post'>
 type CredentialKind = 'api_key' | 'account_password' | 'ssh_key'
+/** 目录分类：三类凭据分类加一个“已撤销”状态视图，与设计稿左侧胶囊一致。 */
+type CredentialCategory = '' | CredentialKind | 'revoked'
 type CredentialSummary = CredentialList['items'][number]
+const CATEGORY_OPTIONS: { value: CredentialCategory; label: string }[] = [
+  { value: '', label: '全部' },
+  { value: 'api_key', label: 'API 密钥' },
+  { value: 'account_password', label: '账号密码' },
+  { value: 'ssh_key', label: 'SSH 密钥' },
+  { value: 'revoked', label: '已撤销' },
+]
 const KIND_LABELS: Record<string, string> = {
   api_key: 'API 密钥',
   account_password: '账号密码',
@@ -59,9 +69,15 @@ export function CredentialVault() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const [search, setSearch] = useState('')
-  const [kind, setKind] = useState<'' | 'api_key' | 'account_password' | 'ssh_key'>('')
+  const [category, setCategory] = useState<CredentialCategory>('')
   const [selectedId, setSelectedId] = useState('')
-  const list = useQuery(credentialsQueryOptions(teamId, { ...(search ? { search } : {}), ...(kind ? { kind } : {}) }))
+  const list = useQuery(
+    credentialsQueryOptions(teamId, {
+      ...(search ? { search } : {}),
+      ...(category && category !== 'revoked' ? { kind: category } : {}),
+      ...(category === 'revoked' ? { status: 'revoked' as const } : {}),
+    }),
+  )
   const items = list.data?.data.items ?? []
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null
   const usage = useQuery({ ...credentialUsageQueryOptions(selected?.id ?? ''), enabled: Boolean(selected?.id) })
@@ -124,9 +140,13 @@ export function CredentialVault() {
   }
   const clearFilters = () => {
     setSearch('')
-    setKind('')
+    setCategory('')
   }
-  const hasFilters = Boolean(search.trim() || kind)
+  const hasFilters = Boolean(search.trim() || category)
+  const grantedProjectNames = (selected?.grants ?? [])
+    .filter((grant) => !grant.revokedAt)
+    .map((grant) => grant.projectName)
+    .join('、')
   if (!currentTeam) {
     return (
       <div className="catalog empty-page">
@@ -136,108 +156,134 @@ export function CredentialVault() {
     )
   }
   return (
-    <div className="catalog vault-page">
-      <div className="row spread">
-        <h1>凭据库</h1>
-        {canManage ? (
-          <Button type="button" onClick={() => setCreateOpen(true)}>
-            添加凭据
-          </Button>
-        ) : null}
-      </div>
-      <div className="row vault-filters">
-        <Input
-          aria-label="搜索凭据"
-          placeholder="搜索名称或说明"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        <Select
-          className="shrink-0"
-          aria-label="凭据分类"
-          value={kind}
-          onChange={(event) => setKind(event.target.value as typeof kind)}
-        >
-          <option value="">全部分类</option>
-          <option value="api_key">API 密钥</option>
-          <option value="account_password">账号密码</option>
-          <option value="ssh_key">SSH 密钥</option>
-        </Select>
-      </div>
-      {list.isPending ? (
-        <div className="vault-body">
-          <DelayedLoading pending>
-            <PageLoading />
-          </DelayedLoading>
-        </div>
-      ) : list.isError ? (
-        <div className="vault-body empty-page">
-          <EmptyState
-            icon={<AlertCircle />}
-            title="凭据加载失败"
-            description={describeRequestError(list.error).description}
-            action={
-              <Button type="button" variant="outline" onClick={() => void list.refetch()}>
-                重新加载
+    <div className="vault-keychain-root">
+      <h1 className="sr-only">凭据库</h1>
+      <div className="keychain-layout vault-keychain">
+        <aside className="keychain-list" aria-label="凭据目录">
+          <div className="vault-toolbar">
+            <label className="search">
+              <Search className="search-icon" aria-hidden="true" />
+              <Input
+                aria-label="搜索凭据"
+                placeholder="搜索凭据"
+                value={search}
+                maxLength={200}
+                className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            {canManage ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="vault-add"
+                aria-label="添加凭据"
+                title="添加凭据"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="size-4" aria-hidden="true" />
               </Button>
-            }
-          />
-        </div>
-      ) : items.length === 0 ? (
-        <div className="vault-body empty-page">
-          <EmptyState
-            mascot="prism"
-            title={hasFilters ? '没有匹配的凭据' : '凭据库还是空的'}
-            description={
-              hasFilters ? '当前搜索或分类没有找到凭据，可以清除筛选后重新查看。' : '添加团队凭据后可授权项目使用。'
-            }
-            action={
-              hasFilters ? (
-                <Button type="button" variant="outline" onClick={clearFilters}>
-                  清除筛选
-                </Button>
-              ) : canManage ? (
-                <Button type="button" onClick={() => setCreateOpen(true)}>
-                  添加凭据
-                </Button>
-              ) : undefined
-            }
-          />
-        </div>
-      ) : (
-        <div className="vault-layout">
-          <section aria-label="凭据列表" className="vault-list">
-            <ul className="plain-list">
-              {items.map((credential) => (
-                <li key={credential.id}>
-                  <Button
-                    type="button"
-                    variant={credential.id === selected?.id ? 'secondary' : 'ghost'}
-                    className="vault-item"
-                    aria-current={credential.id === selected?.id ? 'true' : undefined}
-                    onClick={() => setSelectedId(credential.id)}
-                  >
-                    <span className="vault-item-name">{credential.name}</span>
-                    <span className="vault-item-meta">
-                      {KIND_LABELS[credential.kind] ?? credential.kind}
-                      <span className="badge">{KIND_LABELS[credential.status] ?? credential.status}</span>
-                    </span>
-                  </Button>
-                </li>
-              ))}
+            ) : null}
+          </div>
+
+          <div className="keychain-categories category-pills" role="group" aria-label="按分类筛选凭据">
+            {CATEGORY_OPTIONS.map((option) => (
+              <Button
+                key={option.value || 'all'}
+                type="button"
+                variant="ghost"
+                className={cn('category-pill', category === option.value && 'active')}
+                aria-pressed={category === option.value}
+                onClick={() => {
+                  setCategory(option.value)
+                  setSelectedId('')
+                }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
+          {list.isPending ? (
+            <DelayedLoading pending>
+              <PageLoading message="凭据加载中…" />
+            </DelayedLoading>
+          ) : list.isError ? (
+            <p className="muted small">凭据加载失败。</p>
+          ) : items.length === 0 ? (
+            <div className="empty">
+              <p>{hasFilters ? '没有匹配条目' : '暂无凭据'}</p>
+              <small>{hasFilters ? '调整分类或搜索关键词后重试。' : '由管理员添加后按授权范围使用。'}</small>
+            </div>
+          ) : (
+            <ul className="vault-credential-list">
+              {items.map((credential) => {
+                const active = credential.id === selected?.id
+                return (
+                  <li key={credential.id}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className={cn('keychain-item', active && 'selected')}
+                      aria-current={active ? 'true' : undefined}
+                      onClick={() => setSelectedId(credential.id)}
+                    >
+                      <span className="key-symbol">
+                        <Lock className="size-4" aria-hidden="true" />
+                      </span>
+                      <span>
+                        <strong>{credential.name}</strong>
+                        <small>
+                          {KIND_LABELS[credential.kind] ?? credential.kind} · v{credential.currentVersion}
+                        </small>
+                      </span>
+                      {credential.status !== 'active' ? (
+                        <small className="vault-item-status">
+                          {KIND_LABELS[credential.status] ?? credential.status}
+                        </small>
+                      ) : null}
+                    </Button>
+                  </li>
+                )
+              })}
             </ul>
-          </section>
-          <section aria-label="凭据详情" className="vault-detail">
-            {selected ? (
-              <>
-                <div className="vault-detail-identity">
-                  <div className="row spread">
-                    <h2>{selected.name}</h2>
-                    <span className="badge">{KIND_LABELS[selected.status] ?? selected.status}</span>
-                  </div>
-                  <p className="muted small">
+          )}
+        </aside>
+
+        <section className="keychain-detail" aria-label="凭据详情">
+          {list.isError ? (
+            <EmptyState
+              icon={<AlertCircle />}
+              title="凭据加载失败"
+              description={describeRequestError(list.error).description}
+              action={
+                <Button type="button" variant="outline" onClick={() => void list.refetch()}>
+                  重新加载
+                </Button>
+              }
+            />
+          ) : selected ? (
+            <>
+              <div className="row">
+                <span className="key-symbol large">
+                  <Lock className="size-5" aria-hidden="true" />
+                </span>
+                <div>
+                  <h2>{selected.name}</h2>
+                  <p>
                     {KIND_LABELS[selected.kind] ?? selected.kind} · v{selected.currentVersion}
                   </p>
+                </div>
+                <span className="spacer" />
+                <span className="badge">{KIND_LABELS[selected.status] ?? selected.status}</span>
+              </div>
+
+              <dl className="key-properties">
+                <dt>说明</dt>
+                <dd>{selected.description ?? '无说明'}</dd>
+                <dt>密钥</dt>
+                <dd>
                   {/* key 绑定凭据 id 与版本/状态：切换选中凭据或轮换、撤销后重建组件，立即清除明文、密码与倒计时。 */}
                   <CredentialValueReveal
                     key={`${selected.id}:${selected.currentVersion}:${selected.status}`}
@@ -245,93 +291,107 @@ export function CredentialVault() {
                     maskedValue={selected.maskedValue}
                     canReveal={canViewValue}
                   />
+                </dd>
+                <dt>授权期限</dt>
+                <dd>{selected.expiresAt ? formatDateTime(selected.expiresAt) : '长期有效'}</dd>
+                <dt>项目</dt>
+                <dd>{grantedProjectNames || '未授权'}</dd>
+                <dt>版本</dt>
+                <dd>v{selected.currentVersion}</dd>
+                <dt>最近更新</dt>
+                <dd>{formatDateTime(selected.updatedAt)}</dd>
+              </dl>
+
+              {canManage ? (
+                <div className="row key-actions">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setAction({ kind: 'rotate', target: selected })
+                      setActionValue('')
+                    }}
+                  >
+                    轮换
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setAction({ kind: 'grant', target: selected })
+                      setActionValue('')
+                      setActionProjectId('')
+                    }}
+                  >
+                    授权项目
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => {
+                      setAction({ kind: 'revoke', target: selected })
+                      setActionValue('')
+                    }}
+                  >
+                    撤销
+                  </Button>
                 </div>
-                <dl className="vault-properties">
-                  <dt>说明</dt>
-                  <dd>{selected.description ?? '无说明'}</dd>
-                  <dt>过期时间</dt>
-                  <dd>{selected.expiresAt ? formatDateTime(selected.expiresAt) : '长期有效'}</dd>
-                </dl>
-                {canManage ? (
-                  <div className="row vault-actions">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setAction({ kind: 'rotate', target: selected })
-                        setActionValue('')
-                      }}
-                    >
-                      轮换
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setAction({ kind: 'grant', target: selected })
-                        setActionValue('')
-                        setActionProjectId('')
-                      }}
-                    >
-                      授权项目
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        setAction({ kind: 'revoke', target: selected })
-                        setActionValue('')
-                      }}
-                    >
-                      撤销
-                    </Button>
-                  </div>
-                ) : null}
-                <h3>项目授权</h3>
-                {selected.grants.length === 0 ? (
-                  <p className="muted small">尚未授权项目。</p>
-                ) : (
-                  <ul className="plain-list vault-grants">
-                    {selected.grants.map((grant) => (
-                      <li key={grant.projectId} className="row spread">
-                        <span>{grant.projectName}</span>
-                        <span className="muted small">
-                          {grant.expiresAt ? `${formatDateTime(grant.expiresAt)} 到期` : '长期有效'}
-                        </span>
-                        <span className="badge">{grant.revokedAt ? '已撤销' : '生效中'}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <h3>使用记录</h3>
-                {usage.isPending ? (
-                  <DelayedLoading pending>
-                    <PageLoading />
-                  </DelayedLoading>
-                ) : usage.isError || !usage.data ? (
-                  <p className="muted small">使用记录不可用。</p>
-                ) : usage.data.data.items.length === 0 ? (
-                  <p className="muted small">暂无使用记录。</p>
-                ) : (
-                  <ul className="plain-list vault-usage">
-                    {usage.data.data.items.map((item) => (
-                      <li key={item.id} className="row spread">
-                        <span>{formatDateTime(item.createdAt)}</span>
-                        <span className="muted small">{USAGE_ACTION_LABELS[item.action] ?? item.action}</span>
-                        <span className="muted small">{USAGE_RESULT_LABELS[item.result] ?? item.result}</span>
-                        <span className="muted small">v{item.credentialVersion}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            ) : null}
-          </section>
-        </div>
-      )}
+              ) : (
+                <p className="small muted">仅管理员可以轮换或撤销团队凭据；开发者可以查看被授权凭据的元数据。</p>
+              )}
+
+              <h3 className="vault-usage-title">使用记录</h3>
+              {usage.isPending ? (
+                <DelayedLoading pending>
+                  <PageLoading />
+                </DelayedLoading>
+              ) : usage.isError || !usage.data ? (
+                <p className="muted small">使用记录不可用。</p>
+              ) : usage.data.data.items.length === 0 ? (
+                <p className="muted small">暂无使用记录。</p>
+              ) : (
+                <ul className="plain-list vault-usage">
+                  {usage.data.data.items.map((item) => (
+                    <li key={item.id} className="row spread">
+                      <span>{formatDateTime(item.createdAt)}</span>
+                      <span className="muted small">{USAGE_ACTION_LABELS[item.action] ?? item.action}</span>
+                      <span className="muted small">{USAGE_RESULT_LABELS[item.result] ?? item.result}</span>
+                      <span className="muted small">v{item.credentialVersion}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <p className="small muted vault-credential-note">
+                查看明文需要再次输入当前登录密码，明文只在详情中短暂展示。
+              </p>
+            </>
+          ) : list.isPending ? (
+            <DelayedLoading pending>
+              <PageLoading />
+            </DelayedLoading>
+          ) : (
+            <EmptyState
+              mascot="prism"
+              title={hasFilters ? '没有匹配的凭据' : '凭据库还是空的'}
+              description={
+                hasFilters ? '当前搜索或分类没有找到凭据，可以清除筛选后重新查看。' : '添加团队凭据后可授权项目使用。'
+              }
+              action={
+                hasFilters ? (
+                  <Button type="button" variant="outline" onClick={clearFilters}>
+                    清除筛选
+                  </Button>
+                ) : canManage ? (
+                  <Button type="button" onClick={() => setCreateOpen(true)}>
+                    添加凭据
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
+        </section>
+      </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

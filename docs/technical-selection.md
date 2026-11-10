@@ -279,4 +279,4 @@ shadcn/ui 的本地代码、认证库升级和数据库迁移都需要持续维�
 
 ## V0.1 实施状态（2026-11-10）
 
-后端已实现身份邀请、项目、需求、Bug/回归、提测流程、GitHub/Gitea 只读适配、代码引用与共享 API 客户端；前端页面由 UI 线程推进。真实 GitHub/Gitea、Resend SMTP 与手工验收仍待 quickstart 执行。
+截至 2026-11-10，V0.1、V0.2、V0.3 阶段 A 与 V0.4a 已交付：身份邀请、项目、需求、Bug/回归、提测流程、GitHub/Gitea 只读适配、代码引用、交付与运行版本、凭据库、Skills/模板、内置流水线与对应 Web 页面均已实现；CLI 与独立个人 Bot 可用。真实 GitHub/Gitea、Resend SMTP、外部审核/商店与手工验收仍待 quickstart 执行；平台内 Bot 与运维模块后移，版本顺序见[需求版本规划](prd/release-plan.md)。

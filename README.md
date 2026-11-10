@@ -22,7 +22,7 @@ Git 连接、仓库/PR 读取与自研流水线的分层结构见[Git、PR 与�
 
 轻量个人 Bot 首版已初始化在 [apps/bot](apps/bot/README.md)，使用 pi、DeepSeek 与 SQLite；运行 `pnpm --dir apps/bot dev chat` 开始对话。
 
-前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。V0.1 后端、共享 API 客户端与认证流程已实现；前端页面由 UI 线程按任务继续接入。
+前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。截至 2026-11-10，V0.1、V0.2、V0.3 阶段 A 与 V0.4a 已交付；下一版本为 V0.4b（流水线部署与产品发布），Bot 与运维后移，版本状态见[需求版本规划](docs/prd/release-plan.md)。
 
 界面与主要操作可查看 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](docs/desgin/interactive-prototype-v1/README.md)。
 

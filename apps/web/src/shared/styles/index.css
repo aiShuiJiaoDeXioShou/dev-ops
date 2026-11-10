@@ -321,6 +321,10 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+/* 空状态没有引导说明时，标题与操作按钮之间保留间距，避免贴在一起。 */
+.empty-state h3 + .empty-actions {
+  margin-top: 18px;
+}
 .empty-state .empty-actions .btn {
   min-width: 104px;
 }
@@ -494,9 +498,9 @@
   }
 }
 
-/* 退出登录使用侧栏导航的图标主色，避免填充图标继承正文黑色。 */
+/* 退出登录图标与侧栏其他导航图标保持一致，使用正文墨色而不是主题蓝。 */
 .logout-btn .icon {
-  color: var(--blue);
+  color: var(--ink);
 }
 
 /* 图标与文字使用 grid 两列对齐，避免 flex 基线与中文字体行高造成上下偏移。 */
@@ -712,6 +716,19 @@
   color: var(--blue);
 }
 
+/* 页签计数跟随页签文字颜色，不再套灰色胶囊背景，避免把数量误读成独立标签。 */
+.tab-count {
+  color: inherit;
+  font-weight: 400;
+  opacity: 0.72;
+}
+
+/* 侧栏品牌与账号名属于身份信息而不是文本链接，统一使用正文墨色，不继承 <a> 默认蓝色。 */
+.brand,
+.user {
+  color: var(--ink);
+}
+
 /* 成员表格的表头不响应行 hover；各管理分组之间保留明确间距。 */
 [data-slot='table-header'] [data-slot='table-row']:hover {
   background: transparent;
@@ -851,6 +868,331 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
+}
+
+/* 关联仓库二级弹窗宽度：窄屏保留两侧安全间距。 */
+.link-repository-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+}
+
+/* 设置分组标题与右侧操作按钮对齐。 */
+.settings-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.settings-section-head .settings-section-title {
+  margin-bottom: 0;
+}
+
+/* PR 详情抽屉：覆盖右侧、文件树 + 差异两栏，窄屏改为上下布局。 */
+.pr-sheet-content[data-side='right'] {
+  width: min(920px, 100vw);
+  max-width: 100vw;
+}
+.pr-sheet-content {
+  gap: 0;
+}
+.pr-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.pr-sheet-title {
+  min-width: 0;
+}
+.pr-sheet-title [data-slot='sheet-title'] {
+  font-size: 17px;
+  line-height: 1.5;
+}
+.pr-sheet-meta {
+  display: block;
+  margin-top: 6px;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.pr-sheet-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+.pr-sheet-state {
+  padding: 24px;
+}
+.pr-file-tree {
+  padding: 16px 12px;
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+.pr-file-tree-title {
+  margin: 0 6px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pr-file-group {
+  margin-bottom: 12px;
+}
+.pr-file-dir {
+  margin: 6px 6px 2px;
+  color: var(--quiet);
+  font-size: 12px;
+}
+.pr-file {
+  width: 100%;
+  height: auto;
+  justify-content: space-between;
+  padding: 6px 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 400;
+}
+.pr-file.active {
+  background: var(--selected);
+}
+.pr-file-stats {
+  margin-left: 8px;
+  color: var(--quiet);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.pr-diff-pane {
+  padding: 18px 20px;
+  overflow: auto;
+  min-width: 0;
+}
+.pr-diff-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.pr-diff-path {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pr-diff-path strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.pr-diff {
+  margin: 0;
+}
+.pr-diff .diff-line {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.pr-diff .diff-line.add {
+  color: var(--green);
+}
+.pr-diff .diff-line.remove {
+  color: var(--red);
+}
+.pr-diff .diff-line.hunk {
+  color: var(--blue);
+}
+.pr-sheet-content .pr-diff-pane .code-view {
+  max-height: none;
+}
+
+/* PR 页：GitHub 风格的工具栏、列表、状态图标和筛选条。 */
+.prs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.prs-search {
+  flex: 1;
+  min-width: 240px;
+}
+.prs-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.pr-state-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+}
+.pr-state-tabs .counter {
+  margin-left: 4px;
+}
+.pr-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 8px;
+}
+.pr-row.selected {
+  background: var(--selected);
+  border-bottom-color: transparent;
+}
+.pr-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--quiet);
+}
+.pr-icon.open {
+  color: var(--green);
+}
+.pr-icon.merged {
+  color: var(--blue);
+}
+.pr-icon.closed {
+  color: var(--red);
+}
+.pr-main {
+  flex: 1;
+  min-width: 0;
+}
+.pr-title {
+  height: auto;
+  padding: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+}
+.pr-title:hover {
+  color: var(--blue);
+}
+.pr-meta {
+  margin-top: 4px;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.pr-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* 团队页头：团队标识与操作按钮对齐，成员和连接在下方页签中切换。 */
+.team-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 4px 0 22px;
+  border-bottom: 1px solid var(--line);
+}
+.team-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.team-identity-copy {
+  min-width: 0;
+}
+.team-identity-copy h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+}
+.team-identity-copy p {
+  margin-top: 5px;
+}
+.team-head-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.team-admin > .settings-tabs {
+  margin-top: 18px;
+}
+.team-admin .team-admin-content {
+  gap: 28px;
+}
+
+/* 组合框展开面板与触发按钮等宽，长仓库列表在面板内滚动。 */
+.combobox-content {
+  width: var(--radix-popover-trigger-width);
+  min-width: 240px;
+}
+.combobox-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+/* 弹窗内复用的仓库卡片使用工作区灰阶；原型 .card p 在 portal 中会解析成浅色。
+   仅作用于仓库设置卡片，避免影响其他弹窗正文。 */
+[data-slot='dialog-content'] .repo-settings .card p,
+[data-slot='dialog-content'] .project-settings-sections .muted,
+[data-slot='dialog-content'] .project-settings-sections .badge {
+  color: var(--quiet);
+}
+
+/* 团队设置页签：沿用工作区下划线样式，避免 bg-muted 被 --muted 文字色覆盖成深色。 */
+.settings-tabs [data-slot='tabs-list'] {
+  display: flex;
+  width: 100%;
+  gap: 28px;
+  padding: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+.settings-tabs [data-slot='tabs-trigger'] {
+  padding: 13px 2px 15px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.settings-tabs [data-slot='tabs-trigger']:hover {
+  color: var(--ink);
+}
+.settings-tabs [data-slot='tabs-trigger'][data-state='active'] {
+  background: transparent;
+  color: var(--blue);
+  font-weight: 500;
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+.settings-tabs [data-slot='tabs-content'] {
+  padding-top: 8px;
 }
 
 /* 项目设置弹窗中的基础信息与代码仓库分组。 */
@@ -1158,100 +1500,93 @@ a.skill-title:hover {
   color: var(--blue);
 }
 
-/* 凭据库：标题与筛选固定在页面上方，空状态在剩余区域居中，列表与详情在桌面分两栏。 */
-.vault-page {
+/* 凭据库：按设计稿整页左右分栏，左侧目录（搜索、分类、条目）右侧授权详情，不再占用全宽页头。 */
+.vault-keychain-root {
   display: flex;
-  flex-direction: column;
-}
-.vault-page .vault-filters {
-  margin-bottom: 20px;
-}
-.vault-page .vault-body {
   flex: 1;
+  flex-direction: column;
   min-height: 0;
 }
-.vault-layout {
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  align-items: start;
-  gap: 20px;
-  min-height: 0;
+.vault-keychain {
+  border-bottom: 0;
 }
-.vault-list,
-.vault-detail {
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--background);
-}
-.vault-list {
-  padding: 8px;
-}
-.vault-list .plain-list {
-  gap: 2px;
-}
-.vault-item {
+.vault-keychain .keychain-list {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  min-height: 0;
+  overflow: auto;
+}
+.vault-keychain .vault-toolbar {
+  margin-bottom: 12px;
+}
+.vault-keychain .keychain-categories {
+  gap: 4px;
+  margin: 0 0 12px;
+}
+.vault-keychain .category-pill {
+  padding: 5px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+  background: var(--soft);
+}
+.vault-keychain .category-pill:hover {
+  background: var(--selected);
+}
+.vault-keychain .category-pill.active {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.vault-credential-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* 目录条目用共享按钮承载键盘与禁用语义，这里还原原型的整行点击区域与两行文案排版。 */
+.vault-credential-list .keychain-item {
+  display: flex;
+  align-items: center;
   justify-content: flex-start;
-  gap: 5px;
+  gap: 12px;
   width: 100%;
   height: auto;
-  padding: 9px 10px;
+  padding: 14px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
   text-align: left;
   white-space: normal;
 }
-.vault-item-name {
-  font-weight: 500;
+.vault-credential-list .keychain-item:hover {
+  background: var(--soft);
 }
-.vault-item-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted-foreground);
-  font-size: 12px;
+.vault-credential-list .keychain-item.selected,
+.vault-credential-list .keychain-item.selected:hover {
+  background: var(--selected);
 }
-.vault-detail {
-  padding: 20px 22px;
+.vault-item-status {
+  flex-shrink: 0;
 }
-.vault-detail-identity {
-  min-width: 0;
+.vault-keychain .keychain-detail {
+  overflow: auto;
 }
-.vault-detail h2 {
-  overflow-wrap: anywhere;
+.vault-keychain .keychain-detail h3.vault-usage-title {
+  margin: 26px 0 10px;
+  font-size: 14px;
 }
-.vault-detail h3 {
-  margin: 22px 0 12px;
+.vault-credential-note {
+  margin-top: 24px;
+  line-height: 1.7;
 }
-.vault-properties {
-  display: grid;
-  grid-template-columns: 84px minmax(0, 1fr);
-  gap: 10px 16px;
-  margin: 18px 0 0;
-  font-size: 13px;
+.vault-keychain .vault-secret {
+  margin-top: 0;
 }
-.vault-properties dt {
-  color: var(--quiet);
-}
-.vault-properties dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.vault-actions {
-  margin-top: 18px;
-}
-.vault-grants li,
 .vault-usage li {
   gap: 12px;
   font-size: 13px;
 }
-@media (max-width: 900px) {
-  .vault-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 /* 凭据详情：掩码行内放置查看入口；明文只在内存中短暂展示，按等宽字体呈现。 */
 .vault-secret {
   display: flex;
@@ -1280,4 +1615,32 @@ a.skill-title:hover {
   line-height: 20px;
   color: var(--foreground);
   user-select: all;
+}
+
+@media (max-width: 700px) {
+  .team-page-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .team-head-actions {
+    width: 100%;
+  }
+  .pr-sheet-content[data-side='right'] {
+    width: 100vw;
+  }
+  .pr-sheet-head {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .pr-sheet-body {
+    grid-template-columns: 1fr;
+  }
+  .pr-file-tree {
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .pr-diff-pane {
+    padding: 14px 16px;
+  }
 }

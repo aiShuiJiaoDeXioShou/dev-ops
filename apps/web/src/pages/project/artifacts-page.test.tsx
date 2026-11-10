@@ -74,4 +74,28 @@ describe('artifacts-page', () => {
     await userEvent.click(confirmButton)
     expect(await screen.findByText('确认运行版本')).toBeInTheDocument()
   })
+
+  it('切换到审核与发布页签后展示独立记录区', async () => {
+    server.use(
+      http.get('*/api/v1/projects/project-1/services', () => success([])),
+      http.get('*/api/v1/projects/project-1/artifacts', () => success({ items: [], page: 1, pageSize: 50, total: 0 })),
+      http.get('*/api/v1/projects/project-1/reviews', () => success({ items: [], page: 1, pageSize: 50, total: 0 })),
+      http.get('*/api/v1/projects/project-1/releases', () => success({ items: [], page: 1, pageSize: 50, total: 0 })),
+    )
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionProvider initialUser={sessionFixture.user}>
+          <MemoryRouter initialEntries={['/projects/project-1/artifacts']}>
+            <Routes>
+              <Route path="/projects/:projectId/artifacts" element={<ArtifactsPage />} />
+            </Routes>
+          </MemoryRouter>
+        </SessionProvider>
+      </QueryClientProvider>,
+    )
+    expect(await screen.findByText('还没有构建产物')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: '审核与发布' }))
+    expect(await screen.findByText('还没有审核与发布记录')).toBeInTheDocument()
+    expect(screen.queryByText('还没有构建产物')).not.toBeInTheDocument()
+  })
 })

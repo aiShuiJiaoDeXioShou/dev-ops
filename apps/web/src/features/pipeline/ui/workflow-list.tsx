@@ -1,10 +1,9 @@
 import { Link } from 'react-router'
-import { RefreshCw } from 'lucide-react'
 import { Button } from '@/shared/ui/controls/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { EmptyState } from '@/shared/ui/page-state'
 import { formatRelativeTime } from '@/shared/lib/format'
-import { parseErrorLocation, shortCommitSha } from '../lib/format'
+import { parseErrorLocation } from '../lib/format'
 import { runStatusLabel, runStatusTone } from '../lib/status'
 import type { PipelineWorkflowSummary } from '../model/types'
 import { StatusLabel } from './status-label'
@@ -12,10 +11,6 @@ import { StatusLabel } from './status-label'
 interface WorkflowListProps {
   /** 指定 ref 下解析出的工作流。 */
   workflows: PipelineWorkflowSummary[]
-  /** 当前读取的分支或标签。 */
-  refName: string
-  /** 平台固定的提交 SHA。 */
-  commitSha: string
   /** 当前角色能否触发；浏览者只读。 */
   canTrigger: boolean
   /** 项目基础路径，用于拼接运行详情链接。 */
@@ -45,8 +40,6 @@ function noRunnableHint(workflows: PipelineWorkflowSummary[]): string | null {
  */
 export function WorkflowList({
   workflows,
-  refName,
-  commitSha,
   canTrigger,
   projectBasePath,
   onTrigger,
@@ -56,18 +49,6 @@ export function WorkflowList({
   const hint = noRunnableHint(workflows)
   return (
     <section aria-label="工作流">
-      <div className="section-heading">
-        <h2>工作流</h2>
-        <span className="counter">{workflows.length}</span>
-        <span className="spacer" />
-        <span className="small quiet">
-          {refName} · {shortCommitSha(commitSha)}
-        </span>
-        <Button type="button" variant="ghost" size="sm" onClick={onRefresh} disabled={isRefreshing}>
-          <RefreshCw aria-hidden="true" />
-          {isRefreshing ? '检查中…' : '重新检查'}
-        </Button>
-      </div>
       {workflows.length === 0 ? (
         <EmptyState
           mascot="signal"
