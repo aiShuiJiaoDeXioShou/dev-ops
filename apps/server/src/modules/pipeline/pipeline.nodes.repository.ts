@@ -171,6 +171,8 @@ export async function touchPipelineNode(executor: PipelineExecutor, nodeId: stri
     .update(pipelineNode)
     .set({
       status: fields.status ?? undefined,
+      os: fields.os ?? undefined,
+      arch: fields.arch ?? undefined,
       capabilities: fields.capabilities ?? undefined,
       agent_version: fields.agentVersion ?? undefined,
       last_heartbeat_at: fields.lastHeartbeatAt ?? undefined,
