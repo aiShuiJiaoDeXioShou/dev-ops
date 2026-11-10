@@ -16,6 +16,8 @@ GitHub App 授权、成员与 Bot 的权限和凭据、统一 Git 接口及执�
 
 界面与主要操作可查看 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](docs/desgin/interactive-prototype-v1/README.md)。
 
+Web UI 的 token、组件选择、页面模式、交互规范和 AI 实现约束见[设计规范](docs/design/DESIGN.md)；修改 UI 后运行 `pnpm ui:check`。
+
 安装依赖后，在仓库根目录运行 `pnpm dev:prototype`，然后访问 http://127.0.0.1:4178/；按 `Ctrl+C` 停止服务。
 
 前端位于 [apps/web](apps/web/README.md)，后端位于 [apps/server](apps/server/README.md)，命令行工具位于 [apps/cli](apps/cli/README.md)。应用各自声明依赖，共用根目录工作区与锁文件，协作规则见 [AGENTS.md](AGENTS.md)。

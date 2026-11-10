@@ -59,6 +59,16 @@
 5. 注释解释为什么和约束，不复述代码；公开函数 JSDoc 写用途、参数、返回和异常，显而易见的内部函数不强制。
 6. 错误分层：用户输入或业务规则用 `ApiError` 和业务错误码；数据库读出的值不合法属于数据异常，用普通 `Error` 说明“数据库…不合法”，不要伪装成用户输入错误。
 
+## UI 实现规范（强制）
+
+1. 所有 Web UI 变更开始前必须阅读 [设计规范总入口](docs/design/DESIGN.md)、[设计 Token](docs/design/tokens.md)、[组件选择](docs/design/components.md)与对应[页面模式](docs/design/patterns.md)；交互行为遵循[交互规范](docs/design/interactions.md)。
+2. 可交互控件优先复用 `apps/web/src/shared/ui/controls/`；布局结构使用 `prototype` 层基础类。新增代码禁止裸写 `<button>`、`<input>`、`<select>`、`<textarea>`、`<table>`，禁止新增 `@/prototype/*` 依赖。
+3. 颜色、圆角、状态色必须来自 `design/tokens.json` 和 `apps/web/src/shared/styles/index.css`；禁止裸色值和任意 Tailwind 值（`w-[...]`、`text-[...]` 等）。
+4. 任何数据界面必须覆盖 loading、empty、no-match、error、read-only、提交中与重试状态；交互必须支持键盘、焦点可见、Esc 关闭和关闭后焦点归还。
+5. UI 完成后必须运行 `pnpm ui:check`。`tooling/design/ui-baseline.json` 记录存量债务，只能减少；禁止无理由运行 `pnpm ui:baseline` 放行新增违规。
+6. 交付前在 1440×1000 与 390×844 下截图，对照参考原型或设计稿核对；未验证的视觉/交互差异必须在说明中列出。
+7. 样式分层顺序固定为 `theme, base, prototype, components, utilities`；`apps/web/src/main.tsx` 必须先导入 `@/prototype/styles/layered.css`，再导入 `shared/styles/index.css`。
+
 ## 后端遵循规范
 
 1. 按业务模块组织代码。路由负责 HTTP 输入输出，schema 定义接口契约，service 承载业务规则，repository 负责持久化；后两层按实际需求添加，不生成空壳分层。

@@ -16,7 +16,7 @@
     "api:generate": "pnpm --filter @dev-ops/server api:export && node tooling/scripts/generate-api-client.mjs",
     "prepare:clients": "pnpm api:generate && pnpm --filter @dev-ops/api-client build",
     "build": "pnpm api:generate && pnpm -r build",
-    "check": "pnpm lint && pnpm format:check && pnpm build && pnpm check:boundaries && pnpm test:tooling && pnpm -r check && pnpm test:e2e",
+    "check": "pnpm lint && pnpm format:check && pnpm ui:check && pnpm build && pnpm check:boundaries && pnpm test:tooling && pnpm -r check && pnpm test:e2e",
     "check:boundaries": "depcruise --config tooling/dependency-rules.mjs apps/web/src apps/server/src apps/cli/src packages/api-client/src",
     "test:tooling": "node --test tooling/test/*.test.mjs",
     "test:e2e": "node --test tests/e2e/*.test.mjs",
@@ -28,7 +28,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "ui:check": "node tooling/scripts/check-ui.mjs",
+    "ui:baseline": "node tooling/scripts/check-ui.mjs --update-baseline"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
