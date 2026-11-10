@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import type { Database } from '../../platform/database/client.js'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import { appendActivity } from '../collaboration/public.js'
-import { findBugById } from '../bugs/public.js'
-import { requireTeamMember, type SessionUser } from '../identity/public.js'
-import { findProjectById } from '../projects/public.js'
-import { findRequirementById } from '../requirements/public.js'
+import type { Database } from '../../platform/database/client.ts'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { validatePage } from '../../platform/http/pagination.ts'
+import { appendActivity } from '../collaboration/collaboration.service.ts'
+import { findBugSummaryById } from '../bugs/bugs.repository.ts'
+import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
+import { getProjectContext } from '../projects/projects.access.ts'
+import { findRequirementSummaryById } from '../requirements/requirements.repository.ts'
 import {
   countCodeReferencesForTarget,
   deleteCodeReference,
@@ -21,11 +22,28 @@ import {
   insertCodeReference,
   insertProjectRepository,
   updateCodeReferenceCheck,
-} from './code.repository.js'
+} from './code.repository.ts'
 
 export type GitObjectType = 'commit' | 'issue' | 'change_request'
 const TARGET_TYPES = new Set(['requirement', 'bug'])
-const OBJECT_TYPES = new Set<GitObjectType>(['commit', 'issue', 'change_request'])
+const OBJECT_TYPES: ReadonlySet<string> = new Set(['commit', 'issue', 'change_request'])
+
+/** 判断字符串是否为 Git 对象类型。 */
+function isGitObjectType(value: string): value is GitObjectType {
+  return OBJECT_TYPES.has(value)
+}
+
+/** 校验 Git 对象类型。 */
+function validateGitObjectType(value: string): GitObjectType {
+  if (!isGitObjectType(value)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '远端对象类型不合法')
+  return value
+}
+
+/** 将数据库 Git 对象类型收窄为业务类型；数据不合法时说明是持久化异常。 */
+function toGitObjectType(value: string): GitObjectType {
+  if (!isGitObjectType(value)) throw new Error(`数据库 Git 对象类型不合法: ${value}`)
+  return value
+}
 const GIT_ERROR_CODES = new Set([
   'timeout',
   'auth_failed',
@@ -43,12 +61,28 @@ export interface GitObjectSnapshotPort {
   url: string | null
 }
 /** 代码模块只依赖读取端口，不依赖具体 Git 适配器。 */
+export interface GitTreeEntryPort {
+  path: string
+  type: 'file' | 'directory'
+  size: number | null
+}
+export interface GitFileContentPort {
+  path: string
+  content: string
+  truncated: boolean
+}
 export interface GitReadPort {
   getObject(input: {
     repository: { namespace: string; name: string }
     objectType: GitObjectType
     remoteId: string
   }): Promise<GitObjectSnapshotPort>
+  listTree?(input: { repository: { namespace: string; name: string }; ref: string }): Promise<GitTreeEntryPort[]>
+  getFile?(input: {
+    repository: { namespace: string; name: string }
+    ref: string
+    path: string
+  }): Promise<GitFileContentPort>
 }
 
 export interface RepositoryView {
@@ -147,16 +181,82 @@ export function createCodeService(deps: CodeServiceDeps) {
   const { db } = deps
 
   async function requireProject(actor: SessionUser, projectId: string) {
-    const project = await findProjectById(db, projectId)
+    const project = await getProjectContext(db, projectId)
     if (!project) throw new ApiError(ERROR_CODES.NOT_FOUND, '项目不存在')
-    await requireTeamMember(db, actor.id, project.team_id)
+    await requireTeamMember(db, actor.id, project.teamId)
     return project
   }
 
   async function requireProjectWrite(actor: SessionUser, projectId: string) {
     const project = await requireProject(actor, projectId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     return project
+  }
+
+  async function requireLinkedRepository(actor: SessionUser, projectId: string, repositoryId: string) {
+    const project = await requireProject(actor, projectId)
+    const link = await findProjectRepositoryLink(db, projectId, repositoryId)
+    const repository = await findRepositoryById(db, repositoryId)
+    if (!link || !repository || repository.team_id !== project.teamId) {
+      throw new ApiError(ERROR_CODES.NOT_FOUND, '项目仓库关联不存在')
+    }
+    const connectionIds = await deps.listActiveConnectionIds(project.teamId)
+    if (!connectionIds.includes(repository.connection_id)) {
+      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'Git 连接不可用')
+    }
+    return { project, repository, adapter: await deps.resolveAdapter(repository.connection_id) }
+  }
+
+  function repositoryReadError(error: unknown): never {
+    const code =
+      typeof error === 'object' && error !== null && 'code' in error && error.code === 'auth_failed'
+        ? ERROR_CODES.EXTERNAL_AUTH_FAILED
+        : ERROR_CODES.EXTERNAL_UNAVAILABLE
+    throw new ApiError(code, '读取远端仓库失败，请检查连接状态后重试')
+  }
+
+  async function listRepositoryTree(actor: SessionUser, projectId: string, repositoryId: string, branch?: string) {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.listTree) throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持浏览文件')
+    const ref = (branch?.trim() || repository.default_branch || '').trim()
+    if (!ref) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库没有可用分支')
+    try {
+      const entries = await adapter.listTree({
+        repository: { namespace: repository.namespace, name: repository.name },
+        ref,
+      })
+      return { branch: ref, entries }
+    } catch (error) {
+      repositoryReadError(error)
+    }
+  }
+
+  async function getRepositoryFile(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: { branch?: string; path: string },
+  ) {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.getFile) throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持读取文件')
+    const ref = (input.branch?.trim() || repository.default_branch || '').trim()
+    if (!ref) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库没有可用分支')
+    const path = input.path.trim().replace(/^\/+/, '')
+    if (!path || path.length > 500 || path.split('/').some((segment) => segment === '..' || segment === '')) {
+      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '文件路径不合法')
+    }
+    try {
+      return {
+        branch: ref,
+        ...(await adapter.getFile({
+          repository: { namespace: repository.namespace, name: repository.name },
+          ref,
+          path,
+        })),
+      }
+    } catch (error) {
+      repositoryReadError(error)
+    }
   }
 
   async function listProjectRepositories(actor: SessionUser, projectId: string): Promise<RepositoryView[]> {
@@ -173,11 +273,9 @@ export function createCodeService(deps: CodeServiceDeps) {
     const project = await requireProjectWrite(actor, projectId)
     const page = filters.page ?? 1
     const pageSize = filters.pageSize ?? 20
-    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '分页参数不合法')
-    }
-    const connectionIds = await deps.listActiveConnectionIds(project.team_id)
-    const { rows, total } = await findAvailableRepositories(db, project.team_id, connectionIds, {
+    validatePage(page, pageSize)
+    const connectionIds = await deps.listActiveConnectionIds(project.teamId)
+    const { rows, total } = await findAvailableRepositories(db, project.teamId, connectionIds, {
       search: filters.search?.trim() || undefined,
       page,
       pageSize,
@@ -188,10 +286,10 @@ export function createCodeService(deps: CodeServiceDeps) {
   async function linkRepository(actor: SessionUser, projectId: string, repositoryId: string) {
     const project = await requireProjectWrite(actor, projectId)
     const repository = await findRepositoryById(db, repositoryId)
-    if (!repository || repository.team_id !== project.team_id || repository.status !== 'available') {
+    if (!repository || repository.team_id !== project.teamId || repository.status !== 'available') {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库不可用或不属于当前团队')
     }
-    const connectionIds = await deps.listActiveConnectionIds(project.team_id)
+    const connectionIds = await deps.listActiveConnectionIds(project.teamId)
     if (!connectionIds.includes(repository.connection_id)) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'Git 连接不可用')
     }
@@ -201,13 +299,13 @@ export function createCodeService(deps: CodeServiceDeps) {
     await db.transaction(async (tx) => {
       await insertProjectRepository(tx, {
         id: randomUUID(),
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         repositoryId,
         createdByUserId: actor.id,
       })
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         entityType: 'code_reference',
         entityId: repositoryId,
@@ -228,7 +326,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     await db.transaction(async (tx) => {
       await deleteProjectRepository(tx, projectId, repositoryId)
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         entityType: 'code_reference',
         entityId: repositoryId,
@@ -243,13 +341,13 @@ export function createCodeService(deps: CodeServiceDeps) {
 
   async function validateTarget(projectId: string, targetType: string, targetId: string) {
     if (targetType === 'requirement') {
-      const target = await findRequirementById(db, targetId)
-      if (!target || target.project_id !== projectId)
+      const target = await findRequirementSummaryById(db, targetId)
+      if (!target || target.projectId !== projectId)
         throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '需求不属于当前项目')
       return
     }
-    const target = await findBugById(db, targetId)
-    if (!target || target.project_id !== projectId)
+    const target = await findBugSummaryById(db, targetId)
+    if (!target || target.projectId !== projectId)
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'Bug 不属于当前项目')
   }
 
@@ -265,8 +363,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     },
   ) {
     if (!TARGET_TYPES.has(input.targetType)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '关联事项类型不合法')
-    if (!OBJECT_TYPES.has(input.objectType as GitObjectType))
-      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '远端对象类型不合法')
+    const objectType = validateGitObjectType(input.objectType)
     if (!/^[A-Za-z0-9_.:/-]{1,200}$/.test(input.remoteId))
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '远端对象标识不合法')
     const project = await requireProjectWrite(actor, projectId)
@@ -289,7 +386,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     try {
       snapshot = await adapter.getObject({
         repository: { namespace: repository.namespace, name: repository.name },
-        objectType: input.objectType as GitObjectType,
+        objectType,
         remoteId: input.remoteId,
       })
     } catch (error) {
@@ -300,12 +397,12 @@ export function createCodeService(deps: CodeServiceDeps) {
     try {
       row = await insertCodeReference(db, {
         id: randomUUID(),
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         repositoryId: input.repositoryId,
         targetType: input.targetType,
         targetId: input.targetId,
-        objectType: input.objectType,
+        objectType,
         remoteId: input.remoteId,
         title: snapshot.title,
         state: snapshot.state,
@@ -346,7 +443,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     try {
       const snapshot = await adapter.getObject({
         repository: { namespace: repository.namespace, name: repository.name },
-        objectType: current.object_type as GitObjectType,
+        objectType: toGitObjectType(current.object_type),
         remoteId: current.remote_id,
       })
       return referenceView(
@@ -383,7 +480,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     await db.transaction(async (tx) => {
       await deleteCodeReference(tx, codeReferenceId)
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: current.project_id,
         entityType: current.target_type as 'requirement' | 'bug',
         entityId: current.target_id,
@@ -427,6 +524,8 @@ export function createCodeService(deps: CodeServiceDeps) {
 
   return {
     listProjectRepositories,
+    listRepositoryTree,
+    getRepositoryFile,
     listAvailableRepositories,
     linkRepository,
     unlinkRepository,

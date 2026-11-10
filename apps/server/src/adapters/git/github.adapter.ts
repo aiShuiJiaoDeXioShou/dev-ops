@@ -7,7 +7,11 @@ import {
   type GitObjectInput,
   type GitObjectSnapshot,
   type GitRemoteRepository,
-} from './git.types.js'
+  type GitTreeEntry,
+  type GitTreeInput,
+  type GitFileInput,
+  type GitFileContent,
+} from './git.types.ts'
 
 const TIMEOUT_MS = 10_000
 
@@ -99,6 +103,58 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
     }
   }
 
+  async function listTree(input: GitTreeInput): Promise<GitTreeEntry[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    if (!isAllowlisted(slug, options.allowedRepositories))
+      throw new GitAdapterError('unsupported', '仓库不在允许范围内')
+    let data: { tree?: Array<{ path?: unknown; type?: unknown; size?: unknown }> }
+    try {
+      data = (
+        await client.request('GET /repos/{owner}/{repo}/git/trees/{ref}', {
+          owner: input.repository.namespace,
+          repo: input.repository.name,
+          ref: input.ref,
+          recursive: '1',
+        })
+      ).data as typeof data
+    } catch (error) {
+      throw classify(error)
+    }
+    return (data.tree ?? [])
+      .filter((item) => item.type === 'blob' || item.type === 'tree')
+      .map((item) => ({
+        path: typeof item.path === 'string' ? item.path : '',
+        type: item.type === 'tree' ? ('directory' as const) : ('file' as const),
+        size: typeof item.size === 'number' ? item.size : null,
+      }))
+      .filter((item) => item.path.length > 0)
+  }
+
+  async function getFile(input: GitFileInput): Promise<GitFileContent> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    if (!isAllowlisted(slug, options.allowedRepositories))
+      throw new GitAdapterError('unsupported', '仓库不在允许范围内')
+    let data: { content?: unknown; encoding?: unknown; type?: unknown }
+    try {
+      data = (
+        await client.request('GET /repos/{owner}/{repo}/contents/{path}', {
+          owner: input.repository.namespace,
+          repo: input.repository.name,
+          path: input.path,
+          ref: input.ref,
+        })
+      ).data as typeof data
+    } catch (error) {
+      throw classify(error)
+    }
+    if (data.type === 'dir') throw new GitAdapterError('unsupported', '路径是目录')
+    if (data.encoding !== 'base64' || typeof data.content !== 'string') {
+      throw new GitAdapterError('unsupported', '远端文件不是可读取的文本内容')
+    }
+    const content = Buffer.from(data.content.replace(/\s/g, ''), 'base64').toString('utf8')
+    return { path: input.path, content: content.slice(0, 200_000), truncated: content.length > 200_000 }
+  }
+
   return {
     async checkConnection() {
       try {
@@ -136,5 +192,7 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
       return repositories
     },
     getObject,
+    listTree,
+    getFile,
   }
 }

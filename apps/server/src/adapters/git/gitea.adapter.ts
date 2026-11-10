@@ -5,7 +5,11 @@ import {
   type GitObjectInput,
   type GitObjectSnapshot,
   type GitRemoteRepository,
-} from './git.types.js'
+  type GitTreeEntry,
+  type GitTreeInput,
+  type GitFileInput,
+  type GitFileContent,
+} from './git.types.ts'
 
 const TIMEOUT_MS = 10_000
 const MAX_PAGES = 10
@@ -84,6 +88,38 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     }
   }
 
+  async function listTree(input: GitTreeInput): Promise<GitTreeEntry[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const data = await request<{ tree?: Array<{ path?: unknown; type?: unknown; size?: unknown }> }>(
+      `/repos/${slug}/git/trees/${encodeURIComponent(input.ref)}?recursive=true&per_page=1000`,
+    )
+    return (data.tree ?? [])
+      .filter((item) => item.type === 'blob' || item.type === 'tree' || item.type === 'commit')
+      .map((item) => ({
+        path: typeof item.path === 'string' ? item.path : '',
+        type: item.type === 'tree' ? ('directory' as const) : ('file' as const),
+        size: typeof item.size === 'number' ? item.size : null,
+      }))
+      .filter((item) => item.path.length > 0)
+  }
+
+  async function getFile(input: GitFileInput): Promise<GitFileContent> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const encodedPath = input.path
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    const data = await request<{ content?: unknown; encoding?: unknown; type?: unknown }>(
+      `/repos/${slug}/contents/${encodedPath}?ref=${encodeURIComponent(input.ref)}`,
+    )
+    if (data.type === 'dir') throw new GitAdapterError('unsupported', '路径是目录')
+    if (data.encoding !== 'base64' || typeof data.content !== 'string') {
+      throw new GitAdapterError('unsupported', '远端文件不是可读取的文本内容')
+    }
+    const content = Buffer.from(data.content.replace(/\s/g, ''), 'base64').toString('utf8')
+    return { path: input.path, content: content.slice(0, 200_000), truncated: content.length > 200_000 }
+  }
+
   return {
     async checkConnection() {
       const user = await request<{ login?: string }>('/user')
@@ -112,5 +148,7 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
       return repositories
     },
     getObject,
+    listTree,
+    getFile,
   }
 }

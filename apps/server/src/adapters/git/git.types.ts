@@ -41,11 +41,41 @@ export interface GitConnectionIdentity {
   identity: string
 }
 
+export interface GitRepositoryRef {
+  namespace: string
+  name: string
+}
+
+export interface GitTreeEntry {
+  path: string
+  type: 'file' | 'directory'
+  size: number | null
+}
+
+export interface GitFileContent {
+  path: string
+  content: string
+  truncated: boolean
+}
+
+export interface GitTreeInput {
+  repository: GitRepositoryRef
+  ref: string
+}
+
+export interface GitFileInput extends GitTreeInput {
+  path: string
+}
+
 /** 提供方只读端口；业务模块不感知具体认证方式。 */
 export interface GitAdapter {
   checkConnection(): Promise<GitConnectionIdentity>
   listRepositories(): Promise<GitRemoteRepository[]>
   getObject(input: GitObjectInput): Promise<GitObjectSnapshot>
+  /** 读取仓库文件树；部分历史适配器测试替身可以不实现。 */
+  listTree?(input: GitTreeInput): Promise<GitTreeEntry[]>
+  /** 读取仓库文件内容；部分历史适配器测试替身可以不实现。 */
+  getFile?(input: GitFileInput): Promise<GitFileContent>
 }
 
 /** 按提供方、授权方式和凭据构造适配器。 */

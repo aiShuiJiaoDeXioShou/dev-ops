@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { success } from '../../platform/http/response.js'
-import { requireSessionUser, type IdentityAuth } from '../identity/public.js'
-import type { CodeService } from './code.service.js'
+import { success } from '../../platform/http/response.ts'
+import { requireSessionUser } from '../identity/identity.session.ts'
+import type { IdentityAuth } from '../identity/identity.auth.ts'
+import type { CodeService } from './code.service.ts'
 import {
   availableRepositoryListResponseSchema,
   codeReferenceParamsSchema,
@@ -12,10 +13,14 @@ import {
   projectRepositoryParamsSchema,
   removeReferenceBodySchema,
   removedResponseSchema,
+  repositoryFileQuerySchema,
+  repositoryFileResponseSchema,
   repositoryListResponseSchema,
   repositoryQuerySchema,
+  repositoryTreeQuerySchema,
+  repositoryTreeResponseSchema,
   unlinkRepositoryBodySchema,
-} from './code.schema.js'
+} from './code.schema.ts'
 
 /** 项目仓库与代码引用路由。 */
 export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service: CodeService }> = async (
@@ -46,6 +51,50 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       const user = await requireSessionUser(options.auth, request.headers)
       return success(
         await options.service.listAvailableRepositories(user, request.params.projectId, request.query),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/tree',
+    {
+      schema: {
+        params: projectRepositoryParamsSchema,
+        querystring: repositoryTreeQuerySchema,
+        response: { 200: repositoryTreeResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireSessionUser(options.auth, request.headers)
+      return success(
+        await options.service.listRepositoryTree(
+          user,
+          request.params.projectId,
+          request.params.repositoryId,
+          request.query.branch,
+        ),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/file',
+    {
+      schema: {
+        params: projectRepositoryParamsSchema,
+        querystring: repositoryFileQuerySchema,
+        response: { 200: repositoryFileResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireSessionUser(options.auth, request.headers)
+      return success(
+        await options.service.getRepositoryFile(user, request.params.projectId, request.params.repositoryId, {
+          branch: request.query.branch,
+          path: request.query.path,
+        }),
         request.id,
       )
     },
