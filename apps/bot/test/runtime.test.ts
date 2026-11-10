@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { createAssistantMessageEventStream, type AssistantMessage } from '@earendil-works/pi-ai'
 import type { StreamFn } from '@earendil-works/pi-agent-core'
@@ -171,5 +174,78 @@ test('超过八轮工具循环或到达请求超时，均中止运行并回滚',
     assert.deepEqual(store.snapshot('main').messages, [])
   } finally {
     store.close()
+  }
+})
+
+test('pi 顺序完成写入、读取和 Bash 调用，完整工具结果可恢复', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'bot-runtime-tools-'))
+  const store = new BotStore(':memory:')
+  try {
+    const runtime = createRuntime(
+      { ...config, workspacePath: directory },
+      scripted([
+        message(
+          [
+            {
+              type: 'toolCall',
+              id: 'write-1',
+              name: 'write_file',
+              arguments: { path: 'notes/result.txt', content: '工具已接入' },
+            },
+            { type: 'toolCall', id: 'read-1', name: 'read_file', arguments: { path: 'notes/result.txt' } },
+            {
+              type: 'toolCall',
+              id: 'bash-1',
+              name: 'bash',
+              arguments: { command: "printf '\\nBash追加' >> notes/result.txt" },
+            },
+          ],
+          'toolUse',
+        ),
+        message([{ type: 'text', text: '完成' }]),
+      ]),
+    )
+    assert.equal(await chat(store, runtime, 'tools', '按顺序操作文件'), '完成')
+    assert.equal(await readFile(join(directory, 'notes/result.txt'), 'utf8'), '工具已接入\nBash追加')
+    const results = store.snapshot('tools').messages.filter((item) => item.role === 'toolResult')
+    assert.equal(results.length, 3)
+    assert.ok(results.every((item) => !item.isError))
+    const read = results.find((item) => item.toolName === 'read_file')
+    assert.ok(read)
+    assert.match(JSON.stringify(read.content), /工具已接入/u)
+    assert.doesNotMatch(JSON.stringify(read.content), /Bash追加/u)
+  } finally {
+    store.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('写入后模型失败只回滚对话和记忆，不声称文件操作已经回滚', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'bot-runtime-side-effect-'))
+  const store = new BotStore(':memory:')
+  try {
+    const runtime = createRuntime(
+      { ...config, workspacePath: directory },
+      scripted([
+        message(
+          [
+            {
+              type: 'toolCall',
+              id: 'write-1',
+              name: 'write_file',
+              arguments: { path: 'written.txt', content: '已生效' },
+            },
+          ],
+          'toolUse',
+        ),
+        message([], 'error'),
+      ]),
+    )
+    await assert.rejects(chat(store, runtime, 'tools', '写文件'), /工具操作不会回滚/u)
+    assert.equal(await readFile(join(directory, 'written.txt'), 'utf8'), '已生效')
+    assert.deepEqual(store.snapshot('tools').messages, [])
+  } finally {
+    store.close()
+    await rm(directory, { recursive: true, force: true })
   }
 })

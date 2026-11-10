@@ -8,6 +8,15 @@ const configSchema = z.object({
   BOT_DATABASE_PATH: z.string().trim().min(1).default('.data/bot.sqlite'),
   BOT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(600_000).default(120_000),
   BOT_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(64).max(8192).default(2048),
+  BOT_WORKSPACE: z.string().trim().min(1).default('.'),
+  BOT_TOOL_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
+  DEEPSEEK_WEB_BASE_URL: z
+    .url()
+    .refine((value) => {
+      const url = new URL(value)
+      return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash
+    })
+    .default('https://api.deepseek.com/v1/tools'),
 })
 
 export interface BotConfig {
@@ -16,6 +25,10 @@ export interface BotConfig {
   databasePath: string
   timeoutMs: number
   maxOutputTokens: number
+  workspacePath: string
+  toolTimeoutMs: number
+  webBaseUrl: string
+  bashEnvironment: NodeJS.ProcessEnv
 }
 
 /**
@@ -37,5 +50,14 @@ export function loadConfig(environment: NodeJS.ProcessEnv, cwd = process.cwd()):
     databasePath: resolve(cwd, result.data.BOT_DATABASE_PATH),
     timeoutMs: result.data.BOT_TIMEOUT_MS,
     maxOutputTokens: result.data.BOT_MAX_OUTPUT_TOKENS,
+    workspacePath: resolve(cwd, result.data.BOT_WORKSPACE),
+    toolTimeoutMs: result.data.BOT_TOOL_TIMEOUT_MS,
+    webBaseUrl: result.data.DEEPSEEK_WEB_BASE_URL.replace(/\/+$/u, ''),
+    // 子进程只继承运行所需的基础环境，避免 env 等普通命令意外输出模型密钥。
+    bashEnvironment: Object.fromEntries(
+      ['PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TERM', 'TMPDIR', 'TZ'].flatMap((name) =>
+        environment[name] === undefined ? [] : [[name, environment[name]]],
+      ),
+    ),
   }
 }
