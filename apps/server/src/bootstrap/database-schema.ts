@@ -42,3 +42,12 @@ export {
   externalReview,
   releaseResult,
 } from '../modules/delivery/delivery.tables.ts'
+
+export {
+  skill,
+  skillVersion,
+  agentTemplate,
+  agentTemplateVersion,
+  projectTemplateSelection,
+  templateSnapshotLink,
+} from '../modules/knowledge/knowledge.tables.ts'

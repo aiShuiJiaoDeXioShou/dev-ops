@@ -19,6 +19,7 @@ import type { GitAdapter } from '../adapters/git/git.types.ts'
 import { codeRoutes } from '../modules/code/code.routes.ts'
 import { deliveryRoutes } from '../modules/delivery/delivery.routes.ts'
 import { configurationRoutes } from '../modules/configuration/configuration.routes.ts'
+import { knowledgeRoutes } from '../modules/knowledge/knowledge.routes.ts'
 import { integrationsRoutes } from '../modules/integrations/integrations.routes.ts'
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
@@ -108,6 +109,7 @@ export function createHttpApp(
   if (services.configuration) {
     app.register(configurationRoutes, { prefix: '/api/v1', service: services.configuration })
   }
+  app.register(knowledgeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.knowledge })
   app.register(integrationsRoutes, {
     prefix: '/api/v1',
     auth: services.auth,

@@ -22,6 +22,8 @@ export type ActivityEntityType =
   | 'credential'
   | 'credential_grant'
   | 'project_env_var'
+  | 'skill'
+  | 'agent_template'
 
 export interface NewComment {
   id: string

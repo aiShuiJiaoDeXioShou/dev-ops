@@ -1699,5 +1699,263 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 读取团队技能列表。 */
+    async listSkills(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/skills', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/skills', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/skills`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 发布团队技能。 */
+    async createSkill(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/skills', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/skills', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/skills`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取技能详情。 */
+    async getSkill(skillId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/skills/{skillId}', 'get'>>(
+        `/api/v1/skills/${segment(skillId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 编辑技能。 */
+    async updateSkill(
+      skillId: string,
+      body: ApiBody<'/api/v1/skills/{skillId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/skills/{skillId}/update', 'post'>>(
+        `/api/v1/skills/${segment(skillId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 启用技能。 */
+    async enableSkill(
+      skillId: string,
+      body: ApiBody<'/api/v1/skills/{skillId}/enable', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/skills/{skillId}/enable', 'post'>>(
+        `/api/v1/skills/${segment(skillId)}/enable`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 停用技能。 */
+    async disableSkill(
+      skillId: string,
+      body: ApiBody<'/api/v1/skills/{skillId}/disable', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/skills/{skillId}/disable', 'post'>>(
+        `/api/v1/skills/${segment(skillId)}/disable`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取技能版本历史。 */
+    async listSkillVersions(
+      skillId: string,
+      query?: ApiQuery<'/api/v1/skills/{skillId}/versions', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/skills/{skillId}/versions', 'get'>>(
+        `/api/v1/skills/${segment(skillId)}/versions`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取技能历史版本正文。 */
+    async getSkillVersion(skillId: string, skillVersionId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/skills/{skillId}/versions/{skillVersionId}', 'get'>>(
+        `/api/v1/skills/${segment(skillId)}/versions/${segment(skillVersionId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取技能活动。 */
+    async listSkillActivities(
+      skillId: string,
+      query?: ApiQuery<'/api/v1/skills/{skillId}/activities', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/skills/{skillId}/activities', 'get'>>(
+        `/api/v1/skills/${segment(skillId)}/activities`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取团队 AGENTS.md 模板列表。 */
+    async listAgentTemplates(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/agent-templates', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/agent-templates', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/agent-templates`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 新建 AGENTS.md 模板。 */
+    async createAgentTemplate(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/agent-templates', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/agent-templates', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/agent-templates`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取模板详情。 */
+    async getAgentTemplate(templateId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/agent-templates/{templateId}', 'get'>>(
+        `/api/v1/agent-templates/${segment(templateId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 编辑模板。 */
+    async updateAgentTemplate(
+      templateId: string,
+      body: ApiBody<'/api/v1/agent-templates/{templateId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/agent-templates/{templateId}/update', 'post'>>(
+        `/api/v1/agent-templates/${segment(templateId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 创建模板副本。 */
+    async duplicateAgentTemplate(
+      templateId: string,
+      body: ApiBody<'/api/v1/agent-templates/{templateId}/duplicate', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/agent-templates/{templateId}/duplicate', 'post'>>(
+        `/api/v1/agent-templates/${segment(templateId)}/duplicate`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取模板版本历史。 */
+    async listAgentTemplateVersions(
+      templateId: string,
+      query?: ApiQuery<'/api/v1/agent-templates/{templateId}/versions', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/agent-templates/{templateId}/versions', 'get'>>(
+        `/api/v1/agent-templates/${segment(templateId)}/versions`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取模板历史版本正文。 */
+    async getAgentTemplateVersion(templateId: string, templateVersionId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/agent-templates/{templateId}/versions/{templateVersionId}', 'get'>>(
+        `/api/v1/agent-templates/${segment(templateId)}/versions/${segment(templateVersionId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取模板活动。 */
+    async listAgentTemplateActivities(
+      templateId: string,
+      query?: ApiQuery<'/api/v1/agent-templates/{templateId}/activities', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/agent-templates/{templateId}/activities', 'get'>>(
+        `/api/v1/agent-templates/${segment(templateId)}/activities`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 生成模板快照预览链接。 */
+    async createTemplateSnapshotLink(templateId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/agent-templates/{templateId}/snapshot-links', 'post'>>(
+        `/api/v1/agent-templates/${segment(templateId)}/snapshot-links`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 打开模板快照链接。 */
+    async getTemplateSnapshot(token: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/template-snapshot-links/{token}', 'get'>>(
+        `/api/v1/template-snapshot-links/${segment(token)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取项目当前选用的模板。 */
+    async getProjectAgentTemplate(projectId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/agent-template', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/agent-template`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 选用或切换项目模板。 */
+    async applyProjectAgentTemplate(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/agent-template/apply', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/agent-template/apply', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/agent-template/apply`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 取消项目模板选用。 */
+    async clearProjectAgentTemplate(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/agent-template/clear', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/agent-template/clear', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/agent-template/clear`,
+        'POST',
+        body,
+        options,
+      )
+    },
   }
 }
