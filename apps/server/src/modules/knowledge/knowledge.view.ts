@@ -9,7 +9,7 @@ import type {
   TemplateVersionRow,
   SnapshotLinkRow,
 } from './knowledge.repository.ts'
-import { SKILL_CATEGORIES, type SkillCategory } from './knowledge.types.ts'
+import { SKILL_CATEGORIES, type SkillCategory, type SkillFileStored } from './knowledge.types.ts'
 
 /** 技能列表项视图。 */
 export interface SkillListItemView {
@@ -25,10 +25,19 @@ export interface SkillListItemView {
   updatedAt: string
 }
 
-/** 技能详情视图；包含当前内容版本正文。 */
+/** 技能资源文件视图。 */
+export interface SkillFileView {
+  path: string
+  content: string
+  encoding: 'utf8' | 'base64'
+  sizeBytes: number
+}
+
+/** 技能详情视图；包含当前内容版本正文与资源文件。 */
 export interface SkillDetailView extends SkillListItemView {
   teamId: string
   content: string
+  files: SkillFileView[]
   createdByUserId: string
   createdAt: string
 }
@@ -44,6 +53,7 @@ export interface SkillVersionItemView {
 /** 技能历史版本详情视图。 */
 export interface SkillVersionDetailView extends SkillVersionItemView {
   content: string
+  files: SkillFileView[]
 }
 
 /** 模板列表项视图。 */
@@ -52,6 +62,7 @@ export interface TemplateListItemView {
   name: string
   tag: string
   description: string | null
+  excerpt: string
   contentVersion: number
   version: number
   updatedAt: string
@@ -144,6 +155,7 @@ export function toSkillDetail(row: SkillDetailRecord): SkillDetailView {
     ...toSkillListItem(row),
     teamId: row.teamId,
     content: row.content,
+    files: toSkillFiles(row.files),
     createdByUserId: row.createdByUserId,
     createdAt: row.createdAt.toISOString(),
   }
@@ -161,7 +173,17 @@ export function toSkillVersionItem(row: SkillVersionRow): SkillVersionItemView {
 
 /** 技能版本记录 → 详情视图。 */
 export function toSkillVersionDetail(row: SkillVersionRow): SkillVersionDetailView {
-  return { ...toSkillVersionItem(row), content: row.content }
+  return { ...toSkillVersionItem(row), content: row.content, files: toSkillFiles(row.files) }
+}
+
+/** 技能资源文件记录 → 视图；只返回安全字段。 */
+export function toSkillFiles(files: SkillFileStored[]): SkillFileView[] {
+  return files.map((file) => ({
+    path: file.path,
+    content: file.content,
+    encoding: file.encoding,
+    sizeBytes: file.sizeBytes,
+  }))
 }
 
 /** 模板列表记录 → 视图。 */
@@ -171,6 +193,7 @@ export function toTemplateListItem(row: TemplateListRecord): TemplateListItemVie
     name: row.name,
     tag: row.tag,
     description: row.description,
+    excerpt: row.content.length > 240 ? `${row.content.slice(0, 240)}…` : row.content,
     contentVersion: row.contentVersion,
     version: row.version,
     updatedAt: row.updatedAt.toISOString(),

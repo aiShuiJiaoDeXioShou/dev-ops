@@ -1,5 +1,18 @@
 import { sql } from 'drizzle-orm'
-import { boolean, check, index, integer, primaryKey, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core'
+import {
+  boolean,
+  check,
+  index,
+  integer,
+  jsonb,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core'
+import type { SkillFileStored } from './knowledge.types.ts'
 import { appSchema } from '../../platform/database/namespace.ts'
 
 /**
@@ -48,7 +61,11 @@ export const skillVersion = appSchema.table(
     team_id: uuid('team_id').notNull(),
     skill_id: uuid('skill_id').notNull(),
     content_version: varchar('content_version', { length: 20 }).notNull(),
-    content: varchar('content', { length: 6000 }).notNull(),
+    content: text('content').notNull(),
+    files: jsonb('files')
+      .$type<SkillFileStored[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     created_by_user_id: uuid('created_by_user_id').notNull(),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),

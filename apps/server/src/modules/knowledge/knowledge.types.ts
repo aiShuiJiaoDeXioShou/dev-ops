@@ -8,6 +8,21 @@ export const SKILL_CONTENT_VERSION_PATTERN = /^\d+\.\d+\.\d+$/
 /** 技能调用标识格式：小写字母、数字和连字符。 */
 export const SKILL_IDENTIFIER_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
+/** 技能资源文件的编码：UTF-8 文本或 base64 二进制。 */
+export type SkillFileEncoding = 'utf8' | 'base64'
+
+/** 技能资源文件输入：路径相对于技能根目录，SKILL.md 由技能正文单独维护。 */
+export interface SkillFileInput {
+  path: string
+  content: string
+  encoding: SkillFileEncoding
+}
+
+/** 已校验并计算大小的技能资源文件。 */
+export interface SkillFileStored extends SkillFileInput {
+  sizeBytes: number
+}
+
 /** 阶段 B：已解析的可用技能引用；只含运行需要的标识，不返回正文。 */
 export interface ResolvedSkillRef {
   skillId: string

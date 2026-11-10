@@ -32,10 +32,22 @@ const skillListItemSchema = Type.Object({
   version: versionSchema,
   updatedAt: Type.String(),
 })
+const skillFileInputSchema = Type.Object({
+  path: Type.String({ minLength: 1, maxLength: 200 }),
+  content: Type.String({ minLength: 1, maxLength: 300000 }),
+  encoding: Type.Union([Type.Literal('utf8'), Type.Literal('base64')]),
+})
+const skillFileSchema = Type.Object({
+  path: Type.String(),
+  content: Type.String(),
+  encoding: Type.Union([Type.Literal('utf8'), Type.Literal('base64')]),
+  sizeBytes: Type.Integer({ minimum: 0 }),
+})
 const skillDetailSchema = Type.Object({
   ...skillListItemSchema.properties,
   teamId: uuidSchema,
   content: Type.String(),
+  files: Type.Array(skillFileSchema),
   createdByUserId: uuidSchema,
   createdAt: Type.String(),
 })
@@ -48,12 +60,14 @@ const skillVersionItemSchema = Type.Object({
 const skillVersionDetailSchema = Type.Object({
   ...skillVersionItemSchema.properties,
   content: Type.String(),
+  files: Type.Array(skillFileSchema),
 })
 const templateListItemSchema = Type.Object({
   id: uuidSchema,
   name: Type.String(),
   tag: Type.String(),
   description: Type.Union([Type.String(), Type.Null()]),
+  excerpt: Type.String(),
   contentVersion: Type.Integer({ minimum: 1 }),
   version: versionSchema,
   updatedAt: Type.String(),
@@ -140,7 +154,8 @@ export const createSkillBodySchema = Type.Object(
     category: categorySchema,
     contentVersion: Type.String({ minLength: 1, maxLength: 20 }),
     summary: Type.String({ minLength: 1, maxLength: 100 }),
-    content: Type.String({ minLength: 1, maxLength: 6000 }),
+    content: Type.String({ minLength: 1, maxLength: 50000 }),
+    files: Type.Optional(Type.Array(skillFileInputSchema, { maxItems: 50 })),
   },
   { additionalProperties: false },
 )
@@ -151,7 +166,8 @@ export const updateSkillBodySchema = Type.Object(
     category: categorySchema,
     contentVersion: Type.String({ minLength: 1, maxLength: 20 }),
     summary: Type.String({ minLength: 1, maxLength: 100 }),
-    content: Type.String({ minLength: 1, maxLength: 6000 }),
+    content: Type.String({ minLength: 1, maxLength: 50000 }),
+    files: Type.Optional(Type.Array(skillFileInputSchema, { maxItems: 50 })),
   },
   { additionalProperties: false },
 )

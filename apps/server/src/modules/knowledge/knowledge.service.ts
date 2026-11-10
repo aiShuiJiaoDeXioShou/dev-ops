@@ -52,6 +52,7 @@ import {
   validateSkillCategory,
   validateSkillContent,
   validateSkillContentVersion,
+  validateSkillFiles,
   validateSkillIdentifier,
   validateTemplateContent,
 } from './knowledge.rules.ts'
@@ -175,6 +176,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       contentVersion: string
       summary: string
       content: string
+      files?: { path: string; content: string; encoding: string }[]
     },
   ) {
     await requireWriteRole(db, actor, teamId)
@@ -184,6 +186,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     const contentVersion = validateSkillContentVersion(input.contentVersion)
     const summary = requiredText(input.summary, '简述', 100)
     const content = validateSkillContent(input.content)
+    const files = validateSkillFiles(input.files ?? [])
     if (await findSkillByIdentifier(db, teamId, identifier)) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '调用标识已存在，请换一个')
     }
@@ -196,6 +199,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         skillId,
         contentVersion,
         content,
+        files,
         createdByUserId: actor.id,
       })
       await insertSkill(tx, {
@@ -237,6 +241,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       contentVersion: string
       summary: string
       content: string
+      files?: { path: string; content: string; encoding: string }[]
     },
   ) {
     const current = await requireSkillRead(db, actor, skillId)
@@ -246,6 +251,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     const contentVersion = validateSkillContentVersion(input.contentVersion)
     const summary = requiredText(input.summary, '简述', 100)
     const content = validateSkillContent(input.content)
+    const files = validateSkillFiles(input.files ?? [])
     await db.transaction(async (tx) => {
       const locked = await lockSkill(tx, skillId)
       if (!locked) throw new ApiError(ERROR_CODES.NOT_FOUND, '技能不存在')
@@ -255,9 +261,10 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
       const currentVersion = await findSkillVersionById(tx, locked.currentVersionId)
       if (!currentVersion) throw new Error('数据库技能当前版本缺失')
       const contentChanged = content !== currentVersion.content
+      const filesChanged = JSON.stringify(files) !== JSON.stringify(currentVersion.files)
       let nextVersionId = locked.currentVersionId
-      if (contentChanged && contentVersion === currentVersion.contentVersion) {
-        throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '指令内容变化时必须使用新的版本号')
+      if ((contentChanged || filesChanged) && contentVersion === currentVersion.contentVersion) {
+        throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '指令或资源文件变化时必须使用新的版本号')
       }
       if (contentVersion !== currentVersion.contentVersion) {
         if (await findSkillVersionByContentVersion(tx, skillId, contentVersion)) {
@@ -270,6 +277,7 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
           skillId,
           contentVersion,
           content,
+          files,
           createdByUserId: actor.id,
         })
       }
@@ -286,7 +294,11 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
         entityId: skillId,
         action: 'skill_updated',
         actorUserId: actor.id,
-        changes: { contentVersion, previousContentVersion: currentVersion.contentVersion },
+        changes: {
+          contentVersion,
+          previousContentVersion: currentVersion.contentVersion,
+          fileCount: files.length,
+        },
       })
     })
     return getSkill(actor, skillId)

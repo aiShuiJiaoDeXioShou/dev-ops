@@ -127,6 +127,13 @@
       "when": 1794294509977,
       "tag": "0017_knowledge_skills_agents",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794296278355,
+      "tag": "0018_skill_file_package",
+      "breakpoints": true
     }
   ]
 }

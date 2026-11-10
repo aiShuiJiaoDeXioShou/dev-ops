@@ -1,5 +1,6 @@
 import { and, count, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
+import type { SkillFileStored } from './knowledge.types.ts'
 import {
   agentTemplate,
   agentTemplateVersion,
@@ -34,6 +35,7 @@ const skillVersionColumns = {
   skillId: skillVersion.skill_id,
   contentVersion: skillVersion.content_version,
   content: skillVersion.content,
+  files: skillVersion.files,
   createdByUserId: skillVersion.created_by_user_id,
   createdAt: skillVersion.created_at,
   updatedAt: skillVersion.updated_at,
@@ -108,6 +110,7 @@ export interface SkillVersionRow {
   skillId: string
   contentVersion: string
   content: string
+  files: SkillFileStored[]
   createdByUserId: string
   createdAt: Date
   updatedAt: Date
@@ -190,6 +193,7 @@ export interface SkillListRecord {
 export interface SkillDetailRecord extends SkillListRecord {
   teamId: string
   content: string
+  files: SkillFileStored[]
   createdByUserId: string
   createdAt: Date
 }
@@ -202,6 +206,7 @@ export interface TemplateListRecord {
   version: number
   updatedAt: Date
   contentVersion: number
+  content: string
 }
 
 export interface TemplateDetailRecord extends TemplateListRecord {
@@ -303,6 +308,7 @@ export async function findSkillDetail(db: Database, skillId: string) {
       createdByUserId: skill.created_by_user_id,
       contentVersion: skillVersion.content_version,
       content: skillVersion.content,
+      files: skillVersion.files,
     })
     .from(skill)
     .innerJoin(skillVersion, eq(skill.current_version_id, skillVersion.id))
@@ -325,6 +331,7 @@ export async function insertSkillVersion(
     skillId: string
     contentVersion: string
     content: string
+    files: SkillFileStored[]
     createdByUserId: string
   },
 ) {
@@ -336,6 +343,7 @@ export async function insertSkillVersion(
       skill_id: input.skillId,
       content_version: input.contentVersion,
       content: input.content,
+      files: input.files,
       created_by_user_id: input.createdByUserId,
     })
     .returning(skillVersionColumns)
@@ -499,6 +507,7 @@ export async function findTemplates(db: Database, teamId: string, filters: Templ
         version: agentTemplate.version,
         updatedAt: agentTemplate.updated_at,
         contentVersion: agentTemplateVersion.version,
+        content: agentTemplateVersion.content,
       })
       .from(agentTemplate)
       .innerJoin(agentTemplateVersion, eq(agentTemplate.current_version_id, agentTemplateVersion.id))

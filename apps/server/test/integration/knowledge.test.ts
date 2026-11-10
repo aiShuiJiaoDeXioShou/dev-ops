@@ -116,12 +116,20 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
     contentVersion: '1.0.0',
     summary: '提交前检查风险',
     content: '阅读变更，列出风险与验证建议。',
+    files: [
+      { path: 'references/checklist.md', content: '- 检查风险', encoding: 'utf8' },
+      { path: 'scripts/lint.sh', content: '#!/bin/sh\necho ok', encoding: 'utf8' },
+    ],
   })
   assert.equal(skillCreated.json().success, true, skillCreated.body)
   const skill = skillCreated.json().data
   assert.equal(skill.enabled, true)
   assert.equal(skill.contentVersion, '1.0.0')
   assert.equal(skill.version, 1)
+  assert.equal(skill.files.length, 2)
+  assert.equal(skill.files[0].path, 'references/checklist.md')
+  assert.equal(skill.files[1].path, 'scripts/lint.sh')
+  assert.ok(skill.files[0].sizeBytes > 0)
 
   const skillList = await inject('GET', `/api/v1/teams/${teamId}/skills?search=评审`, viewerUser)
   assert.equal(skillList.json().data.total, 1)
@@ -144,9 +152,14 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
     contentVersion: '1.1.0',
     summary: '提交前检查风险与测试',
     content: '阅读变更，列出风险、缺失测试与验证建议。',
+    files: [
+      { path: 'references/checklist.md', content: '- 检查风险\n- 检查测试', encoding: 'utf8' },
+      { path: 'scripts/lint.sh', content: '#!/bin/sh\necho ok', encoding: 'utf8' },
+    ],
   })
   assert.equal(skillEdited.json().success, true, skillEdited.body)
   assert.equal(skillEdited.json().data.contentVersion, '1.1.0')
+  assert.equal(skillEdited.json().data.files.length, 2)
 
   const staleUpdate = await inject('POST', `/api/v1/skills/${skill.id}/update`, devUser, {
     version: 1,
@@ -161,6 +174,32 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
   const skillVersions = await inject('GET', `/api/v1/skills/${skill.id}/versions`, viewerUser)
   assert.equal(skillVersions.json().data.total, 2)
   assert.equal(skillVersions.json().data.items[0].contentVersion, '1.1.0')
+  const firstVersion = skillVersions.json().data.items[0]
+  const firstVersionDetail = await inject('GET', `/api/v1/skills/${skill.id}/versions/${firstVersion.id}`, viewerUser)
+  assert.equal(firstVersionDetail.json().data.files.length, 2)
+  assert.match(firstVersionDetail.json().data.files[0].content, /检查测试/)
+
+  // 资源文件路径非法、重复或与 SKILL.md 冲突时整次保存被拒绝
+  const invalidFile = await inject('POST', `/api/v1/teams/${teamId}/skills`, devUser, {
+    name: '非法技能',
+    identifier: 'invalid-files',
+    category: 'engineering',
+    contentVersion: '1.0.0',
+    summary: '校验资源路径',
+    content: '正文',
+    files: [{ path: '../secret.md', content: 'x', encoding: 'utf8' }],
+  })
+  assert.equal(invalidFile.json().code, 'VALIDATION_ERROR')
+  const reservedFile = await inject('POST', `/api/v1/skills/${skill.id}/update`, devUser, {
+    version: 2,
+    name: '代码评审',
+    category: 'engineering',
+    contentVersion: '1.2.0',
+    summary: '校验资源路径',
+    content: '正文',
+    files: [{ path: 'SKILL.md', content: 'x', encoding: 'utf8' }],
+  })
+  assert.equal(reservedFile.json().code, 'VALIDATION_ERROR')
 
   const disabled = await inject('POST', `/api/v1/skills/${skill.id}/disable`, devUser, { version: 2 })
   assert.equal(disabled.json().data.enabled, false)
