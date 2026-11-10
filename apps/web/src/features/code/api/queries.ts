@@ -52,3 +52,28 @@ export function useTeamRepositories(teamId: string, enabled = true) {
     isLoading: connections.isPending || repositoryQueries.some((query) => query.isPending),
   }
 }
+
+/** 仓库文件树。 */
+export function repositoryTreeQueryOptions(projectId: string, repositoryId: string, branch?: string) {
+  return queryOptions({
+    queryKey: ['code', 'tree', projectId, repositoryId, branch],
+    queryFn: ({ signal }) =>
+      apiClient.listRepositoryTree(projectId, repositoryId, branch ? { branch } : undefined, { signal }),
+    enabled: Boolean(projectId && repositoryId),
+  })
+}
+
+/** 仓库文件内容。 */
+export function repositoryFileQueryOptions(
+  projectId: string,
+  repositoryId: string,
+  branch: string | undefined,
+  path: string,
+) {
+  return queryOptions({
+    queryKey: ['code', 'file', projectId, repositoryId, branch, path],
+    queryFn: ({ signal }) =>
+      apiClient.getRepositoryFile(projectId, repositoryId, { ...(branch ? { branch } : {}), path }, { signal }),
+    enabled: Boolean(projectId && repositoryId && path),
+  })
+}

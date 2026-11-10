@@ -1,9 +1,9 @@
-import type { components, paths } from './generated/api.js'
+import type { components, paths } from './generated/api.ts'
 import validateHealth from './generated/health.mjs'
 import validateReadiness from './generated/readiness.mjs'
 import validateError from './generated/error.mjs'
 
-export type { components, paths } from './generated/api.js'
+export type { components, paths } from './generated/api.ts'
 
 /** 生成的 OpenAPI 路径集合。 */
 type ApiPath = keyof paths
@@ -927,6 +927,34 @@ export function createApiClient(options: ApiClientOptions) {
     ) {
       return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/available', 'get'>>(
         `/api/v1/projects/${segment(projectId)}/repositories/available`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取仓库文件树。 */
+    async listRepositoryTree(
+      projectId: string,
+      repositoryId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/repositories/{repositoryId}/tree', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/tree', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/tree`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取仓库文件内容。 */
+    async getRepositoryFile(
+      projectId: string,
+      repositoryId: string,
+      query: ApiQuery<'/api/v1/projects/{projectId}/repositories/{repositoryId}/file', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/file', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/file`,
         'GET',
         undefined,
         { ...options, query },

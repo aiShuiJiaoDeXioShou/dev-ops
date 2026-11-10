@@ -3,6 +3,8 @@ export {
   connectionRepositoriesQueryOptions,
   gitConnectionsQueryOptions,
   projectRepositoriesQueryOptions,
+  repositoryFileQueryOptions,
+  repositoryTreeQueryOptions,
 } from './api/queries'
 export { CodeReferenceDialog } from './ui/code-reference-dialog'
 export { RepositoryPicker } from './ui/repository-picker'
