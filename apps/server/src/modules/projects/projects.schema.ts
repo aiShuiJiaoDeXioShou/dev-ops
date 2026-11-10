@@ -1,5 +1,5 @@
 import { Type, type Static } from 'typebox'
-import { apiResponseSchema } from '../../platform/http/response.js'
+import { apiResponseSchema } from '../../platform/http/response.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const projectSchema = Type.Object({

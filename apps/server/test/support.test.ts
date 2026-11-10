@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { FakeMailer } from './support/fake-mailer.js'
-import { createFakeGitData } from './support/fake-git.js'
-import { createTestApp } from './support/create-test-app.js'
+import { FakeMailer } from './support/fake-mailer.ts'
+import { createFakeGitData } from './support/fake-git.ts'
+import { createTestApp } from './support/create-test-app.ts'
 
 test('fake mailer records messages without network access', async () => {
   const mailer = new FakeMailer()

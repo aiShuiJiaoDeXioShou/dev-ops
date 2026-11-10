@@ -1,5 +1,5 @@
-import type { MailMessage, MailSender } from '../../src/adapters/mail/mail.types.js'
-import { MailDeliveryError } from '../../src/adapters/mail/mail.types.js'
+import type { MailMessage, MailSender } from '../../src/adapters/mail/mail.types.ts'
+import { MailDeliveryError } from '../../src/adapters/mail/mail.types.ts'
 
 /** 进程内邮件替身；只记录待断言的消息，不访问网络。 */
 export class FakeMailer implements MailSender {

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { check, index, primaryKey, smallint, text, timestamp, uuid } from 'drizzle-orm/pg-core'
-import { appSchema } from '../../platform/database/namespace.js'
+import { appSchema } from '../../platform/database/namespace.ts'
 
 /** 加密保存的 Git 凭据；业务接口只返回名称、状态与版本。 */
 export const secret = appSchema.table(

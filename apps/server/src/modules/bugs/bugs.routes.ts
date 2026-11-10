@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { success } from '../../platform/http/response.js'
-import { requireSessionUser, type IdentityAuth } from '../identity/public.js'
-import type { BugsService } from './bugs.service.js'
+import { success } from '../../platform/http/response.ts'
+import { requireSessionUser } from '../identity/identity.session.ts'
+import type { IdentityAuth } from '../identity/identity.auth.ts'
+import type { BugsService } from './bugs.service.ts'
 import {
   activityPageResponseSchema,
   bugListResponseSchema,
@@ -25,7 +26,7 @@ import {
   unlinkRequirementBodySchema,
   updateBugBodySchema,
   withdrawRegressionBodySchema,
-} from './bugs.schema.js'
+} from './bugs.schema.ts'
 
 /** Bug 列表、详情、状态动作、关联、评论与活动路由。 */
 export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service: BugsService }> = async (

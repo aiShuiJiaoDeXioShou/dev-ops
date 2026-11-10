@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createTestApp } from '../support/create-test-app.js'
+import { createTestApp } from '../support/create-test-app.ts'
 
 test('未登录访问团队接口返回 HTTP 200 + UNAUTHENTICATED 业务错误', async (t) => {
   const app = createTestApp()

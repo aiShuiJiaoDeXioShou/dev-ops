@@ -1,8 +1,8 @@
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 
 export type RequirementStatus = 'pending' | 'in_development' | 'submitted' | 'in_testing' | 'passed' | 'cancelled'
-export const REQUIREMENT_STATUSES: ReadonlySet<RequirementStatus> = new Set([
+export const REQUIREMENT_STATUSES: ReadonlySet<string> = new Set([
   'pending',
   'in_development',
   'submitted',
@@ -71,17 +71,27 @@ export function validateContent(input: {
   }
 }
 
-/** 校验需求业务状态。 */
-export function validateStatus(status: string): RequirementStatus {
-  if (!REQUIREMENT_STATUSES.has(status as RequirementStatus)) {
-    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '需求状态不合法')
-  }
-  return status as RequirementStatus
+/** 判断字符串是否为需求业务状态。 */
+export function isRequirementStatus(value: string): value is RequirementStatus {
+  return REQUIREMENT_STATUSES.has(value)
 }
 
-/** 校验分页参数。 */
-export function validatePage(page: number, pageSize: number): void {
-  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '分页参数不合法')
+/** 校验需求业务状态。 */
+export function validateStatus(status: string): RequirementStatus {
+  if (!isRequirementStatus(status)) {
+    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '需求状态不合法')
   }
+  return status
+}
+
+/** 将数据库需求状态收窄为业务类型；数据不合法时说明是持久化异常。 */
+export function toRequirementStatus(value: string): RequirementStatus {
+  if (!isRequirementStatus(value)) throw new Error(`数据库需求状态不合法: ${value}`)
+  return value
+}
+
+/** 将数据库内容方式收窄为业务类型；数据不合法时说明是持久化异常。 */
+export function toContentMode(value: string): 'markdown' | 'external_link' {
+  if (value !== 'markdown' && value !== 'external_link') throw new Error(`数据库需求内容方式不合法: ${value}`)
+  return value
 }

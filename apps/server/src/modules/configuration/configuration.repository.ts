@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { secret } from './configuration.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import { secret } from './configuration.tables.ts'
 
 /** 插入加密凭据。 */
 export async function insertSecret(

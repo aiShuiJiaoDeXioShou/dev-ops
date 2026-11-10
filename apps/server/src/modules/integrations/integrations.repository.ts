@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { gitConnection } from './integrations.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import { gitConnection } from './integrations.tables.ts'
 
 /** 插入 Git 连接。 */
 export async function insertGitConnection(

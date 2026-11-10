@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util'
-import { checkHealth } from './commands/health.js'
+import { checkHealth } from './commands/health.ts'
 
 const DEFAULT_SERVER = 'http://127.0.0.1:3001'
 const DEFAULT_TIMEOUT_MS = 5_000

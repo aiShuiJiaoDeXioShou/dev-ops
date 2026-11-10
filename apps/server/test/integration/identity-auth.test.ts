@@ -3,9 +3,9 @@ import { randomBytes } from 'node:crypto'
 import { test } from 'node:test'
 import { sql } from 'drizzle-orm'
 import { Client } from 'pg'
-import { createHttpApp } from '../../src/bootstrap/create-http-app.js'
-import { loadConfig } from '../../src/platform/config/env.js'
-import { migrateDatabase } from '../../src/platform/database/migrate.js'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import { loadConfig } from '../../src/platform/config/env.ts'
+import { migrateDatabase } from '../../src/platform/database/migrate.ts'
 
 function readCookies(header: string | string[] | undefined): string[] {
   if (header === undefined) return []

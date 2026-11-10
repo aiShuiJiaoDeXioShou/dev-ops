@@ -4,7 +4,7 @@ import { once } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { createServer, type RequestListener } from 'node:http'
 import { test, type TestContext } from 'node:test'
-import { runCli } from '../src/cli.js'
+import { runCli } from '../src/cli.ts'
 
 async function execute(args: string[], env: NodeJS.ProcessEnv = {}) {
   let stdout = ''

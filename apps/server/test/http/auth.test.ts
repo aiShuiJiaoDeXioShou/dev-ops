@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createTestApp } from '../support/create-test-app.js'
+import { createTestApp } from '../support/create-test-app.ts'
 
 test('认证端点已挂载，浏览器自助注册被拒绝', async (t) => {
   const app = createTestApp()

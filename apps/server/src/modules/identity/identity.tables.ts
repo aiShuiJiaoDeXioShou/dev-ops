@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
-import { appSchema } from '../../platform/database/namespace.js'
+import { appSchema } from '../../platform/database/namespace.ts'
 
 // Better Auth 表：Drizzle 属性名与数据库列名均使用 snake_case，
 // 通过 identity.auth.ts 的 fields 映射匹配 Better Auth 的 camelCase 模型字段。

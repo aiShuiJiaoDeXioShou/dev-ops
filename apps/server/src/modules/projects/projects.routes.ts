@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { success } from '../../platform/http/response.js'
-import { requireSessionUser, type IdentityAuth } from '../identity/public.js'
-import type { ProjectsService } from './projects.service.js'
+import { success } from '../../platform/http/response.ts'
+import { requireSessionUser } from '../identity/identity.session.ts'
+import type { IdentityAuth } from '../identity/identity.auth.ts'
+import type { ProjectsService } from './projects.service.ts'
 import {
   createProjectBodySchema,
   projectListQuerySchema,
@@ -11,7 +12,7 @@ import {
   projectStatsResponseSchema,
   projectTeamParamsSchema,
   updateProjectBodySchema,
-} from './projects.schema.js'
+} from './projects.schema.ts'
 
 /** 项目列表/详情/更新/统计路由。 */
 export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service: ProjectsService }> = async (

@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { check, index, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
-import { appSchema } from '../../platform/database/namespace.js'
+import { appSchema } from '../../platform/database/namespace.ts'
 
 /** 团队 Git 连接；授权凭据只保存 secret 引用。 */
 export const gitConnection = appSchema.table(

@@ -2,11 +2,16 @@ import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { Client } from 'pg'
-import { loadConfig } from '../../src/platform/config/env.js'
-import { createDatabase } from '../../src/platform/database/client.js'
-import { migrateDatabase } from '../../src/platform/database/migrate.js'
-import { addComment, appendActivity, listActivities, listComments } from '../../src/modules/collaboration/public.js'
-import { ApiError } from '../../src/platform/http/errors.js'
+import { loadConfig } from '../../src/platform/config/env.ts'
+import { createDatabase } from '../../src/platform/database/client.ts'
+import { migrateDatabase } from '../../src/platform/database/migrate.ts'
+import {
+  addComment,
+  appendActivity,
+  listActivities,
+  listComments,
+} from '../../src/modules/collaboration/collaboration.service.ts'
+import { ApiError } from '../../src/platform/http/errors.ts'
 
 test('评论与活动在同一事务执行器中追加、分页并拒绝非法目标类型', { timeout: 60_000 }, async (t) => {
   const cleanup: Array<() => Promise<unknown>> = []

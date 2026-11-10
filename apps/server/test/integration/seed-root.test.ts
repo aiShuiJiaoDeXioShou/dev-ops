@@ -3,10 +3,10 @@ import { randomBytes } from 'node:crypto'
 import { test } from 'node:test'
 import { sql } from 'drizzle-orm'
 import { Client } from 'pg'
-import { createHttpApp } from '../../src/bootstrap/create-http-app.js'
-import { loadConfig } from '../../src/platform/config/env.js'
-import { migrateDatabase } from '../../src/platform/database/migrate.js'
-import { seedRootAccount } from '../../src/modules/identity/identity.seed.js'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import { loadConfig } from '../../src/platform/config/env.ts'
+import { migrateDatabase } from '../../src/platform/database/migrate.ts'
+import { seedRootAccount } from '../../src/modules/identity/identity.seed.ts'
 
 test('root 种子命令幂等创建用户与平台管理员，重复执行不重复账号', { timeout: 60_000 }, async (t) => {
   const cleanup: Array<() => Promise<unknown>> = []

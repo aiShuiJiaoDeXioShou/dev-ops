@@ -1,5 +1,5 @@
 import { index, integer, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
-import { appSchema } from './namespace.js'
+import { appSchema } from './namespace.ts'
 
 /** 幂等请求记录；同一用户、范围与 key 只允许成功处理一次。 */
 export const idempotencyRecord = appSchema.table(

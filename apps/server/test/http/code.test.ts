@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createTestApp } from '../support/create-test-app.js'
+import { createTestApp } from '../support/create-test-app.ts'
 
 test('未登录访问仓库与代码引用接口返回 UNAUTHENTICATED', async (t) => {
   const app = createTestApp()

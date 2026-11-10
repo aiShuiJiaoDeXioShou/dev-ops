@@ -1,5 +1,6 @@
 import js from '@eslint/js'
 import prettier from 'eslint-config-prettier'
+import importX from 'eslint-plugin-import-x'
 import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
@@ -52,6 +53,14 @@ export default tseslint.config(
   {
     files: ['**/*.{js,mjs,cjs}'],
     languageOptions: { globals: { ...globals.node } },
+  },
+  {
+    files: ['**/*.{ts,tsx,js,mjs,cjs}'],
+    plugins: { 'import-x': importX },
+    rules: {
+      'import-x/newline-after-import': 'error',
+      'import-x/no-duplicates': 'error',
+    },
   },
   {
     files: ['**/*.test.*', 'tests/**/*.mjs', 'tooling/**/*.mjs'],

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
-import type { AppConfig } from '../../platform/config/env.js'
-import type { Database } from '../../platform/database/client.js'
-import { authAccount, authSession, authUser, authVerification } from './identity.tables.js'
+import type { AppConfig } from '../../platform/config/env.ts'
+import type { Database } from '../../platform/database/client.ts'
+import { authAccount, authSession, authUser, authVerification } from './identity.tables.ts'
 
 /**
  * 创建平台 Better Auth 实例。

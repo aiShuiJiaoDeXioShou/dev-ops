@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import type { Database } from '../../platform/database/client.js'
-import { ApiError } from '../../platform/http/errors.js'
-import { findIdempotency, recordIdempotency, requestHash } from '../../platform/http/idempotency.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
+import type { Database } from '../../platform/database/client.ts'
+import { ApiError } from '../../platform/http/errors.ts'
+import { findIdempotency, recordIdempotency, requestHash } from '../../platform/http/idempotency.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import {
   addComment,
   appendActivity,
@@ -11,17 +11,13 @@ import {
   type ActivityView,
   type CommentView,
   type PageResult,
-} from '../collaboration/public.js'
-import { findUserById, requireTeamMember, type SessionUser } from '../identity/public.js'
-import { findActiveTeamMember, findProjectById, lockProject, type ProjectCounts } from '../projects/public.js'
-import {
-  EDITABLE_STATUSES,
-  normalizeTitle,
-  validateContent,
-  validatePage,
-  validateStatus,
-  type RequirementStatus,
-} from './requirements.rules.js'
+} from '../collaboration/collaboration.service.ts'
+import { findActiveTeamMemberIds, isActiveTeamMember } from '../identity/identity.repository.ts'
+import { loadUserRefs } from '../identity/identity.display.ts'
+import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
+import { validatePage } from '../../platform/http/pagination.ts'
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
+import { EDITABLE_STATUSES, normalizeTitle, validateContent, validateStatus } from './requirements.rules.ts'
 import {
   countOpenRequirementsByProjects,
   findCollaborators,
@@ -36,75 +32,10 @@ import {
   replaceCollaborators,
   updateRequirement,
   updateRequirementState,
-} from './requirements.repository.js'
-
-export interface RequirementListItem {
-  id: string
-  projectId: string
-  number: number
-  title: string
-  status: RequirementStatus
-  devOwner: { userId: string; name: string } | null
-  testOwner: { userId: string; name: string } | null
-  version: number
-  updatedAt: string
-}
-
-export interface LinkedBugView {
-  id: string
-  number: number
-  title: string
-  status: string
-}
-
-export interface TestSubmissionView {
-  id: string
-  submittedByUserId: string
-  devOwnerUserId: string
-  testOwnerUserId: string
-  scopeNote: string
-  selfTestResult: string
-  selfTestNote: string | null
-  testEntry: string | null
-  versionNote: string | null
-  createdAt: string
-}
-
-export interface LinkedCodeReferenceView {
-  id: string
-  repositoryId: string
-  targetType: string
-  targetId: string
-  objectType: string
-  remoteId: string
-  title: string | null
-  state: string | null
-  url: string | null
-  lastCheckStatus: string
-  lastErrorCode: string | null
-  lastCheckedAt: string | null
-}
-export type RequirementBugReader = (requirementId: string) => Promise<LinkedBugView[]>
-export type RequirementCodeReferenceReader = (
-  targetType: 'requirement' | 'bug',
-  targetId: string,
-) => Promise<LinkedCodeReferenceView[]>
-
-export interface RequirementDetail extends RequirementListItem {
-  teamId: string
-  contentMode: 'markdown' | 'external_link'
-  contentMarkdown: string | null
-  externalUrl: string | null
-  externalSummary: string | null
-  acceptanceCriteria: string | null
-  collaborators: Array<{ userId: string; name: string }>
-  latestTestSubmission: TestSubmissionView | null
-  linkedBugs: LinkedBugView[]
-  needsReview: boolean
-  linkedCodeReferences: LinkedCodeReferenceView[]
-  createdAt: string
-  createdByUserId: string
-}
+  type RequirementRow,
+} from './requirements.repository.ts'
+import type { RequirementBugReader, RequirementCodeReferenceReader, RequirementDetail } from './requirements.types.ts'
+import { toRequirementDetail, toRequirementListItem, toTestSubmissionView } from './requirements.view.ts'
 
 export interface RequirementsServiceDeps {
   db: Database
@@ -129,15 +60,15 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   const { db } = deps
 
   async function requireProjectAccess(actor: SessionUser, projectId: string) {
-    const project = await findProjectById(db, projectId)
+    const project = await getProjectContext(db, projectId)
     if (!project) throw new ApiError(ERROR_CODES.NOT_FOUND, '项目不存在')
-    await requireTeamMember(db, actor.id, project.team_id)
+    await requireTeamMember(db, actor.id, project.teamId)
     return project
   }
 
   async function requireProjectWrite(actor: SessionUser, projectId: string) {
     const project = await requireProjectAccess(actor, projectId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     return project
   }
 
@@ -148,66 +79,27 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     return { row, project }
   }
 
-  async function userName(userId: string | null): Promise<string> {
-    if (!userId) return ''
-    return (await findUserById(db, userId))?.name ?? '未知用户'
-  }
-
-  async function toDetail(row: Awaited<ReturnType<typeof findRequirementById>> & object): Promise<RequirementDetail> {
-    const collaboratorRows = await findCollaborators(db, row.id)
-    const collaborators = await Promise.all(
-      collaboratorRows.map(async (item) => ({
-        userId: item.userId,
-        name: (await findUserById(db, item.userId))?.name ?? '未知用户',
-      })),
-    )
-    const [devOwnerName, testOwnerName, latestSubmission, linkedBugs, linkedCodeReferences] = await Promise.all([
-      userName(row.dev_owner_user_id),
-      userName(row.test_owner_user_id),
+  async function toDetail(row: RequirementRow): Promise<RequirementDetail> {
+    const [collaboratorRows, latestSubmission, linkedBugs, linkedCodeReferences] = await Promise.all([
+      findCollaborators(db, row.id),
       findLatestSubmission(db, row.id),
       deps.bugs ? deps.bugs(row.id) : Promise.resolve([]),
       deps.codeReferences ? deps.codeReferences('requirement', row.id) : Promise.resolve([]),
     ])
-    const latestTestSubmission: TestSubmissionView | null = latestSubmission
-      ? {
-          id: latestSubmission.id,
-          submittedByUserId: latestSubmission.submitted_by_user_id,
-          devOwnerUserId: latestSubmission.dev_owner_user_id,
-          testOwnerUserId: latestSubmission.test_owner_user_id,
-          scopeNote: latestSubmission.scope_note,
-          selfTestResult: latestSubmission.self_test_result,
-          selfTestNote: latestSubmission.self_test_note,
-          testEntry: latestSubmission.test_entry,
-          versionNote: latestSubmission.version_note,
-          createdAt: latestSubmission.created_at.toISOString(),
-        }
-      : null
-    const needsReview =
-      row.status === 'passed' && linkedBugs.some((bug) => bug.status !== 'resolved' && bug.status !== 'closed')
-    return {
-      id: row.id,
-      teamId: row.team_id,
-      projectId: row.project_id,
-      number: row.number,
-      title: row.title,
-      contentMode: row.content_mode as 'markdown' | 'external_link',
-      contentMarkdown: row.content_markdown,
-      externalUrl: row.external_url,
-      externalSummary: row.external_summary,
-      acceptanceCriteria: row.acceptance_criteria,
-      devOwner: row.dev_owner_user_id ? { userId: row.dev_owner_user_id, name: devOwnerName } : null,
-      testOwner: row.test_owner_user_id ? { userId: row.test_owner_user_id, name: testOwnerName } : null,
-      collaborators: collaborators.map((item) => ({ userId: item.userId, name: item.name })),
-      latestTestSubmission,
+    const ownerUserIds = [
+      ...(row.dev_owner_user_id === null ? [] : [row.dev_owner_user_id]),
+      ...(row.test_owner_user_id === null ? [] : [row.test_owner_user_id]),
+      ...collaboratorRows.map((item) => item.userId),
+    ]
+    const refs = await loadUserRefs(db, ownerUserIds)
+    return toRequirementDetail({
+      row,
+      collaborators: collaboratorRows,
+      latestSubmission: latestSubmission ?? null,
       linkedBugs,
-      needsReview,
       linkedCodeReferences,
-      status: row.status as RequirementStatus,
-      version: row.version,
-      createdByUserId: row.created_by_user_id,
-      createdAt: row.created_at.toISOString(),
-      updatedAt: row.updated_at.toISOString(),
-    }
+      refs,
+    })
   }
 
   async function validateOwners(
@@ -216,19 +108,23 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     testOwnerUserId?: string | null,
     collaboratorUserIds?: string[],
   ) {
-    if (devOwnerUserId && !(await findActiveTeamMember(db, teamId, devOwnerUserId))) {
+    const uniqueCollaborators = [...new Set(collaboratorUserIds ?? [])]
+    const candidateUserIds = [devOwnerUserId, testOwnerUserId, ...uniqueCollaborators].filter(
+      (userId): userId is string => userId !== null && userId !== undefined,
+    )
+    const activeMemberIds = await findActiveTeamMemberIds(db, teamId, candidateUserIds)
+    if (devOwnerUserId && !activeMemberIds.has(devOwnerUserId)) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '研发主负责人不是正常团队成员')
     }
-    if (testOwnerUserId && !(await findActiveTeamMember(db, teamId, testOwnerUserId))) {
+    if (testOwnerUserId && !activeMemberIds.has(testOwnerUserId)) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '测试负责人不是正常团队成员')
     }
-    const unique = [...new Set(collaboratorUserIds ?? [])]
-    for (const userId of unique) {
-      if (!(await findActiveTeamMember(db, teamId, userId))) {
+    for (const userId of uniqueCollaborators) {
+      if (!activeMemberIds.has(userId)) {
         throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '协作人员不是正常团队成员')
       }
     }
-    return unique
+    return uniqueCollaborators
   }
 
   async function listRequirements(
@@ -248,23 +144,13 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       page,
       pageSize,
     })
-    const items: RequirementListItem[] = await Promise.all(
-      rows.map(async (row) => ({
-        id: row.id,
-        projectId: row.project_id,
-        number: row.number,
-        title: row.title,
-        status: row.status as RequirementStatus,
-        devOwner: row.dev_owner_user_id
-          ? { userId: row.dev_owner_user_id, name: await userName(row.dev_owner_user_id) }
-          : null,
-        testOwner: row.test_owner_user_id
-          ? { userId: row.test_owner_user_id, name: await userName(row.test_owner_user_id) }
-          : null,
-        version: row.version,
-        updatedAt: row.updated_at.toISOString(),
-      })),
+    const ownerUserIds = rows.flatMap((row) =>
+      row.dev_owner_user_id === null && row.test_owner_user_id === null
+        ? []
+        : [row.dev_owner_user_id, row.test_owner_user_id].filter((userId): userId is string => userId !== null),
     )
+    const ownerRefs = await loadUserRefs(db, ownerUserIds)
+    const items = rows.map((row) => toRequirementListItem({ row, refs: ownerRefs }))
     return { items, page, pageSize, total }
   }
 
@@ -287,7 +173,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     const title = normalizeTitle(input.title)
     const content = validateContent(input)
     const collaborators = await validateOwners(
-      project.team_id,
+      project.teamId,
       input.devOwnerUserId,
       input.testOwnerUserId,
       input.collaboratorUserIds,
@@ -298,11 +184,11 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     }
     const requirementId = randomUUID()
     const row = await db.transaction(async (tx) => {
-      await lockProject(tx, projectId)
+      await lockProjectForWrite(tx, projectId)
       const number = await nextRequirementNumber(tx, projectId)
       const created = await insertRequirement(tx, {
         id: requirementId,
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         number,
         title,
@@ -316,10 +202,10 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         createdByUserId: actor.id,
       })
       if (collaborators.length > 0) {
-        await replaceCollaborators(tx, requirementId, project.team_id, collaborators, actor.id)
+        await replaceCollaborators(tx, requirementId, project.teamId, collaborators, actor.id)
       }
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         entityType: 'requirement',
         entityId: requirementId,
@@ -356,7 +242,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '版本参数不合法')
     }
     const { row: current, project } = await requireRequirement(actor, requirementId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (!EDITABLE_STATUSES.has(current.status)) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '当前需求状态不允许修改范围字段')
     }
@@ -383,9 +269,9 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     const collaborators =
       input.collaboratorUserIds === undefined
         ? undefined
-        : await validateOwners(project.team_id, input.devOwnerUserId, input.testOwnerUserId, input.collaboratorUserIds)
+        : await validateOwners(project.teamId, input.devOwnerUserId, input.testOwnerUserId, input.collaboratorUserIds)
     if (collaborators === undefined && (input.devOwnerUserId !== undefined || input.testOwnerUserId !== undefined)) {
-      await validateOwners(project.team_id, input.devOwnerUserId, input.testOwnerUserId, [])
+      await validateOwners(project.teamId, input.devOwnerUserId, input.testOwnerUserId, [])
     }
 
     const changes: Record<string, unknown> = {}
@@ -413,11 +299,11 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '需求已被更新，请刷新后重试')
       if (collaborators !== undefined) {
-        await replaceCollaborators(tx, requirementId, project.team_id, collaborators, actor.id)
+        await replaceCollaborators(tx, requirementId, project.teamId, collaborators, actor.id)
       }
       if (Object.keys(changes).length > 0) {
         await appendActivity(tx, {
-          teamId: project.team_id,
+          teamId: project.teamId,
           projectId: project.id,
           entityType: 'requirement',
           entityId: requirementId,
@@ -433,9 +319,9 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
 
   async function addRequirementComment(actor: SessionUser, requirementId: string, bodyMarkdown: string) {
     const { project } = await requireRequirement(actor, requirementId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     return addComment(db, {
-      teamId: project.team_id,
+      teamId: project.teamId,
       projectId: project.id,
       entityType: 'requirement',
       entityId: requirementId,
@@ -466,7 +352,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
 
   async function requireWorkflow(actor: SessionUser, requirementId: string) {
     const { row, project } = await requireRequirement(actor, requirementId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (
       !EDITABLE_STATUSES.has(row.status) &&
       !['submitted', 'in_testing', 'passed', 'cancelled'].includes(row.status)
@@ -478,25 +364,10 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
 
   async function activeOwner(teamId: string, userId: string | null, name: string): Promise<string> {
     if (!userId) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, `请先指定${name}`)
-    if (!(await findActiveTeamMember(db, teamId, userId))) {
+    if (!(await isActiveTeamMember(db, teamId, userId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, `${name}不是正常团队成员`)
     }
     return userId
-  }
-
-  function submissionView(row: Awaited<ReturnType<typeof insertTestSubmission>>): TestSubmissionView {
-    return {
-      id: row.id,
-      submittedByUserId: row.submitted_by_user_id,
-      devOwnerUserId: row.dev_owner_user_id,
-      testOwnerUserId: row.test_owner_user_id,
-      scopeNote: row.scope_note,
-      selfTestResult: row.self_test_result,
-      selfTestNote: row.self_test_note,
-      testEntry: row.test_entry,
-      versionNote: row.version_note,
-      createdAt: row.created_at.toISOString(),
-    }
   }
 
   async function transition(
@@ -520,7 +391,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '需求已被更新，请刷新后重试')
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'requirement',
         entityId: requirementId,
@@ -538,7 +409,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   async function startDevelopment(actor: SessionUser, requirementId: string, input: { version: number }) {
     const { row, project } = await requireWorkflow(actor, requirementId)
     if (row.status !== 'pending') throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有待处理需求可以开始开发')
-    const owner = await activeOwner(project.team_id, row.dev_owner_user_id, '研发负责人')
+    const owner = await activeOwner(project.teamId, row.dev_owner_user_id, '研发负责人')
     return transition(
       actor,
       requirementId,
@@ -568,7 +439,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     const scope = 'requirement.submit-test'
     if (input.idempotencyKey) {
       const existing = await findIdempotency(db, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         actorUserId: actor.id,
         scope,
         key: input.idempotencyKey,
@@ -577,8 +448,8 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     }
     if (current.status !== 'in_development')
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有开发中需求可以提测')
-    const devOwnerId = await activeOwner(project.team_id, current.dev_owner_user_id, '研发负责人')
-    await activeOwner(project.team_id, input.testOwnerUserId, '测试负责人')
+    const devOwnerId = await activeOwner(project.teamId, current.dev_owner_user_id, '研发负责人')
+    await activeOwner(project.teamId, input.testOwnerUserId, '测试负责人')
     const scopeNote = requiredTextInService(input.scopeNote, '测试范围')
     const selfTestNote = input.selfTestNote?.trim() ?? ''
     if (input.selfTestResult !== 'passed' && selfTestNote.length === 0) {
@@ -592,7 +463,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       await lockRequirement(tx, requirementId)
       if (input.idempotencyKey) {
         await recordIdempotency(tx, {
-          teamId: project.team_id,
+          teamId: project.teamId,
           actorUserId: actor.id,
           scope,
           key: input.idempotencyKey,
@@ -603,7 +474,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       }
       const submission = await insertTestSubmission(tx, {
         id: submissionId,
-        teamId: project.team_id,
+        teamId: project.teamId,
         requirementId,
         submittedByUserId: actor.id,
         devOwnerUserId: devOwnerId,
@@ -620,7 +491,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '需求已被更新，请刷新后重试')
       const activity = await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'requirement',
         entityId: requirementId,
@@ -632,7 +503,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     })
     return {
       requirement: await toDetail(result.updated),
-      submission: submissionView(result.submission),
+      submission: toTestSubmissionView(result.submission),
       activityId: result.activityId,
     }
   }
@@ -640,7 +511,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   async function startTest(actor: SessionUser, requirementId: string, input: { version: number }) {
     const { row, project } = await requireWorkflow(actor, requirementId)
     if (row.status !== 'submitted') throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有待测试需求可以开始测试')
-    await activeOwner(project.team_id, row.test_owner_user_id, '测试负责人')
+    await activeOwner(project.teamId, row.test_owner_user_id, '测试负责人')
     return transition(actor, requirementId, { version: input.version, status: 'in_testing' }, 'test_started')
   }
 
@@ -725,10 +596,10 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     input: { version: number; reason: string },
   ) {
     const { row, project } = await requireRequirement(actor, requirementId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (row.status !== 'cancelled') throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有已取消需求可以恢复')
-    if (row.dev_owner_user_id) await activeOwner(project.team_id, row.dev_owner_user_id, '研发负责人')
-    if (row.test_owner_user_id) await activeOwner(project.team_id, row.test_owner_user_id, '测试负责人')
+    if (row.dev_owner_user_id) await activeOwner(project.teamId, row.dev_owner_user_id, '研发负责人')
+    if (row.test_owner_user_id) await activeOwner(project.teamId, row.test_owner_user_id, '测试负责人')
     return transition(actor, requirementId, { version: input.version, status: 'pending' }, 'requirement_restored', {
       reason: reasonTextInService(input.reason, '恢复原因'),
     })
@@ -738,7 +609,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     await requireRequirement(actor, requirementId)
     validatePage(page, pageSize)
     const { rows, total } = await findTestSubmissions(db, requirementId, page, pageSize)
-    return { items: rows.map(submissionView), page, pageSize, total }
+    return { items: rows.map(toTestSubmissionView), page, pageSize, total }
   }
 
   async function countOpenRequirements(projectIds: string[]): Promise<Map<string, number>> {
@@ -769,4 +640,3 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
 }
 
 export type RequirementsService = ReturnType<typeof createRequirementsService>
-export type { ProjectCounts }

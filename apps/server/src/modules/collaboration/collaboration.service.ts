@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { validatePage } from '../../platform/http/pagination.ts'
 import {
   findActivities,
   findComments,
@@ -9,10 +10,10 @@ import {
   type ActivityEntityType,
   type CommentEntityType,
   type DatabaseExecutor,
-} from './collaboration.repository.js'
+} from './collaboration.repository.ts'
 
-const COMMENT_ENTITY_TYPES = new Set<CommentEntityType>(['project', 'requirement', 'bug'])
-const ACTIVITY_ENTITY_TYPES = new Set<ActivityEntityType>([
+const COMMENT_ENTITY_TYPES: ReadonlySet<string> = new Set(['project', 'requirement', 'bug'])
+const ACTIVITY_ENTITY_TYPES: ReadonlySet<string> = new Set([
   'project',
   'requirement',
   'bug',
@@ -60,15 +61,36 @@ function requireNonEmpty(value: string, name: string, maxLength: number): string
   return trimmed
 }
 
-function validateEntityType<T extends string>(value: string, allowed: Set<T>, name: string): T {
-  if (!allowed.has(value as T)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, `${name}不合法`)
-  return value as T
+/** 将数据库评论目标类型收窄为业务类型；数据不合法时说明是持久化异常。 */
+function toCommentEntityType(value: string): CommentEntityType {
+  if (!isCommentEntityType(value)) throw new Error(`数据库评论目标类型不合法: ${value}`)
+  return value
 }
 
-function validatePage(page: number, pageSize: number): void {
-  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '分页参数不合法')
-  }
+/** 将数据库活动目标类型收窄为业务类型；数据不合法时说明是持久化异常。 */
+function toActivityEntityType(value: string): ActivityEntityType {
+  if (!isActivityEntityType(value)) throw new Error(`数据库活动目标类型不合法: ${value}`)
+  return value
+}
+
+/** 判断字符串是否为评论目标类型。 */
+function isCommentEntityType(value: string): value is CommentEntityType {
+  return COMMENT_ENTITY_TYPES.has(value)
+}
+
+/** 判断字符串是否为活动目标类型。 */
+function isActivityEntityType(value: string): value is ActivityEntityType {
+  return ACTIVITY_ENTITY_TYPES.has(value)
+}
+
+function validateCommentEntityType(value: string): CommentEntityType {
+  if (!isCommentEntityType(value)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '评论目标类型不合法')
+  return value
+}
+
+function validateActivityEntityType(value: string): ActivityEntityType {
+  if (!isActivityEntityType(value)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '活动目标类型不合法')
+  return value
 }
 
 function mapComment(row: ReturnType<typeof insertComment> extends Promise<infer T> ? T : never): CommentView {
@@ -76,7 +98,7 @@ function mapComment(row: ReturnType<typeof insertComment> extends Promise<infer 
     id: row.id,
     teamId: row.team_id,
     projectId: row.project_id,
-    entityType: row.entity_type as CommentEntityType,
+    entityType: toCommentEntityType(row.entity_type),
     entityId: row.entity_id,
     authorUserId: row.author_user_id,
     bodyMarkdown: row.body_markdown,
@@ -89,7 +111,7 @@ function mapActivity(row: Awaited<ReturnType<typeof insertActivity>>): ActivityV
     id: row.id,
     teamId: row.team_id,
     projectId: row.project_id,
-    entityType: row.entity_type as ActivityEntityType,
+    entityType: toActivityEntityType(row.entity_type),
     entityId: row.entity_id,
     action: row.action,
     actorUserId: row.actor_user_id,
@@ -121,7 +143,7 @@ export async function appendActivity(
     note?: string
   },
 ): Promise<ActivityView> {
-  const entityType = validateEntityType(input.entityType, ACTIVITY_ENTITY_TYPES, '活动目标类型')
+  const entityType = validateActivityEntityType(input.entityType)
   const action = requireNonEmpty(input.action, '动作', 48)
   const reason = input.reason === undefined ? undefined : requireNonEmpty(input.reason, '原因', 2000)
   const note = input.note === undefined ? undefined : requireNonEmpty(input.note, '说明', 2000)
@@ -158,7 +180,7 @@ export async function addComment(
     bodyMarkdown: string
   },
 ): Promise<CommentView> {
-  const entityType = validateEntityType(input.entityType, COMMENT_ENTITY_TYPES, '评论目标类型')
+  const entityType = validateCommentEntityType(input.entityType)
   const bodyMarkdown = requireNonEmpty(input.bodyMarkdown, '评论', 20_000)
   const row = await insertComment(executor, {
     id: randomUUID(),
@@ -190,14 +212,14 @@ export async function listComments(
   pageSize = 20,
 ): Promise<PageResult<CommentView>> {
   validatePage(page, pageSize)
-  const type = validateEntityType(entityType, COMMENT_ENTITY_TYPES, '评论目标类型')
+  const type = validateCommentEntityType(entityType)
   const { rows, total } = await findComments(executor, type, entityId, page, pageSize)
   return {
     items: rows.map((row) => ({
       id: row.id,
       teamId: row.team_id,
       projectId: row.project_id,
-      entityType: row.entity_type as CommentEntityType,
+      entityType: toCommentEntityType(row.entity_type),
       entityId: row.entity_id,
       authorUserId: row.author_user_id,
       bodyMarkdown: row.body_markdown,
@@ -227,14 +249,14 @@ export async function listActivities(
   pageSize = 20,
 ): Promise<PageResult<ActivityView>> {
   validatePage(page, pageSize)
-  const type = validateEntityType(entityType, ACTIVITY_ENTITY_TYPES, '活动目标类型')
+  const type = validateActivityEntityType(entityType)
   const { rows, total } = await findActivities(executor, type, entityId, page, pageSize)
   return {
     items: rows.map((row) => ({
       id: row.id,
       teamId: row.team_id,
       projectId: row.project_id,
-      entityType: row.entity_type as ActivityEntityType,
+      entityType: toActivityEntityType(row.entity_type),
       entityId: row.entity_id,
       action: row.action,
       actorUserId: row.actor_user_id,

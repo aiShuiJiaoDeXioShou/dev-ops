@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { activity, comment } from './collaboration.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import { activity, comment } from './collaboration.tables.ts'
 
 /** 数据所有者可传入根连接或同一事务连接。 */
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]

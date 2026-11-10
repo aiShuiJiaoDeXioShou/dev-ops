@@ -83,7 +83,7 @@ apps/server/
 ├── src/
 │   ├── entrypoints/              # HTTP 和迁移命令入口
 │   ├── bootstrap/                # HTTP 组装、迁移 schema 聚合
-│   ├── modules/health/           # 现有健康与就绪接口
+│   ├── modules/                  # identity、projects、requirements、bugs、code 等业务模块
 │   └── platform/
 │       ├── config/               # 环境变量校验
 │       ├── database/             # 连接池、命名空间、迁移执行
@@ -98,6 +98,10 @@ apps/server/
 
 新增业务时，建立 `modules/<业务名>/`。路由文件负责 HTTP 输入输出，schema 文件定义请求和响应。出现业务规则时添加 service，出现持久化操作时添加 repository；service 通过参数接收依赖，避免直接依赖 HTTP request/reply。
 
+后端是 Node ESM 工程：`package.json` 声明 `"type": "module"`，tsconfig 使用 `module` 与 `moduleResolution: NodeNext`。相对导入统一写 `.ts` 扩展名（与源文件一致）；共享 Node tsconfig 开启 `rewriteRelativeImportExtensions`，`tsc` 输出到 `dist/` 时自动改写为 `.js`，本地开发由 `tsx` 解析源码。这是 NodeNext ESM 的标准做法，不是模块化配置缺失或写法错误。
+
+后端按业务模块组织，模块用于组织代码而不是强制封装：跨模块可以直接导入对方的 service、read、repository 或表定义，也可以跨模块 SQL join。同一张表的写入逻辑优先留在数据所属模块，靠代码评审维持；不再强制 `public.ts` 门面或依赖检查。
+
 将模块作为 Fastify 插件注册到 `bootstrap/create-http-app.ts`，统一使用 `/api/v1` 前缀。用 TypeBox 定义请求和响应 schema，插件使用 `FastifyPluginAsyncTypebox` 保留类型推导。需要拒绝额外字段时，在对象 schema 中指定 `additionalProperties: false`。
 
 自研接口只使用 GET 与 POST，统一返回 HTTP 200 与响应信封：
@@ -107,7 +111,7 @@ apps/server/
 
 业务失败使用错误码表达，不用 4xx/5xx；`requestId` 与响应头 `x-request-id` 一致，用于关联日志。未知 API 路径同样返回 HTTP 200 + `NOT_FOUND` 信封；未处理异常返回 500 失败信封，内部细节只进入日志。相关行为由 [test/http/app.test.ts](test/http/app.test.ts) 验证。
 
-根目录 `pnpm api:generate` 从已注册路由导出 OpenAPI 并生成 Web、CLI 的共享客户端，无需数据库在线。后续业务表在所属模块定义，并从 `bootstrap/database-schema.ts` 汇总；跨模块通过 `public.ts` 调用，依赖检查见根目录 `pnpm check:boundaries`。Worker、适配器和业务 service 在出现实际使用者时添加。
+根目录 `pnpm api:generate` 从已注册路由导出 OpenAPI 并生成 Web、CLI 的共享客户端，无需数据库在线。后续业务表在所属模块定义，并从 `bootstrap/database-schema.ts` 汇总；跨模块直接导入目标模块实现，循环依赖、应用越界和 platform 反向依赖由根目录 `pnpm check:boundaries` 检查。Worker、适配器和业务 service 在出现实际使用者时添加。
 
 数据库配置与迁移见[数据库说明](../../docs/architecture/database.md)。认证和异步任务的接入条件见[选型规划](../../docs/architecture/server-foundation.md)。
 

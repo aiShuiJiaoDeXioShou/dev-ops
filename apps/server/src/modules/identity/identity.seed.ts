@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import type { IdentityAuth } from './identity.auth.js'
-import { authUser, platformAdmin } from './identity.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import type { IdentityAuth } from './identity.auth.ts'
+import { authUser, platformAdmin } from './identity.tables.ts'
 
 /**
  * 幂等初始化平台 root 账号。

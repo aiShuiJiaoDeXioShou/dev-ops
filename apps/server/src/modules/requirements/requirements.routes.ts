@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { success } from '../../platform/http/response.js'
-import { requireSessionUser, type IdentityAuth } from '../identity/public.js'
-import type { RequirementsService } from './requirements.service.js'
+import { success } from '../../platform/http/response.ts'
+import { requireSessionUser } from '../identity/identity.session.ts'
+import type { IdentityAuth } from '../identity/identity.auth.ts'
+import type { RequirementsService } from './requirements.service.ts'
 import {
   activityPageResponseSchema,
   cancelRequirementBodySchema,
@@ -27,7 +28,7 @@ import {
   testSubmissionPageResponseSchema,
   updateRequirementBodySchema,
   withdrawTestBodySchema,
-} from './requirements.schema.js'
+} from './requirements.schema.ts'
 
 /** 需求列表、详情、创建、更新、评论与活动路由。 */
 export const requirementRoutes: FastifyPluginAsyncTypebox<{

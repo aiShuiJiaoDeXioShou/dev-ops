@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
-import { appSchema } from '../../platform/database/namespace.js'
+import { appSchema } from '../../platform/database/namespace.ts'
 
 /** 内部 Bug；现象、预期与复现信息是建单必填的业务事实。 */
 export const bug = appSchema.table(
@@ -45,6 +45,7 @@ export const bug = appSchema.table(
       sql`(${table.reproduction_unknown} = true) OR (${table.reproduction} IS NOT NULL AND length(btrim(${table.reproduction})) > 0)`,
     ),
     index('idx_bug_project_status').on(table.project_id, table.status, table.updated_at, table.id),
+    index('idx_bug_project_updated').on(table.project_id, table.updated_at, table.id),
     index('idx_bug_project_owner').on(table.project_id, table.fix_owner_user_id),
     index('idx_bug_team').on(table.team_id),
   ],

@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import type { Database } from '../../platform/database/client.js'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import { requireTeamMember, type SessionUser } from '../identity/public.js'
-import type { SecretCipher } from './configuration.crypto.js'
-import { findSecretForDecrypt, insertSecret, listSecrets, revokeSecret } from './configuration.repository.js'
+import type { Database } from '../../platform/database/client.ts'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
+import type { SecretCipher } from './configuration.crypto.ts'
+import { findSecretForDecrypt, insertSecret, listSecrets, revokeSecret } from './configuration.repository.ts'
 
 const SECRET_KINDS = new Set(['git_token', 'github_app_private_key'])
 

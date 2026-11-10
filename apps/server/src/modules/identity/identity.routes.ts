@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import { failure } from '../../platform/http/response.js'
-import type { IdentityAuth } from './identity.auth.js'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { failure } from '../../platform/http/response.ts'
+import type { IdentityAuth } from './identity.auth.ts'
 
 function toHeaders(source: Record<string, string | string[] | undefined>): Headers {
   const headers = new Headers()
@@ -38,7 +38,7 @@ export const identityAuthRoutes: FastifyPluginAsync<{ auth: IdentityAuth; origin
       }
 
       const url = new URL(request.url, options.origin)
-      const headers = toHeaders(request.headers as Record<string, string | string[] | undefined>)
+      const headers = toHeaders(request.headers)
       const init: RequestInit = { method: request.method, headers }
       if (request.method !== 'GET' && request.body !== undefined) {
         init.body = JSON.stringify(request.body)

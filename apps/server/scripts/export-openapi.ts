@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
-import { createHttpApp } from '../src/bootstrap/create-http-app.js'
-import { loadConfig } from '../src/platform/config/env.js'
+import { createHttpApp } from '../src/bootstrap/create-http-app.ts'
+import { loadConfig } from '../src/platform/config/env.ts'
 
 // 契约导出只组装路由，不探测数据库，也不读取本地凭据或监听端口。
 const app = createHttpApp(

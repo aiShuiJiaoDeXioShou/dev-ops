@@ -1,18 +1,22 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
-import type { AppConfig } from '../../platform/config/env.js'
-import type { Database } from '../../platform/database/client.js'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import { requireTeamMember, type SessionUser } from '../identity/public.js'
-import type { ConfigurationService } from '../configuration/public.js'
-import { findConnectionRepositories, markRepositoriesUnavailable, upsertGitRepositories } from '../code/public.js'
+import type { AppConfig } from '../../platform/config/env.ts'
+import type { Database } from '../../platform/database/client.ts'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
+import type { ConfigurationService } from '../configuration/configuration.service.ts'
+import {
+  findConnectionRepositories,
+  markRepositoriesUnavailable,
+  upsertGitRepositories,
+} from '../code/code.repository.ts'
 import {
   findActiveConnectionIds,
   findGitConnectionById,
   findGitConnections,
   insertGitConnection,
   updateGitConnection,
-} from './integrations.repository.js'
+} from './integrations.repository.ts'
 
 const NAME_MAX = 120
 

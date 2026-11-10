@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import type { AppConfig } from '../../platform/config/env.js'
-import type { Database } from '../../platform/database/client.js'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import type { IdentityAuth } from './identity.auth.js'
+import type { AppConfig } from '../../platform/config/env.ts'
+import type { Database } from '../../platform/database/client.ts'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import type { IdentityAuth } from './identity.auth.ts'
 import {
   countActiveAdmins,
   findInvitationById,
@@ -22,8 +22,8 @@ import {
   lockTeam,
   updateInvitation,
   updateTeamMember,
-} from './identity.repository.js'
-import { requirePlatformAdmin, requireTeamMember, type SessionUser, type TeamRole } from './identity.session.js'
+} from './identity.repository.ts'
+import { requirePlatformAdmin, requireTeamMember, type SessionUser, type TeamRole } from './identity.session.ts'
 import {
   createInvitationToken,
   hashInvitationToken,
@@ -31,9 +31,10 @@ import {
   isUniqueViolation,
   normalizeEmail,
   normalizeRole,
+  toTeamRole,
   normalizeTeamName,
   wouldRemoveLastAdmin,
-} from './identity.rules.js'
+} from './identity.rules.ts'
 
 export interface InvitationView {
   id: string
@@ -74,7 +75,7 @@ function invitationView(
     id: row.id,
     teamId: row.team_id,
     email: row.email,
-    role: row.role as TeamRole,
+    role: toTeamRole(row.role),
     status: row.status,
     expiresAt: row.expires_at.toISOString(),
     invitedByUserId: row.invited_by_user_id,
@@ -95,7 +96,7 @@ function memberView(row: {
     userId: row.userId,
     name: row.name,
     email: row.email,
-    role: row.role as TeamRole,
+    role: toTeamRole(row.role),
     status: row.status,
     joinedAt: row.joinedAt.toISOString(),
   }
@@ -291,7 +292,7 @@ export function createIdentityService(deps: IdentityServiceDeps) {
     return {
       teamName: teamRow.name,
       email: row.email,
-      role: row.role as TeamRole,
+      role: toTeamRole(row.role),
       expiresAt: row.expires_at.toISOString(),
     }
   }
@@ -365,12 +366,12 @@ export function createIdentityService(deps: IdentityServiceDeps) {
       await updateInvitation(tx, locked.id, { status: 'accepted', acceptedAt: new Date() })
     })
 
-    return { userId, teamId: teamRow.id, teamName: teamRow.name, role: invitationRow.role as TeamRole, cookies }
+    return { userId, teamId: teamRow.id, teamName: teamRow.name, role: toTeamRole(invitationRow.role), cookies }
   }
 
   async function listMyTeams(user: SessionUser) {
     const rows = await listTeamsForUser(db, user.id)
-    return rows.map((row) => ({ ...row, role: row.role as TeamRole }))
+    return rows.map((row) => ({ ...row, role: toTeamRole(row.role) }))
   }
 
   return {

@@ -1,10 +1,18 @@
 import { randomUUID } from 'node:crypto'
 import { and, count, desc, eq, ilike, inArray, max, or, sql } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { requirement, requirementCollaborator, requirementTestSubmission } from './requirements.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import { requirement, requirementCollaborator, requirementTestSubmission } from './requirements.tables.ts'
+import type { RequirementSummary } from './requirements.types.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type RequirementExecutor = Database | TransactionDatabase
+
+/** 需求完整行，供详情映射使用。 */
+export type RequirementRow = NonNullable<Awaited<ReturnType<typeof findRequirementById>>>
+/** 需求列表投影行，仅包含列表需要的字段。 */
+export type RequirementListRow = Awaited<ReturnType<typeof findRequirements>>['rows'][number]
+/** 需求提测记录行。 */
+export type RequirementSubmissionRow = NonNullable<Awaited<ReturnType<typeof findLatestSubmission>>>
 
 export interface RequirementListFilters {
   search?: string
@@ -40,7 +48,7 @@ export async function nextRequirementNumber(tx: TransactionDatabase, projectId: 
  * @param db 数据库连接。
  * @param projectId 项目标识。
  * @param filters 搜索、状态、负责人、分页。
- * @returns 需求行与总数。
+ * @returns 列表所需字段投影与总数；不返回正文等大字段。
  */
 export async function findRequirements(db: Database, projectId: string, filters: RequirementListFilters) {
   const conditions = [eq(requirement.project_id, projectId)]
@@ -54,7 +62,17 @@ export async function findRequirements(db: Database, projectId: string, filters:
   const where = and(...conditions)
   const [rows, [total]] = await Promise.all([
     db
-      .select()
+      .select({
+        id: requirement.id,
+        project_id: requirement.project_id,
+        number: requirement.number,
+        title: requirement.title,
+        status: requirement.status,
+        dev_owner_user_id: requirement.dev_owner_user_id,
+        test_owner_user_id: requirement.test_owner_user_id,
+        version: requirement.version,
+        updated_at: requirement.updated_at,
+      })
       .from(requirement)
       .where(where)
       .orderBy(desc(requirement.updated_at), desc(requirement.id))
@@ -189,24 +207,18 @@ export async function countOpenRequirementsByProjects(db: Database, projectIds: 
   return new Map(rows.map((row) => [row.projectId, row.value]))
 }
 
-export interface RequirementSummary {
-  id: string
-  number: number
-  title: string
-  status: string
-  projectId: string
-  teamId: string
-}
-
 /**
  * 按标识批量读取需求摘要，供 Bug/流程模块展示关联；不返回正文。
- * @param db 数据库连接。
+ * @param executor 数据库连接或事务。
  * @param requirementIds 需求标识集合。
- * @returns 需求摘要数组，顺序与查询结果一致。
+ * @returns 需求摘要数组，顺序与查询结果一致；空数组直接返回空数组。
  */
-export async function findRequirementSummaries(db: Database, requirementIds: string[]): Promise<RequirementSummary[]> {
+export async function findRequirementSummaries(
+  executor: RequirementExecutor,
+  requirementIds: string[],
+): Promise<RequirementSummary[]> {
   if (requirementIds.length === 0) return []
-  return db
+  return executor
     .select({
       id: requirement.id,
       number: requirement.number,
@@ -216,7 +228,21 @@ export async function findRequirementSummaries(db: Database, requirementIds: str
       teamId: requirement.team_id,
     })
     .from(requirement)
-    .where(inArray(requirement.id, requirementIds))
+    .where(inArray(requirement.id, [...new Set(requirementIds)]))
+}
+
+/**
+ * 按标识读取单条需求摘要，供跨模块校验需求归属。
+ * @param executor 数据库连接或事务。
+ * @param requirementId 需求标识。
+ * @returns 需求摘要；需求不存在时返回 undefined。
+ */
+export async function findRequirementSummaryById(
+  executor: RequirementExecutor,
+  requirementId: string,
+): Promise<RequirementSummary | undefined> {
+  const [summary] = await findRequirementSummaries(executor, [requirementId])
+  return summary
 }
 
 /**

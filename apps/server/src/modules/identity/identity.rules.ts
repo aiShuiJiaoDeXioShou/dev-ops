@@ -1,11 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import type { TeamRole } from './identity.session.js'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import type { TeamRole } from './identity.session.ts'
 
 /** 邀请默认有效期：7 天（Q02 暂定）。 */
 export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000
-export const TEAM_ROLES: ReadonlySet<TeamRole> = new Set(['admin', 'developer', 'viewer'])
+export const TEAM_ROLES: ReadonlySet<string> = new Set(['admin', 'developer', 'viewer'])
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** 归一化并校验邮箱。 */
@@ -26,10 +26,21 @@ export function normalizeTeamName(name: string): string {
   return value
 }
 
+/** 判断字符串是否为团队角色。 */
+export function isTeamRole(value: string): value is TeamRole {
+  return TEAM_ROLES.has(value)
+}
+
 /** 校验团队角色。 */
 export function normalizeRole(role: string): TeamRole {
-  if (!TEAM_ROLES.has(role as TeamRole)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '团队角色不合法')
-  return role as TeamRole
+  if (!isTeamRole(role)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '团队角色不合法')
+  return role
+}
+
+/** 将数据库团队角色收窄为业务类型；数据不合法时说明是持久化异常。 */
+export function toTeamRole(value: string): TeamRole {
+  if (!isTeamRole(value)) throw new Error(`数据库团队角色不合法: ${value}`)
+  return value
 }
 
 /** 计算邀请 token 的 SHA-256 哈希。 */

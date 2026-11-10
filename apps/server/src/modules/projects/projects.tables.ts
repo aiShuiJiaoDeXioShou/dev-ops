@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { check, index, integer, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
-import { appSchema } from '../../platform/database/namespace.js'
+import { appSchema } from '../../platform/database/namespace.ts'
 
 /** 项目：团队内的业务容器，负责人表示责任而非额外授权。 */
 export const project = appSchema.table(
@@ -22,6 +22,7 @@ export const project = appSchema.table(
     unique('uk_project_team_name').on(table.team_id, table.name),
     check('ck_project_status', sql`${table.status} in ('active', 'paused', 'ended')`),
     index('idx_project_team_status').on(table.team_id, table.status, table.updated_at, table.id),
+    index('idx_project_team_updated').on(table.team_id, table.updated_at, table.id),
     index('idx_project_owner').on(table.team_id, table.owner_user_id),
   ],
 )

@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, isNull } from 'drizzle-orm'
-import type { Database } from '../database/client.js'
-import { ApiError } from './errors.js'
-import { ERROR_CODES } from './error-codes.js'
-import { idempotencyRecord } from '../database/idempotency.tables.js'
+import type { Database } from '../database/client.ts'
+import { ApiError } from './errors.ts'
+import { ERROR_CODES } from './error-codes.ts'
+import { idempotencyRecord } from '../database/idempotency.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 

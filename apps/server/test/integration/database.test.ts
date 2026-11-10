@@ -7,11 +7,11 @@ import { test } from 'node:test'
 import { eq, sql } from 'drizzle-orm'
 import { bigint, text } from 'drizzle-orm/pg-core'
 import { Client } from 'pg'
-import { createHttpApp } from '../../src/bootstrap/create-http-app.js'
-import { loadConfig } from '../../src/platform/config/env.js'
-import { createDatabase } from '../../src/platform/database/client.js'
-import { migrateDatabase } from '../../src/platform/database/migrate.js'
-import { appSchema } from '../../src/platform/database/namespace.js'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import { loadConfig } from '../../src/platform/config/env.ts'
+import { createDatabase } from '../../src/platform/database/client.ts'
+import { migrateDatabase } from '../../src/platform/database/migrate.ts'
+import { appSchema } from '../../src/platform/database/namespace.ts'
 
 // 此表仅在随机命名的测试库中创建，不写入业务 schema 或正式迁移。
 const record = appSchema.table('integration_record', {

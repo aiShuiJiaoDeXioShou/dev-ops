@@ -1,5 +1,5 @@
 import { Type, type TSchema } from 'typebox'
-import { ERROR_CODES, type ErrorCode } from './error-codes.js'
+import { ERROR_CODES, type ErrorCode } from './error-codes.ts'
 
 /** 成功响应固定 code，调用方可据此做类型收窄和日志检索。 */
 export const SUCCESS_CODE = ERROR_CODES.OK

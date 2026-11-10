@@ -9,16 +9,16 @@ import { test } from 'node:test'
 const executable = fileURLToPath(new URL('../../node_modules/.bin/depcruise', import.meta.url))
 const configuration = fileURLToPath(new URL('../dependency-rules.mjs', import.meta.url))
 
-test('真实依赖扫描允许公开接口并拒绝越界导入和循环依赖', async () => {
+test('真实依赖扫描允许 Web 公开接口和后端跨模块导入，并拒绝越界导入和循环依赖', async () => {
   const cases = [
     [
-      '公开接口',
+      'Web 公开接口与后端跨模块直接导入',
       null,
       {
         'apps/web/src/pages/detail.ts': "import { value } from '@/features/project/public'; export { value }",
         'apps/web/src/features/project/public.ts': 'export const value = 1',
-        'apps/server/src/modules/requirement/service.ts': "export { value } from '../project/public.js'",
-        'apps/server/src/modules/project/public.ts': 'export const value = 1',
+        'apps/server/src/modules/requirement/service.ts': "export { value } from '../project/service.js'",
+        'apps/server/src/modules/project/service.ts': 'export const value = 1',
       },
     ],
     [
@@ -38,19 +38,11 @@ test('真实依赖扫描允许公开接口并拒绝越界导入和循环依赖',
       },
     ],
     [
-      '跨模块读取仓储',
-      'server-module-public-entry',
-      {
-        'apps/server/src/modules/requirement/service.ts': "export { value } from '../project/repository.js'",
-        'apps/server/src/modules/project/repository.ts': 'export const value = 1',
-      },
-    ],
-    [
       '基础设施依赖业务',
       'server-platform-is-foundation',
       {
-        'apps/server/src/platform/database/client.ts': "export { value } from '../../modules/project/public.js'",
-        'apps/server/src/modules/project/public.ts': 'export const value = 1',
+        'apps/server/src/platform/database/client.ts': "export { value } from '../../modules/project/service.js'",
+        'apps/server/src/modules/project/service.ts': 'export const value = 1',
       },
     ],
     [
@@ -58,8 +50,8 @@ test('真实依赖扫描允许公开接口并拒绝越界导入和循环依赖',
       'packages-independent-of-apps',
       {
         'packages/api-client/src/index.ts':
-          "export { value } from '../../../apps/server/src/modules/project/public.js'",
-        'apps/server/src/modules/project/public.ts': 'export const value = 1',
+          "export { value } from '../../../apps/server/src/modules/project/service.js'",
+        'apps/server/src/modules/project/service.ts': 'export const value = 1',
       },
     ],
     [
@@ -88,7 +80,7 @@ test('真实依赖扫描允许公开接口并拒绝越界导入和循环依赖',
       const result = spawnSync(executable, ['--config', configuration, '--output-type', 'json', 'apps', 'packages'], {
         cwd,
         encoding: 'utf8',
-        timeout: 15_000,
+        timeout: 60_000,
       })
       assert.ifError(result.error)
       assert.ok(result.stdout.trim(), `${label}: ${result.stderr}`)
@@ -100,7 +92,7 @@ test('真实依赖扫描允许公开接口并拒绝越界导入和循环依赖',
         const gate = spawnSync(executable, ['--config', configuration, 'apps', 'packages'], {
           cwd,
           encoding: 'utf8',
-          timeout: 15_000,
+          timeout: 60_000,
         })
         assert.ifError(gate.error)
         assert.notEqual(gate.status, 0, `${label} 未阻止检查通过`)

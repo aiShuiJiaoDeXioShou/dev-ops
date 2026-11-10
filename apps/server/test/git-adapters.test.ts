@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createGitHubCliAdapter } from '../src/adapters/git/github-cli.adapter.js'
-import { createGitHubAppAdapter, type GitHubAppClient } from '../src/adapters/git/github.adapter.js'
-import { createGiteaAdapter } from '../src/adapters/git/gitea.adapter.js'
-import { createGitAdapter } from '../src/adapters/git/git.registry.js'
-import { GitAdapterError } from '../src/adapters/git/git.types.js'
-import { loadConfig } from '../src/platform/config/env.js'
+import { createGitHubCliAdapter } from '../src/adapters/git/github-cli.adapter.ts'
+import { createGitHubAppAdapter, type GitHubAppClient } from '../src/adapters/git/github.adapter.ts'
+import { createGiteaAdapter } from '../src/adapters/git/gitea.adapter.ts'
+import { createGitAdapter } from '../src/adapters/git/git.registry.ts'
+import { GitAdapterError } from '../src/adapters/git/git.types.ts'
+import { loadConfig } from '../src/platform/config/env.ts'
 
 const baseInput = { provider: 'github' as const, authKind: 'github_cli' as const, instanceUrl: 'https://github.com' }
 const allowed = ['aiShuiJiaoDeXioShou/dev-ops']

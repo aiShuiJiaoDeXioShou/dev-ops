@@ -1,7 +1,7 @@
-import { loadConfig } from '../src/platform/config/env.js'
-import { createDatabase } from '../src/platform/database/client.js'
-import { createIdentityAuth } from '../src/modules/identity/identity.auth.js'
-import { seedRootAccount } from '../src/modules/identity/identity.seed.js'
+import { loadConfig } from '../src/platform/config/env.ts'
+import { createDatabase } from '../src/platform/database/client.ts'
+import { createIdentityAuth } from '../src/modules/identity/identity.auth.ts'
+import { seedRootAccount } from '../src/modules/identity/identity.seed.ts'
 
 function readRequired(name: 'ROOT_EMAIL' | 'ROOT_INITIAL_PASSWORD'): string {
   const value = process.env[name]?.trim()

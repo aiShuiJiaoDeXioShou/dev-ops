@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { ERROR_CODES } from '../../src/platform/http/error-codes.js'
-import { failure, success } from '../../src/platform/http/response.js'
+import { ERROR_CODES } from '../../src/platform/http/error-codes.ts'
+import { failure, success } from '../../src/platform/http/response.ts'
 
 test('成功信封包含固定成功码、请求标识与业务数据', () => {
   assert.deepEqual(success({ id: '42' }, 'trace'), {

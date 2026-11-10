@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { check, index, jsonb, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
-import { appSchema } from '../../platform/database/namespace.js'
+import { appSchema } from '../../platform/database/namespace.ts'
 
 /** 事项评论；正文保存 Markdown 源文本，服务端不渲染 HTML。 */
 export const comment = appSchema.table(

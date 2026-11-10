@@ -1,6 +1,7 @@
-import { and, asc, count, desc, eq } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { authUser, invitation, team, teamMember } from './identity.tables.js'
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm'
+import type { Database } from '../../platform/database/client.ts'
+import { authUser, invitation, team, teamMember } from './identity.tables.ts'
+import type { UserSummary } from './identity.types.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type IdentityExecutor = Database | TransactionDatabase
@@ -304,17 +305,54 @@ export async function findUserById(executor: IdentityExecutor, userId: string) {
 }
 
 /**
- * 查询团队成员关系，仅返回正常状态。
+ * 按标识批量读取用户摘要，供其他模块一次填充负责人姓名，替代逐条查询。
+ * @param executor 数据库连接或事务。
+ * @param userIds 用户标识集合；重复标识会被去重。
+ * @returns 用户摘要数组；空数组直接返回空数组，不访问数据库。
+ */
+export async function findUserSummariesByIds(executor: IdentityExecutor, userIds: string[]): Promise<UserSummary[]> {
+  if (userIds.length === 0) return []
+  const uniqueUserIds = [...new Set(userIds)]
+  return executor
+    .select({ id: authUser.id, name: authUser.name })
+    .from(authUser)
+    .where(inArray(authUser.id, uniqueUserIds))
+}
+
+/**
+ * 批量筛查团队内正常状态的成员标识，用于一次校验多个负责人或协作人。
+ * @param executor 数据库连接或事务。
+ * @param teamId 团队标识。
+ * @param userIds 待校验的用户标识集合；重复标识会被去重。
+ * @returns 属于团队正常成员的用户标识集合；空数组直接返回空集合。
+ */
+export async function findActiveTeamMemberIds(
+  executor: IdentityExecutor,
+  teamId: string,
+  userIds: string[],
+): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set()
+  const rows = await executor
+    .select({ userId: teamMember.user_id })
+    .from(teamMember)
+    .where(
+      and(
+        eq(teamMember.team_id, teamId),
+        eq(teamMember.status, 'active'),
+        inArray(teamMember.user_id, [...new Set(userIds)]),
+      ),
+    )
+  return new Set(rows.map((row) => row.userId))
+}
+
+/**
+ * 判断用户是否为团队正常成员。
  * @param executor 数据库连接或事务。
  * @param teamId 团队标识。
  * @param userId 用户标识。
- * @returns 正常成员关系或 undefined。
+ * @returns 是正常成员返回 true，否则返回 false。
  */
-export async function findActiveTeamMember(executor: IdentityExecutor, teamId: string, userId: string) {
-  const [row] = await executor
-    .select()
-    .from(teamMember)
-    .where(and(eq(teamMember.team_id, teamId), eq(teamMember.user_id, userId), eq(teamMember.status, 'active')))
-    .limit(1)
-  return row
+export async function isActiveTeamMember(executor: IdentityExecutor, teamId: string, userId: string): Promise<boolean> {
+  const activeIds = await findActiveTeamMemberIds(executor, teamId, [userId])
+  return activeIds.has(userId)
 }

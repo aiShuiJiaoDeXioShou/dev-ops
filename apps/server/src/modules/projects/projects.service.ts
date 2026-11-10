@@ -1,26 +1,24 @@
 import { randomUUID } from 'node:crypto'
-import type { Database } from '../../platform/database/client.js'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import { appendActivity } from '../collaboration/public.js'
-import {
-  findActiveTeamMember,
-  findUserById,
-  requireTeamMember,
-  type SessionUser,
-  type TeamRole,
-} from '../identity/public.js'
+import type { Database } from '../../platform/database/client.ts'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { appendActivity } from '../collaboration/collaboration.service.ts'
+import { isActiveTeamMember } from '../identity/identity.repository.ts'
+import { toTeamRole } from '../identity/identity.rules.ts'
+import { loadUserRefs, userRefOf, type UserRef } from '../identity/identity.display.ts'
+import { requireTeamMember, type SessionUser, type TeamRole } from '../identity/identity.session.ts'
+import { validatePage } from '../../platform/http/pagination.ts'
+import { lockProjectForWrite } from './projects.access.ts'
 import {
   findProjectById,
   findProjectByName,
   findProjects,
   insertProject,
-  lockProject,
   updateProject,
-} from './projects.repository.js'
+} from './projects.repository.ts'
 
 export type ProjectStatus = 'active' | 'paused' | 'ended'
-const PROJECT_STATUSES = new Set<ProjectStatus>(['active', 'paused', 'ended'])
+const PROJECT_STATUSES: ReadonlySet<string> = new Set(['active', 'paused', 'ended'])
 
 export interface ProjectCounts {
   openRequirements: number
@@ -69,15 +67,20 @@ function normalizeDescription(description: string | null | undefined): string | 
   return value.length === 0 ? null : value
 }
 
-function validateStatus(status: string): ProjectStatus {
-  if (!PROJECT_STATUSES.has(status as ProjectStatus)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '项目状态不合法')
-  return status as ProjectStatus
+/** 判断字符串是否为项目状态。 */
+function isProjectStatus(value: string): value is ProjectStatus {
+  return PROJECT_STATUSES.has(value)
 }
 
-function validatePage(page: number, pageSize: number): void {
-  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '分页参数不合法')
-  }
+function validateStatus(status: string): ProjectStatus {
+  if (!isProjectStatus(status)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '项目状态不合法')
+  return status
+}
+
+/** 将数据库项目状态收窄为业务类型；数据不合法时说明是持久化异常。 */
+function toProjectStatus(value: string): ProjectStatus {
+  if (!isProjectStatus(value)) throw new Error(`数据库项目状态不合法: ${value}`)
+  return value
 }
 
 /**
@@ -94,21 +97,23 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     return new Map(projectIds.map((id) => [id, loaded.get(id) ?? { openRequirements: 0, openBugs: 0 }]))
   }
 
-  async function ownerName(userId: string): Promise<string> {
-    return (await findUserById(db, userId))?.name ?? '未知用户'
+  async function ownerRefFor(userId: string): Promise<UserRef> {
+    const refs = await loadUserRefs(db, [userId])
+    return userRefOf(userId, refs) ?? { userId, name: '未知用户' }
   }
 
-  async function toView(
+  function toView(
     row: Awaited<ReturnType<typeof findProjectById>> & object,
     counts: ProjectCounts,
-  ): Promise<ProjectView> {
+    owner: UserRef,
+  ): ProjectView {
     return {
       id: row.id,
       teamId: row.team_id,
       name: row.name,
       description: row.description,
-      owner: { userId: row.owner_user_id, name: await ownerName(row.owner_user_id) },
-      status: row.status as ProjectStatus,
+      owner,
+      status: toProjectStatus(row.status),
       counts,
       version: row.version,
       createdAt: row.created_at.toISOString(),
@@ -125,7 +130,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
 
   async function requireWritableMember(actor: SessionUser, teamId: string): Promise<TeamRole> {
     const membership = await requireTeamMember(db, actor.id, teamId, ['admin', 'developer'])
-    return membership.role as TeamRole
+    return toTeamRole(membership.role)
   }
 
   async function listProjects(
@@ -145,9 +150,17 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       pageSize,
     })
     const counts = await countsFor(rows.map((row) => row.id))
+    const ownerRefs = await loadUserRefs(
+      db,
+      rows.map((row) => row.owner_user_id),
+    )
     return {
-      items: await Promise.all(
-        rows.map((row) => toView(row, counts.get(row.id) ?? { openRequirements: 0, openBugs: 0 })),
+      items: rows.map((row) =>
+        toView(
+          row,
+          counts.get(row.id) ?? { openRequirements: 0, openBugs: 0 },
+          userRefOf(row.owner_user_id, ownerRefs) ?? { userId: row.owner_user_id, name: '未知用户' },
+        ),
       ),
       page,
       pageSize,
@@ -164,7 +177,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     const name = normalizeName(input.name)
     const description = normalizeDescription(input.description)
     const ownerUserId = input.ownerUserId ?? actor.id
-    if (!(await findActiveTeamMember(db, teamId, ownerUserId))) {
+    if (!(await isActiveTeamMember(db, teamId, ownerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '项目负责人不是正常团队成员')
     }
     if (await findProjectByName(db, teamId, name)) {
@@ -190,13 +203,13 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       })
       return created
     })
-    return toView(row, { openRequirements: 0, openBugs: 0 })
+    return toView(row, { openRequirements: 0, openBugs: 0 }, await ownerRefFor(ownerUserId))
   }
 
   async function getProject(actor: SessionUser, projectId: string) {
     const row = await requireProjectAccess(actor, projectId)
-    const counts = await countsFor([projectId])
-    return toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 })
+    const [counts, owner] = await Promise.all([countsFor([projectId]), ownerRefFor(row.owner_user_id)])
+    return toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 }, owner)
   }
 
   async function updateProjectDetails(
@@ -223,7 +236,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     if (status !== undefined && status !== current.status && !statusReason) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '变更项目状态必须填写原因')
     }
-    if (input.ownerUserId !== undefined && !(await findActiveTeamMember(db, current.team_id, input.ownerUserId))) {
+    if (input.ownerUserId !== undefined && !(await isActiveTeamMember(db, current.team_id, input.ownerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '项目负责人不是正常团队成员')
     }
     if (name !== undefined && name !== current.name && (await findProjectByName(db, current.team_id, name))) {
@@ -240,7 +253,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     if (status !== undefined && status !== current.status) changes.status = [current.status, status]
 
     const row = await db.transaction(async (tx) => {
-      await lockProject(tx, projectId)
+      await lockProjectForWrite(tx, projectId)
       const updated = await updateProject(tx, projectId, input.version, {
         name,
         description,
@@ -262,8 +275,8 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       }
       return updated
     })
-    const counts = await countsFor([projectId])
-    return toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 })
+    const [counts, owner] = await Promise.all([countsFor([projectId]), ownerRefFor(row.owner_user_id)])
+    return toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 }, owner)
   }
 
   async function getStats(actor: SessionUser, projectId: string): Promise<ProjectCounts> {

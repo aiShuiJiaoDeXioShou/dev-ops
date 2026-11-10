@@ -1,6 +1,6 @@
 import { and, count, desc, eq, ilike, or, sql } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { project } from './projects.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import { project } from './projects.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type ProjectExecutor = Database | TransactionDatabase
@@ -15,6 +15,21 @@ export interface ProjectListFilters {
 /** 按标识查找项目。 */
 export async function findProjectById(db: Database, projectId: string) {
   const [row] = await db.select().from(project).where(eq(project.id, projectId)).limit(1)
+  return row
+}
+
+/**
+ * 读取项目上下文投影，仅返回标识与所属团队，供跨模块权限校验与归属判断使用。
+ * @param executor 数据库连接或事务。
+ * @param projectId 项目标识。
+ * @returns 项目上下文投影或 undefined。
+ */
+export async function findProjectContext(executor: ProjectExecutor, projectId: string) {
+  const [row] = await executor
+    .select({ id: project.id, teamId: project.team_id })
+    .from(project)
+    .where(eq(project.id, projectId))
+    .limit(1)
   return row
 }
 

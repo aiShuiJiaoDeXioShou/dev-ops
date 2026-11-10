@@ -1,17 +1,11 @@
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 
 export type BugStatus = 'pending' | 'in_fix' | 'in_regression' | 'resolved' | 'closed'
 export type CloseReason = 'duplicate' | 'not_bug' | 'wont_fix'
-export const BUG_STATUSES: ReadonlySet<BugStatus> = new Set([
-  'pending',
-  'in_fix',
-  'in_regression',
-  'resolved',
-  'closed',
-])
+export const BUG_STATUSES: ReadonlySet<string> = new Set(['pending', 'in_fix', 'in_regression', 'resolved', 'closed'])
 export const EDITABLE_BUG_STATUSES: ReadonlySet<string> = new Set(['pending', 'in_fix'])
-export const CLOSE_REASONS: ReadonlySet<CloseReason> = new Set(['duplicate', 'not_bug', 'wont_fix'])
+export const CLOSE_REASONS: ReadonlySet<string> = new Set(['duplicate', 'not_bug', 'wont_fix'])
 
 /** 归一化 Bug 标题并校验长度。 */
 export function normalizeBugTitle(title: string): string {
@@ -76,21 +70,30 @@ export function validateReproduction(
   return { reproduction: text, reproductionUnknown: false }
 }
 
+/** 判断字符串是否为 Bug 业务状态。 */
+export function isBugStatus(value: string): value is BugStatus {
+  return BUG_STATUSES.has(value)
+}
+
 /** 校验 Bug 状态。 */
 export function validateBugStatus(status: string): BugStatus {
-  if (!BUG_STATUSES.has(status as BugStatus)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'Bug 状态不合法')
-  return status as BugStatus
+  if (!isBugStatus(status)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'Bug 状态不合法')
+  return status
+}
+
+/** 将数据库 Bug 状态收窄为业务类型；数据不合法时说明是持久化异常。 */
+export function toBugStatus(value: string): BugStatus {
+  if (!isBugStatus(value)) throw new Error(`数据库 Bug 状态不合法: ${value}`)
+  return value
+}
+
+/** 判断字符串是否为关闭原因。 */
+export function isCloseReason(value: string): value is CloseReason {
+  return CLOSE_REASONS.has(value)
 }
 
 /** 校验关闭原因。 */
 export function validateCloseReason(reason: string): CloseReason {
-  if (!CLOSE_REASONS.has(reason as CloseReason)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '关闭原因不合法')
-  return reason as CloseReason
-}
-
-/** 校验分页参数。 */
-export function validatePage(page: number, pageSize: number): void {
-  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
-    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '分页参数不合法')
-  }
+  if (!isCloseReason(reason)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '关闭原因不合法')
+  return reason
 }

@@ -3,12 +3,12 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { sql } from 'drizzle-orm'
 import { Client } from 'pg'
-import { createHttpApp } from '../../src/bootstrap/create-http-app.js'
-import { loadConfig } from '../../src/platform/config/env.js'
-import { migrateDatabase } from '../../src/platform/database/migrate.js'
-import { team, teamMember } from '../../src/modules/identity/identity.tables.js'
-import { createAuthenticatedUser } from '../support/auth.js'
-import { FakeMailer } from '../support/fake-mailer.js'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import { loadConfig } from '../../src/platform/config/env.ts'
+import { migrateDatabase } from '../../src/platform/database/migrate.ts'
+import { team, teamMember } from '../../src/modules/identity/identity.tables.ts'
+import { createAuthenticatedUser } from '../support/auth.ts'
+import { FakeMailer } from '../support/fake-mailer.ts'
 
 test('项目创建、筛选、版本冲突、权限、跨团队与活动记录', { timeout: 90_000 }, async (t) => {
   const cleanup: Array<() => Promise<unknown>> = []

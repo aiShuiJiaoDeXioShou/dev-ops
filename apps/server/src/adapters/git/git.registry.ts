@@ -1,5 +1,5 @@
-import type { AppConfig } from '../../platform/config/env.js'
-import type { GitAdapter, GitAdapterInput } from './git.types.js'
+import type { AppConfig } from '../../platform/config/env.ts'
+import type { GitAdapter, GitAdapterInput } from './git.types.ts'
 
 export interface GitAdapterDependencies {
   githubCli?: (input: GitAdapterInput) => GitAdapter

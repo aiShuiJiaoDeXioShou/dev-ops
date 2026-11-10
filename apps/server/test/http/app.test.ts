@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Type } from 'typebox'
-import { createHttpApp } from '../../src/bootstrap/create-http-app.js'
-import { loadConfig } from '../../src/platform/config/env.js'
-import { ApiError } from '../../src/platform/http/errors.js'
-import { ERROR_CODES } from '../../src/platform/http/error-codes.js'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import { loadConfig } from '../../src/platform/config/env.ts'
+import { ApiError } from '../../src/platform/http/errors.ts'
+import { ERROR_CODES } from '../../src/platform/http/error-codes.ts'
 
 const databaseUrl = 'postgresql://test_user:unit_test@127.0.0.1:1/dev_ops_test'
 const testConfig = loadConfig({

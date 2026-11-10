@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/client'
 import type { TeamRole } from '@/features/identity/public'
+
 export function canWriteBugs(role: TeamRole): boolean {
   return role === 'admin' || role === 'developer'
 }

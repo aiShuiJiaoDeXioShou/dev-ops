@@ -1,7 +1,8 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { success } from '../../platform/http/response.js'
-import { requireSessionUser, type IdentityAuth } from '../identity/public.js'
-import type { IntegrationsService } from './integrations.service.js'
+import { success } from '../../platform/http/response.ts'
+import { requireSessionUser } from '../identity/identity.session.ts'
+import type { IdentityAuth } from '../identity/identity.auth.ts'
+import type { IntegrationsService } from './integrations.service.ts'
 import {
   callbackParamsSchema,
   callbackQuerySchema,
@@ -17,7 +18,7 @@ import {
   revokeConnectionResponseSchema,
   syncRepositoriesResponseSchema,
   teamParamsSchema,
-} from './integrations.schema.js'
+} from './integrations.schema.ts'
 
 /** Git 提供方、连接与授权回调路由。 */
 export const integrationsRoutes: FastifyPluginAsyncTypebox<{

@@ -1,5 +1,5 @@
 import { Type, type Static } from 'typebox'
-import { apiResponseSchema } from '../../platform/http/response.js'
+import { apiResponseSchema } from '../../platform/http/response.ts'
 
 const roleSchema = Type.Union([Type.Literal('admin'), Type.Literal('developer'), Type.Literal('viewer')])
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })

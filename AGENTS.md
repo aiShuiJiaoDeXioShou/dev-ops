@@ -7,7 +7,7 @@
 - `apps/web/`：React、TypeScript、Vite 前端；`src/app/` 组装应用，`pages/` 组合页面，`features/` 按业务组织，`shared/` 提供公共基础。
 - `apps/cli/`：Node.js、TypeScript 命令行工具；入口位于 `src/index.ts`，命令位于 `src/commands/`，测试位于 `test/`。
 - `apps/server/`：Node.js、Fastify、TypeScript 后端；`src/entrypoints/` 是进程入口，`bootstrap/` 负责依赖组装。
-- `apps/server/src/modules/`：业务模块；当前仅健康检查模块，后续模块按真实需求添加。
+- `apps/server/src/modules/`：业务模块；当前包含 identity、projects、requirements、bugs、code、collaboration、configuration、integrations、health。
 - `apps/server/src/platform/`：进程配置、HTTP 公共能力、数据库连接与迁移执行器，不依赖业务模块。
 - `apps/server/src/bootstrap/database-schema.ts`：聚合模块表定义，供 Drizzle 生成迁移；`apps/server/drizzle/` 保存版本化 SQL 与元数据。
 - `packages/api-client/`：Web 和 CLI 共用的类型化客户端，类型与运行时校验器从后端 OpenAPI 生成。
@@ -17,12 +17,14 @@
 
 应用分别维护 package.json，仓库统一使用 pnpm 工作区和根锁文件。新增依赖在所属工作区声明，并更新根锁文件。应用使用 TypeScript 7；工程工具因编译器 API 兼容性使用根目录的 TypeScript 5，不能让工具依赖改变应用编译器。
 
+`apps/server` 使用 Node ESM：`apps/server/package.json` 声明 `"type": "module"`，TypeScript 配置为 `module` 与 `moduleResolution: NodeNext`。相对导入统一写 `.ts` 扩展名（与源文件一致）；共享 Node tsconfig 开启 `rewriteRelativeImportExtensions`，`tsc` 输出到 `dist/` 时自动改写为 `.js`，本地开发由 `tsx` 直接解析 `.ts` 源文件。这是 NodeNext ESM 的标准做法，不是模块化配置问题。
+
 运行方式见 [README.md](README.md)，后端扩展约定见 [apps/server/README.md](apps/server/README.md)，CLI 用法见 [apps/cli/README.md](apps/cli/README.md)。后端使用 PostgreSQL 18、Drizzle ORM 和 `pg` 连接池，数据库操作见[数据库说明](docs/architecture/database.md)。目标模块归属见[架构方案](docs/architecture/system-design.md)；基础工程接入不代表业务功能已经实现。
 
 ## 模块依赖
 
 1. Web 按 app → pages → features → shared 依赖；跨功能使用所属 feature 的 `public.ts`，禁止页面层之外反向引用页面或应用组装。
-2. 后端跨模块使用 `public.ts`，禁止读取其他模块的 repository、表定义和内部状态。bootstrap 可访问路由与构造入口完成组装，platform 不反向依赖业务模块。
+2. 后端按业务模块组织代码，模块用于组织代码而不是强制封装：跨模块可以直接导入对方 service、read、repository、表定义，也可以跨模块 SQL join。同一张表的写入逻辑优先集中在数据所属模块，避免散落；该约定靠代码评审维持，不做静态依赖限制。bootstrap 可访问路由与构造入口完成组装，platform 不反向依赖业务模块。
 3. Web、CLI 只通过 API 操作 Server；共享包不导入应用源码，Server 不依赖生成的 api-client。
 4. 生成的接口类型与校验器不手工修改、不提交。修改 TypeBox 契约后运行根目录 `pnpm api:generate`，完整检查使用 `pnpm check`。
 5. 新增导入须通过 `pnpm check:boundaries`；根级检查同时验证越界导入和循环依赖确实会失败。
@@ -48,10 +50,19 @@
 9. 错误必须被明确处理或向上传递。禁止空 `catch`、吞掉异常、以成功结果掩盖失败；只在能恢复、转换错误或补充上下文时捕获。
 10. React 组件聚焦展示与交互。可由现有 props 或 state 计算的数据直接派生，避免重复保存状态；共享逻辑确有复用需求时再提取组件或 Hook。
 
+## 可读性与可维护性
+
+1. 文件与函数按职责拆分：service/repository 超过约 300 行、单个函数超过约 50 行或嵌套超过 3 层时，优先按用例或映射提取有业务名称的小函数；纯 row→view 映射放 `*.view.ts`，service 只负责权限、事务和编排。
+2. 同一校验、分页、用户展示或格式化逻辑出现第 3 次时提取到共享模块（例如 `platform/http/pagination.ts`、`identity.display.ts`），禁止复制粘贴；只有第二个调用者出现前不预建抽象。
+3. 数据库 `text` 转业务枚举用 `isXxx`/`toXxx` 类型守卫在映射边界收窄，用户输入用 `validateXxx`；禁止用 `as` 断言把 `text` 直接当成业务类型。
+4. 命名表达层次：`row`/`record` 表示持久化数据，`view`/`item`/`detail` 表示响应，`input` 表示请求；布尔值使用 `is`、`has`、`can`、`should` 前缀。
+5. 注释解释为什么和约束，不复述代码；公开函数 JSDoc 写用途、参数、返回和异常，显而易见的内部函数不强制。
+6. 错误分层：用户输入或业务规则用 `ApiError` 和业务错误码；数据库读出的值不合法属于数据异常，用普通 `Error` 说明“数据库…不合法”，不要伪装成用户输入错误。
+
 ## 后端遵循规范
 
 1. 按业务模块组织代码。路由负责 HTTP 输入输出，schema 定义接口契约，service 承载业务规则，repository 负责持久化；后两层按实际需求添加，不生成空壳分层。
-2. 业务函数通过参数接收依赖，避免直接依赖 Fastify 的 request/reply。跨模块使用明确接口，禁止绕过模块边界直接修改其他模块内部状态。
+2. 业务函数通过参数接收依赖，避免直接依赖 Fastify 的 request/reply。跨模块写入优先通过对方提供的用例函数，避免绕过模块约定直接修改其他模块内部状态。
 3. 请求和响应使用 TypeBox schema，类型尽量从 schema 推导，避免重复维护相同结构。外部输入必须在入口校验，数据库查询结果不能未经筛选直接作为接口响应。
 4. 对外业务 HTTP 接口只使用 GET 与 POST：GET 用于读取且不得产生副作用；POST 用于创建、修改、删除、状态流转、关联调整和批量动作。禁止为业务路由定义 PUT、PATCH、DELETE 等非 GET/POST 方法，不得使用 `X-HTTP-Method-Override` 等方法覆盖；写操作通过明确动作子路径表达，例如 `/requirements/:id/submit-test`、`/resources/:id/remove`。
 5. 平台自研接口（包括 `/api/v1/health`、`/api/v1/ready`）统一返回 HTTP 200 与统一响应信封：成功为 `{ success: true, code: "OK", message, requestId, data? }`，业务失败为 `{ success: false, code: <业务错误码>, message, requestId, data? }`。不使用 201、202、204 等其他成功码；禁止用 4xx/5xx 表达可预期的业务失败。第三方认证协议端点（Better Auth）按其协议原样返回，并在接口文档中列为显式例外。
@@ -76,7 +87,7 @@
 
 ### 表结构与字段
 
-1. 数据库设计禁止使用外键约束和数据库级联操作，包括 ORM 自动生成的外键。关联字段可以存在，其有效性、删除策略和并发一致性必须由业务逻辑负责。
+1. 数据库设计禁止使用外键约束，包括 ORM 自动生成的外键，因此也不使用数据库级联。关联字段可以存在，其有效性、删除顺序和并发一致性必须由业务逻辑负责；删除子记录时在同一事务中显式处理。
 2. 库、表、字段使用小写 `snake_case`，名称以字母开头，避开保留字。表名使用单数实体名，必要时加业务前缀，例如 `project_member`。
 3. 业务表必须有主键 `id`、创建时间 `created_at` 和更新时间 `updated_at`。审计时间使用 `timestamptz`，创建和更新路径必须维护其值；默认值不会自动维护后续的 `updated_at`。
 4. 主键应稳定且不承载可变业务含义，关联字段与被引用字段类型保持一致。ID 生成策略在首次建模时统一；数据库生成整数 ID 时优先使用 `bigint GENERATED ALWAYS AS IDENTITY` 并显式声明主键。需要分布式生成时评估原生 `uuid`。`bigint` ID 通过 API 统一以字符串传输。参见 [Identity 列](https://www.postgresql.org/docs/18/ddl-identity-columns.html)。
@@ -117,7 +128,7 @@
 
 ## 格式化、静态检查与提交
 
-1. 统一使用根目录 Prettier 配置：无分号、单引号、2 空格、行宽 120、尾随逗号；提交前运行 `pnpm format`。CI/交付检查运行 `pnpm format:check`，不得以编辑器自动格式化结果代替。
+1. 统一使用根目录 Prettier 配置：无分号、单引号、2 空格、行宽 120、尾随逗号；提交前运行 `pnpm format`。CI/交付检查运行 `pnpm format:check`，不得以编辑器自动格式化结果代替。导入块与后续代码之间保留一个空行，由 ESLint 的 `import-x/newline-after-import` 检查；Prettier 不负责语句之间的空行。
 2. 统一使用根目录 ESLint flat config；`pnpm lint` 必须通过，禁止用 `eslint-disable` 绕过规则，确需例外时在紧邻位置说明原因并缩小范围。各应用原有的 oxlint 脚本保留为快速检查，不作为唯一质量门禁。
 3. 新增或修改 TypeScript 必须通过类型检查；禁止 `any`、非空断言和强制类型转换掩盖问题。完成后运行对应应用的 check/build，涉及数据库时运行 `pnpm --dir apps/server test:db`。
 4. 每实现一个可独立验收的功能，必须提交对应 Git 文件，提交前确认：

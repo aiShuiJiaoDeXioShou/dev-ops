@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createApiClient, RequestError } from '../src/index.js'
+import { createApiClient, RequestError } from '../src/index.ts'
 
 function success(data: unknown): Response {
   return Response.json({ success: true, code: 'OK', message: '成功', requestId: 'trace', data })

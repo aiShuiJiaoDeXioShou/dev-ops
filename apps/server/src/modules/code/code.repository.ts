@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, count, desc, eq, ilike, inArray, notInArray, or } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { codeReference, gitRepository, projectRepository } from './code.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import { codeReference, gitRepository, projectRepository } from './code.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type CodeExecutor = Database | TransactionDatabase

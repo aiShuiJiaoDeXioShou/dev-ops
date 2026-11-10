@@ -1,8 +1,8 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { success } from '../../platform/http/response.js'
-import { requireSessionUser } from './identity.session.js'
-import type { IdentityService } from './identity.service.js'
-import type { IdentityAuth } from './identity.auth.js'
+import { success } from '../../platform/http/response.ts'
+import { requireSessionUser } from './identity.session.ts'
+import type { IdentityService } from './identity.service.ts'
+import type { IdentityAuth } from './identity.auth.ts'
 import {
   acceptInvitationBodySchema,
   acceptInvitationResponseSchema,
@@ -21,7 +21,7 @@ import {
   teamParamsSchema,
   teamSummaryListResponseSchema,
   tokenParamsSchema,
-} from './identity.team.schema.js'
+} from './identity.team.schema.ts'
 
 /**
  * 注册团队、成员与邀请接口。

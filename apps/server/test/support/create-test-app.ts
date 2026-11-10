@@ -1,8 +1,8 @@
-import { createHttpApp } from '../../src/bootstrap/create-http-app.js'
-import type { MailSender } from '../../src/adapters/mail/mail.types.js'
-import type { GitAdapter } from '../../src/adapters/git/git.types.js'
-import type { GitAdapterFactory } from '../../src/modules/integrations/public.js'
-import { createTestConfig } from './test-config.js'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import type { MailSender } from '../../src/adapters/mail/mail.types.ts'
+import type { GitAdapter } from '../../src/adapters/git/git.types.ts'
+import type { GitAdapterFactory } from '../../src/modules/integrations/integrations.service.ts'
+import { createTestConfig } from './test-config.ts'
 
 /**
  * 创建不监听端口的测试应用。

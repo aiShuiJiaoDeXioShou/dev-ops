@@ -46,16 +46,10 @@ const configuration = {
       to: { path: '^apps/web/src/features/', pathNot: ['^apps/web/src/features/$1/', '/public\\.ts$'] },
     },
     {
-      name: 'server-module-public-entry',
-      severity: 'error',
-      from: { path: '^apps/server/src/modules/([^/]+)/' },
-      to: { path: '^apps/server/src/modules/', pathNot: ['^apps/server/src/modules/$1/', '/public\\.ts$'] },
-    },
-    {
       name: 'server-composition-owns-wiring',
       severity: 'error',
       from: { path: '^apps/server/src/(?!bootstrap/|modules/)' },
-      to: { path: '^apps/server/src/modules/', pathNot: '/public\\.ts$' },
+      to: { path: '^apps/server/src/modules/' },
     },
     {
       name: 'server-modules-independent-of-wiring',

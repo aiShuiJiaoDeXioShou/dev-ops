@@ -13,7 +13,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-validators.mjs",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-validators.mjs && node scripts/rewrite-declarations.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "test": "node --import tsx --test test/*.test.ts",

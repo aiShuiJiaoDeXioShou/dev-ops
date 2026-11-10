@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { loadConfig } from '../src/platform/config/env.js'
+import { loadConfig } from '../src/platform/config/env.ts'
 
 const databaseUrl = 'postgresql://test_user:unit_test@127.0.0.1:1/dev_ops_test'
 

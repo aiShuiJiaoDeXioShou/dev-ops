@@ -1,4 +1,4 @@
-import { loadConfig, type AppConfig } from '../../src/platform/config/env.js'
+import { loadConfig, type AppConfig } from '../../src/platform/config/env.ts'
 
 /** 测试用数据库 URL；不连接真实数据库，仅通过配置校验。 */
 export const TEST_DATABASE_URL = 'postgresql://test_user:unit_test@127.0.0.1:1/dev_ops_test'

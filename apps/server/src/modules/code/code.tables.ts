@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { check, index, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
-import { appSchema } from '../../platform/database/namespace.js'
+import { appSchema } from '../../platform/database/namespace.ts'
 
 /** 从 Git 连接同步的远端仓库快照。 */
 export const gitRepository = appSchema.table(

@@ -1,6 +1,6 @@
 import envSchema from 'env-schema'
 import { Type, type Static } from 'typebox'
-import { validateDatabaseUrl } from './database.js'
+import { validateDatabaseUrl } from './database.ts'
 
 const environmentSchema = Type.Object({
   NODE_ENV: Type.Union([Type.Literal('development'), Type.Literal('test'), Type.Literal('production')], {

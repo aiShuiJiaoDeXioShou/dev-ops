@@ -1,6 +1,6 @@
 import type { FastifyError, FastifyInstance } from 'fastify'
-import { ERROR_CODES, type ErrorCode } from './error-codes.js'
-import { failure, failureEnvelopeSchema } from './response.js'
+import { ERROR_CODES, type ErrorCode } from './error-codes.ts'
+import { failure, failureEnvelopeSchema } from './response.ts'
 
 /**
  * 业务可预期的 API 错误。

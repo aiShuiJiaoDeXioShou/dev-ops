@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import type { Database } from '../../platform/database/client.js'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
+import type { Database } from '../../platform/database/client.ts'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import {
   addComment,
   appendActivity,
@@ -10,10 +10,13 @@ import {
   type ActivityView,
   type CommentView,
   type PageResult,
-} from '../collaboration/public.js'
-import { findUserById, requireTeamMember, type SessionUser } from '../identity/public.js'
-import { findActiveTeamMember, findProjectById, lockProject } from '../projects/public.js'
-import { findRequirementById, findRequirementSummaries, type RequirementSummary } from '../requirements/public.js'
+} from '../collaboration/collaboration.service.ts'
+import { isActiveTeamMember } from '../identity/identity.repository.ts'
+import { loadUserRefs } from '../identity/identity.display.ts'
+import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
+import { validatePage } from '../../platform/http/pagination.ts'
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
+import { findRequirementSummaries, findRequirementSummaryById } from '../requirements/requirements.repository.ts'
 import {
   countOpenBugsByProjects,
   deleteBugLink,
@@ -32,7 +35,8 @@ import {
   nextRegressionAttempt,
   updateBug,
   updateRegression,
-} from './bugs.repository.js'
+  type BugRow,
+} from './bugs.repository.ts'
 import {
   EDITABLE_BUG_STATUSES,
   normalizeBugTitle,
@@ -42,76 +46,12 @@ import {
   requiredText,
   validateBugStatus,
   validateCloseReason,
-  validatePage,
   validateReproduction,
-  type BugStatus,
   type CloseReason,
-} from './bugs.rules.js'
+} from './bugs.rules.ts'
+import type { BugCodeReferenceReader, BugDetail } from './bugs.types.ts'
+import { toBugDetail, toBugListItem, toRegressionView } from './bugs.view.ts'
 
-export interface OwnerView {
-  userId: string
-  name: string
-}
-export interface BugListItem {
-  id: string
-  projectId: string
-  number: number
-  title: string
-  status: BugStatus
-  fixOwner: OwnerView | null
-  regressionOwner: OwnerView | null
-  version: number
-  updatedAt: string
-}
-export interface RegressionView {
-  id: string
-  attempt: number
-  fixSummary: string
-  fixer: OwnerView
-  verifier: OwnerView
-  result: string
-  failureReason: string | null
-  createdAt: string
-  verifiedAt: string | null
-}
-export interface LinkedRequirementView {
-  id: string
-  number: number
-  title: string
-  status: string
-}
-export interface BugDetail extends BugListItem {
-  teamId: string
-  phenomenon: string
-  expectedBehavior: string
-  reproduction: string | null
-  reproductionUnknown: boolean
-  evidenceText: string | null
-  evidenceUrl: string | null
-  createdByUserId: string
-  createdAt: string
-  linkedRequirements: LinkedRequirementView[]
-  regressions: RegressionView[]
-  linkedCodeReferences: LinkedCodeReferenceView[]
-}
-export interface LinkedCodeReferenceView {
-  id: string
-  repositoryId: string
-  targetType: string
-  targetId: string
-  objectType: string
-  remoteId: string
-  title: string | null
-  state: string | null
-  url: string | null
-  lastCheckStatus: string
-  lastErrorCode: string | null
-  lastCheckedAt: string | null
-}
-export type BugCodeReferenceReader = (
-  targetType: 'requirement' | 'bug',
-  targetId: string,
-) => Promise<LinkedCodeReferenceView[]>
 export interface BugsServiceDeps {
   db: Database
   codeReferences?: BugCodeReferenceReader
@@ -126,15 +66,15 @@ export function createBugsService(deps: BugsServiceDeps) {
   const { db } = deps
 
   async function requireProjectAccess(actor: SessionUser, projectId: string) {
-    const project = await findProjectById(db, projectId)
+    const project = await getProjectContext(db, projectId)
     if (!project) throw new ApiError(ERROR_CODES.NOT_FOUND, '项目不存在')
-    await requireTeamMember(db, actor.id, project.team_id)
+    await requireTeamMember(db, actor.id, project.teamId)
     return project
   }
 
   async function requireProjectWrite(actor: SessionUser, projectId: string) {
     const project = await requireProjectAccess(actor, projectId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     return project
   }
 
@@ -145,71 +85,25 @@ export function createBugsService(deps: BugsServiceDeps) {
     return { row, project }
   }
 
-  async function userName(userId: string | null): Promise<string> {
-    if (!userId) return ''
-    return (await findUserById(db, userId))?.name ?? '未知用户'
-  }
-
-  async function ownerView(userId: string | null, name: string): Promise<OwnerView | null> {
-    return userId ? { userId, name } : null
-  }
-
-  async function regressionView(item: Awaited<ReturnType<typeof insertRegression>>): Promise<RegressionView> {
-    const [fixerName, verifierName] = await Promise.all([userName(item.fixer_user_id), userName(item.verifier_user_id)])
-    return {
-      id: item.id,
-      attempt: item.attempt,
-      fixSummary: item.fix_summary,
-      fixer: { userId: item.fixer_user_id, name: fixerName },
-      verifier: { userId: item.verifier_user_id, name: verifierName },
-      result: item.result,
-      failureReason: item.failure_reason,
-      createdAt: item.created_at.toISOString(),
-      verifiedAt: item.verified_at?.toISOString() ?? null,
-    }
-  }
-
-  async function detail(row: Awaited<ReturnType<typeof findBugById>> & object): Promise<BugDetail> {
-    const [fixOwnerName, regressionOwnerName, requirementIds, regressions, linkedCodeReferences] = await Promise.all([
-      userName(row.fix_owner_user_id),
-      userName(row.regression_owner_user_id),
+  async function detail(row: BugRow): Promise<BugDetail> {
+    const [requirementIds, regressions, linkedCodeReferences] = await Promise.all([
       findBugRequirementIds(db, row.id),
       listRegressions(db, row.id),
       deps.codeReferences ? deps.codeReferences('bug', row.id) : Promise.resolve([]),
     ])
-    const summaries = await findRequirementSummaries(
-      db,
-      requirementIds.map((item) => item.requirementId),
-    )
-    const regressionViews: RegressionView[] = await Promise.all(regressions.map(regressionView))
-    return {
-      id: row.id,
-      teamId: row.team_id,
-      projectId: row.project_id,
-      number: row.number,
-      title: row.title,
-      phenomenon: row.phenomenon,
-      expectedBehavior: row.expected_behavior,
-      reproduction: row.reproduction,
-      reproductionUnknown: row.reproduction_unknown,
-      evidenceText: row.evidence_text,
-      evidenceUrl: row.evidence_url,
-      fixOwner: await ownerView(row.fix_owner_user_id, fixOwnerName),
-      regressionOwner: await ownerView(row.regression_owner_user_id, regressionOwnerName),
-      status: row.status as BugStatus,
-      version: row.version,
-      createdByUserId: row.created_by_user_id,
-      createdAt: row.created_at.toISOString(),
-      updatedAt: row.updated_at.toISOString(),
-      linkedRequirements: summaries.map((item) => ({
-        id: item.id,
-        number: item.number,
-        title: item.title,
-        status: item.status,
-      })),
-      regressions: regressionViews,
-      linkedCodeReferences,
-    }
+    const ownerUserIds = [
+      ...(row.fix_owner_user_id === null ? [] : [row.fix_owner_user_id]),
+      ...(row.regression_owner_user_id === null ? [] : [row.regression_owner_user_id]),
+      ...regressions.flatMap((item) => [item.fixer_user_id, item.verifier_user_id]),
+    ]
+    const [linkedRequirements, refs] = await Promise.all([
+      findRequirementSummaries(
+        db,
+        requirementIds.map((item) => item.requirementId),
+      ),
+      loadUserRefs(db, ownerUserIds),
+    ])
+    return toBugDetail({ row, linkedRequirements, regressions, linkedCodeReferences, refs })
   }
 
   async function listBugs(
@@ -229,19 +123,11 @@ export function createBugsService(deps: BugsServiceDeps) {
       page,
       pageSize,
     })
-    const items: BugListItem[] = await Promise.all(
-      rows.map(async (row) => ({
-        id: row.id,
-        projectId: row.project_id,
-        number: row.number,
-        title: row.title,
-        status: row.status as BugStatus,
-        fixOwner: await ownerView(row.fix_owner_user_id, await userName(row.fix_owner_user_id)),
-        regressionOwner: await ownerView(row.regression_owner_user_id, await userName(row.regression_owner_user_id)),
-        version: row.version,
-        updatedAt: row.updated_at.toISOString(),
-      })),
+    const ownerUserIds = rows.flatMap((row) =>
+      [row.fix_owner_user_id, row.regression_owner_user_id].filter((userId): userId is string => userId !== null),
     )
+    const ownerRefs = await loadUserRefs(db, ownerUserIds)
+    const items = rows.map((row) => toBugListItem(row, ownerRefs))
     return { items, page, pageSize, total }
   }
 
@@ -267,23 +153,24 @@ export function createBugsService(deps: BugsServiceDeps) {
     const repro = validateReproduction(input.reproduction, input.reproductionUnknown ?? false)
     const evidenceText = optionalText(input.evidenceText, '证据文本')
     const evidenceUrl = optionalHttpUrl(input.evidenceUrl)
-    if (input.fixOwnerUserId && !(await findActiveTeamMember(db, project.team_id, input.fixOwnerUserId))) {
+    if (input.fixOwnerUserId && !(await isActiveTeamMember(db, project.teamId, input.fixOwnerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '修复负责人不是正常团队成员')
     }
     const requirementIds = [...new Set(input.requirementIds ?? [])]
-    for (const requirementId of requirementIds) {
-      const requirement = await findRequirementById(db, requirementId)
-      if (!requirement || requirement.project_id !== projectId) {
-        throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '只能关联同项目需求')
-      }
+    const requirementSummaries = await findRequirementSummaries(db, requirementIds)
+    if (
+      requirementSummaries.length !== requirementIds.length ||
+      requirementSummaries.some((requirement) => requirement.projectId !== projectId)
+    ) {
+      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '只能关联同项目需求')
     }
     const bugId = randomUUID()
     const row = await db.transaction(async (tx) => {
-      await lockProject(tx, projectId)
+      await lockProjectForWrite(tx, projectId)
       const number = await nextBugNumber(tx, projectId)
       const created = await insertBug(tx, {
         id: bugId,
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         number,
         title,
@@ -298,10 +185,10 @@ export function createBugsService(deps: BugsServiceDeps) {
         createdByUserId: actor.id,
       })
       for (const requirementId of requirementIds) {
-        await insertBugLink(tx, { teamId: project.team_id, bugId, requirementId, createdByUserId: actor.id })
+        await insertBugLink(tx, { teamId: project.teamId, bugId, requirementId, createdByUserId: actor.id })
       }
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId,
         entityType: 'bug',
         entityId: bugId,
@@ -337,7 +224,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '版本参数不合法')
     }
     const { row: current, project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (!EDITABLE_BUG_STATUSES.has(current.status)) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '当前 Bug 状态不允许直接修改现象、预期与复现信息')
     }
@@ -354,7 +241,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     }
     const evidenceText = input.evidenceText === undefined ? undefined : optionalText(input.evidenceText, '证据文本')
     const evidenceUrl = input.evidenceUrl === undefined ? undefined : optionalHttpUrl(input.evidenceUrl)
-    if (input.fixOwnerUserId && !(await findActiveTeamMember(db, project.team_id, input.fixOwnerUserId))) {
+    if (input.fixOwnerUserId && !(await isActiveTeamMember(db, project.teamId, input.fixOwnerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '修复负责人不是正常团队成员')
     }
     const changes: Record<string, unknown> = {}
@@ -387,7 +274,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       if (Object.keys(changes).length > 0) {
         await appendActivity(tx, {
-          teamId: project.team_id,
+          teamId: project.teamId,
           projectId: project.id,
           entityType: 'bug',
           entityId: bugId,
@@ -403,11 +290,11 @@ export function createBugsService(deps: BugsServiceDeps) {
 
   async function startFix(actor: SessionUser, bugId: string, input: { version: number }) {
     const { row: current, project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (current.status !== 'pending') throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有待处理 Bug 可以开始修复')
     const ownerId = current.fix_owner_user_id
     if (!ownerId) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '开始修复必须指定修复负责人')
-    if (!(await findActiveTeamMember(db, project.team_id, ownerId))) {
+    if (!(await isActiveTeamMember(db, project.teamId, ownerId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '修复负责人不是正常团队成员')
     }
     const row = await db.transaction(async (tx) => {
@@ -415,7 +302,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       const updated = await updateBug(tx, bugId, input.version, { status: 'in_fix', fixOwnerUserId: ownerId })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'bug',
         entityId: bugId,
@@ -433,11 +320,11 @@ export function createBugsService(deps: BugsServiceDeps) {
     input: { version: number; fixSummary: string; verifierUserId?: string },
   ) {
     const { row: current, project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (current.status !== 'in_fix') throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有修复中 Bug 可以提交回归')
     const fixSummary = requiredText(input.fixSummary, '修复说明')
     const verifierId = input.verifierUserId ?? current.regression_owner_user_id ?? current.created_by_user_id
-    if (!(await findActiveTeamMember(db, project.team_id, verifierId))) {
+    if (!(await isActiveTeamMember(db, project.teamId, verifierId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '回归负责人不是正常团队成员')
     }
     const row = await db.transaction(async (tx) => {
@@ -445,7 +332,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       const attempt = await nextRegressionAttempt(tx, bugId)
       const regression = await insertRegression(tx, {
         id: randomUUID(),
-        teamId: project.team_id,
+        teamId: project.teamId,
         bugId,
         attempt,
         fixSummary,
@@ -458,7 +345,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       const activity = await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'bug',
         entityId: bugId,
@@ -468,16 +355,17 @@ export function createBugsService(deps: BugsServiceDeps) {
       })
       return { updated, regression, activityId: activity.id }
     })
+    const regressionNames = await loadUserRefs(db, [row.regression.fixer_user_id, row.regression.verifier_user_id])
     return {
       bug: await detail(row.updated),
-      regression: await regressionView(row.regression),
+      regression: toRegressionView(row.regression, regressionNames),
       activityId: row.activityId,
     }
   }
 
   async function withdrawRegression(actor: SessionUser, bugId: string, input: { version: number; reason: string }) {
     const { row: current, project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (current.status !== 'in_regression')
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有待回归 Bug 可以撤回回归')
     const reason = reasonText(input.reason, '撤回原因')
@@ -489,7 +377,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       const updated = await updateBug(tx, bugId, input.version, { status: 'in_fix' })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'bug',
         entityId: bugId,
@@ -508,7 +396,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     input: { version: number; result: 'passed' | 'failed'; note: string },
   ) {
     const { row: current, project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (current.status !== 'in_regression')
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有待回归 Bug 可以记录回归结论')
     if (input.result !== 'passed' && input.result !== 'failed')
@@ -528,7 +416,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'bug',
         entityId: bugId,
@@ -547,7 +435,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     input: { version: number; category: CloseReason; note: string; duplicateOfBugId?: string },
   ) {
     const { row: current, project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (!['pending', 'in_fix', 'in_regression'].includes(current.status)) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '当前 Bug 状态不允许关闭')
     }
@@ -572,7 +460,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       const updated = await updateBug(tx, bugId, input.version, { status: 'closed' })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'bug',
         entityId: bugId,
@@ -588,7 +476,7 @@ export function createBugsService(deps: BugsServiceDeps) {
 
   async function reopenBug(actor: SessionUser, bugId: string, input: { version: number; reason: string }) {
     const { row: current, project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (!['resolved', 'closed'].includes(current.status))
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有已解决或已关闭 Bug 可以重开')
     const reason = reasonText(input.reason, '重开原因')
@@ -597,7 +485,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       const updated = await updateBug(tx, bugId, input.version, { status: 'pending' })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'bug',
         entityId: bugId,
@@ -613,17 +501,17 @@ export function createBugsService(deps: BugsServiceDeps) {
   async function linkRequirement(actor: SessionUser, bugId: string, requirementId: string, version: number) {
     const { row: current, project } = await requireBug(actor, bugId)
     if (version !== current.version) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
-    const requirementRow = await findRequirementById(db, requirementId)
-    if (!requirementRow || requirementRow.project_id !== current.project_id) {
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
+    const requirement = await findRequirementSummaryById(db, requirementId)
+    if (!requirement || requirement.projectId !== current.project_id) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '只能关联同项目需求')
     }
     if (await findBugLink(db, bugId, requirementId)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '需求已关联')
     try {
       await db.transaction(async (tx) => {
-        await insertBugLink(tx, { teamId: project.team_id, bugId, requirementId, createdByUserId: actor.id })
+        await insertBugLink(tx, { teamId: project.teamId, bugId, requirementId, createdByUserId: actor.id })
         await appendActivity(tx, {
-          teamId: project.team_id,
+          teamId: project.teamId,
           projectId: project.id,
           entityType: 'bug',
           entityId: bugId,
@@ -652,13 +540,13 @@ export function createBugsService(deps: BugsServiceDeps) {
   ) {
     const { row: current, project } = await requireBug(actor, bugId)
     if (version !== current.version) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     if (!(await findBugLink(db, bugId, requirementId))) throw new ApiError(ERROR_CODES.NOT_FOUND, '关联不存在')
     const note = reasonText(reason, '移除原因')
     await db.transaction(async (tx) => {
       await deleteBugLink(tx, bugId, requirementId)
       await appendActivity(tx, {
-        teamId: project.team_id,
+        teamId: project.teamId,
         projectId: project.id,
         entityType: 'bug',
         entityId: bugId,
@@ -675,9 +563,9 @@ export function createBugsService(deps: BugsServiceDeps) {
 
   async function addBugComment(actor: SessionUser, bugId: string, bodyMarkdown: string) {
     const { project } = await requireBug(actor, bugId)
-    await requireTeamMember(db, actor.id, project.team_id, ['admin', 'developer'])
+    await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
     return addComment(db, {
-      teamId: project.team_id,
+      teamId: project.teamId,
       projectId: project.id,
       entityType: 'bug',
       entityId: bugId,
@@ -736,4 +624,3 @@ export function createBugsService(deps: BugsServiceDeps) {
 }
 
 export type BugsService = ReturnType<typeof createBugsService>
-export type { RequirementSummary }

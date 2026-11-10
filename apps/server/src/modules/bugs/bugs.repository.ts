@@ -1,10 +1,18 @@
 import { randomUUID } from 'node:crypto'
 import { and, count, desc, eq, ilike, inArray, max, or, sql } from 'drizzle-orm'
-import type { Database } from '../../platform/database/client.js'
-import { bug, bugRegression, bugRequirementLink } from './bugs.tables.js'
+import type { Database } from '../../platform/database/client.ts'
+import { bug, bugRegression, bugRequirementLink } from './bugs.tables.ts'
+import type { BugSummary, BugSummaryForRequirement } from './bugs.types.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type BugExecutor = Database | TransactionDatabase
+
+/** Bug 完整行，供详情映射使用。 */
+export type BugRow = NonNullable<Awaited<ReturnType<typeof findBugById>>>
+/** Bug 列表投影行，仅包含列表需要的字段。 */
+export type BugListRow = Awaited<ReturnType<typeof findBugs>>['rows'][number]
+/** Bug 回归记录行。 */
+export type RegressionRow = NonNullable<Awaited<ReturnType<typeof insertRegression>>>
 
 export interface BugListFilters {
   search?: string
@@ -17,6 +25,23 @@ export interface BugListFilters {
 /** 按标识查找 Bug。 */
 export async function findBugById(db: Database, bugId: string) {
   const [row] = await db.select().from(bug).where(eq(bug.id, bugId)).limit(1)
+  return row
+}
+
+/** 按标识读取 Bug 摘要投影，供跨模块校验归属与展示关联，不返回正文。 */
+export async function findBugSummaryById(executor: BugExecutor, bugId: string): Promise<BugSummary | undefined> {
+  const [row] = await executor
+    .select({
+      id: bug.id,
+      number: bug.number,
+      title: bug.title,
+      status: bug.status,
+      projectId: bug.project_id,
+      teamId: bug.team_id,
+    })
+    .from(bug)
+    .where(eq(bug.id, bugId))
+    .limit(1)
   return row
 }
 
@@ -40,7 +65,7 @@ export async function nextBugNumber(tx: TransactionDatabase, projectId: string) 
  * @param db 数据库连接。
  * @param projectId 项目标识。
  * @param filters 搜索、状态、负责人、分页。
- * @returns Bug 行与总数。
+ * @returns 列表所需字段投影与总数；不返回现象、复现等大字段。
  */
 export async function findBugs(db: Database, projectId: string, filters: BugListFilters) {
   const conditions = [eq(bug.project_id, projectId)]
@@ -54,7 +79,17 @@ export async function findBugs(db: Database, projectId: string, filters: BugList
   const where = and(...conditions)
   const [rows, [total]] = await Promise.all([
     db
-      .select()
+      .select({
+        id: bug.id,
+        project_id: bug.project_id,
+        number: bug.number,
+        title: bug.title,
+        status: bug.status,
+        fix_owner_user_id: bug.fix_owner_user_id,
+        regression_owner_user_id: bug.regression_owner_user_id,
+        version: bug.version,
+        updated_at: bug.updated_at,
+      })
       .from(bug)
       .where(where)
       .orderBy(desc(bug.updated_at), desc(bug.id))
@@ -271,13 +306,6 @@ export async function countOpenBugsByProjects(db: Database, projectIds: string[]
     .where(and(inArray(bug.project_id, projectIds), sql`${bug.status} not in ('resolved', 'closed')`))
     .groupBy(bug.project_id)
   return new Map(rows.map((row) => [row.projectId, row.value]))
-}
-
-export interface BugSummaryForRequirement {
-  id: string
-  number: number
-  title: string
-  status: string
 }
 
 /**

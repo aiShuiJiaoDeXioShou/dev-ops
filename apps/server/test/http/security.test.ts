@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createTestApp } from '../support/create-test-app.js'
+import { createTestApp } from '../support/create-test-app.ts'
 
 test('错误响应不泄漏堆栈、SQL 或凭据，并保留请求标识', async (t) => {
   const app = createTestApp()

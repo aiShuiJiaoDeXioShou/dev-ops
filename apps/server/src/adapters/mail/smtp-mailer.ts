@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer'
-import type { AppConfig } from '../../platform/config/env.js'
-import { MailDeliveryError, type MailMessage, type MailSender } from './mail.types.js'
+import type { AppConfig } from '../../platform/config/env.ts'
+import { MailDeliveryError, type MailMessage, type MailSender } from './mail.types.ts'
 
 const MAIL_TIMEOUT_MS = 10_000
 

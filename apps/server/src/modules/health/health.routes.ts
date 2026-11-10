@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import { failure, success } from '../../platform/http/response.js'
-import { healthResponseSchema, readinessResponseSchema } from './health.schema.js'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { failure, success } from '../../platform/http/response.ts'
+import { healthResponseSchema, readinessResponseSchema } from './health.schema.ts'
 
 /**
  * 注册独立的进程存活与数据库就绪接口。

@@ -1,5 +1,5 @@
-import { createHttpApp } from '../bootstrap/create-http-app.js'
-import { loadConfig } from '../platform/config/env.js'
+import { createHttpApp } from '../bootstrap/create-http-app.ts'
+import { loadConfig } from '../platform/config/env.ts'
 
 const config = loadConfig()
 const app = createHttpApp(config)

@@ -1,5 +1,0 @@
-export { createRequirementsService } from './requirements.service.js'
-export type { RequirementDetail, RequirementListItem, RequirementsService } from './requirements.service.js'
-export type { RequirementStatus } from './requirements.rules.js'
-export { findRequirementById, findRequirementSummaries } from './requirements.repository.js'
-export type { RequirementSummary } from './requirements.repository.js'

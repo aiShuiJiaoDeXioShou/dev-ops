@@ -1,10 +1,10 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import type { IncomingHttpHeaders } from 'node:http'
-import { ApiError } from '../../platform/http/errors.js'
-import { ERROR_CODES } from '../../platform/http/error-codes.js'
-import type { Database } from '../../platform/database/client.js'
-import type { IdentityAuth } from './identity.auth.js'
-import { platformAdmin, teamMember } from './identity.tables.js'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import type { Database } from '../../platform/database/client.ts'
+import type { IdentityAuth } from './identity.auth.ts'
+import { platformAdmin, teamMember } from './identity.tables.ts'
 
 export type TeamRole = 'admin' | 'developer' | 'viewer'
 

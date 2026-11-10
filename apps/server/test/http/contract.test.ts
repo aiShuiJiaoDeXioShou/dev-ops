@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createTestApp } from '../support/create-test-app.js'
-import { ERROR_CODES } from '../../src/platform/http/error-codes.js'
+import { createTestApp } from '../support/create-test-app.ts'
+import { ERROR_CODES } from '../../src/platform/http/error-codes.ts'
 
 test('注册路由只使用 GET/POST，统一错误码与 API 404 信封', async (t) => {
   const app = createTestApp()
