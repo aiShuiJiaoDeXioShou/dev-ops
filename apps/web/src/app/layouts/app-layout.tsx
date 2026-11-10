@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { cn } from '@/shared/lib/utils'
 import { signOut, useSession } from '@/features/identity/public'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import {
   Dialog,
@@ -134,7 +134,7 @@ export function AppLayout() {
           >
             <PrototypeIcon name="menu" />
           </button>
-          {isReady ? <Outlet /> : <PageSkeleton />}
+          {isReady ? <Outlet /> : <DelayedPageSkeleton />}
           <div id="workspace-detail-host" />
         </main>
       </div>

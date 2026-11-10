@@ -45,6 +45,7 @@
 | `Alert` | `shared/ui/controls/alert.tsx` | 错误/提示摘要 |
 | `Toast` | `shared/ui/toast.tsx` | 操作结果反馈 |
 | `PageLoading` / `PageError` / `EmptyState` | `shared/ui/page-state.tsx` | 页面级状态 |
+| `DelayedLoading` | `shared/ui/delayed-loading.tsx` | 延迟渲染加载占位（默认 200ms），避免快速请求导致骨架闪烁 |
 | `PageSkeleton` / `Skeleton` | `shared/ui/page-skeleton.tsx` / `skeleton.tsx` | 加载骨架 |
 
 ## 页面中不允许的写法

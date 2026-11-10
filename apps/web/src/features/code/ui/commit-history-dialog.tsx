@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { describeRequestError } from '@/shared/api/errors'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { PageLoading } from '@/shared/ui/page-state'
@@ -37,7 +38,9 @@ export function CommitHistoryDialog({
             <DialogTitle>提交记录</DialogTitle>
           </DialogHeader>
           {list.isPending ? (
-            <PageLoading />
+            <DelayedLoading pending>
+              <PageLoading />
+            </DelayedLoading>
           ) : list.isError ? (
             <p role="alert">提交记录加载失败：{describeRequestError(list.error).description}</p>
           ) : list.data.data.items.length === 0 ? (
@@ -59,7 +62,9 @@ export function CommitHistoryDialog({
           {selectedRef ? (
             <section aria-label="提交详情">
               {detail.isPending ? (
-                <PageLoading />
+                <DelayedLoading pending>
+                  <PageLoading />
+                </DelayedLoading>
               ) : detail.isError ? (
                 <p className="muted">提交详情加载失败。</p>
               ) : (

@@ -3,6 +3,7 @@ import { AlertCircle, Inbox } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/controls/alert'
 import { Button } from '@/shared/ui/controls/button'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 
 /**
  * 展示页面或数据首次加载时的占位内容。
@@ -136,5 +137,18 @@ export function EmptyState({ title, description, mascot, icon, action, secondary
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * 认证页等启动阶段使用的延迟加载占位。
+ * @param props.message 向辅助技术播报的加载说明，默认为页面加载中。
+ * @returns 延迟后展示的加载占位；快速加载时不渲染，避免骨架闪烁。
+ */
+export function DelayedPageLoading({ message }: { message?: string }) {
+  return (
+    <DelayedLoading pending>
+      <PageLoading message={message} />
+    </DelayedLoading>
   )
 }

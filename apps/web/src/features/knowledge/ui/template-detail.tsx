@@ -4,6 +4,7 @@ import { Copy, Download, Link2, Pencil, Plus } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
@@ -66,7 +67,9 @@ export function TemplateDetailDialog({
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="knowledge-dialog">
         {query.isPending ? (
-          <PageLoading message="模板加载中…" />
+          <DelayedLoading pending>
+            <PageLoading message="模板加载中…" />
+          </DelayedLoading>
         ) : query.isError || !template ? (
           <PageError
             title="模板加载失败"

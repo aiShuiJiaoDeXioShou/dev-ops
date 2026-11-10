@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
-import { PageLoading } from '@/shared/ui/page-state'
+import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { sessionQueryOptions } from '../api/queries'
 
 /**
@@ -62,7 +62,7 @@ export function AcceptInvitationForm() {
         邀请链接缺少 token。
       </p>
     )
-  if (invitation.isPending) return <PageLoading />
+  if (invitation.isPending) return <DelayedPageLoading />
   if (invitation.isError || !invitation.data)
     return (
       <p role="alert" className="text-sm text-destructive">

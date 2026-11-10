@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { buildQueryOptions } from '../api/queries'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -18,7 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
  */
 export function BuildDetailPanel({ buildId }: { buildId: string }) {
   const query = useQuery(buildQueryOptions(buildId))
-  if (query.isPending) return <PageSkeleton />
+  if (query.isPending) return <DelayedPageSkeleton />
   if (query.isError || !query.data) {
     const described = describeRequestError(query.error)
     return (

@@ -1,8 +1,8 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { RequireAuth } from '@/features/identity/public'
-import { PageLoading } from '@/shared/ui/page-state'
-import { AppShellSkeleton, PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageLoading } from '@/shared/ui/page-state'
+import { DelayedAppShellSkeleton, DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { NotFoundPage } from '@/pages/not-found'
 import { RouteErrorPage } from './route-error'
 
@@ -12,96 +12,108 @@ import { RouteErrorPage } from './route-error'
  */
 export function createAppRoutes(): RouteObject[] {
   const routes: RouteObject[] = [
-    { path: '/login', lazy: () => import('@/pages/auth/login-page'), HydrateFallback: PageLoading },
+    { path: '/login', lazy: () => import('@/pages/auth/login-page'), HydrateFallback: DelayedPageLoading },
     {
       path: '/accept-invitation',
       lazy: () => import('@/pages/auth/accept-invitation-page'),
-      HydrateFallback: PageLoading,
+      HydrateFallback: DelayedPageLoading,
     },
-    { path: '/forgot-password', lazy: () => import('@/pages/auth/forgot-password-page'), HydrateFallback: PageLoading },
-    { path: '/reset-password', lazy: () => import('@/pages/auth/reset-password-page'), HydrateFallback: PageLoading },
+    {
+      path: '/forgot-password',
+      lazy: () => import('@/pages/auth/forgot-password-page'),
+      HydrateFallback: DelayedPageLoading,
+    },
+    {
+      path: '/reset-password',
+      lazy: () => import('@/pages/auth/reset-password-page'),
+      HydrateFallback: DelayedPageLoading,
+    },
     {
       element: <RequireAuth />,
-      HydrateFallback: AppShellSkeleton,
+      HydrateFallback: DelayedAppShellSkeleton,
       children: [
         {
           path: '/',
           Component: AppLayout,
           ErrorBoundary: RouteErrorPage,
-          HydrateFallback: PageSkeleton,
+          HydrateFallback: DelayedPageSkeleton,
           children: [
             { index: true, element: <Navigate to="/projects" replace /> },
             {
               path: 'projects',
               lazy: () => import('@/pages/projects/project-list-page'),
-              HydrateFallback: PageSkeleton,
+              HydrateFallback: DelayedPageSkeleton,
             },
             {
               path: 'projects/:projectId',
               lazy: () => import('@/pages/project/project-layout'),
-              HydrateFallback: PageSkeleton,
+              HydrateFallback: DelayedPageSkeleton,
               children: [
                 { index: true, element: <Navigate to="requirements" replace /> },
                 {
                   path: 'requirements',
                   lazy: () => import('@/pages/project/requirements-page'),
-                  HydrateFallback: PageSkeleton,
+                  HydrateFallback: DelayedPageSkeleton,
                 },
-                { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: PageSkeleton },
-                { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: PageSkeleton },
-                { path: 'prs', lazy: () => import('@/pages/project/prs-page'), HydrateFallback: PageSkeleton },
+                { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: DelayedPageSkeleton },
+                { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: DelayedPageSkeleton },
+                { path: 'prs', lazy: () => import('@/pages/project/prs-page'), HydrateFallback: DelayedPageSkeleton },
                 {
                   path: 'pipelines',
                   lazy: () => import('@/pages/project/pipelines-page'),
-                  HydrateFallback: PageSkeleton,
+                  HydrateFallback: DelayedPageSkeleton,
                 },
                 {
                   path: 'environment',
                   lazy: () => import('@/pages/project/environment-page'),
-                  HydrateFallback: PageSkeleton,
+                  HydrateFallback: DelayedPageSkeleton,
                 },
                 {
                   path: 'artifacts',
                   lazy: () => import('@/pages/project/artifacts-page'),
-                  HydrateFallback: PageSkeleton,
+                  HydrateFallback: DelayedPageSkeleton,
                 },
               ],
             },
             {
               path: 'capabilities',
               lazy: () => import('@/pages/capabilities/capabilities-layout'),
-              HydrateFallback: PageSkeleton,
+              HydrateFallback: DelayedPageSkeleton,
               children: [
                 { index: true, element: <Navigate to="skills" replace /> },
                 {
                   path: 'skills',
                   lazy: () => import('@/pages/capabilities/skills-page'),
-                  HydrateFallback: PageSkeleton,
+                  HydrateFallback: DelayedPageSkeleton,
                 },
                 {
                   path: 'templates',
                   lazy: () => import('@/pages/capabilities/templates-page'),
-                  HydrateFallback: PageSkeleton,
+                  HydrateFallback: DelayedPageSkeleton,
                 },
                 {
                   path: 'snapshots/:token',
                   lazy: () => import('@/pages/capabilities/template-snapshot-page'),
-                  HydrateFallback: PageSkeleton,
+                  HydrateFallback: DelayedPageSkeleton,
                 },
               ],
             },
             {
               path: 'settings/profile',
               lazy: () => import('@/pages/settings/profile-page'),
-              HydrateFallback: PageSkeleton,
+              HydrateFallback: DelayedPageSkeleton,
             },
-            { path: 'vault', lazy: () => import('@/pages/vault-page'), HydrateFallback: PageSkeleton },
+            { path: 'vault', lazy: () => import('@/pages/vault-page'), HydrateFallback: DelayedPageSkeleton },
             {
               path: 'settings/team',
               lazy: () => import('@/pages/settings/team-settings-page'),
-              HydrateFallback: PageSkeleton,
+              HydrateFallback: DelayedPageSkeleton,
             },
-            { path: 'system/status', lazy: () => import('@/pages/system-status'), HydrateFallback: PageSkeleton },
+            {
+              path: 'system/status',
+              lazy: () => import('@/pages/system-status'),
+              HydrateFallback: DelayedPageSkeleton,
+            },
             { path: '*', Component: NotFoundPage },
           ],
         },

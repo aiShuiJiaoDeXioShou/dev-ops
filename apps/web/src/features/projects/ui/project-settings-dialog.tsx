@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/public'
 import { RepositoryPicker } from '@/features/code/public'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectQueryOptions } from '../api/queries'
@@ -32,7 +33,9 @@ export function ProjectSettingsDialog({
           <DialogDescription>修改项目资料、负责人和状态，并管理代码仓库与 Git 连接。</DialogDescription>
         </DialogHeader>
         {project.isPending ? (
-          <PageSkeleton />
+          <DelayedLoading pending>
+            <PageSkeleton />
+          </DelayedLoading>
         ) : project.isError || !project.data ? (
           <div className="empty">
             <h3>项目设置加载失败</h3>

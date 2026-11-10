@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
@@ -46,7 +47,12 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
       showToast(message, 'error')
     },
   })
-  if (members.isPending) return <PageLoading />
+  if (members.isPending)
+    return (
+      <DelayedLoading pending>
+        <PageLoading />
+      </DelayedLoading>
+    )
   if (members.isError) {
     const described = describeRequestError(members.error)
     return (
@@ -143,7 +149,9 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">待接受邀请</h2>
         {invitations.isPending ? (
-          <PageLoading />
+          <DelayedLoading pending>
+            <PageLoading />
+          </DelayedLoading>
         ) : invitations.data?.data.length ? (
           <div className="rounded-xl border bg-card">
             <Table>

@@ -9,10 +9,11 @@ import {
 } from '@/features/code/public'
 import { SearchX } from 'lucide-react'
 import { describeRequestError } from '@/shared/api/errors'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Select } from '@/shared/ui/controls/select'
 import { EmptyState, PageLoading } from '@/shared/ui/page-state'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 
 const STATE_LABELS: Record<string, string> = {
   open: '打开',
@@ -48,7 +49,7 @@ export function Component() {
     enabled: Boolean(selectedNumber),
   })
 
-  if (repositories.isPending) return <PageSkeleton />
+  if (repositories.isPending) return <DelayedPageSkeleton />
   if (repositories.isError) {
     return <EmptyState title="仓库加载失败" description={describeRequestError(repositories.error).description} />
   }
@@ -85,7 +86,9 @@ export function Component() {
         </Select>
       </div>
       {list.isPending ? (
-        <PageLoading />
+        <DelayedLoading pending>
+          <PageLoading />
+        </DelayedLoading>
       ) : list.isError ? (
         <EmptyState title="PR 加载失败" description={describeRequestError(list.error).description} />
       ) : list.data.data.items.length === 0 ? (
@@ -107,7 +110,9 @@ export function Component() {
       {selectedNumber ? (
         <section aria-label="PR 详情">
           {detail.isPending ? (
-            <PageLoading />
+            <DelayedLoading pending>
+              <PageLoading />
+            </DelayedLoading>
           ) : detail.isError ? (
             <EmptyState title="PR 详情加载失败" description={describeRequestError(detail.error).description} />
           ) : (
@@ -138,7 +143,9 @@ export function Component() {
               )}
               <h4>差异</h4>
               {diff.isPending ? (
-                <PageLoading />
+                <DelayedLoading pending>
+                  <PageLoading />
+                </DelayedLoading>
               ) : diff.isError ? (
                 <p className="muted">差异不可用：{describeRequestError(diff.error).description}</p>
               ) : (

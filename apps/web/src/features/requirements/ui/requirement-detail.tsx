@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
@@ -54,7 +55,12 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
     onSuccess: invalidate,
     onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '状态更新失败。'),
   })
-  if (query.isPending) return <PageLoading message="需求加载中…" />
+  if (query.isPending)
+    return (
+      <DelayedLoading pending>
+        <PageLoading message="需求加载中…" />
+      </DelayedLoading>
+    )
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (

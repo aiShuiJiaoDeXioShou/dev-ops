@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { useSession } from '@/features/identity/public'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -17,7 +18,7 @@ import {
 } from '@/features/delivery/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { EmptyState, PageLoading } from '@/shared/ui/page-state'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 
 const ENVIRONMENTS = [
   { value: 'development', label: '开发' },
@@ -79,7 +80,7 @@ export function Component() {
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
 
-  if (services.isPending) return <PageSkeleton />
+  if (services.isPending) return <DelayedPageSkeleton />
   if (services.isError) {
     const described = describeRequestError(services.error)
     return (
@@ -125,7 +126,9 @@ export function Component() {
         <section aria-label="运行版本" className="project-summary-section">
           <h3>运行版本</h3>
           {runVersions.isPending ? (
-            <PageLoading />
+            <DelayedLoading pending>
+              <PageLoading />
+            </DelayedLoading>
           ) : runVersions.isError ? (
             <p className="muted">运行版本加载失败，请重试。</p>
           ) : (
@@ -162,7 +165,9 @@ export function Component() {
       <section aria-label="产物">
         <h3>最新构建产物</h3>
         {artifacts.isPending ? (
-          <PageLoading />
+          <DelayedLoading pending>
+            <PageLoading />
+          </DelayedLoading>
         ) : artifacts.isError ? (
           <EmptyState title="产物加载失败" description={describeRequestError(artifacts.error).description} />
         ) : artifacts.data.data.items.length === 0 ? (

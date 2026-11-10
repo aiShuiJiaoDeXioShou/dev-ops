@@ -16,7 +16,7 @@ import {
 import { Input } from '@/shared/ui/controls/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { Tag, type TagVariant } from '@/shared/ui/tag'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { DelayedPageLoading, EmptyState, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { apiTokensQueryOptions, type ApiTokenMetadata } from '../api/tokens'
 
@@ -97,7 +97,7 @@ export function ApiTokenSection() {
     }
   }
 
-  if (tokens.isPending) return <PageLoading message="正在加载 API Token…" />
+  if (tokens.isPending) return <DelayedPageLoading message="正在加载 API Token…" />
   if (tokens.isError) {
     const described = describeRequestError(tokens.error)
     return (

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatDateTime } from '@/shared/lib/format'
-import { PageLoading } from '@/shared/ui/page-state'
+import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { activitiesQueryOptions, type CollabTarget } from '../api/queries'
 
 const ACTION_LABELS: Record<string, string> = {
@@ -31,7 +31,7 @@ const ACTION_LABELS: Record<string, string> = {
 /** 事项活动时间线。 */
 export function ActivityTimeline({ target, targetId }: { target: CollabTarget; targetId: string }) {
   const query = useQuery(activitiesQueryOptions(target, targetId))
-  if (query.isPending) return <PageLoading message="活动加载中…" />
+  if (query.isPending) return <DelayedPageLoading message="活动加载中…" />
   if (query.isError)
     return (
       <p role="alert" className="text-sm text-destructive">

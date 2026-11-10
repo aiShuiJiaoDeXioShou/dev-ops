@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { formatDateTime } from '@/shared/lib/format'
-import { PageLoading } from '@/shared/ui/page-state'
+import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { commentsQueryOptions, type CollabTarget } from '../api/queries'
 
 /** 事项评论列表。 */
 export function CommentList({ target, targetId }: { target: CollabTarget; targetId: string }) {
   const query = useQuery(commentsQueryOptions(target, targetId))
-  if (query.isPending) return <PageLoading message="评论加载中…" />
+  if (query.isPending) return <DelayedPageLoading message="评论加载中…" />
   if (query.isError)
     return (
       <p role="alert" className="text-sm text-destructive">

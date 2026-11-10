@@ -5,7 +5,7 @@ import { ArrowUpRight, Layers, Plus, Search, SearchX } from 'lucide-react'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { cn } from '@/shared/lib/utils'
@@ -60,7 +60,7 @@ export function SkillList({ teamId }: { teamId: string }) {
               onRetry={() => void query.refetch()}
             />
           ) : query.isPending ? (
-            <PageSkeleton />
+            <DelayedPageSkeleton />
           ) : (
             <>
               <div className="skill-toolbar">

@@ -4,6 +4,7 @@ import { Select } from '@/shared/ui/controls/select'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { describeRequestError } from '@/shared/api/errors'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageLoading } from '@/shared/ui/page-state'
 import { projectActivityQueryOptions } from '../api/queries'
 
@@ -53,7 +54,12 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
       source,
     }),
   )
-  if (query.isPending) return <PageLoading message="项目晴雨表加载中…" />
+  if (query.isPending)
+    return (
+      <DelayedLoading pending>
+        <PageLoading message="项目晴雨表加载中…" />
+      </DelayedLoading>
+    )
   if (query.isError) {
     return (
       <p className="section-note" role="alert">

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { useToast } from '@/shared/ui/toast'
-import { EmptyState, PageLoading } from '@/shared/ui/page-state'
+import { DelayedPageLoading, EmptyState } from '@/shared/ui/page-state'
 import { envVariablesQueryOptions, credentialsQueryOptions } from '../api/queries'
 
 const ENVIRONMENTS = [
@@ -109,7 +109,7 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
     if (form.kind === 'credential_ref' && !form.credentialId) return showToast('请选择已授权凭据。', 'error')
     save.mutate()
   }
-  if (variables.isPending) return <PageLoading />
+  if (variables.isPending) return <DelayedPageLoading />
   if (variables.isError) {
     return <EmptyState title="环境变量加载失败" description={describeRequestError(variables.error).description} />
   }

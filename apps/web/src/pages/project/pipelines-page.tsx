@@ -3,7 +3,7 @@ import { useParams } from 'react-router'
 import { pipelineRunsQueryOptions } from '@/features/delivery/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
-import { EmptyState, PageLoading } from '@/shared/ui/page-state'
+import { DelayedPageLoading, EmptyState } from '@/shared/ui/page-state'
 
 const STATUS_LABELS: Record<string, string> = {
   queued: '排队中',
@@ -18,7 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
 export function Component() {
   const { projectId = '' } = useParams()
   const runs = useQuery(pipelineRunsQueryOptions(projectId, { page: 1, pageSize: 20 }))
-  if (runs.isPending) return <PageLoading />
+  if (runs.isPending) return <DelayedPageLoading />
   if (runs.isError) {
     return (
       <EmptyState

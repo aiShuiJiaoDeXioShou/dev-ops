@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { describeRequestError } from '@/shared/api/errors'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { Button } from '@/shared/ui/controls/button'
 import { Tag } from '@/shared/ui/tag'
@@ -22,7 +23,12 @@ export function Component() {
       meta.remove()
     }
   }, [])
-  if (query.isPending) return <PageLoading message="快照加载中…" />
+  if (query.isPending)
+    return (
+      <DelayedLoading pending>
+        <PageLoading message="快照加载中…" />
+      </DelayedLoading>
+    )
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
@@ -60,7 +61,12 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
     onSuccess: invalidate,
     onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '开始修复失败。'),
   })
-  if (query.isPending) return <PageLoading message="Bug 加载中…" />
+  if (query.isPending)
+    return (
+      <DelayedLoading pending>
+        <PageLoading message="Bug 加载中…" />
+      </DelayedLoading>
+    )
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (

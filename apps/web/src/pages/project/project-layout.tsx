@@ -6,7 +6,7 @@ import { ProjectSettingsDialog, projectQueryOptions } from '@/features/projects/
 import { AgentTemplateBadge } from '@/features/knowledge/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { Tag } from '@/shared/ui/tag'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 
 const STATUS_LABELS = { active: '进行中', paused: '暂停', ended: '已结束' } as const
 const tabs = [
@@ -26,7 +26,7 @@ export function Component() {
   const navigate = useNavigate()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const project = useQuery(projectQueryOptions(projectId))
-  if (project.isPending) return <PageSkeleton />
+  if (project.isPending) return <DelayedPageSkeleton />
   if (project.isError || !project.data) {
     const described = describeRequestError(project.error)
     return (

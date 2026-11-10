@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/public'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -125,7 +126,9 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
         ) : null}
       </div>
       {reviews.isPending ? (
-        <PageLoading />
+        <DelayedLoading pending>
+          <PageLoading />
+        </DelayedLoading>
       ) : reviews.isError ? (
         <p className="muted">提审记录加载失败。</p>
       ) : reviews.data.data.items.length === 0 ? null : (
@@ -154,7 +157,9 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
       )}
       <h4>实际发布</h4>
       {releases.isPending ? (
-        <PageLoading />
+        <DelayedLoading pending>
+          <PageLoading />
+        </DelayedLoading>
       ) : releases.isError ? (
         <p className="muted">发布记录加载失败。</p>
       ) : releases.data.data.items.length === 0 ? null : (

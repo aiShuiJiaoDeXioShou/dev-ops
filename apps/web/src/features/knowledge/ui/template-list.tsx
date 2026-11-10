@@ -7,7 +7,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
 import { projectListQueryOptions } from '@/features/projects/public'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
@@ -81,7 +81,7 @@ export function TemplateList({ teamId }: { teamId: string }) {
               onRetry={() => void query.refetch()}
             />
           ) : query.isPending ? (
-            <PageSkeleton />
+            <DelayedPageSkeleton />
           ) : (
             <>
               <div className="template-toolbar">

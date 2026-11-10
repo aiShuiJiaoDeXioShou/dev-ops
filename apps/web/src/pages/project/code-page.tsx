@@ -12,7 +12,7 @@ import {
 } from '@/features/code/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { PageError } from '@/shared/ui/page-state'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { useToast } from '@/shared/ui/toast'
 import {
@@ -198,7 +198,7 @@ export function Component() {
       return next
     })
   }, [activePath])
-  if (project.isPending || repositories.isPending) return <PageSkeleton />
+  if (project.isPending || repositories.isPending) return <DelayedPageSkeleton />
   if (project.isError || !project.data) {
     const described = describeRequestError(project.error)
     return (

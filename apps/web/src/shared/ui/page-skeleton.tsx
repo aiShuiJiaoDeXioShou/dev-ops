@@ -1,3 +1,5 @@
+import { DelayedLoading } from './delayed-loading'
+
 /**
  * 首屏会话/团队加载时保持与工作区一致的外壳，避免全屏加载态与最终布局错位。
  * @returns 侧栏与主内容骨架屏。
@@ -52,5 +54,30 @@ export function PageSkeleton() {
         ))}
       </div>
     </div>
+  )
+}
+
+/**
+ * 应用启动/会话加载阶段使用的延迟外壳骨架。
+ * 加载快于延迟时不渲染骨架，避免首屏一闪而过的闪烁；慢加载仍有明确占位。
+ * @returns 延迟后展示的外壳骨架。
+ */
+export function DelayedAppShellSkeleton() {
+  return (
+    <DelayedLoading pending>
+      <AppShellSkeleton />
+    </DelayedLoading>
+  )
+}
+
+/**
+ * 页面数据加载阶段使用的延迟页面骨架。
+ * @returns 延迟后展示的页面骨架。
+ */
+export function DelayedPageSkeleton() {
+  return (
+    <DelayedLoading pending>
+      <PageSkeleton />
+    </DelayedLoading>
   )
 }

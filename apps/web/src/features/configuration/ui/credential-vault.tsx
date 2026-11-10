@@ -5,6 +5,7 @@ import { useSession } from '@/features/identity/public'
 import { projectListQueryOptions } from '@/features/projects/public'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -127,7 +128,9 @@ export function CredentialVault() {
       <div className="row vault-layout">
         <section aria-label="凭据列表" className="vault-list">
           {list.isPending ? (
-            <PageLoading />
+            <DelayedLoading pending>
+              <PageLoading />
+            </DelayedLoading>
           ) : list.isError ? (
             <EmptyState title="凭据加载失败" description={describeRequestError(list.error).description} />
           ) : list.data.data.items.length === 0 ? (
@@ -225,7 +228,9 @@ export function CredentialVault() {
               ) : null}
               <h3>使用记录</h3>
               {usage.isPending ? (
-                <PageLoading />
+                <DelayedLoading pending>
+                  <PageLoading />
+                </DelayedLoading>
               ) : usage.isError || !usage.data ? (
                 <p className="muted">使用记录不可用。</p>
               ) : usage.data.data.items.length === 0 ? (

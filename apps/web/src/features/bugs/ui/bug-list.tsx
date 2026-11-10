@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { SearchX } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { EmptyState } from '@/shared/ui/page-state'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
@@ -34,7 +34,7 @@ export function BugList({ projectId }: { projectId: string }) {
   const [createOpen, setCreateOpen] = useState(false)
   const canWrite = canWriteBugs(role)
   const update = (patch: Partial<typeof state>) => setParams(toSearchParams(updateListState(state, patch)))
-  if (query.isPending) return <PageSkeleton />
+  if (query.isPending) return <DelayedPageSkeleton />
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (

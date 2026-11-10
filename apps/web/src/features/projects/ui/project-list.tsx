@@ -6,7 +6,7 @@ import { PrototypeIcon } from '@/prototype/icons/icon'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { EmptyState } from '@/shared/ui/page-state'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectActivityQueryOptions, projectListQueryOptions } from '../api/queries'
 import {
   parseProjectFilters,
@@ -61,7 +61,7 @@ export function ProjectList() {
         />
       </div>
     )
-  if (query.isPending) return <PageSkeleton />
+  if (query.isPending) return <DelayedPageSkeleton />
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (

@@ -4,6 +4,7 @@ import { Copy, Download, PackageOpen, Pencil, Power } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
@@ -88,7 +89,9 @@ export function SkillDetailDialog({
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="knowledge-dialog">
         {query.isPending ? (
-          <PageLoading message="技能加载中…" />
+          <DelayedLoading pending>
+            <PageLoading message="技能加载中…" />
+          </DelayedLoading>
         ) : query.isError || !skill ? (
           <PageError
             title="技能加载失败"
