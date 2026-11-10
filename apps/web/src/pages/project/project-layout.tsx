@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { ProjectSettingsDialog, projectQueryOptions } from '@/features/projects/public'
+import { AgentTemplateBadge } from '@/features/knowledge/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { Tag } from '@/shared/ui/tag'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
@@ -54,6 +55,7 @@ export function Component() {
             <Tag>{STATUS_LABELS[detail.status]}</Tag>
           </div>
           <div className="row header-actions">
+            <AgentTemplateBadge projectId={projectId} />
             <button type="button" className="icon-btn" aria-label="项目设置" onClick={() => setSettingsOpen(true)}>
               <PrototypeIcon name="settings" />
             </button>

@@ -44,6 +44,7 @@ export function AppLayout() {
   const primaryNavItems = [
     { to: '/projects', label: '项目', icon: 'folder' as const },
     { to: '/system/status', label: '运维', accessibleLabel: '系统状态', icon: 'activity' as const },
+    { to: '/capabilities', label: '能力', icon: 'capabilities' as const },
   ]
   return (
     <div className={cn('shell', menuOpen && 'menu-open')}>

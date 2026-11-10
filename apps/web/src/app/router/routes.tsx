@@ -52,6 +52,29 @@ export function createAppRoutes(): RouteObject[] {
               ],
             },
             {
+              path: 'capabilities',
+              lazy: () => import('@/pages/capabilities/capabilities-layout'),
+              HydrateFallback: PageSkeleton,
+              children: [
+                { index: true, element: <Navigate to="skills" replace /> },
+                {
+                  path: 'skills',
+                  lazy: () => import('@/pages/capabilities/skills-page'),
+                  HydrateFallback: PageSkeleton,
+                },
+                {
+                  path: 'templates',
+                  lazy: () => import('@/pages/capabilities/templates-page'),
+                  HydrateFallback: PageSkeleton,
+                },
+                {
+                  path: 'snapshots/:token',
+                  lazy: () => import('@/pages/capabilities/template-snapshot-page'),
+                  HydrateFallback: PageSkeleton,
+                },
+              ],
+            },
+            {
               path: 'settings/team',
               lazy: () => import('@/pages/settings/team-settings-page'),
               HydrateFallback: PageSkeleton,
