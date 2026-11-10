@@ -134,7 +134,7 @@ export function CredentialVault() {
             <EmptyState
               mascot="prism"
               title="凭据库还是空的"
-              description="添加团队凭据后按项目授权，环境变量即可通过引用使用密钥，明文不会回显。"
+              description="添加团队凭据后可授权项目使用。"
               action={
                 canManage ? (
                   <Button type="button" onClick={() => setCreateOpen(true)}>

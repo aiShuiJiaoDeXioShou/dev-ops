@@ -33,17 +33,10 @@ export function Component() {
     )
   }
   if (runs.data.data.items.length === 0) {
-    return (
-      <EmptyState
-        mascot="signal"
-        title="暂无流水线运行"
-        description="外部 CI 上报运行结果后会显示在这里；本页只记录与展示，不触发、不重跑、不取消。"
-      />
-    )
+    return <EmptyState mascot="signal" title="暂无流水线运行" description="外部 CI 上报运行结果后会显示在这里。" />
   }
   return (
     <div className="project-tab-panel">
-      <p className="muted">本页只记录与展示外部流水线运行，不触发、不重跑、不取消。</p>
       <ul className="plain-list">
         {runs.data.data.items.map((run) => (
           <li key={run.id}>

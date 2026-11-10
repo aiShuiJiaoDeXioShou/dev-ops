@@ -53,13 +53,7 @@ export function Component() {
     return <EmptyState title="仓库加载失败" description={describeRequestError(repositories.error).description} />
   }
   if (repositories.data.data.length === 0) {
-    return (
-      <EmptyState
-        mascot="aperture"
-        title="尚未关联仓库"
-        description="请先在项目设置中关联代码仓库，关联后即可按仓库只读查看 PR、变更文件与差异。"
-      />
-    )
+    return <EmptyState mascot="aperture" title="尚未关联仓库" description="请先在项目设置中关联代码仓库。" />
   }
   return (
     <div className="project-tab-panel">

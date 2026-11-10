@@ -117,7 +117,7 @@ export function RepositoryPicker({
           <Tag>{repositories.length} 个</Tag>
         </div>
         {repositories.length === 0 ? (
-          <p className="section-note">尚未关联仓库。关联后可以在需求和 Bug 中添加代码引用。</p>
+          <p className="section-note">尚未关联仓库。</p>
         ) : (
           <div className="repo-list">
             {repositories.map((repo) => (

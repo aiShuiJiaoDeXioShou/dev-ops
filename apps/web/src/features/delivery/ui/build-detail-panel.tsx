@@ -71,7 +71,7 @@ export function BuildDetailPanel({ buildId }: { buildId: string }) {
       <section aria-label="关联事项">
         <h4>关联事项</h4>
         {build.targets.length === 0 ? (
-          <p className="muted">尚未关联需求或 Bug；关联不进入提测、不改变事项状态。</p>
+          <p className="muted">尚未关联需求或 Bug。</p>
         ) : (
           <ul className="plain-list">
             {build.targets.map((target) => (

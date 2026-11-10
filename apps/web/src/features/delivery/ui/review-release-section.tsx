@@ -128,9 +128,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
         <PageLoading />
       ) : reviews.isError ? (
         <p className="muted">提审记录加载失败。</p>
-      ) : reviews.data.data.items.length === 0 ? (
-        <p className="muted">暂无提审记录。</p>
-      ) : (
+      ) : reviews.data.data.items.length === 0 ? null : (
         <ul className="plain-list">
           {reviews.data.data.items.map((review) => (
             <li key={review.id}>
@@ -159,9 +157,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
         <PageLoading />
       ) : releases.isError ? (
         <p className="muted">发布记录加载失败。</p>
-      ) : releases.data.data.items.length === 0 ? (
-        <p className="muted">尚未记录实际发布；审核通过不代表已发布。</p>
-      ) : (
+      ) : releases.data.data.items.length === 0 ? null : (
         <ul className="plain-list">
           {releases.data.data.items.map((release) => (
             <li key={release.id}>

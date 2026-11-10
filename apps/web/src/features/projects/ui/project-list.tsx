@@ -206,7 +206,7 @@ export function ProjectList() {
                         </Link>
                         <span className="project-metric-muted">
                           <strong>—</strong>
-                          <span>Bots 未开放</span>
+                          <span>Bots</span>
                         </span>
                       </div>
                       <div className="project-card-footer">

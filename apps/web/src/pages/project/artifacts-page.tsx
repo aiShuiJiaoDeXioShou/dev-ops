@@ -169,7 +169,7 @@ export function Component() {
           <EmptyState
             mascot="project"
             title="还没有构建产物"
-            description="上报构建后，安装包、二维码或测试地址会出现在这里；新构建不会覆盖正在运行的版本。"
+            description="上报构建后，安装包、二维码或测试地址会出现在这里。"
             action={
               canManage ? (
                 <Button type="button" onClick={() => setReportOpen(true)}>

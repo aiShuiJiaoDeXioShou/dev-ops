@@ -99,7 +99,8 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
         <strong>项目晴雨表</strong>
         <span className="small quiet">过去一年 · {total} 次活动</span>
         <span className="spacer" />
-        <span className="small quiet">时区 UTC</span>
+        {data.sourceStatus.code !== 'ok' ? <span className="tag">代码未同步</span> : null}
+        {data.sourceStatus.pullRequest !== 'ok' ? <span className="tag">PR 未同步</span> : null}
         <Select
           className="activity-source"
           aria-label="活动来源"
@@ -151,7 +152,7 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
         </div>
       </div>
       <div className="activity-footer">
-        <span>代码 · 事项 · PR · Bots（V0.2 未开放）</span>
+        <span>代码 · 事项 · PR · Bots</span>
         <div className="activity-legend" aria-label="颜色越深，活动越多">
           <span>少</span>
           {[0, 1, 2, 3, 4].map((level) => (
@@ -160,10 +161,6 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
           <span>多</span>
         </div>
       </div>
-      <p className="section-note">
-        来源状态：事项可读 · 代码 {data.sourceStatus.code === 'ok' ? '可读' : '未同步'} · PR{' '}
-        {data.sourceStatus.pullRequest === 'ok' ? '可读' : '未同步'}；未同步来源不计入活动总数。
-      </p>
       <Dialog open={selected !== null} onOpenChange={(open) => (open ? undefined : setSelected(null))}>
         <DialogContent>
           <DialogHeader>
@@ -184,7 +181,6 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
                   </div>
                 ))}
               </div>
-              <p className="small quiet">每个日期按 UTC 归类；Bots 入口在 V0.2 暂不开放。</p>
             </>
           ) : null}
           <DialogFooter>
