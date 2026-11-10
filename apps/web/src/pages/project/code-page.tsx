@@ -6,6 +6,7 @@ import { useSession } from '@/features/identity/public'
 import { projectQueryOptions } from '@/features/projects/public'
 import {
   projectRepositoriesQueryOptions,
+  repositoryBranchesQueryOptions,
   repositoryFileQueryOptions,
   repositoryTreeQueryOptions,
   RepositoryPicker,
@@ -27,10 +28,13 @@ export function Component() {
   const project = useQuery(projectQueryOptions(projectId))
   const repositories = useQuery(projectRepositoriesQueryOptions(projectId))
   const [selectedRepositoryId, setSelectedRepositoryId] = useState('')
+  const [selectedBranch, setSelectedBranch] = useState('')
   const [selectedPath, setSelectedPath] = useState('')
   const linkedRepositories = repositories.data?.data ?? []
   const repository = linkedRepositories.find((item) => item.id === selectedRepositoryId) ?? linkedRepositories[0]
-  const branch = repository?.defaultBranch ?? undefined
+  const branches = useQuery(repositoryBranchesQueryOptions(projectId, repository?.id ?? ''))
+  const branchOptions = branches.data?.data.branches ?? (repository?.defaultBranch ? [repository.defaultBranch] : [])
+  const branch = selectedBranch || repository?.defaultBranch || branchOptions[0] || undefined
   const tree = useQuery(repositoryTreeQueryOptions(projectId, repository?.id ?? '', branch))
   const files = (tree.data?.data.entries ?? []).filter((entry) => entry.type === 'file').map((entry) => entry.path)
   const defaultPath = files.find((path) => path.toLowerCase() === 'readme.md') ?? files[0] ?? ''
@@ -85,8 +89,19 @@ export function Component() {
     <div className="catalog code-overview-page">
       <div className="git-strip">
         <PrototypeIcon name="branch" />
-        <select aria-label="代码分支" value={tree.data?.data.branch ?? branch ?? ''} disabled>
-          <option value={branch ?? ''}>{branch ?? '默认分支'}</option>
+        <select
+          aria-label="代码分支"
+          value={tree.data?.data.branch ?? branch ?? ''}
+          onChange={(event) => {
+            setSelectedBranch(event.target.value)
+            setSelectedPath('')
+          }}
+        >
+          {branchOptions.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
         </select>
         <span className="divider" />
         <PrototypeIcon name="repo" />
@@ -96,6 +111,7 @@ export function Component() {
             value={repository.id}
             onChange={(event) => {
               setSelectedRepositoryId(event.target.value)
+              setSelectedBranch('')
               setSelectedPath('')
             }}
           >

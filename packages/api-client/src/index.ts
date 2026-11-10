@@ -932,6 +932,15 @@ export function createApiClient(options: ApiClientOptions) {
         { ...options, query },
       )
     },
+    /** 读取仓库分支列表。 */
+    async listRepositoryBranches(projectId: string, repositoryId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/branches', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/branches`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
     /** 读取仓库文件树。 */
     async listRepositoryTree(
       projectId: string,

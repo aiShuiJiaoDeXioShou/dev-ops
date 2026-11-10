@@ -77,3 +77,12 @@ export function repositoryFileQueryOptions(
     enabled: Boolean(projectId && repositoryId && path),
   })
 }
+
+/** 仓库分支列表。 */
+export function repositoryBranchesQueryOptions(projectId: string, repositoryId: string) {
+  return queryOptions({
+    queryKey: ['code', 'branches', projectId, repositoryId],
+    queryFn: ({ signal }) => apiClient.listRepositoryBranches(projectId, repositoryId, { signal }),
+    enabled: Boolean(projectId && repositoryId),
+  })
+}

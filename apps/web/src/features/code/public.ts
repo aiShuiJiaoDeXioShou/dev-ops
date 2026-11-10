@@ -3,6 +3,7 @@ export {
   connectionRepositoriesQueryOptions,
   gitConnectionsQueryOptions,
   projectRepositoriesQueryOptions,
+  repositoryBranchesQueryOptions,
   repositoryFileQueryOptions,
   repositoryTreeQueryOptions,
 } from './api/queries'
