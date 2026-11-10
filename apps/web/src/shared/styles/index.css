@@ -873,3 +873,18 @@
   color: var(--blue);
   border-bottom: 1px solid var(--blue);
 }
+
+/* 账号行与上方导航文字对齐：15px 左内边距 + 头像 26 + 5px 间距 = 导航文字起点。 */
+.user {
+  padding: 8px 15px;
+  gap: 5px;
+}
+.user-copy {
+  flex: 1;
+}
+.user .avatar {
+  flex-shrink: 0;
+}
+.user .badge {
+  margin-left: 4px;
+}

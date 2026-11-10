@@ -89,7 +89,6 @@ export function AppLayout() {
                 {currentTeam?.name ?? '未加入团队'}
               </span>
             </span>
-            <span className="spacer" />
             <span className="badge">{ROLE_LABELS[role]}</span>
           </div>
           <button type="button" className="nav-btn logout-btn" onClick={() => setLogoutOpen(true)}>
