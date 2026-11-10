@@ -83,6 +83,7 @@ export interface GitReadPort {
     ref: string
     path: string
   }): Promise<GitFileContentPort>
+  listBranches?(input: { repository: { namespace: string; name: string } }): Promise<string[]>
 }
 
 export interface RepositoryView {
@@ -213,6 +214,16 @@ export function createCodeService(deps: CodeServiceDeps) {
         ? ERROR_CODES.EXTERNAL_AUTH_FAILED
         : ERROR_CODES.EXTERNAL_UNAVAILABLE
     throw new ApiError(code, '读取远端仓库失败，请检查连接状态后重试')
+  }
+
+  async function listRepositoryBranches(actor: SessionUser, projectId: string, repositoryId: string) {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.listBranches) return repository.default_branch ? [repository.default_branch] : []
+    try {
+      return await adapter.listBranches({ repository: { namespace: repository.namespace, name: repository.name } })
+    } catch (error) {
+      repositoryReadError(error)
+    }
   }
 
   async function listRepositoryTree(actor: SessionUser, projectId: string, repositoryId: string, branch?: string) {
@@ -524,6 +535,7 @@ export function createCodeService(deps: CodeServiceDeps) {
 
   return {
     listProjectRepositories,
+    listRepositoryBranches,
     listRepositoryTree,
     getRepositoryFile,
     listAvailableRepositories,

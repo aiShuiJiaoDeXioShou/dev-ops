@@ -155,6 +155,25 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
     return { path: input.path, content: content.slice(0, 200_000), truncated: content.length > 200_000 }
   }
 
+  async function listBranches(input: { repository: { namespace: string; name: string } }): Promise<string[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    if (!isAllowlisted(slug, options.allowedRepositories))
+      throw new GitAdapterError('unsupported', '仓库不在允许范围内')
+    let data: Array<{ name?: unknown }>
+    try {
+      data = (
+        await client.request('GET /repos/{owner}/{repo}/branches', {
+          owner: input.repository.namespace,
+          repo: input.repository.name,
+          per_page: 100,
+        })
+      ).data as Array<{ name?: unknown }>
+    } catch (error) {
+      throw classify(error)
+    }
+    return data.flatMap((item) => (typeof item.name === 'string' ? [item.name] : []))
+  }
+
   return {
     async checkConnection() {
       try {
@@ -194,5 +213,6 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
     getObject,
     listTree,
     getFile,
+    listBranches,
   }
 }

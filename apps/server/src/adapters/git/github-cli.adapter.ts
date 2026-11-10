@@ -180,6 +180,13 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
     return { path: input.path, content: content.slice(0, 200_000), truncated: content.length > 200_000 }
   }
 
+  async function listBranches(input: { repository: { namespace: string; name: string } }): Promise<string[]> {
+    const slug = repoSlug(input)
+    if (!isAllowlisted(slug, allowed)) throw new GitAdapterError('unsupported', '仓库不在允许范围内')
+    const data = parseJson<Array<{ name?: unknown }>>(await run(['api', `repos/${slug}/branches?per_page=100`]))
+    return data.flatMap((item) => (typeof item.name === 'string' ? [item.name] : []))
+  }
+
   return {
     async checkConnection() {
       const identity = (await run(['api', 'user', '--jq', '.login'])).trim()
@@ -207,5 +214,6 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
     getObject,
     listTree,
     getFile,
+    listBranches,
   }
 }

@@ -76,6 +76,8 @@ export interface GitAdapter {
   listTree?(input: GitTreeInput): Promise<GitTreeEntry[]>
   /** 读取仓库文件内容；部分历史适配器测试替身可以不实现。 */
   getFile?(input: GitFileInput): Promise<GitFileContent>
+  /** 读取仓库分支列表；部分历史适配器测试替身可以不实现。 */
+  listBranches?(input: { repository: GitRepositoryRef }): Promise<string[]>
 }
 
 /** 按提供方、授权方式和凭据构造适配器。 */

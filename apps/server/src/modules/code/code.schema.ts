@@ -42,6 +42,7 @@ export const repositoryQuerySchema = Type.Object({
   pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
 })
 export const repositoryListResponseSchema = apiResponseSchema(Type.Array(repositorySchema))
+export const repositoryBranchesResponseSchema = apiResponseSchema(Type.Object({ branches: Type.Array(Type.String()) }))
 export const repositoryTreeQuerySchema = Type.Object({ branch: Type.Optional(Type.String({ maxLength: 200 })) })
 export const repositoryTreeResponseSchema = apiResponseSchema(
   Type.Object({ branch: Type.String(), entries: Type.Array(treeEntrySchema) }),

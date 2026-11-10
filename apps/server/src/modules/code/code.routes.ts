@@ -15,6 +15,7 @@ import {
   removedResponseSchema,
   repositoryFileQuerySchema,
   repositoryFileResponseSchema,
+  repositoryBranchesResponseSchema,
   repositoryListResponseSchema,
   repositoryQuerySchema,
   repositoryTreeQuerySchema,
@@ -51,6 +52,26 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
       const user = await requireSessionUser(options.auth, request.headers)
       return success(
         await options.service.listAvailableRepositories(user, request.params.projectId, request.query),
+        request.id,
+      )
+    },
+  )
+
+  app.get(
+    '/projects/:projectId/repositories/:repositoryId/branches',
+    {
+      schema: { params: projectRepositoryParamsSchema, response: { 200: repositoryBranchesResponseSchema } },
+    },
+    async (request) => {
+      const user = await requireSessionUser(options.auth, request.headers)
+      return success(
+        {
+          branches: await options.service.listRepositoryBranches(
+            user,
+            request.params.projectId,
+            request.params.repositoryId,
+          ),
+        },
         request.id,
       )
     },

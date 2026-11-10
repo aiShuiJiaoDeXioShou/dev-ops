@@ -120,6 +120,12 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     return { path: input.path, content: content.slice(0, 200_000), truncated: content.length > 200_000 }
   }
 
+  async function listBranches(input: { repository: { namespace: string; name: string } }): Promise<string[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const data = await request<Array<{ name?: unknown }>>(`/repos/${slug}/branches?limit=100`)
+    return data.flatMap((item) => (typeof item.name === 'string' ? [item.name] : []))
+  }
+
   return {
     async checkConnection() {
       const user = await request<{ login?: string }>('/user')
@@ -150,5 +156,6 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     getObject,
     listTree,
     getFile,
+    listBranches,
   }
 }
