@@ -131,7 +131,9 @@ export function createProjectDashboardService(deps: ProjectDashboardDeps) {
           })()
       : 'all'
     const today = new Date(`${dateOf(new Date())}T00:00:00.000Z`)
-    const from = query.from ? parseDate(query.from, '开始日期') : addDays(today, -(MAX_WINDOW_DAYS - 1))
+    // 默认窗口对齐到周日，前端按原型 53×7 热力图直接布局；上限仍为 371 天。
+    const weekStart = addDays(today, -today.getUTCDay())
+    const from = query.from ? parseDate(query.from, '开始日期') : addDays(weekStart, -52 * 7)
     const to = query.to ? parseDate(query.to, '结束日期') : today
     if (to.getTime() < from.getTime()) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '结束日期不能早于开始日期')
     if ((to.getTime() - from.getTime()) / DAY_MS + 1 > MAX_WINDOW_DAYS) {
