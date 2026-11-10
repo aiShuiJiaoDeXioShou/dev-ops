@@ -81,7 +81,7 @@ V0.2 在无外键前提下新增以下业务表，关联一致性由 service 事
 | --- | --- | --- |
 | `build_record`、`build_record_correction`、`build_artifact`、`build_record_target` | delivery | 交付上报、更正与三类产物引用 |
 | `service_run_version`、`service_run_version_change` | delivery | 服务三环境实际运行版本与变更历史 |
-| `pipeline_run`、`pipeline_run_status` | delivery | 外部流水线运行记录与状态历史 |
+| `pipeline_run`、`pipeline_run_status` | delivery | 外部流水线运行记录与状态历史；V0.4a 迁移 0020 已按 A-05 决策删除（本机旧表 0 行，无生产数据） |
 | `external_review`、`release_result` | delivery | 外部提审与实际发布，两者分离 |
 | `credential`、`credential_version`、`credential_project_grant`、`credential_usage` | configuration | 团队凭据元数据、版本密文、授权与使用记录 |
 | `project_env_var` | configuration | 项目三环境变量与凭据引用 |
@@ -99,6 +99,28 @@ V0.2 在无外键前提下新增以下业务表，关联一致性由 service 事
 - `template_snapshot_link` 只保存令牌摘要与模板版本，不保存正文；打开链接仍要求登录与团队成员权限，不提供匿名/公网访问。
 - 知识模块写操作只写自身表与 `activity`，不写项目、需求、Bug、交付或远端仓库；技能/模板停用与编辑不删除历史版本。
 - 错误码复用 `VALIDATION_ERROR`、`FORBIDDEN`、`NOT_FOUND`、`VERSION_CONFLICT`、`PRECONDITION_FAILED`，不新增知识专属码。
+
+## V0.4a pipeline 表（迁移 0020–0021）
+
+V0.4a 新增 `pipeline` 模块的 7 张表，替代已下线的 `delivery` 外部流水线上报表。表只保存运行事实与元数据，日志与产物正文保存在 `PIPELINE_STORAGE_DIR` 下的本地目录；无外键，关联一致性由 pipeline service 的事务、条件更新与租约约束保证。
+
+| 表 | 说明 |
+| --- | --- |
+| `pipeline_run` | 平台创建的一次运行：固定提交 SHA、工作流快照与哈希、运行计划、输入、状态、幂等键、节点、超时与失败/取消信息；`project_id + idempotency_key` 唯一 |
+| `pipeline_run_step` | 运行内步骤执行事实：全局 `step_index`、类型（run/builtin）、状态、退出码、错误摘要与起止时间；`run_id + step_index` 唯一 |
+| `pipeline_run_log` | 日志分片元数据：步骤、序号、存储相对路径、大小；`run_id + step_index + seq` 唯一，重复分片不重复写入 |
+| `pipeline_artifact` | 产物元数据：名称、大小、SHA-256、所属步骤与可用状态；`run_id + name` 唯一 |
+| `pipeline_node` | 团队执行节点：状态、能力标签、操作系统/架构、并发上限、Agent 版本与最近心跳 |
+| `pipeline_node_token` | 一次性注册令牌与 Agent 长期令牌的 SHA-256 哈希、状态与撤销信息，不保存明文 |
+| `pipeline_lease` | 运行与节点的调度租约：租约令牌哈希、有效期与释放状态；部分唯一索引保证同一运行至多一个活动租约 |
+
+约束要点：
+
+- 运行状态 CHECK 取值为 `queued`/`assigned`/`running`/`cancelling`/`succeeded`/`failed`/`cancelled`/`interrupted`；步骤状态为 `pending`/`running`/`succeeded`/`failed`/`skipped`/`cancelled`；节点状态为 `pending`/`online`/`draining`/`offline`/`disabled`。
+- 调度 Worker 用 `SELECT ... FOR UPDATE SKIP LOCKED` 领取待调度运行，租约过期或节点心跳超时由 Worker 收口为 `interrupted`，不自动改派同一运行。
+- 迁移 0020 删除旧 `delivery.pipeline_run`、`pipeline_run_status` 并创建 pipeline 表、索引与 `uk_pipeline_lease_active_run` 部分唯一索引；迁移 0021 补齐中文表/列注释并将 `activity` 实体类型白名单扩展到 `pipeline_run`、`pipeline_node`。
+- `activity` 新增 `pipeline_run`、`pipeline_node` 实体类型，用于记录触发、取消、节点变更与产物下载；不新增数据库外键。
+- 日志与产物存储布局为 `<PIPELINE_STORAGE_DIR>/runs/<runId>/{logs/<stepIndex>/<seq>.log,artifacts/<artifactId>.bin}`，数据库只保存相对 `storage_key`，读取时校验仍在存储根目录内。
 
 ## 部署边界
 

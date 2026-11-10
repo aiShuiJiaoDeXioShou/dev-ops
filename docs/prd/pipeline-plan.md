@@ -250,6 +250,32 @@ flowchart LR
 
 扩展性的关键不是把每一行代码都写成可配置，而是：运行计划是平台自有模型、节点协议稳定、内置步骤有注册表、日志与产物存储有接口。做到这四点，后续加语言、加步骤、加执行后端都不需要改控制面。
 
+### 5.8 社区 runner 的策略对照
+
+主流自托管 CI 的共同做法是“控制面 + 主动外连的 agent/runner”，平台不执行用户代码，代码在任务执行时由 agent 从 Git 拉取。差异主要在任务获取方式、隔离方式和扩展形态。
+
+| 项目 | 控制面与执行面 | 任务获取 | 代码与工作区 | 隔离与扩容 | 可借鉴 |
+| --- | --- | --- | --- | --- | --- |
+| [GitHub Actions self-hosted runner](https://docs.github.com/en/actions/concepts/runners/self-hosted-runners) | GitHub 控制面，runner 在用户机器 | runner 主动轮询；注册令牌换 runner 身份 | workspace 在 runner，checkout 时拉取 | Docker 容器或宿主机；runner group/标签；临时 runner 与 ARC 扩容 | 注册令牌、标签路由、一次性工作区、临时 runner |
+| [GitLab Runner](https://docs.gitlab.com/runner/executors/) | GitLab 控制面，runner 在用户环境 | runner 注册后轮询任务 | workspace 在 runner；`CI_JOB_TOKEN` 拉代码 | Docker、Kubernetes、Instance 等 executor；并发槽位与 autoscaler | executor 抽象、并发槽位、工件与缓存 |
+| [Buildkite agent](https://buildkite.com/docs/agent) | Buildkite 控制面，agent 在用户环境 | agent 连接队列领取任务 | checkout 拉代码；agent hooks 扩展 | Docker、K8s agent stack；队列与优先级 | 队列路由、钩子扩展、agent 生命周期 |
+| [Gitea Runner](https://gitea.com/gitea/runner) | Gitea 控制面，runner 在用户环境 | 注册后 daemon 轮询 | 任务工作区；`builtin:checkout` | Docker、Kubernetes、host；`runs-on` 标签；同类缓存与产物服务 | 标签映射、DinD 隔离、日志脱敏、内置动作 |
+| [Jenkins](https://www.jenkins.io/doc/book/managing/nodes/) | controller 调度，agent 执行 | agent 连接 controller，或 controller 主动连接 | 节点工作区 | executors 并发槽位；K8s/云动态节点 | 把 agent 视为不可靠、executor 并发模型、节点健康检查 |
+| [Woodpecker](https://woodpecker-ci.org/docs/administration/general) | server 解析 YAML，agent 执行 | agent 通过 gRPC 连接 server | agent 本地执行，Docker/K8s/local 后端 | Docker、Kubernetes、local；可选 autoscaler | 控制面解析 YAML、agent 只执行、autoscaler 后置 |
+| Tekton/Argo（K8s 原生） | 控制器创建 Pod | 无长期 agent，控制器直接建 Pod | 工作区挂载或从 Git 拉取 | 每任务一个 Pod | 执行环境即容器；我们可先 Docker，后续再加 K8s 后端 |
+
+共同策略：
+
+1. 控制面与执行面分离，平台 API 不运行用户代码；agent 主动外连，避免平台反向访问内网。
+2. 注册令牌换长期身份，配合心跳、标签或能力路由、队列与租约；节点被视为不可靠。
+3. 代码不进入平台存储；agent 在任务时拉取确定提交，工作区临时且按任务隔离，失败或完成后清理。
+4. 隔离优先用容器或 Pod；共享宿主机与长期工作区只在受控环境使用；临时 runner 更安全。
+5. 日志分片上传、产物独立上传，密钥脱敏；取消和超时由控制面下发，节点尽力停止并上报真实结果。
+6. 扩容与升级后置：先固定节点池与并发槽位，再评估 autoscaler、K8s、临时 runner 和版本自动升级。
+7. 现成项目通常绑定自己的控制面；社区里“自研 runner”的团队大多长期维护 agent 生命周期、升级、日志与安全，不把 runner 当作短期附属品。
+
+对我们的启示：当前“平台控制面 + 自托管 Agent + 平台侧解析 YAML”的方向与 Woodpecker 等实现一致；差异是我们把平台专属步骤与 YAML 子集作为一等能力，不引入现成 CI 引擎。P1 保持单节点、长驻 agent 与单任务容器；临时 runner、K8s 后端与 autoscaler 等扩展项按 P2/P3 评估。
+
 ## 6. 业务对象与状态
 
 ### 6.1 对象
@@ -400,3 +426,15 @@ stateDiagram-v2
 5. V0.4b 的发布与变更计划沿用 M13，不并入流水线第一版。
 
 本文第 1 章是确认的方向，第 2 章是工作区核对事实，第 3 章是已修订的条款，第 4 至 9 章是架构与版本提案，第 12 章记录已确认与仍待确认的决策点。
+
+## 14. V0.4a 实现现状（2026-11-10）
+
+V0.4a 已按第 12 章 PL-Q01、PL-Q03、PL-Q04、PL-Q06、PL-Q07、PL-Q08、PL-Q09、PL-Q15、PL-Q16、PL-Q17、PL-Q18、PL-Q19 的确认方向实现：仓库内 `.devops/workflows/` 的 YAML 子集在平台侧解析与校验、平台生成并固定运行计划、PostgreSQL 队列 + 独立 Worker + 租约调度、自托管节点 Agent 在单 Linux 容器内串行执行、日志分片与产物本地存储 + 鉴权下载、超时/取消/节点失联显式收口。执行器完全自研，不引入 act、Gitea Runner 或其他 CI 运行时。
+
+本轮落地与提案的差异：
+
+- PL-Q05 产物模型：平台托管产物独立成 `pipeline_artifact`，与 `delivery` 的外部引用产物分开表达，未做跨模块合并展示。
+- PL-Q14 外部 CI 上报：按 spec A-05 决策直接下线（迁移 0020 删除旧表），未保留导入兼容路径；共享环境升级前需先导出确认。
+- 表达式、`runs-on` 镜像映射、隐藏限制与内置步骤以 `specs/005-v04a-pipeline-runner/contracts/workflow-yaml.md` 为准；Agent 内部协议以 `contracts/agent-protocol.md` 为准，不进入公开 OpenAPI。
+
+V0.4b（受控执行与发布：代码写操作、远端 PR、变更计划、人工放行、部署与版本验证）仍未实现，需单独建立规格；本文第 12 章的 PL-Q10、PL-Q11 等后续决策不随 V0.4a 完成而关闭。验收证据与未验证项见 `specs/005-v04a-pipeline-runner/evidence.md`。

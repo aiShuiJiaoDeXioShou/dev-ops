@@ -43,6 +43,24 @@ pnpm dev
 
 `pnpm dev` 先生成并构建 API 客户端，再同时启动 Web 和 Server。默认 Web 地址为 `http://localhost:5173`，API 为 `http://127.0.0.1:3001`。也可以分别运行 `pnpm dev:web`、`pnpm dev:server`。开发代理地址可用启动进程环境变量 `DEV_OPS_API_TARGET` 指定。
 
+V0.4a 内置流水线还需要两个独立进程：调度 Worker 与自托管执行节点 Agent。Worker 用 PostgreSQL 行锁和租约调度运行、监控超时并收口节点离线，需在 Server 之外单独启动：
+
+```bash
+pnpm --dir apps/server dev:worker
+```
+
+执行节点需要一台可用的 Docker 主机（P1 为本地开发机），在团队设置 → 连接与节点中创建节点并复制一次性注册令牌，然后以环境变量启动 Agent（也可写入 agent 本地 `.env`）。平台地址、节点令牌与工作目录等配置见 [apps/pipeline-agent/README.md](apps/pipeline-agent/README.md)，日志与产物保存在 `PIPELINE_STORAGE_DIR` 指向的受控目录：
+
+```bash
+PLATFORM_URL=http://127.0.0.1:3001 \
+AGENT_REGISTRATION_TOKEN=<一次性令牌> \
+AGENT_WORK_DIR=/tmp/devops-agent \
+AGENT_LABELS=linux,docker,node24 \
+pnpm dev:agent
+```
+
+仓库内 `.devops/workflows/` 中的 YAML 工作流按[平台支持的子集](specs/005-v04a-pipeline-runner/contracts/workflow-yaml.md)解析；语法不支持、节点离线、步骤超时与取消都会显式失败或中断，不会显示为成功。完整步骤见[内置流水线验收指南](specs/005-v04a-pipeline-runner/quickstart.md)。
+
 CLI 首次使用前执行 `pnpm prepare:clients`，之后查看帮助或检查运行中的服务：
 
 ```bash

@@ -53,9 +53,11 @@ dev-ops/
 ├── apps/
 │   ├── web/                       # 浏览器应用
 │   ├── server/                    # HTTP、Worker 和业务模块
+│   ├── pipeline-agent/            # 自托管流水线执行节点（主动外连平台）
 │   └── cli/                       # 命令行入口
 ├── packages/
-│   └── api-client/                # 从后端契约生成的客户端与接口类型
+│   ├── api-client/                # 从后端契约生成的客户端与接口类型
+│   └── pipeline-protocol/         # Server 与 Agent 共用的流水线协议类型
 ├── tooling/                      # 共享编译配置、依赖边界检查和工程脚本
 ├── tests/
 │   └── e2e/                      # 跨 Web、Server、CLI 的完整流程
@@ -116,6 +118,7 @@ apps/web/
 │   │   ├── bugs/
 │   │   ├── code/
 │   │   ├── delivery/
+│   │   ├── pipeline/             # 流水线页、运行详情与执行节点管理
 │   │   ├── bots/
 │   │   ├── collaboration/
 │   │   ├── tasks/
@@ -211,11 +214,11 @@ apps/server/
 ├── src/
 │   ├── entrypoints/
 │   │   ├── http.ts               # 启动 HTTP 服务和关闭资源
-│   │   └── worker.ts             # 首个可靠后台作业需要时加入
+│   │   └── worker.ts             # 流水线调度 Worker：领取运行、租约、超时与节点离线收口
 │   ├── bootstrap/
 │   │   ├── create-services.ts    # 创建模块、适配器并传入依赖
 │   │   ├── create-http-app.ts    # 组装 Fastify、鉴权入口与路由
-│   │   ├── create-worker.ts      # 后台作业处理器组装，按需加入
+│   │   ├── create-worker.ts      # 流水线调度 Worker 的依赖组装与生命周期
 │   │   └── database-schema.ts    # 汇总模块表定义供迁移工具使用
 │   ├── modules/
 │   │   ├── identity/
@@ -224,6 +227,7 @@ apps/server/
 │   │   ├── bugs/
 │   │   ├── code/
 │   │   ├── delivery/
+│   │   ├── pipeline/             # 流水线定义解析、运行、日志、产物与执行节点
 │   │   ├── bots/
 │   │   ├── collaboration/
 │   │   ├── tasks/
@@ -332,6 +336,7 @@ DSH 的包约定区分能力定义、提供方和使用方，并要求扩展依�
 | bugs | 缺陷、复现信息、修复和回归、需求及代码关联 | 本地 Bug 状态与远端 Issue 状态分别保存 |
 | code | 仓库、Git 对象引用、来源信息与代码操作规则 | Git 内容以来源平台为准 |
 | delivery | 交付、构建记录、产物引用、已确认的运行版本及审核结果 | 最新产物与环境实际版本分别表达 |
+| pipeline | 流水线定义解析、运行与步骤、日志与产物、执行节点、令牌与租约 | 只保存运行事实与元数据，日志/产物正文在受控存储；不执行用户代码于 API 进程 |
 | bots | Bot 定义、配置、负责人及能力授权 | 不保存另一套任务运行状态 |
 | collaboration | 会话、群组、消息、工作标签和资源引用 | 项目入口复用原会话记录 |
 | tasks | 任务、每次运行、交接、结果及验收 | 技术作业重试与任务业务状态分开 |
@@ -382,6 +387,8 @@ flowchart LR
 ## 8. 运行进程与数据边界
 
 HTTP 进程负责及时完成的请求，Worker 承接邮件投递、同步和后续 Bot 执行等需要持久记录与恢复的作业。两者先保留在同一个 Server 包内，复用 service、repository 和适配器，独立启动并管理连接生命周期。
+
+流水线（V0.4a）按控制面与执行面分离：HTTP 进程负责工作流解析、触发、权限与日志/产物读取；`entrypoints/worker` 作为独立进程用 PostgreSQL 行锁与租约调度运行、监控超时并收口节点离线；`apps/pipeline-agent` 运行在团队自托管 Docker 主机上，主动外连平台领取租约，用短期 Git 凭据拉取固定提交，在单容器内执行平台固定后的运行计划并回传状态、日志与产物。API 进程不执行用户代码，Agent 不解析 YAML，两者通过 `packages/pipeline-protocol` 的同一份 TypeBox 契约交互。节点令牌、Git 短期凭据与运行时密钥只在内存短暂使用，不进入日志、运行记录与产物元数据。
 
 首个需要可靠投递的功能出现时加入持久化作业设施，优先评估复用 PostgreSQL。业务写入与作业意图共同提交，Worker 在提交后执行外部请求并记录结果。调度机制放在 platform/jobs，具体邮件或任务处理逻辑放在所属模块；队列实现随首次真实用例验证，不先建立通用工作流引擎。
 
