@@ -136,3 +136,13 @@ apps/server/
 ## API Token 与 CLI（2026-11-10）
 
 服务端新增 `personal_access_token` 表与 `/api/v1/me`、`/api/v1/me/tokens*` 接口；业务接口同时接受现有 Better Auth Cookie 会话和 `Authorization: Bearer devops_pat_...`。Token 只保存 SHA-256 摘要、明文仅在创建响应返回一次，管理接口只允许登录会话。CLI 使用说明见 [apps/cli/README.md](../cli/README.md)。
+
+## V0.3 knowledge 模块（Skills 与模板）
+
+`src/modules/knowledge/` 提供团队 Skills 与 AGENTS.md 模板的阶段 A 能力，路由挂载在 `/api/v1`：
+
+- 技能：`GET/POST /teams/:teamId/skills`、`GET /skills/:skillId`、`POST /skills/:skillId/update|enable|disable`、版本与活动列表。
+- 模板：`GET/POST /teams/:teamId/agent-templates`、`GET /agent-templates/:templateId`、`POST .../update|duplicate`、版本/活动、`POST .../snapshot-links`、`GET /template-snapshot-links/:token`。
+- 项目选用：`GET /projects/:projectId/agent-template`、`POST .../apply|clear`。
+
+约束：只使用 GET/POST 与统一信封；复用既有业务错误码；团队隔离与浏览者只读由 service 校验；所有写操作同事务并写 `activity`（实体类型 `skill`/`agent_template`）。正文、令牌不写入日志/活动；快照页设置 `Referrer-Policy: no-referrer`；模板与技能不写入项目关联仓库。阶段 B 解析函数（技能候选、运行模板）已随服务返回，等待 M07/M09 调用方接入。

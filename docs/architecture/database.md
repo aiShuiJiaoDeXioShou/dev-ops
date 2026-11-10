@@ -87,9 +87,18 @@ V0.2 在无外键前提下新增以下业务表，关联一致性由 service 事
 | `project_env_var` | configuration | 项目三环境变量与凭据引用 |
 | `project_service`、`project_service_repository` | projects | 服务目录与仓库映射 |
 | `team.icon_text`、`team.description`、`team.version` | identity | 团队资料与乐观锁版本 |
-| `agent_skill`、`agent_template` 等 | knowledge | V0.3 知识资产模块（并行分支合并） |
+| `skill`、`skill_version`、`agent_template`、`agent_template_version`、`project_template_selection`、`template_snapshot_link` | knowledge | V0.3 知识资产：技能/模板当前元数据与内容版本、项目选用、快照链接；`activity` 实体类型扩展为 `skill`/`agent_template`，错误码复用现有业务码 |
 
 凭据明文只在创建/轮换请求体出现，使用 AES-256-GCM 加密后写入 `credential_version`，响应只返回元数据与固定掩码；环境变量引用凭据时只保存整数标识，撤销或授权缩小时同事务将引用变量置为失效。上述表均通过版本化迁移生成，迁移编号以 `apps/server/drizzle/meta/_journal.json` 为准。
+
+### V0.3 knowledge 表与约束
+
+- 6 张表均启用中文表/列注释（迁移 0017、0018），主键 UUID，无外键；团队隔离字段 `team_id` 随表携带，关联一致性由 service 事务与条件更新保证。
+- `skill.version` 是乐观锁修订号，内容版本存于 `skill_version.content_version`（三段式由成员维护）；`skill_version.files` 为 JSONB 资源文件快照。
+- `agent_template.version` 为乐观锁，`agent_template_version.version` 为整数内容版本；`project_template_selection.project_id` 唯一，保证一个项目至多一个当前模板。
+- `template_snapshot_link` 只保存令牌摘要与模板版本，不保存正文；打开链接仍要求登录与团队成员权限，不提供匿名/公网访问。
+- 知识模块写操作只写自身表与 `activity`，不写项目、需求、Bug、交付或远端仓库；技能/模板停用与编辑不删除历史版本。
+- 错误码复用 `VALIDATION_ERROR`、`FORBIDDEN`、`NOT_FOUND`、`VERSION_CONFLICT`、`PRECONDITION_FAILED`，不新增知识专属码。
 
 ## 部署边界
 
