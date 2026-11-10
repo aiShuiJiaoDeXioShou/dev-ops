@@ -77,122 +77,120 @@ export function TemplateList({ teamId }: { teamId: string }) {
           ) : undefined
         }
       />
-      <div className="content">
-        <div className="catalog">
-          {query.isError ? (
-            <PageError
-              title="模板列表加载失败"
-              description={describeRequestError(query.error).description}
-              requestId={describeRequestError(query.error).requestId}
-              onRetry={() => void query.refetch()}
-            />
-          ) : query.isPending ? (
-            <DelayedPageSkeleton />
-          ) : (
-            <>
-              <label className="search">
-                <Search className="search-icon" aria-hidden="true" />
-                <Input
-                  aria-label="搜索模板名称或分类"
-                  placeholder="搜索模板名称或分类"
-                  value={search}
-                  maxLength={200}
-                  className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                  onChange={(event) => updateParam('search', event.target.value)}
+      <div className="catalog">
+        {query.isError ? (
+          <PageError
+            title="模板列表加载失败"
+            description={describeRequestError(query.error).description}
+            requestId={describeRequestError(query.error).requestId}
+            onRetry={() => void query.refetch()}
+          />
+        ) : query.isPending ? (
+          <DelayedPageSkeleton />
+        ) : (
+          <>
+            <label className="search">
+              <Search className="search-icon" aria-hidden="true" />
+              <Input
+                aria-label="搜索模板名称或分类"
+                placeholder="搜索模板名称或分类"
+                value={search}
+                maxLength={200}
+                className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+                onChange={(event) => updateParam('search', event.target.value)}
+              />
+            </label>
+            {query.data.data.items.length === 0 ? (
+              search ? (
+                <EmptyState
+                  mascot="project"
+                  title="没有符合条件的模板"
+                  description="换个关键词，或清除搜索后重新查看。"
+                  action={
+                    <Button type="button" variant="outline" onClick={() => setParams(new URLSearchParams())}>
+                      清除搜索
+                    </Button>
+                  }
                 />
-              </label>
-              {query.data.data.items.length === 0 ? (
-                search ? (
-                  <EmptyState
-                    mascot="project"
-                    title="没有符合条件的模板"
-                    description="换个关键词，或清除搜索后重新查看。"
-                    action={
-                      <Button type="button" variant="outline" onClick={() => setParams(new URLSearchParams())}>
-                        清除搜索
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <EmptyState
-                    mascot="project"
-                    title="还没有 AGENTS.md 模板"
-                    description="把项目的协作约定整理成模板，选用后供项目 Bot 作为协作约定使用。"
-                    action={
-                      canWrite ? (
-                        <Button type="button" onClick={() => setCreateOpen(true)}>
-                          新建模板
-                        </Button>
-                      ) : undefined
-                    }
-                  />
-                )
               ) : (
-                <ul className="template-grid">
-                  {query.data.data.items.map((item) => (
-                    <li key={item.id} className="template-card">
-                      <div className="row spread">
-                        <span className="skill-glyph">
-                          <FileText className="size-5" aria-hidden="true" />
-                        </span>
-                        <Tag>{item.tag}</Tag>
-                      </div>
-                      <h3>
-                        <Link className="skill-title" to={`?template=${encodeURIComponent(item.id)}`}>
-                          {item.name}
-                        </Link>
-                      </h3>
-                      <p>{item.description || '暂无说明'}</p>
-                      <pre>{item.excerpt}</pre>
-                      <div className="document-toolbar">
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0"
-                          onClick={() => void copyContent(item.id)}
-                        >
-                          复制内容
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0"
-                          onClick={() => void copyLink(item.id)}
-                        >
-                          <Link2 className="size-3.5" />
-                          复制链接
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0"
-                          onClick={() => void downloadTemplate(item.id)}
-                        >
-                          下载
-                        </Button>
-                      </div>
-                      <div className="row spread">
-                        <span className="text-xs text-muted-foreground">v{item.contentVersion}</span>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          className="h-auto p-0"
-                          onClick={() => updateParam('template', item.id)}
-                        >
-                          管理文件 →
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </div>
+                <EmptyState
+                  mascot="project"
+                  title="还没有 AGENTS.md 模板"
+                  description="把项目的协作约定整理成模板，选用后供项目 Bot 作为协作约定使用。"
+                  action={
+                    canWrite ? (
+                      <Button type="button" onClick={() => setCreateOpen(true)}>
+                        新建模板
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              )
+            ) : (
+              <ul className="template-grid">
+                {query.data.data.items.map((item) => (
+                  <li key={item.id} className="template-card">
+                    <div className="row spread">
+                      <span className="skill-glyph">
+                        <FileText className="size-5" aria-hidden="true" />
+                      </span>
+                      <Tag>{item.tag}</Tag>
+                    </div>
+                    <h3>
+                      <Link className="skill-title" to={`?template=${encodeURIComponent(item.id)}`}>
+                        {item.name}
+                      </Link>
+                    </h3>
+                    <p>{item.description || '暂无说明'}</p>
+                    <pre>{item.excerpt}</pre>
+                    <div className="document-toolbar">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0"
+                        onClick={() => void copyContent(item.id)}
+                      >
+                        复制内容
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0"
+                        onClick={() => void copyLink(item.id)}
+                      >
+                        <Link2 className="size-3.5" />
+                        复制链接
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0"
+                        onClick={() => void downloadTemplate(item.id)}
+                      >
+                        下载
+                      </Button>
+                    </div>
+                    <div className="row spread">
+                      <span className="text-xs text-muted-foreground">v{item.contentVersion}</span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0"
+                        onClick={() => updateParam('template', item.id)}
+                      >
+                        管理文件 →
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </div>
       {selected && (
         <TemplateDetailDialog teamId={teamId} templateId={selected} onClose={() => updateParam('template', '')} />
