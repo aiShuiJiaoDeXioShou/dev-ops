@@ -37,7 +37,10 @@ export function Component() {
 
   const run = useQuery(pipelineRunQueryOptions(runId))
   const detail = run.data?.run
-  const activeStepIndex = selectedStepIndex ?? detail?.steps[0]?.index ?? null
+  // 默认查看第一个有日志的步骤，避免详情打开在无日志步骤上误以为日志为空。
+  const defaultLogStepIndex =
+    detail?.logs.find((stat) => stat.chunkCount > 0)?.stepIndex ?? detail?.steps[0]?.index ?? null
+  const activeStepIndex = selectedStepIndex ?? defaultLogStepIndex
   const logs = usePipelineLogs(runId, activeStepIndex, detail ? isRunActive(detail.status) : false)
   const cancel = useMutation({
     mutationFn: (reason: string) => cancelPipelineRun(runId, reason),
@@ -89,6 +92,7 @@ export function Component() {
           selectedStepIndex={activeStepIndex ?? 0}
           onSelectStep={setSelectedStepIndex}
           isRunActive={isRunActive(detail.status)}
+          runStatus={detail.status}
         />
       </section>
 

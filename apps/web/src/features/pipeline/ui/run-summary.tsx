@@ -16,31 +16,41 @@ interface RunReason {
 }
 
 /**
+ * 取可展示的非空说明；接口可能返回空字符串，此时按缺失处理，避免出现空白提示。
+ * @param value 接口返回的说明文本。
+ * @returns 去掉首尾空白后的文本；为空时返回 null。
+ */
+function nonEmptyMessage(value: string | null): string | null {
+  const trimmed = value?.trim() ?? ''
+  return trimmed.length > 0 ? trimmed : null
+}
+
+/**
  * 根据运行状态与错误信息生成可读的终态/等待说明。
  * @param run 运行详情。
  * @returns 需要展示的说明；无额外说明时返回 null。
  */
 function describeRunReason(run: PipelineRunDetail): RunReason | null {
+  const message = nonEmptyMessage(run.errorMessage)
   if (run.status === 'failed') {
     return {
       variant: 'destructive',
       title: '运行失败',
-      description: run.errorMessage ?? '步骤执行失败，请查看步骤时间线与日志定位原因。',
+      description: message ?? '步骤执行失败，请查看步骤时间线与日志定位原因。',
     }
   }
   if (run.status === 'interrupted') {
     return {
       variant: 'destructive',
       title: '运行已中断',
-      description:
-        run.errorMessage ?? '执行节点失联或租约过期，平台已停止等待。已有日志与产物保留，可重新触发一次运行。',
+      description: message ?? '执行节点失联或租约过期，平台已停止等待。已有日志与产物保留，可重新触发一次运行。',
     }
   }
   if (run.status === 'cancelled') {
     return {
       variant: 'default',
       title: '运行已取消',
-      description: run.errorMessage ?? '取消请求已完成。已发生的镜像推送、文件上传等外部副作用无法撤回。',
+      description: message ?? '取消请求已完成。已发生的镜像推送、文件上传等外部副作用无法撤回。',
     }
   }
   if (run.status === 'cancelling') {

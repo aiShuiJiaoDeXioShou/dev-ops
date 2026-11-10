@@ -78,21 +78,27 @@ function runDetail(overrides: Record<string, unknown> = {}) {
   }
 }
 
-/** 注册详情与日志读取的默认处理；日志按步骤返回给定分片。 */
+/**
+ * 注册详情与日志读取的默认处理；日志按步骤返回给定分片。
+ * 与真实服务端一致：afterSeq 是“不含”游标且 seq 从 0 开始，默认值为 -1。
+ */
 function mockRun(
   detail: Record<string, unknown>,
   logs: { items?: { seq: number; content: string; truncated: boolean }[]; hasMore?: boolean } = {},
 ) {
+  const allChunks = logs.items ?? []
   server.use(
     http.get('*/api/v1/pipeline-runs/run-1', () => success(detail)),
-    http.get('*/api/v1/pipeline-runs/run-1/logs', () =>
-      success({
+    http.get('*/api/v1/pipeline-runs/run-1/logs', ({ request }) => {
+      const afterSeq = Number(new URL(request.url).searchParams.get('afterSeq') ?? '-1')
+      const items = allChunks.filter((chunk) => chunk.seq > afterSeq)
+      return success({
         stepIndex: 0,
-        items: logs.items ?? [],
-        nextSeq: logs.items?.at(-1)?.seq ?? 0,
+        items,
+        nextSeq: items.at(-1)?.seq ?? afterSeq,
         hasMore: logs.hasMore ?? false,
-      }),
-    ),
+      })
+    }),
   )
 }
 
@@ -127,24 +133,35 @@ describe('pipeline-run-page', () => {
   })
 
   it('中断状态、失败步骤与终态原因可区分展示', async () => {
-    mockRun(runDetail({ steps: [stepInstall] }))
+    // 运行中断时仍停留在 running 的步骤展示为已中断，且不按当前时间累计假耗时。
+    mockRun(
+      runDetail({
+        steps: [
+          stepInstall,
+          { ...stepInstall, index: 1, name: 'Wait', status: 'running', exitCode: null, finishedAt: null },
+        ],
+      }),
+    )
     renderPage()
     expect(await screen.findByRole('heading', { name: 'web-build' })).toBeInTheDocument()
     expect(screen.getByText('运行已中断')).toBeInTheDocument()
     expect(screen.getByText('执行节点失联，租约已过期。')).toBeInTheDocument()
     expect(screen.getByText('Install')).toBeInTheDocument()
     expect(screen.getByText(/退出码：1/)).toBeInTheDocument()
+    expect(screen.getByText('Wait')).toBeInTheDocument()
+    expect(screen.getAllByText('已中断')).toHaveLength(2)
     expect(screen.getByText('dev-machine-01')).toBeInTheDocument()
   })
 
   it('运行日志按步骤展示，过期日志通过重新读取恢复', async () => {
     mockRun(runDetail({ status: 'failed', errorMessage: '步骤执行失败。', steps: [stepInstall] }), {
       items: [
-        { seq: 1, content: '> install dependencies\n', truncated: false },
-        { seq: 2, content: 'ERR_PNPM_NO_SCRIPT\n', truncated: false },
+        { seq: 0, content: '> install dependencies\n', truncated: false },
+        { seq: 1, content: 'ERR_PNPM_NO_SCRIPT\n', truncated: false },
       ],
     })
     renderPage()
+    // seq=0 的首片也必须在真实 afterSeq 语义下返回，避免日志首片被跳过。
     expect(await screen.findByText(/ERR_PNPM_NO_SCRIPT/)).toBeInTheDocument()
     expect(screen.getByText(/install dependencies/)).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '按步骤筛选日志' })).toBeInTheDocument()

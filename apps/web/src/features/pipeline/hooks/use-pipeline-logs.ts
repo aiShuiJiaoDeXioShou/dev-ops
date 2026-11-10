@@ -32,7 +32,7 @@ const EMPTY_CHUNKS: PipelineLogChunk[] = []
 /**
  * 按步骤轮询运行日志。
  *
- * 首次读取从 afterSeq=0 连续读取全部分页，随后仅在运行未结束时按固定间隔读取增量；
+ * 首次读取从 afterSeq=-1 连续读取全部分页（包含 seq=0 的首片），随后仅在运行未结束时按固定间隔读取增量；
  * 重复 seq 只保留一次，运行结束或组件卸载时停止轮询。读取失败保留已加载内容，
  * 由调用方展示错误并提供重试/刷新。
  * @param runId 运行标识。
@@ -66,7 +66,8 @@ export function usePipelineLogs(runId: string, stepIndex: number | null, isRunAc
     const controller = new AbortController()
     const collected: PipelineLogChunk[] = []
     const seenSeq = new Set<number>()
-    let afterSeq = 0
+    // 服务端 afterSeq 是“不含”游标且日志 seq 从 0 开始，起点必须用 -1 才能读到首片。
+    let afterSeq = -1
     let truncated = false
     setIsPending(true)
     setErrorDescription(null)

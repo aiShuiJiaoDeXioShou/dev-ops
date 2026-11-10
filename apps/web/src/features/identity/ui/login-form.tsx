@@ -17,7 +17,9 @@ export function LoginForm() {
   const mutation = useMutation({
     mutationFn: () => signInEmail(email.trim(), password),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey })
+      // 登录成功的会话必须写回缓存后再跳转：受保护路由会读取会话，
+      // 若此时缓存仍是登录前的 null，会把刚登录的用户再次重定向到登录页。
+      await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey, type: 'all' })
       const redirect = params.get('redirect')
       navigate(redirect && redirect.startsWith('/') ? redirect : '/projects', { replace: true })
     },
