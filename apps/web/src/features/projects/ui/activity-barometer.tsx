@@ -158,7 +158,6 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
         </div>
       </div>
       <div className="activity-footer">
-        <span>代码 · 事项 · PR · Bots</span>
         <div className="activity-legend" aria-label="颜色越深，活动越多">
           <span>少</span>
           {[0, 1, 2, 3, 4].map((level) => (

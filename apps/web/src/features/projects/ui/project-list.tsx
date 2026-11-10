@@ -95,9 +95,6 @@ export function ProjectList() {
             创建项目
           </button>
         </div>
-        <p>
-          {currentTeam.name} · 共 {query.data.data.total} 个项目
-        </p>
       </header>
       <div className="catalog project-home">
         <ActivityBarometer teamId={currentTeam.id} search={filters.search} status={filters.status} />
