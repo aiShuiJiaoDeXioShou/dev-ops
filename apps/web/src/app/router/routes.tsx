@@ -64,6 +64,11 @@ export function createAppRoutes(): RouteObject[] {
                   HydrateFallback: DelayedPageSkeleton,
                 },
                 {
+                  path: 'pipelines/:runId',
+                  lazy: () => import('@/pages/project/pipeline-run-page'),
+                  HydrateFallback: DelayedPageSkeleton,
+                },
+                {
                   path: 'environment',
                   lazy: () => import('@/pages/project/environment-page'),
                   HydrateFallback: DelayedPageSkeleton,
@@ -107,6 +112,11 @@ export function createAppRoutes(): RouteObject[] {
             {
               path: 'settings/team',
               lazy: () => import('@/pages/settings/team-settings-page'),
+              HydrateFallback: DelayedPageSkeleton,
+            },
+            {
+              path: 'settings/pipeline-nodes',
+              lazy: () => import('@/pages/settings/pipeline-nodes-page'),
               HydrateFallback: DelayedPageSkeleton,
             },
             {

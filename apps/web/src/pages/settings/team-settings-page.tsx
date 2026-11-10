@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { ShieldAlert } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { CreateTeamDialog, MemberManagement, TeamProfileForm, useSession } from '@/features/identity/public'
@@ -31,6 +32,15 @@ export function Component() {
     <div className="catalog team-admin">
       <h1 className="sr-only">团队管理</h1>
       <TeamProfileForm />
+      <section aria-label="连接与节点" className="settings-section">
+        <h2 className="settings-section-title">连接与节点</h2>
+        <p className="muted">
+          内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
+        </p>
+        <Link className="btn" to="/settings/pipeline-nodes">
+          管理执行节点
+        </Link>
+      </section>
       {role === 'admin' ? (
         <MemberManagement teamId={currentTeam.id} canManage />
       ) : (

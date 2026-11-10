@@ -586,6 +586,28 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 读取项目流水线运行列表。 */
+    async listPipelineRuns(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/pipeline-runs', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-runs', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/pipeline-runs`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取流水线运行详情。 */
+    async getPipelineRun(runId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-runs/{runId}', 'get'>>(
+        `/api/v1/pipeline-runs/${segment(runId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
     /** 更正构建记录。 */
     async correctBuild(
       buildId: string,
@@ -1946,6 +1968,130 @@ export function createApiClient(options: ApiClientOptions) {
         `/api/v1/projects/${segment(projectId)}/agent-template/clear`,
         'POST',
         body,
+        options,
+      )
+    },
+
+    /** 读取项目在指定 ref 下的流水线工作流列表（含解析结果与最近运行）。 */
+    async listPipelineWorkflows(
+      projectId: string,
+      query?: ApiQuery<'/api/v1/projects/{projectId}/pipeline-workflows', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-workflows', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/pipeline-workflows`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取单个工作流详情：原始 YAML、解析错误与运行计划摘要。 */
+    async getPipelineWorkflow(
+      projectId: string,
+      query: ApiQuery<'/api/v1/projects/{projectId}/pipeline-workflows/detail', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-workflows/detail', 'get'>>(
+        `/api/v1/projects/${segment(projectId)}/pipeline-workflows/detail`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 手动触发一次流水线运行；同一幂等键返回同一次运行。 */
+    async triggerPipelineRun(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/pipeline-runs', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/pipeline-runs', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/pipeline-runs`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 请求取消流水线运行；取消是尽力而为，返回最新运行详情。 */
+    async cancelPipelineRun(
+      runId: string,
+      body: ApiBody<'/api/v1/pipeline-runs/{runId}/cancel', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-runs/{runId}/cancel', 'post'>>(
+        `/api/v1/pipeline-runs/${segment(runId)}/cancel`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 按步骤与 afterSeq 读取运行日志分片；运行中用于轮询增量。 */
+    async listPipelineRunLogs(
+      runId: string,
+      query?: ApiQuery<'/api/v1/pipeline-runs/{runId}/logs', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-runs/{runId}/logs', 'get'>>(
+        `/api/v1/pipeline-runs/${segment(runId)}/logs`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 读取运行产物元数据；下载地址由服务端按权限签发。 */
+    async listPipelineArtifacts(runId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-runs/{runId}/artifacts', 'get'>>(
+        `/api/v1/pipeline-runs/${segment(runId)}/artifacts`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取团队执行节点列表；仅团队管理员可见完整字段。 */
+    async listPipelineNodes(teamId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/pipeline-nodes', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/pipeline-nodes`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 注册执行节点并返回一次性注册令牌。 */
+    async createPipelineNode(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/pipeline-nodes', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/pipeline-nodes', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/pipeline-nodes`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 排空执行节点：不再分配新运行，已有任务继续。 */
+    async drainPipelineNode(nodeId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-nodes/{nodeId}/drain', 'post'>>(
+        `/api/v1/pipeline-nodes/${segment(nodeId)}/drain`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 停用执行节点并撤销活动 Agent 令牌。 */
+    async disablePipelineNode(nodeId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-nodes/{nodeId}/disable', 'post'>>(
+        `/api/v1/pipeline-nodes/${segment(nodeId)}/disable`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 轮换节点 Agent 令牌并返回新令牌（只显示一次）。 */
+    async rotatePipelineNodeToken(nodeId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/pipeline-nodes/{nodeId}/tokens/rotate', 'post'>>(
+        `/api/v1/pipeline-nodes/${segment(nodeId)}/tokens/rotate`,
+        'POST',
+        undefined,
         options,
       )
     },
