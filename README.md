@@ -18,6 +18,8 @@ Git 连接、仓库/PR 读取与自研流水线的分层结构见[Git、PR 与�
 
 独立 Bot、会话、任务、Agent 执行与平台 API 隔离的建议见 [Bots 独立子系统架构草案](docs/architecture/bots-architecture.md)，包含开源参考、权限边界、恢复机制与实施顺序。
 
+运行时内部端口、原生协议映射、双向事件及控制顺序见 [Bots 运行时适配契约与示例](docs/architecture/bots-runtime-examples.md)。
+
 轻量个人 Bot 首版已初始化在 [apps/bot](apps/bot/README.md)，使用 pi、DeepSeek 与 SQLite；运行 `pnpm --dir apps/bot dev chat` 开始对话。
 
 前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。V0.1 后端、共享 API 客户端与认证流程已实现；前端页面由 UI 线程按任务继续接入。

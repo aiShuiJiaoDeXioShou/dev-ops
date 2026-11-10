@@ -4,7 +4,7 @@
 
 | 属性   | 内容                                                                                                                                                                               |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 状态   | 方案草案，供评审；目录、表、接口及状态均为拟议设计                                                                                                                                 |
+| 状态   | 方案草案；运行时接入方式与 PostgreSQL 方向已确认，目录、表、接口及状态仍为拟议设计                                                                                                 |
 | 负责人 | 项目维护者                                                                                                                                                                         |
 | 读者   | 后端、前端、执行器开发者及测试人员                                                                                                                                                 |
 | 范围   | Bot 定义、会话、任务、运行、工具调用、上下文、执行环境和平台接入                                                                                                                   |
@@ -16,9 +16,9 @@
 
 PostgreSQL 已确认为本项目存储方向。长期记忆作为首批能力，由 Bots 维护提取、更新、召回与遗忘流程；数据库引擎不决定记忆内容及生效范围。
 
-Agent 执行循环优先验证 pi agent-core，平台自行维护任务状态、权限、工具执行记录与恢复逻辑。代码开发阶段再增加一种外部执行器适配，按实际需求选择 Codex、Claude 或 pi coding-agent。适配器通过编译期注册接入，不建设动态插件市场。
+运行时适配层参考 OpenBot 的分工：Codex 接 app-server，Claude Code 接 Claude Agent SDK，pi 接 CLI RPC。三个后端并列接入平台定义的 AgentRuntimeClient，由 Bots 控制面维护任务状态、权限、工具记录与恢复。适配器通过编译期注册接入，不建设动态插件市场。
 
-pi 的模型 provider 负责模型 API，pi agent-core 提供自身的 Agent 循环；Codex 与 Claude Code 则通过各自 SDK 作为并列的原生运行时接入。运行时选择和模型选择分别配置，调用某个模型不代表启动同名 Agent 工具。类型检查过的接口形态见[运行时适配示例](bots-runtime-examples.md)。
+运行时选择和模型选择分别配置，pi 是一个后端，不承担 Codex 或 Claude Code 的统一调度。平台不直接依赖 pi agent-core 或 Codex TypeScript SDK 作为这套适配层的入口。内部端口与事件结构见[运行时适配契约与示例](bots-runtime-examples.md)。
 
 首个验收目标是：创建无项目 Bot，保存一条偏好，在新会话中正确召回，纠正或遗忘后不再使用旧值；显式任务可以读取获准项目、提交文本结果并由成员验收。关闭浏览器与重启 Worker 后，记忆和任务进展仍可恢复。群聊、代码修改和生产执行分别扩展。
 
@@ -55,24 +55,26 @@ pi 的模型 provider 负责模型 API，pi agent-core 提供自身的 Agent 循
 
 下表依据 2026-11-10 查阅的官方仓库或官方文档。能力描述仅表示参考项目公开提供的机制；最后一列是本方案的选型判断，不代表已经完成依赖兼容验证。
 
-| 项目         | 可借鉴机制与依据                                                                                                                                                                                                                                                                                                                                    | 采用方式及边界                                                                  |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| OpenBot      | 独立工作区、持久会话、FIFO 消息、交接和上下文压缩，见[固定版本 README](https://raw.githubusercontent.com/nightly-labs/openbot/818d747347fe18ccad897f508fb628feebb052e5/README.md)                                                                                                                                                                   | 产品与交互参考。它面向本地桌面；其执行权限模型不能直接作为团队平台的权限方案    |
-| OpenClaw     | Agent 独立状态与会话，见[多 Agent 文档](https://docs.openclaw.ai/concepts/multi-agent)；会话内串行、会话间限流，见[固定版本队列说明](https://raw.githubusercontent.com/openclaw/openclaw/427edb705217c93139e2577e81176a668e39814f/docs/concepts/queue.md)                                                                                           | 借鉴会话路由和 mailbox 思路。其进程内队列不能直接承担本平台跨 Worker 的持久调度 |
-| pi           | agent-core 提供工具执行、事件流与上下文转换，见[固定版本说明](https://raw.githubusercontent.com/earendil-works/pi/a05e3a07763c38d23d50207742f7e073e35cd0f8/packages/agent/README.md)；coding-agent 另有[嵌入式 SDK](https://raw.githubusercontent.com/earendil-works/pi/a05e3a07763c38d23d50207742f7e073e35cd0f8/packages/coding-agent/docs/sdk.md) | 首选执行循环候选。平台保留业务与调度权威，不把 SDK 会话文件作为业务数据库       |
-| LangGraph JS | [持久化](https://docs.langchain.com/oss/javascript/langgraph/persistence)区分会话 checkpoint 与长期 store；[interrupt](https://docs.langchain.com/oss/javascript/langgraph/interrupts)支持等待外部输入，并指出恢复时的副作用重放问题                                                                                                                | 作为复杂持久工作流的备选。首批流程简单，先避免同时维护图状态与平台任务状态      |
+| 项目         | 可借鉴机制与依据                                                                                                                                                                                                                                                                                                                                    | 采用方式及边界                                                                                |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| OpenBot      | 独立工作区、持久会话、FIFO 消息、交接和上下文压缩，见[固定版本 README](https://raw.githubusercontent.com/nightly-labs/openbot/818d747347fe18ccad897f508fb628feebb052e5/README.md)                                                                                                                                                                   | 产品与交互参考。它面向本地桌面；其执行权限模型不能直接作为团队平台的权限方案                  |
+| OpenClaw     | Agent 独立状态与会话，见[多 Agent 文档](https://docs.openclaw.ai/concepts/multi-agent)；会话内串行、会话间限流，见[固定版本队列说明](https://raw.githubusercontent.com/openclaw/openclaw/427edb705217c93139e2577e81176a668e39814f/docs/concepts/queue.md)                                                                                           | 借鉴会话路由和 mailbox 思路。其进程内队列不能直接承担本平台跨 Worker 的持久调度               |
+| pi           | agent-core 提供工具执行、事件流与上下文转换，见[固定版本说明](https://raw.githubusercontent.com/earendil-works/pi/a05e3a07763c38d23d50207742f7e073e35cd0f8/packages/agent/README.md)；coding-agent 另有[嵌入式 SDK](https://raw.githubusercontent.com/earendil-works/pi/a05e3a07763c38d23d50207742f7e073e35cd0f8/packages/coding-agent/docs/sdk.md) | 通过 CLI RPC 作为运行时接入；模型选择由 pi 支持的 provider 决定，会话文件不作为平台业务数据库 |
+| LangGraph JS | [持久化](https://docs.langchain.com/oss/javascript/langgraph/persistence)区分会话 checkpoint 与长期 store；[interrupt](https://docs.langchain.com/oss/javascript/langgraph/interrupts)支持等待外部输入，并指出恢复时的副作用重放问题                                                                                                                | 作为复杂持久工作流的备选。首批流程简单，先避免同时维护图状态与平台任务状态                    |
 
-许可记录分别见 OpenBot 的 [PolyForm Noncommercial 1.0.0](https://raw.githubusercontent.com/nightly-labs/openbot/main/LICENSE)、pi 的 [MIT](https://raw.githubusercontent.com/earendil-works/pi/main/LICENSE)、OpenClaw 的 [MIT](https://raw.githubusercontent.com/openclaw/openclaw/main/LICENSE)与 LangGraph JS 的 [MIT](https://raw.githubusercontent.com/langchain-ai/langgraphjs/af1d87cc42f00f0e2d535236c6ff211b8c5f1c9f/LICENSE)。本方案只参考 OpenBot 的公开产品行为，不计划复制其实现；引入其他依赖时仍需核对锁定版本及其依赖许可。
+许可记录分别见 OpenBot 的 [PolyForm Noncommercial 1.0.0](https://raw.githubusercontent.com/nightly-labs/openbot/main/LICENSE)、pi 的 [MIT](https://raw.githubusercontent.com/earendil-works/pi/main/LICENSE)、OpenClaw 的 [MIT](https://raw.githubusercontent.com/openclaw/openclaw/main/LICENSE)与 LangGraph JS 的 [MIT](https://raw.githubusercontent.com/langchain-ai/langgraphjs/af1d87cc42f00f0e2d535236c6ff211b8c5f1c9f/LICENSE)。本方案参考 OpenBot 的产品和架构机制，独立实现适配器，不复制其实现；引入其他依赖时仍需核对锁定版本及其依赖许可。
 
-> **Why & What - 轻量执行循环**
+> **Why & What - 原生运行时分别适配**
 >
-> **选择：** 优先验证 pi agent-core，自建有限的业务编排。
+> **选择：** 平台统一内部端口，Codex、Claude 和 pi 分别通过 app-server、SDK 与 RPC 接入。
 >
-> **理由：** 当前需要模型、工具与事件接入，业务路径可以由明确状态转换表达。pi 不替平台提供团队权限和跨进程恢复，这些仍需实现。
+> **理由：** 平台可以复用各自的原生执行循环和会话恢复，同时统一任务与审计。适配不能消除模型、工具和压缩能力差异，必须显式声明能力。
 >
-> **备选：** LangGraph 的 checkpoint 与 interrupt 适合分支流程和人工中断；若首批就有大量跨步骤恢复需求，其价值会更高。直接封装模型 API 依赖更少，但需自行维护工具循环和事件兼容。
+> **备选：** 直接使用 pi agent-core 统一所有模型，能控制同一套工具循环，但不保留 Codex 和 Claude Code 的完整运行时行为；只接一种运行时能减少首批工作，但不满足已确定的多运行时方向。
 >
-> **代价与退路：** 先用小实验验证 Node、TypeBox、工具拦截、取消和历史恢复。验证失败时替换 runtime 适配器，保留业务表和工具协议。
+> **代价与退路：** 分别维护协议、版本和契约测试。某种运行时未通过实验时保持不可选，任务可明确转交，不静默切换运行时或身份。
+>
+> **范围：** 长期复杂工作流仍可另行评估 LangGraph，当前不让执行图替代平台任务权威。
 
 ### 3.1 OpenBot 的长期记忆机制
 
@@ -87,9 +89,21 @@ pi 的模型 provider 负责模型 API，pi agent-core 提供自身的 Agent 循
 
 SQLite 同时保存其他应用记录；聊天历史、任务、运行恢复信息与上述事实记忆分别建模。是否能够跨会话持续使用所学内容，由记忆生命周期和上下文装配决定。
 
+### 3.2 OpenBot 的运行时边界
+
+运行时结构核对使用 OpenBot `b1f5e6020e40bb9d41b6a1afb7a4c0603ff63850`，日期同第 3 章。它在自己的 [AgentClient](https://raw.githubusercontent.com/nightly-labs/openbot/b1f5e6020e40bb9d41b6a1afb7a4c0603ff63850/src/backend/agent-client.ts) 后注册多个驱动；本项目借鉴这个边界，内部端口由本项目定义。
+
+| 运行时      | 已核对的 OpenBot 接法                                          | 依据                                                                                                                                                     |
+| ----------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex       | 启动 app-server 子进程，通过 stdio 交换请求和事件              | [CodexAppServerClient](https://raw.githubusercontent.com/nightly-labs/openbot/b1f5e6020e40bb9d41b6a1afb7a4c0603ff63850/src/backend/app-server-client.ts) |
+| Claude Code | Claude Agent SDK 包装为统一客户端                              | [ClaudeAgentClient](https://raw.githubusercontent.com/nightly-labs/openbot/b1f5e6020e40bb9d41b6a1afb7a4c0603ff63850/src/backend/claude-client.ts)        |
+| pi          | 启动 CLI RPC 子进程，翻译会话、prompt、abort 和 compact 等操作 | [PiAgentClient](https://raw.githubusercontent.com/nightly-labs/openbot/b1f5e6020e40bb9d41b6a1afb7a4c0603ff63850/src/backend/pi-client.ts)                |
+
+官方协议入口为 [Codex app-server](https://learn.chatgpt.com/docs/app-server)、[Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/typescript) 与 [pi RPC](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc.md)，查阅日期同第 3 章。平台适配器按锁定的 CLI/SDK 版本验证能力；运行时回复成功接收命令，与模型工作最终完成分别判断。
+
 ## 4. 组件与数据归属
 
-Bots 控制面管理用户可见记录，Worker 调度运行，Runner 承担实际执行。首批仅做受控 API 工具时，runtime 可以运行在 Worker；开放项目命令前必须迁至隔离 Runner。
+Bots 控制面管理用户可见记录，Worker 领取与编排 Run，Runner 持有运行时适配器、原生进程及 SDK 会话。三种运行时都进入受控 Runner；HTTP 与 Worker 不直接执行项目脚本。首批可同主机部署，进程权限、目录和凭据边界仍分别实施。
 
 ```mermaid
 flowchart TB
@@ -98,14 +112,19 @@ flowchart TB
     EDGE --> PLATFORM[平台 Server API]
     HTTP --> DB[(Bots 数据库)]
     WORKER[Bots Worker] --> DB
-    WORKER --> RUNTIME[pi runtime 适配器]
-    WORKER --> RUNNER[隔离 Runner 与外部执行器]
-    RUNTIME --> TOOLS[受控工具入口]
-    RUNNER --> TOOLS
+    WORKER --> RUNNER[受控 Runner 与 AgentRuntimeClient]
+    RUNNER --> CODEX[Codex app-server]
+    RUNNER --> CLAUDE[Claude Agent SDK]
+    RUNNER --> PI[pi CLI RPC]
+    CODEX --> TOOLS[受控工具入口 ToolBroker]
+    CLAUDE --> TOOLS
+    PI --> TOOLS
     TOOLS --> PLATFORM
     HTTP --> PLATFORM
     PLATFORM --> APPDB[(平台数据库)]
-    RUNTIME --> MODEL[模型提供方]
+    CODEX --> MODEL[模型提供方]
+    CLAUDE --> MODEL
+    PI --> MODEL
 ```
 
 | 归属                                           | 拥有的数据与规则                                          | 对外关系                                              |
@@ -125,6 +144,45 @@ flowchart TB
 
 反向代理分流 Bot 对象路径及 `/api/v1/teams/:teamId/bots`、`/api/v1/teams/:teamId/bot-conversations`，不能把所有 `/teams` 路由转给 Bots。对象路径与事件路由见第 9 章。浏览器使用同源 Cookie，Bots 经受信任的身份核验 API 验证会话，不自行解密平台 Cookie。POST 同时实施 Origin/CSRF 检查；CLI 使用相同业务协议的独立凭据。
 
+### 4.1 统一运行时端口
+
+AgentRuntimeClient 是 Runner 内部端口，负责会话控制、双向事件和原生协议转换。平台 API 使用 HTTP GET/POST 的要求不改变原生 stdio 或 SDK 协议；内部端口也不直接暴露为浏览器可调用的任意 RPC。
+
+| 操作                            | 统一语义                               | 边界                                                        |
+| ------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
+| `connect`、`getCapabilities`    | 启动通道、握手并读取版本与已验证能力   | Codex 完成 initialize/initialized；其他适配器执行各自初始化 |
+| `startSession`、`resumeSession` | 创建或继续平台绑定的原生会话           | 返回并持久化绑定后才提交任务输入；会话 ID 不是权限凭证      |
+| `startTurn`                     | 在空闲会话中提交一次输入               | 只表示提交成功，结果通过事件流给出；首批不自动并行输入      |
+| `events`                        | 订阅输出、工具、批准请求、用量和终态   | 提交输入前开始消费；保持有界缓冲及背压                      |
+| `respondToRequest`              | 回答当前会话、当前代次的工具或批准请求 | 不能把旧连接的 request ID 回复给新连接                      |
+| `interruptTurn`                 | 请求停止指定原生轮次                   | 收到终态或确认进程退出后才释放可写执行槽                    |
+| `compactSession`                | 请求支持的原生压缩                     | 按能力开放；不支持时明确返回，不假装压缩成功                |
+| `disconnect`                    | 释放进程、连接或 SDK 资源              | 不等于删除原生会话或遗忘平台长期记忆                        |
+
+运行时能力按锁定版本记录 `resume`、`interrupt`、`explicitCompaction`、`automaticCompaction` 与 `platformTools`。模型和推理配置也分别确认；不支持的模型、工具绑定或参数在派发前拒绝，不静默丢弃配置。
+
+统一事件至少包括会话绑定、输入接收、输出增量、最终正文、工具请求与执行结果、批准请求、用量更新、上下文压缩、轮次结束及运行时退出。每个事件附平台 session、Run、连接代次和单调序号；原生 ID 作为私有关联字段，不能直接用作全局去重键。
+
+Codex 的 `turn/completed` 必须读取最终状态；Claude 的 SDK result 必须区分成功与错误。pi 的 prompt response 只确认命令处理，`agent_end` 也可能继续自动重试或压缩恢复；应等待 `agent_settled` 并检查错误/取消记录。pi 返回 `handled` 时不等待不存在的模型终态，按受控命令的实际结果处理。协议细节以第 3.2 节来源和锁定版本为准。
+
+适配器在 Runner 内将原始消息校验为统一事件，Worker 再转换为平台状态。输出增量可有界合批，完成正文与终态必须持久化后对外确认；崩溃丢失的未提交尾部标记中断。原始协议正文、内部错误和推理内容不默认写入共享日志或直接展示。
+
+### 4.2 会话恢复与工具桥接
+
+原生会话按团队、Bot、当前使用者或会话、可选任务、runtime、账号、Runner、工作目录及权限/上下文版本绑定。PostgreSQL 保存平台绑定、运行记录、事件游标和记忆权威；原生 CLI 的 JSONL、SQLite 或其他私有文件按受控执行器状态保管，不成为第二套平台长期记忆库，也不直接改写它们的内部表。
+
+Runner 的配置实验还需核对原生自动记忆、全局规则和扩展加载。首批关闭会独立学习并跨会话自动注入的非平台记忆通道，只允许受控工具维护平台记忆；项目 AGENTS.md 和 Skill 按已选版本作为明确输入。无法隔离独立自动学习的运行时不开放该能力，不能在遗忘后从原生插件重新加载旧事实。
+
+同一物理会话同时只允许一个有效 Run。原生进程空闲后可按能力释放，恢复先检查会话文件、账号、工作目录、配置版本及上下文代次。空白 Runner 只有 session ID 无法恢复；首批采取会话粘着 Runner，丢失或不兼容时用明确交接摘要建立新会话并记录替代关系。切换 runtime 同样新建会话，不把另一运行时的 ID 原样传入。
+
+三条工具绑定都进入同一 ToolBroker，再调用第 6 章的受控 API。Codex 优先验证 app-server 动态工具；该入口目前有实验能力开关，版本与握手不满足时必须明确拒绝工具型运行。Claude 通过 SDK 的自定义 MCP 工具回调接入；pi 通过受控扩展或 MCP 桥接本地工具入口，RPC 本身不视为任意工具注册接口。
+
+ToolBroker 接收的上下文由 Runner 注入，模型只提供业务参数。执行前核对平台身份、Run 租约代次、目标项目和具体能力，保存调用意图与幂等键，再执行 API；结果通过原生请求关联回传。原生 shell、文件读写和浏览器能力另外受 Runner 隔离与运行时工具策略控制，不能拿平台工具鉴权代替本地隔离。
+
+原生运行时的工具批准请求与平台生产变更放行分别处理。适配器将请求绑定到当前 Run，转交现有任务输入/批准流程；未取得授权时拒绝，不自动以创建者身份批准。等待输入超过原生通道可保持的时限时，保存阻塞原因并结束本次 Run，下一次按检查点和当前授权恢复。
+
+Worker 或 Runner 断线后先查运行与操作记录。只有确认旧原生执行已停止，才允许另一个可写运行接管；不能从最后一条文本猜测执行成功，也不能自动重放未知写工具。进程级退出应关联该连接上全部未结束运行，不能只结束最后一个会话。stdout 按协议持续读取，stderr 仅作脱敏诊断；请求超时、单条记录大小、待处理请求数与事件缓冲均设有界限制。
+
 ## 5. 核心对象与状态
 
 Bot 表示持续身份，Conversation 表示共享记录与可见范围，Task 表示明确交付目标，Run 表示一次执行尝试。普通聊天可以产生不含 `task_id` 的 Run。一个 Bot 在多个会话中保持同一职责配置，但各会话历史、任务上下文及执行器会话分别隔离。
@@ -139,7 +197,7 @@ Bot 表示持续身份，Conversation 表示共享记录与可见范围，Task �
 | ToolCall     | 工具、规范输入、项目、授权引用、幂等键、执行结果与外部操作 ID             | 写操作结果不确定时进入核对流程                      |
 | Handoff      | 原执行者、新执行者、原因、摘要、交付引用、未完成项                        | 转交追加历史，保留旧运行记录                        |
 
-任务拟采用 `open → in_progress → awaiting_review → completed`；缺少输入、配置或执行能力时进入 `waiting`，保存明确的 `wait_reason`。拒绝验收回到 `in_progress`，取消进入 `cancelled`。运行失败只结束该次运行，并把任务设为等待重试或处理，不能自动标记任务完成。
+任务拟采用 `open → in_progress → awaiting_review → completed`；缺少输入、配置或执行能力时进入 `waiting`，保存明确的 `wait_reason`。拒绝验收回到 `in_progress`，取消进入 `cancelled`。运行失败只结束该次运行，并把任务设为等待重试或处理，不能自动标记任务完成。请求接收、原生轮次结束、平台 Run 成功与任务验收分别记录。
 
 Run 拟采用 `queued → running → succeeded | failed | cancelled | interrupted`；等待人工输入时进入 `suspended`。恢复使用同一任务的新 Run，并链接前次检查点；原 suspended Run 结束为 interrupted，并记录后继运行。Run 的 `succeeded` 只表示本次执行结束。模型产出交付后，任务进入待验收。
 
@@ -168,7 +226,7 @@ Bots 自身的配置、发言和任务变更同样遵循团队角色，浏览者
 
 Bot 启停与运行存活由 Bots 权威判断；项目授权、用户资格与资源归属由平台判断。平台在发放执行授权时取得 Bot 状态证明，并在实际能力调用时通过受认证的 Bots 内部核验 API 检查当前运行和代次。该内部核验只读取 Bots 本地权威状态，避免再次请求平台形成调用环。核验失败则拒绝新调用；只验证尚未到期的离线 Token 无法满足立即撤销要求。
 
-服务凭据只证明服务身份。运行级短期凭据由工具入口保管，不进入模型、聊天、记忆或项目脚本。外部 coding runtime 能触发的平台动作也必须经过这个入口；原生 shell 运行在受限 Runner，不能用环境变量中的长期 PAT 绕过授权。
+服务凭据只证明服务身份。运行级短期凭据由工具入口保管，不进入模型、聊天、记忆或项目脚本。外部 coding runtime 能触发的平台动作也必须经过这个入口；原生 shell 运行在受限 Runner，不能用环境变量中的长期 PAT 绕过授权。平台业务工具在 HTTP API 上统一语义；SDK 或扩展需要的 MCP/本地桥接仅承担运行时协议转换。
 
 每次写工具先持久保存规范输入和稳定幂等键，再调用业务 API。超时后按同一键查询结果；对不提供幂等或结果核对的动作，保留 `unknown` 并等待处理。模型重新生成参数属于新意图，不能作为恢复同一写操作的方式。
 
@@ -188,7 +246,7 @@ Bot 启停与运行存活由 Bots 权威判断；项目授权、用户资格与�
 
 首批采用 PostgreSQL 运行记录与短租约完成调度。创建消息或任务时，在同一 Bots 数据库事务内写入运行意图。Worker 使用短事务与 `FOR UPDATE SKIP LOCKED` 领取工作，提交后再调用模型；不在模型等待期间持有数据库事务。
 
-领取同时锁定 runtime session 的执行槽，保存 `lease_owner`、`lease_until` 与单调递增的 `lease_epoch`。心跳和结果提交都带代次并检查条件更新行数；旧 Worker 失去租约后，其结果不能覆盖新状态。平台工具核验同一代次，阻止旧 Worker 发起新的项目写入。
+领取同时锁定 runtime session 的执行槽，保存 `lease_owner`、`lease_until` 与单调递增的 `lease_epoch`。心跳和结果提交都带代次并检查条件更新行数；旧 Worker 失去租约后，其结果不能覆盖新状态。平台工具核验同一代次，阻止旧 Worker 发起新的项目写入。Runner 上报事件同样携带 Run 和租约代次，旧连接不得补写新运行结果。
 
 租约到期不等于进程已停止。Worker 应取消对应运行；无法确认 Runner 或外部 CLI 已停止时，任务进入 `waiting` 并等待核对，不同时启动另一个可写运行。已经发出的外部写入仍按操作记录核对，不能通过 fencing 宣称它已撤销。
 
@@ -232,7 +290,7 @@ HTTP 提交立即返回 HTTP 200、统一响应信封及 `runId`，不等待模�
 3. 同范围内先检查重复与已有条目版本，优先更新或合并。用户明确纠正的旧条目标记为失效；无法判断的冲突保留为候选并请求确认，模型不能覆盖用户锁定条目。
 4. 低风险且来源明确的私有条目可以自动生效；扩大受众或发布团队/项目共享知识必须经有权成员确认，发布通过所属模块 API 完成。
 5. 新运行先过滤当前使用者、会话和资源权限，再装配少量 essential 记忆；其余条目由任务相关查询按需召回，并限制总上下文大小。
-6. 用户编辑、遗忘或来源撤权时，停用条目并更新检索索引和派生摘要；下一模型调用前重建受影响上下文，后台旧任务不得重新激活已遗忘内容。
+6. 用户编辑、遗忘或来源撤权时，停用条目并更新检索索引和派生摘要；对受影响原生会话请求中断，停止后用允许内容重建，后台旧任务不得重新激活已遗忘内容。
 
 遗忘同时清理在线正文、检索索引及派生副本，审计只留不含正文的操作元数据；备份按保留策略到期清理。纠正可以保留受限版本证据，但旧值不再进入有效召回。
 
@@ -266,9 +324,9 @@ HTTP 提交立即返回 HTTP 200、统一响应信封及 `runId`，不等待模�
 
 会话访问与内容访问分别校验。工具读取资源前，核对执行者权限和拟分享的会话受众；资源不足以向全体接收者共享时，在原会话只返回不可披露提示。历史消息、摘要、工具结果及模型输出均保存来源权限集合；无法细分时，保守继承该次上下文全部来源限制。
 
-增加会话成员不自动授予旧内容。读取历史或重建上下文时重查其来源范围，撤权后隐藏受限正文并排除相关摘要；现有模型 session 不能继续复用包含失效资料的缓存，应从合规内容重建。Bot 身份记忆仅保存职责等共享配置，私聊任务知识不能自动写入团队共享记忆。
+增加会话成员不自动授予旧内容。读取历史或重建上下文时重查其来源范围，撤权后隐藏受限正文并排除相关摘要。对含失效资料的原生会话，立即停用后续工具和受限输出，发起中断，停止后从允许内容新建会话；不能假设能拦截外部运行时内部的每次模型请求，或撤回已经发送给模型的正文。Bot 身份记忆仅保存职责等共享配置，私聊任务知识不能自动写入团队共享记忆。
 
-代码阶段每个 Run 使用独立目录、工作分支和容器；Runner 不挂载宿主 Home、SSH 凭据或 Docker socket，设置 CPU、内存、磁盘、时限与网络出口限制。工作目录只是路径边界，实际隔离由容器或更强运行环境承担。首批受控 API Bot 不开放任意 shell。
+原生运行时从首批接入即使用受控执行环境，代码阶段每个 Run 使用独立目录、工作分支和容器；Runner 不挂载宿主 Home、SSH 凭据或 Docker socket，设置 CPU、内存、磁盘、时限与网络出口限制。工作目录只是路径边界，实际隔离由容器或更强运行环境承担。首批按运行时能力限制工具和网络；无法实现所需限制的运行时保持不可选。恢复到新工作目录时重查原生会话兼容性，不能把旧 cwd 当作当前执行目录。
 
 Git 检出和推送由平台受信执行通道处理，模型与项目脚本不取得来源写凭据。流水线使用已推送的确定提交和独立执行目录。Bot Runner 与流水线节点可共用节点注册协议，但队列、凭据、目录及状态归属分别维护。
 
@@ -286,7 +344,7 @@ Git 检出和推送由平台受信执行通道处理，模型与项目脚本不�
 | 长期记忆   | `bot_memory`、`bot_memory_source`、`bot_memory_review`                                                       | 记忆带来源、受众与修订；提取输入范围与去重键唯一             |
 | 后续能力   | `bot_trigger`                                                                                                | 触发来源事件键唯一                                           |
 
-资源引用、消息正文块与受 schema 校验的 runtime 元数据可用 `jsonb`；成员、项目标签关系、技能版本引用和权限来源关系单独建表。runtime session 保存 Bot、会话、可选任务以及外部 session ID，唯一键使用明确的会话/任务分区，不使用 Bot ID 作为唯一会话键。
+资源引用、消息正文块与受 schema 校验的 runtime 元数据可用 `jsonb`；成员、项目标签关系、技能版本引用和权限来源关系单独建表。runtime session 保存 Bot、会话、可选任务、runtime 与版本、账号引用、Runner、工作目录引用、外部 session ID、权限修订和上下文代次。唯一键使用明确的会话/任务分区，不使用 Bot ID 作为唯一会话键；同一绑定最多一条 active 记录。原生会话标识和文件位置仅服务端可见。
 
 下列路由均为待设计契约，统一在 `/api/v1` 下；除明确列出的内部接口外，由登录用户或 CLI 调用。业务读取使用 GET，创建和状态转换使用 POST，返回 HTTP 200 与统一信封。错误码先复用平台语义，确需新增时统一登记。
 
@@ -310,27 +368,33 @@ Git 检出和推送由平台受信执行通道处理，模型与项目脚本不�
 
 ## 10. 实施顺序与验收
 
-先用执行实验验证 runtime，再按下表交付垂直路径。每个切片都要覆盖后端、客户端、界面和必要测试；具体文件名为落点建议，进入开发时按现有用例细化，不生成占位模块。
+先锁定内部端口，并对三个已确定通道逐个执行兼容实验，再按下表交付垂直路径。运行时只有通过相应用例后才标记可用，不用某一适配器通过替代另外两项验证。具体文件名为落点建议，进入开发时按现有用例细化，不生成占位模块。
 
-| 顺序 | 交付与文件落点                                                                                                                              | 可独立验收的结果                                                                                    |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 1    | 新建 `apps/bots` 的 package、NodeNext 配置、`src/entrypoints/http.ts` 与 `worker.ts`、bootstrap、迁移；增加 `packages/bots-client` 生成流程 | Node 与类型兼容实验通过；假工具可流式输出、取消、恢复完整历史；数据库账号不能读取平台表             |
-| 2    | 平台 `modules/identity/` 增加服务身份、委托与执行授权；Bots `adapters/platform/` 使用生成客户端                                             | 获准读取成功；伪造 Bot/项目、成员停用、Token 过期及撤权均被拒绝                                     |
-| 3    | Bots `modules/agents/`、`modules/conversations/`、`modules/context/`、`modules/execution/`；Web Bot、会话及记忆入口                         | 无项目 Bot 对话；跨会话记忆可召回、纠正与遗忘；提取可重试去重；刷新与重启保留结果；聊天不自动建任务 |
-| 4    | Bots `modules/tasks/` 与 tool-call 持久化；平台补接一项写工具的执行身份和幂等                                                               | 显式任务、补充、文本交付、待验收、退回与验收贯通；API 已写入后断线不会重复建记录                    |
-| 5    | 群组成员、Leader、转交、标签、群组记忆与来源可见性；项目协作入口调用 Bots API                                                               | 只选定承接者运行；移出执行者后任务阻塞；标签归集复用同一会话；个人和群组记忆范围隔离                |
-| 6    | Skills 与模板版本接入、摘要、配置等待；随后才增加 `apps/bots/src/adapters/runtimes/` 与隔离 Runner                                          | 停用技能阻止新调用；配置满足且权限有效后恢复；任务交接保留证据；代码运行彼此隔离                    |
-| 7    | 事件与定时触发、通知、代码提交和受控运维接口                                                                                                | 重复事件只创建一个任务；节点离线保留阻塞；验收任务不会自动放行发布                                  |
+| 顺序 | 交付与文件落点                                                                                                                               | 可独立验收的结果                                                                                       |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 1    | 新建 `apps/bots` 的 package、NodeNext 配置、HTTP/Worker/Runner 入口及迁移；在 `modules/execution/` 定义内部端口；生成 `packages/bots-client` | 假运行时验证双向事件、取消与终态；Bots 数据库账号不能读取平台表                                        |
+| 2    | 在 `adapters/runtimes/codex/`、`claude/`、`pi/` 逐个实现 app-server、SDK、RPC 适配；增加公共契约测试和工具桥接替身                           | 每项分别验证启动、版本/能力、流式正文、恢复、中断、退出、工具请求与失败；配置不可用时明确拒绝派发      |
+| 3    | 平台 `modules/identity/` 增加服务身份、委托与执行授权；Bots `adapters/platform/` 接入；ToolBroker 绑定三条运行时工具路径                     | 获准读取成功；伪造身份、跨项目、过期与撤权被拒；Codex 实验动态工具能力单独验证                         |
+| 4    | Bots agents、conversations、context、execution 用例及 Web Bot、会话和记忆入口                                                                | 无项目 Bot 对话；跨会话及更换运行时后记忆可召回；纠正、遗忘、提取重试与重启恢复通过；不混用原生会话 ID |
+| 5    | Bots tasks 与工具调用持久化；平台接入一项具备幂等的写能力                                                                                    | 显式任务、补充、交付、退回与验收贯通；API 已写入后断线不重复建记录；中断确认前不重复执行               |
+| 6    | 群组、Leader、转交、标签、群组记忆与来源可见性；项目协作入口调用 Bots API                                                                    | 单一承接者；移出执行者后阻塞；标签复用同一会话；个人和群组记忆范围隔离                                 |
+| 7    | Skills 与模板版本、配置等待、代码工作目录和受控 Git 交付                                                                                     | 技能停用阻止新调用；权限恢复后继续；代码目录与凭据隔离；原生 session 恢复检查工作目录                  |
+| 8    | 事件、定时、通知、代码提交和受控运维                                                                                                         | 重复事件只建一个任务；节点离线保留阻塞；任务验收不自动放行发布                                         |
 
 拟议目录为：
 
 ```text
 apps/bots/
   src/
-    entrypoints/       HTTP、Worker 与迁移入口
+    entrypoints/       HTTP、Worker、Runner 与迁移入口
     bootstrap/         依赖组装与本应用表聚合
     modules/           agents、conversations、tasks、execution、context
-    adapters/          platform API、模型与实际接入的 runtime
+    adapters/
+      platform/        平台 API 客户端适配
+      runtimes/
+        codex/         app-server stdio、请求与事件转换
+        claude/        Agent SDK、会话与工具回调
+        pi/            CLI RPC、会话与扩展桥接
     platform/          本应用配置、HTTP、数据库连接
   drizzle/             Bots 自有迁移
   test/                用例、HTTP、数据库与 runtime 契约测试
@@ -341,20 +405,20 @@ packages/bots-client/  从 Bots OpenAPI 生成的客户端
 
 每个源码切片执行 `pnpm prepare:clients`、对应应用 check/build、`pnpm check:boundaries`、`pnpm lint` 与 `pnpm format:check`。Bots 建立自己的 `test:db`，涉及平台持久化时另运行 `pnpm --dir apps/server test:db`；完整接入通过扩展后的 `pnpm check`。UI 另外执行 `pnpm ui:check` 并核对两种规定尺寸截图。
 
-恢复测试必须覆盖：双 Worker 同时领取、领取后崩溃、写操作已完成但响应丢失、租约过期后旧 Worker 回写、无法确认 Runner 停止、取消与在途写入交错。权限测试覆盖跨团队、跨项目、成员变更、技能停用、私聊知识污染和摘要撤权。真实模型实验记录实际用量和失败原因，不把 mock 通过当作供应商接入完成。
+恢复测试必须覆盖：双 Worker 同时领取、领取后崩溃、写操作已完成但响应丢失、租约过期后旧 Worker 回写、无法确认 Runner 停止、取消与在途写入交错。权限测试覆盖跨团队、跨项目、成员变更、技能停用、私聊知识污染和摘要撤权。运行时公共契约还需覆盖初始化前通知、乱序响应、快速完成、stderr 噪声、损坏与超大记录、进程退出、无最终结果、取消与自然结束竞态、原生会话丢失、未知工具请求及能力不支持。真实模型实验记录实际用量和失败原因，不把 mock 通过当作供应商接入完成。
 
 ## 11. 待确认事项与运行成本
 
-首批实施前由项目维护者确认应用与数据边界；执行器负责人验证 pi 的兼容性。以下问题可以在架构评审时收敛，不阻碍先完成假工具与持久恢复实验。
+首批实施前由项目维护者确认应用与数据边界；执行器负责人验证已确定的三个接入通道。以下问题可以在架构评审时收敛，不阻碍先完成假工具与持久恢复实验。
 
-| 决策                     | 建议默认方向                                             | 确认责任                 |
-| ------------------------ | -------------------------------------------------------- | ------------------------ |
-| 相对独立的范围           | 同仓库独立应用，首批同主机部署、独立数据库账号           | 项目维护者               |
-| 首批 runtime 与模型来源  | pi agent-core 加一个明确模型提供方；模型凭据仅服务端保存 | 执行器负责人、项目维护者 |
-| 首批交付内容             | 跨会话长期记忆、通用文本与项目查询，再增加可核对写能力   | 产品、后端负责人         |
-| 代码执行位置             | 后续注册的受控 Runner；人工本地开发仍可用 CLI 上报       | 执行器负责人             |
-| 对话、工具正文与记忆保留 | 制定容量与清理策略，删除来源后使派生摘要失效             | 产品、平台负责人         |
-| 使用预算与并发           | 实验后设团队/运行上限，耗尽后保留进展并等待处理          | 项目维护者               |
+| 决策                     | 建议默认方向                                                                | 确认责任                 |
+| ------------------------ | --------------------------------------------------------------------------- | ------------------------ |
+| 相对独立的范围           | 同仓库独立应用，首批同主机部署、独立数据库账号                              | 项目维护者               |
+| 运行时版本与模型来源     | 三个接入通道已确定；逐个锁定 CLI/SDK 版本及可用模型，凭据仅在受控服务端提供 | 执行器负责人、项目维护者 |
+| 首批交付内容             | 跨会话长期记忆、通用文本与项目查询，再增加可核对写能力                      | 产品、后端负责人         |
+| Runner 部署与版本管理    | 首批采用受控 Runner；确认主机、注册方式、资源配额和 CLI/SDK 升级策略        | 执行器负责人             |
+| 对话、工具正文与记忆保留 | 制定容量与清理策略，删除来源后使派生摘要失效                                | 产品、平台负责人         |
+| 使用预算与并发           | 实验后设团队/运行上限，耗尽后保留进展并等待处理                             | 项目维护者               |
 
 独立服务的收益是运行故障与业务 API 分开、执行器可替换、业务表归属明确。相应成本是两套应用生命周期、内部身份协议、跨服务部分失败、上下文撤权与 Runner 维护；这些成本由平台承担，不能交给模型提示词解决。
 
@@ -362,4 +426,4 @@ packages/bots-client/  从 Bots OpenAPI 生成的客户端
 
 首批应保留有界执行步数、模型用量和运行时限。预算耗尽时保存检查点并明确任务阻塞；运行失败、节点离线和来源不可用均不得展示成功。生产动作进入平台具体变更计划，批准绑定版本、环境和操作参数，任务验收不能替代该授权。
 
-本文的需求和源码事实集中在第 2 章，第三方依据集中在第 3 章；其余章节为建议设计。评审首先收敛独立应用边界、首批 runtime、记忆生命周期与验收路径，再将第 10 章拆为具体开发任务。
+本文的需求和源码事实集中在第 2 章，第三方依据集中在第 3 章；其余章节为建议设计。评审首先收敛独立应用边界、运行时版本与能力实验、记忆生命周期及验收路径，再将第 10 章拆为具体开发任务。
