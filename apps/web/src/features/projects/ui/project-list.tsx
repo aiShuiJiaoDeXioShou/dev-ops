@@ -18,6 +18,7 @@ import {
 } from '../model/filters'
 import { ProjectForm } from './project-form'
 import { ProjectSettingsDialog } from './project-settings-dialog'
+import { ActivityBarometer } from './activity-barometer'
 
 /** 项目列表：项目卡片、状态筛选、搜索与创建入口。 */
 export function ProjectList() {
@@ -93,6 +94,7 @@ export function ProjectList() {
         </p>
       </header>
       <div className="catalog">
+        <ActivityBarometer teamId={currentTeam.id} search={filters.search} status={filters.status} />
         <div className="filters">
           <select
             className="btn project-filter"
