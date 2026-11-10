@@ -25,6 +25,7 @@ const ACTIVITY_ENTITY_TYPES: ReadonlySet<string> = new Set([
   'build_artifact',
   'service_run_version',
   'pipeline_run',
+  'pipeline_node',
   'external_review',
   'release_result',
   'credential',

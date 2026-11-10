@@ -482,17 +482,18 @@ export function createCodeService(deps: CodeServiceDeps) {
     }
   }
 
-  async function getRepositoryFile(
+  async function readRepositoryFileAtRef(
     actor: SessionUser,
     projectId: string,
     repositoryId: string,
-    input: { branch?: string; path: string },
+    refInput: string,
+    pathInput: string,
   ) {
     const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
     if (!adapter.getFile) throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持读取文件')
-    const ref = (input.branch?.trim() || repository.default_branch || '').trim()
-    if (!ref) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库没有可用分支')
-    const path = input.path.trim().replace(/^\/+/, '')
+    const ref = refInput.trim()
+    if (!ref) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'ref 不能为空')
+    const path = pathInput.trim().replace(/^\/+/, '')
     if (!path || path.length > 500 || path.split('/').some((segment) => segment === '..' || segment === '')) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '文件路径不合法')
     }
@@ -508,6 +509,18 @@ export function createCodeService(deps: CodeServiceDeps) {
     } catch (error) {
       repositoryReadError(error)
     }
+  }
+
+  async function getRepositoryFile(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: { branch?: string; path: string },
+  ) {
+    const { repository } = await requireLinkedRepository(actor, projectId, repositoryId)
+    const ref = (input.branch?.trim() || repository.default_branch || '').trim()
+    if (!ref) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库没有可用分支')
+    return readRepositoryFileAtRef(actor, projectId, repositoryId, ref, input.path)
   }
 
   async function listProjectRepositories(actor: SessionUser, projectId: string): Promise<RepositoryView[]> {
@@ -961,6 +974,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     listRepositoryBranches,
     listRepositoryTree,
     getRepositoryFile,
+    getRepositoryFileAtRef: readRepositoryFileAtRef,
     listAvailableRepositories,
     linkRepository,
     unlinkRepository,

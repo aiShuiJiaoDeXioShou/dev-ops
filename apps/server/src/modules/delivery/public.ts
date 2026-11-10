@@ -10,8 +10,6 @@ export type {
   ProjectArtifactView,
   RunVersionView,
   RunVersionChangeView,
-  PipelineRunView,
-  PipelineRunDetailView,
   ReviewView,
   ReleaseView,
 } from './delivery.view.ts'

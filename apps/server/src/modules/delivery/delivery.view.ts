@@ -1,21 +1,10 @@
 import type { ProjectArtifactRecord } from './delivery.artifact.repository.ts'
-import type { RelatedBuildRecord } from './delivery.pipeline.repository.ts'
-import {
-  externalReview,
-  pipelineRun,
-  pipelineRunStatus,
-  releaseResult,
-  serviceRunVersion,
-  serviceRunVersionChange,
-} from './delivery.tables.ts'
+import { externalReview, releaseResult, serviceRunVersion, serviceRunVersionChange } from './delivery.tables.ts'
 import type {
   ArtifactSource,
   ArtifactStatus,
   ArtifactType,
-  BuildResultStatus,
   Environment,
-  PipelineStatus,
-  PipelineTriggerSource,
   ReleaseStatus,
   ReviewStatus,
   ReviewTargetType,
@@ -26,11 +15,8 @@ import {
   toArtifactSource,
   toArtifactStatus,
   toArtifactType,
-  toBuildResultStatus,
   toEnvironment,
   toExternalUrl,
-  toPipelineStatus,
-  toPipelineTriggerSource,
   toReleaseStatus,
   toReviewStatus,
   toReviewTargetType,
@@ -111,49 +97,6 @@ export interface RunVersionChangeView {
   changedAt: string
 }
 
-/** 流水线运行视图。 */
-export interface PipelineRunView {
-  id: string
-  projectId: string
-  serviceId: string | null
-  pipelineName: string
-  pipelineKey: string
-  commitRef: string | null
-  triggerSource: PipelineTriggerSource
-  status: PipelineStatus
-  startedAt: string | null
-  finishedAt: string | null
-  resultUrl: string | null
-  source: string
-  sourceRunId: string
-  lastReportedAt: string
-  createdAt: string
-  updatedAt: string
-}
-
-/** 流水线运行状态历史视图。 */
-export interface PipelineRunStatusView {
-  id: string
-  status: PipelineStatus
-  reportedAt: string
-  note: string | null
-  createdAt: string
-}
-
-/** 运行详情按来源运行标识关联的构建摘要。 */
-export interface RelatedBuildView {
-  id: string
-  versionLabel: string
-  collectedAt: string
-  resultStatus: BuildResultStatus
-}
-
-/** 流水线运行详情视图：运行字段加状态历史与关联构建。 */
-export interface PipelineRunDetailView extends PipelineRunView {
-  statusHistory: PipelineRunStatusView[]
-  relatedBuilds: RelatedBuildView[]
-}
-
 /** 外部提审记录视图。 */
 export interface ReviewView {
   id: string
@@ -193,8 +136,6 @@ export interface ReleaseView {
 
 type RunVersionRow = typeof serviceRunVersion.$inferSelect
 type RunVersionChangeRow = typeof serviceRunVersionChange.$inferSelect
-type PipelineRunRow = typeof pipelineRun.$inferSelect
-type PipelineRunStatusRow = typeof pipelineRunStatus.$inferSelect
 type ExternalReviewRow = typeof externalReview.$inferSelect
 type ReleaseResultRow = typeof releaseResult.$inferSelect
 
@@ -281,64 +222,6 @@ export function toRunVersionChangeView(row: RunVersionChangeRow): RunVersionChan
     reason: row.reason,
     changedBy: row.changed_by_user_id,
     changedAt: toIso(row.created_at) ?? '',
-  }
-}
-
-/**
- * 将流水线运行行映射为视图。
- * @param row 流水线运行行。
- * @returns 流水线运行视图。
- * @throws 数据库枚举不合法时抛出普通 Error。
- */
-export function toPipelineRunView(row: PipelineRunRow): PipelineRunView {
-  return {
-    id: row.id,
-    projectId: row.project_id,
-    serviceId: row.service_id,
-    pipelineName: row.pipeline_name,
-    pipelineKey: row.pipeline_key,
-    commitRef: row.commit_ref,
-    triggerSource: toPipelineTriggerSource(row.trigger_source),
-    status: toPipelineStatus(row.status),
-    startedAt: toIso(row.started_at),
-    finishedAt: toIso(row.finished_at),
-    resultUrl: row.result_url === null ? null : toExternalUrl(row.result_url, '结果地址'),
-    source: row.source,
-    sourceRunId: row.source_run_id,
-    lastReportedAt: toIso(row.last_reported_at) ?? '',
-    createdAt: toIso(row.created_at) ?? '',
-    updatedAt: toIso(row.updated_at) ?? '',
-  }
-}
-
-/**
- * 将流水线状态历史行映射为视图。
- * @param row 状态历史行。
- * @returns 状态历史视图。
- * @throws 数据库状态不合法时抛出普通 Error。
- */
-export function toPipelineRunStatusView(row: PipelineRunStatusRow): PipelineRunStatusView {
-  return {
-    id: row.id,
-    status: toPipelineStatus(row.status),
-    reportedAt: toIso(row.reported_at) ?? '',
-    note: row.note,
-    createdAt: toIso(row.created_at) ?? '',
-  }
-}
-
-/**
- * 将关联构建行映射为摘要视图。
- * @param row 构建摘要行。
- * @returns 关联构建视图。
- * @throws 数据库状态不合法时抛出普通 Error。
- */
-export function toRelatedBuildView(row: RelatedBuildRecord): RelatedBuildView {
-  return {
-    id: row.id,
-    versionLabel: row.version_label,
-    collectedAt: toIso(row.collected_at) ?? '',
-    resultStatus: toBuildResultStatus(row.result_status),
   }
 }
 

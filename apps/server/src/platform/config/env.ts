@@ -39,6 +39,13 @@ const environmentSchema = Type.Object({
   GITHUB_APP_ID: Type.Optional(Type.String({ pattern: '^[0-9]+$' })),
   GITHUB_APP_PRIVATE_KEY_PATH: Type.Optional(Type.String({ minLength: 1 })),
   GITHUB_APP_SLUG: Type.Optional(Type.String({ pattern: '^[A-Za-z0-9-]+$' })),
+  PIPELINE_STORAGE_DIR: Type.String({ minLength: 1, default: './pipeline-data' }),
+  PIPELINE_RUN_TIMEOUT_SECONDS: Type.Integer({ minimum: 60, maximum: 86_400, default: 3_600 }),
+  PIPELINE_LEASE_TTL_SECONDS: Type.Integer({ minimum: 30, maximum: 600, default: 90 }),
+  PIPELINE_HEARTBEAT_TIMEOUT_SECONDS: Type.Integer({ minimum: 15, maximum: 300, default: 60 }),
+  PIPELINE_LOG_CHUNK_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 262_144 }),
+  PIPELINE_ARTIFACT_MAX_BYTES: Type.Integer({ minimum: 1_048_576, maximum: 2_147_483_648, default: 524_288_000 }),
+  PIPELINE_WORKFLOW_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 131_072 }),
 })
 
 function validateHttpOrigin(value: string, name: string): string {

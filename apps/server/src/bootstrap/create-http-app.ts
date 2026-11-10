@@ -19,12 +19,15 @@ import type { MailSender } from '../adapters/mail/mail.types.ts'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
 import { codeRoutes } from '../modules/code/code.routes.ts'
 import { deliveryRoutes } from '../modules/delivery/delivery.routes.ts'
+import { pipelineRoutes } from '../modules/pipeline/pipeline.routes.ts'
+import { pipelineAgentRoutes } from '../modules/pipeline/pipeline.agent.routes.ts'
 import { configurationRoutes } from '../modules/configuration/configuration.routes.ts'
 import { knowledgeRoutes } from '../modules/knowledge/knowledge.routes.ts'
 import { integrationsRoutes } from '../modules/integrations/integrations.routes.ts'
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
 import { resolveActor } from '../modules/identity/identity.actor.ts'
+import type { PipelineCredentialProvider } from '../modules/pipeline/pipeline.credentials.ts'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -48,6 +51,8 @@ export function createHttpApp(
     gitAdapterResolver?: (connectionId: string) => Promise<GitAdapter>
     activeConnectionIds?: (teamId: string) => Promise<string[]>
     gitAdapterFactory?: (connection: Parameters<GitAdapterFactory>[0]) => Promise<GitAdapter>
+    /** 流水线 Git 凭据签发提供者；集成测试可注入替身，避免依赖本机 Git 登录态。 */
+    pipelineCredentials?: PipelineCredentialProvider
   } = {},
 ) {
   const app = Fastify({
@@ -80,6 +85,11 @@ export function createHttpApp(
     reply.header('x-request-id', request.id)
   })
 
+  // 产物上传按原始 tar 流处理：保留请求流交给路由边写盘边计算校验和，避免大文件进入内存缓冲。
+  app.addContentTypeParser('application/octet-stream', (_request, payload, done) => {
+    done(null, payload)
+  })
+
   const idempotency = createIdempotencyHooks({
     db: services.database.db,
     getUserId: async (headers) => (await resolveActor(services.auth, services.tokens, headers))?.user.id ?? null,
@@ -94,6 +104,9 @@ export function createHttpApp(
       openapi: {
         info: { title: 'Dev Ops API', version: '0.0.0' },
       },
+      // Agent 协议端点只服务自托管执行节点，使用独立协议包与 README 文档；
+      // 不进入对外 OpenAPI 与生成客户端，避免内部令牌协议出现在 Web/CLI 类型中。
+      hiddenTag: 'devops-internal',
     })
     app.register(swaggerUi, { routePrefix: '/docs' })
   }
@@ -108,6 +121,18 @@ export function createHttpApp(
   app.register(bugRoutes, { prefix: '/api/v1', auth: services.auth, service: services.bugs })
   app.register(codeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.code })
   app.register(deliveryRoutes, { prefix: '/api/v1', service: services.delivery })
+  app.register(pipelineRoutes, {
+    prefix: '/api/v1',
+    service: services.pipeline,
+    nodes: services.pipelineNodes,
+  })
+  app.register(pipelineAgentRoutes, {
+    prefix: '/api/v1',
+    nodes: services.pipelineNodes,
+    agent: services.pipelineAgent,
+    maxArtifactBytes: config.PIPELINE_ARTIFACT_MAX_BYTES,
+    maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
+  })
   if (services.configuration) {
     app.register(configurationRoutes, { prefix: '/api/v1', service: services.configuration })
   }

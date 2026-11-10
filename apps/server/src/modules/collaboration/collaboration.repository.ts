@@ -17,6 +17,7 @@ export type ActivityEntityType =
   | 'build_artifact'
   | 'service_run_version'
   | 'pipeline_run'
+  | 'pipeline_node'
   | 'external_review'
   | 'release_result'
   | 'credential'

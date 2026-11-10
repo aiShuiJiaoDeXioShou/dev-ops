@@ -146,3 +146,54 @@ apps/server/
 - 项目选用：`GET /projects/:projectId/agent-template`、`POST .../apply|clear`。
 
 约束：只使用 GET/POST 与统一信封；复用既有业务错误码；团队隔离与浏览者只读由 service 校验；所有写操作同事务并写 `activity`（实体类型 `skill`/`agent_template`）。正文、令牌不写入日志/活动；快照页设置 `Referrer-Policy: no-referrer`；模板与技能不写入项目关联仓库。阶段 B 解析函数（技能候选、运行模板）已随服务返回，等待 M07/M09 调用方接入。
+
+## V0.4a pipeline 模块（内置流水线执行器）
+
+`src/modules/pipeline/` 提供内置流水线控制面、调度 Worker 与 Agent 协议端点；工作流语法见 `specs/005-v04a-pipeline-runner/contracts/workflow-yaml.md`，Agent 内部协议见 `contracts/agent-protocol.md`。
+
+- 数据表：`pipeline_run`、`pipeline_run_step`、`pipeline_run_log`、`pipeline_artifact`、`pipeline_node`、`pipeline_node_token`、`pipeline_lease`（迁移 0020 建表、0021 补中文注释与活动目标约束）。日志/产物正文存本地目录，数据库只存元数据。
+- 进程：API 进程负责控制面与 Agent 协议端点；独立 Worker（`pnpm --dir apps/server dev:worker` / `node dist/entrypoints/worker.js`）负责 `FOR UPDATE SKIP LOCKED` 调度、能力匹配、租约过期、节点离线、运行超时与取消兜底。
+- 触发固定提交 SHA、工作流快照与运行计划；租约以节点令牌 + `X-Lease-Token` 作用域，数据库只保存令牌 SHA-256 哈希；Git 短期凭据与运行时 secrets 只在 Agent 领取租约的响应中物化，不写入运行记录、日志与视图。
+
+### 平台接口（均走 /api/v1、GET/POST、统一信封）
+
+| 方法与路径                                           | 权限          | 说明                                                         |
+| ---------------------------------------------------- | ------------- | ------------------------------------------------------------ |
+| `GET /projects/:projectId/pipeline-workflows`        | 项目可见      | 列出 `.devops/workflows/` 工作流与解析状态、最近运行         |
+| `GET /projects/:projectId/pipeline-workflows/detail` | 项目可见      | 工作流详情、YAML 内容、内容哈希与计划摘要                    |
+| `POST /projects/:projectId/pipeline-runs`            | 管理员/开发者 | 手动触发运行，幂等键重复返回同一运行                         |
+| `GET /projects/:projectId/pipeline-runs`             | 项目可见      | 运行列表，按 workflowPath/status/from/to 筛选并分页          |
+| `GET /pipeline-runs/:runId`                          | 项目可见      | 运行详情：输入摘要、发起人、节点摘要、步骤、产物与日志元数据 |
+| `POST /pipeline-runs/:runId/cancel`                  | 管理员/开发者 | 取消运行，返回最新详情                                       |
+| `GET /pipeline-runs/:runId/logs`                     | 项目可见      | 按 stepIndex/afterSeq/limit 读取日志分片                     |
+| `GET /pipeline-runs/:runId/artifacts`                | 项目可见      | 运行产物列表（含受鉴权 downloadUrl）                         |
+| `GET /pipeline-artifacts/:artifactId/download`       | 项目可见      | 产物二进制下载（文件传输显式例外，见下）                     |
+| `GET/POST /teams/:teamId/pipeline-nodes`             | 团队管理员    | 节点列表、创建节点并返回一次性注册令牌                       |
+| `POST /pipeline-nodes/:nodeId/drain`                 | 团队管理员    | 排空节点，不再分配新运行                                     |
+| `POST /pipeline-nodes/:nodeId/disable`               | 团队管理员    | 停用节点并撤销 Agent 令牌                                    |
+| `POST /pipeline-nodes/:nodeId/tokens/rotate`         | 团队管理员    | 轮换 Agent 令牌，旧令牌立即失效                              |
+
+角色口径：浏览者可查看工作流/运行/日志/产物，不可触发或取消；开发者可触发与取消；节点管理与令牌轮换仅团队管理员。所有接口逐层校验登录身份、团队成员、项目归属与角色。
+
+工作流来源口径：P1 工作流列表以项目**第一个已关联仓库**为来源（返回单一 `commitSha`）；触发与详情会在项目全部已关联仓库中按路径查找，找到后固定该仓库的提交与快照。多仓库同时展示与目录配置后置到 P2。
+
+### Agent 内部协议端点
+
+`/api/v1/agent/*`（register、heartbeat、lease、lease 重约、步骤状态、日志、产物上传、完成）只服务自托管执行节点，使用 `Authorization: Bearer <agentToken>` 与租约作用域头 `X-Lease-Token`；节点注册以注册令牌绑定的节点为准，请求中的 `name` 仅作为 Agent 自述信息，不参与校验。该组端点**不进入公开 OpenAPI 与生成客户端**，契约以 `specs/005-v04a-pipeline-runner/contracts/agent-protocol.md` 为准；协议类型由 `packages/pipeline-protocol` 统一导出。
+
+租约领取幂等口径（P1 已知限制）：数据库只保存 `lease_token_hash`，无法重放同一明文令牌，因此**节点已有活动租约时重复领取返回 `data: null`**；Agent 首次领取响应丢失时应依赖租约过期由 Worker 收口为 `interrupted`，不重复获取已分配运行。可重放的幂等租约令牌方案（如加密暂存明文或一次性重放窗口）留待 P2 评估。契约文档 `contracts/agent-protocol.md` 由 Lead 同步该偏差。
+
+节点状态与注册口径：管理员停用节点时会撤销其全部令牌，因此停用后再次注册返回 `AGENT_REGISTRATION_TOKEN_INVALID`；已注册节点在停用后调用心跳返回 `AGENT_NODE_DISABLED`。日志分片与产物的 HTTP 层只保留一个宽松的协议上限（日志单分片 1 MB、产物上限 + 1 MB 缓冲），超过平台业务上限（`PIPELINE_LOG_CHUNK_MAX_BYTES` / `PIPELINE_ARTIFACT_MAX_BYTES`）时由服务层返回 `AGENT_LOG_LIMIT_EXCEEDED` / `AGENT_ARTIFACT_LIMIT_EXCEEDED`，避免被 schema 提前拦成 `VALIDATION_ERROR`。
+
+### 错误码登记（集中定义于 platform/http/error-codes.ts）
+
+- 工作流/触发：`PIPELINE_WORKFLOW_NOT_FOUND`、`PIPELINE_WORKFLOW_PARSE_ERROR`、`PIPELINE_WORKFLOW_SCHEMA_ERROR`、`PIPELINE_WORKFLOW_UNSUPPORTED`、`PIPELINE_WORKFLOW_SECRET_UNSAFE`、`PIPELINE_REPOSITORY_UNAVAILABLE`、`PIPELINE_COMMIT_NOT_FOUND`。
+- 运行与产物：`PIPELINE_RUN_NOT_FOUND`、`PIPELINE_STATE_CONFLICT`、`PIPELINE_LOG_NOT_FOUND`、`PIPELINE_ARTIFACT_NOT_FOUND`、`PIPELINE_ARTIFACT_CONFLICT`、`PIPELINE_STORAGE_ERROR`、`PIPELINE_LEASE_EXPIRED`、`PIPELINE_NODE_OFFLINE`、`PIPELINE_NODE_NOT_FOUND`、`PIPELINE_NODE_NAME_CONFLICT`。
+- 凭据：`PIPELINE_GIT_CREDENTIAL_ERROR`、`PIPELINE_SECRET_UNAVAILABLE`；错误消息只说明不可用原因，不返回令牌、Git 凭据或连接串。
+- Agent 协议：`AGENT_TOKEN_INVALID`、`AGENT_REGISTRATION_TOKEN_INVALID`、`AGENT_NODE_DISABLED`、`AGENT_LEASE_EXPIRED`、`AGENT_LEASE_INVALID`、`AGENT_STEP_STATE_CONFLICT`、`AGENT_LOG_SEQ_CONFLICT`、`AGENT_LOG_LIMIT_EXCEEDED`、`AGENT_ARTIFACT_LIMIT_EXCEEDED`、`AGENT_VERSION_UNSUPPORTED`（`packages/pipeline-protocol` 同时导出 `AGENT_ERROR_CODES` 供 Agent 复用）。
+
+### 显式例外与安全约束
+
+- **文件传输显式例外**：`GET /pipeline-artifacts/:artifactId/download` 成功时返回 `application/octet-stream` 流，不套信封，响应头带 `X-Content-SHA256`；失败仍返回 HTTP 200 + 统一 JSON 信封。该例外与 Better Auth 协议端点例外分开登记。
+- 服务端不执行用户代码；API 进程只做控制面，容器执行在自托管节点。日志与错误在服务端和 Agent 侧各脱敏一次；节点令牌、Git 凭据、运行时密钥只保存哈希/密文，明文本只在必要时短暂出现在内存与一次性响应中。
+- 日志/产物大小与分片数量有上限；租约过期不自动改派，运行收口为 `interrupted` 并保留已有日志与产物。

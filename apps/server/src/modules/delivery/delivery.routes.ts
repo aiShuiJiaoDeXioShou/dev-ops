@@ -14,10 +14,6 @@ import {
   createReleaseBodySchema,
   createReviewBodySchema,
   linkTargetBodySchema,
-  pipelineRunDetailResponseSchema,
-  pipelineRunListQuerySchema,
-  pipelineRunListResponseSchema,
-  pipelineRunParamsSchema,
   projectArtifactListQuerySchema,
   projectArtifactListResponseSchema,
   projectParamsSchema,
@@ -26,7 +22,6 @@ import {
   releaseListResponseSchema,
   releaseViewResponseSchema,
   reportBuildBodySchema,
-  reportPipelineRunBodySchema,
   reviewListQuerySchema,
   reviewListResponseSchema,
   reviewParamsSchema,
@@ -252,60 +247,6 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
         ),
         request.id,
       )
-    },
-  )
-
-  app.post(
-    '/projects/:projectId/pipeline-runs',
-    {
-      schema: {
-        params: projectParamsSchema,
-        body: reportPipelineRunBodySchema,
-        response: { 200: pipelineRunDetailResponseSchema },
-      },
-    },
-    async (request) => {
-      const actor = await requireActor(request)
-      return success(await options.service.reportPipelineRun(actor, request.params.projectId, request.body), request.id)
-    },
-  )
-
-  app.get(
-    '/projects/:projectId/pipeline-runs',
-    {
-      schema: {
-        params: projectParamsSchema,
-        querystring: pipelineRunListQuerySchema,
-        response: { 200: pipelineRunListResponseSchema },
-      },
-    },
-    async (request) => {
-      const actor = await requireActor(request)
-      return success(
-        await options.service.listPipelineRuns(actor, request.params.projectId, {
-          serviceId: request.query.serviceId,
-          status: request.query.status,
-          from: request.query.from,
-          to: request.query.to,
-          page: request.query.page ?? 1,
-          pageSize: request.query.pageSize ?? 20,
-        }),
-        request.id,
-      )
-    },
-  )
-
-  app.get(
-    '/pipeline-runs/:runId',
-    {
-      schema: {
-        params: pipelineRunParamsSchema,
-        response: { 200: pipelineRunDetailResponseSchema },
-      },
-    },
-    async (request) => {
-      const actor = await requireActor(request)
-      return success(await options.service.getPipelineRun(actor, request.params.runId), request.id)
     },
   )
 

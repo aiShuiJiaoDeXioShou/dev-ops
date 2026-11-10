@@ -53,7 +53,6 @@ import {
   validateEnvironment,
   validateReason,
 } from './delivery.validators.ts'
-import { createPipelineRunUseCases } from './delivery.pipeline.service.ts'
 import { createReleaseUseCases } from './delivery.release.service.ts'
 import { createReviewUseCases } from './delivery.review.service.ts'
 import { createRunVersionUseCases } from './delivery.run-version.service.ts'
@@ -173,7 +172,6 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
   const requireProject = createProjectAccess(db)
   const artifactUseCases = createArtifactUseCases({ db, requireProject })
   const runVersionUseCases = createRunVersionUseCases({ db, requireProject })
-  const pipelineRunUseCases = createPipelineRunUseCases({ db, requireProject })
   const reviewUseCases = createReviewUseCases({ db, requireProject })
   const releaseUseCases = createReleaseUseCases({ db, requireProject })
 
@@ -571,7 +569,6 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
     unlinkTarget,
     ...artifactUseCases,
     ...runVersionUseCases,
-    ...pipelineRunUseCases,
     ...reviewUseCases,
     ...releaseUseCases,
   }

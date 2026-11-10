@@ -153,21 +153,6 @@ const verificationStatusSchema = Type.Union([
   Type.Literal('unknown'),
 ])
 const runVersionSourceSchema = Type.Union([Type.Literal('manual'), Type.Literal('deployment_receipt')])
-const pipelineStatusSchema = Type.Union([
-  Type.Literal('queued'),
-  Type.Literal('running'),
-  Type.Literal('succeeded'),
-  Type.Literal('failed'),
-  Type.Literal('cancelled'),
-  Type.Literal('unknown'),
-])
-const pipelineTriggerSourceSchema = Type.Union([
-  Type.Literal('manual'),
-  Type.Literal('push'),
-  Type.Literal('schedule'),
-  Type.Literal('external'),
-  Type.Literal('unknown'),
-])
 const reviewTargetTypeSchema = Type.Union([Type.Literal('mini_program'), Type.Literal('mobile_app')])
 const reviewStatusSchema = Type.Union([
   Type.Literal('pending'),
@@ -182,7 +167,6 @@ const releaseStatusSchema = Type.Union([
   Type.Literal('partially_released'),
   Type.Literal('unknown'),
 ])
-const utcDateSchema = Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })
 const latestFlagSchema = Type.Optional(Type.String({ pattern: '^(true|false)$' }))
 
 export const projectArtifactListQuerySchema = Type.Object({
@@ -215,34 +199,6 @@ export const confirmRunVersionBodySchema = Type.Object(
   },
   { additionalProperties: false },
 )
-
-export const pipelineRunParamsSchema = Type.Object({ runId: uuidSchema })
-export const reportPipelineRunBodySchema = Type.Object(
-  {
-    pipelineName: Type.String({ minLength: 1, maxLength: 120 }),
-    pipelineKey: Type.String({ minLength: 1, maxLength: 120 }),
-    serviceId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
-    commitRef: Type.Optional(Type.Union([Type.String({ maxLength: 200 }), Type.Null()])),
-    triggerSource: pipelineTriggerSourceSchema,
-    status: pipelineStatusSchema,
-    startedAt: Type.Optional(timestampSchema),
-    finishedAt: Type.Optional(timestampSchema),
-    resultUrl: Type.Optional(Type.Union([Type.String({ maxLength: 2000 }), Type.Null()])),
-    source: Type.String({ minLength: 1, maxLength: 120 }),
-    sourceRunId: Type.String({ minLength: 1, maxLength: 200 }),
-    reportedAt: timestampSchema,
-  },
-  { additionalProperties: false },
-)
-
-export const pipelineRunListQuerySchema = Type.Object({
-  serviceId: Type.Optional(uuidSchema),
-  status: Type.Optional(pipelineStatusSchema),
-  from: Type.Optional(utcDateSchema),
-  to: Type.Optional(utcDateSchema),
-  page: Type.Optional(Type.Integer({ minimum: 1 })),
-  pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
-})
 
 export const reviewParamsSchema = Type.Object({ reviewId: uuidSchema })
 export const createReviewBodySchema = Type.Object(
@@ -334,42 +290,6 @@ const runVersionChangeViewSchema = Type.Object({
   changedBy: uuidSchema,
   changedAt: Type.String(),
 })
-const pipelineRunViewSchema = Type.Object({
-  id: uuidSchema,
-  projectId: uuidSchema,
-  serviceId: Type.Union([uuidSchema, Type.Null()]),
-  pipelineName: Type.String(),
-  pipelineKey: Type.String(),
-  commitRef: Type.Union([Type.String(), Type.Null()]),
-  triggerSource: pipelineTriggerSourceSchema,
-  status: pipelineStatusSchema,
-  startedAt: Type.Union([Type.String(), Type.Null()]),
-  finishedAt: Type.Union([Type.String(), Type.Null()]),
-  resultUrl: Type.Union([Type.String(), Type.Null()]),
-  source: Type.String(),
-  sourceRunId: Type.String(),
-  lastReportedAt: Type.String(),
-  createdAt: Type.String(),
-  updatedAt: Type.String(),
-})
-const pipelineRunStatusViewSchema = Type.Object({
-  id: uuidSchema,
-  status: pipelineStatusSchema,
-  reportedAt: Type.String(),
-  note: Type.Union([Type.String(), Type.Null()]),
-  createdAt: Type.String(),
-})
-const relatedBuildViewSchema = Type.Object({
-  id: uuidSchema,
-  versionLabel: Type.String(),
-  collectedAt: Type.String(),
-  resultStatus: resultStatusSchema,
-})
-const pipelineRunDetailSchema = Type.Object({
-  ...pipelineRunViewSchema.properties,
-  statusHistory: Type.Array(pipelineRunStatusViewSchema),
-  relatedBuilds: Type.Array(relatedBuildViewSchema),
-})
 const reviewViewSchema = Type.Object({
   id: uuidSchema,
   projectId: uuidSchema,
@@ -422,12 +342,6 @@ export const runVersionHistoryListSchema = Type.Object({
   pageSize: Type.Integer(),
   total: Type.Integer(),
 })
-export const pipelineRunListSchema = Type.Object({
-  items: Type.Array(pipelineRunViewSchema),
-  page: Type.Integer(),
-  pageSize: Type.Integer(),
-  total: Type.Integer(),
-})
 export const reviewListSchema = Type.Object({
   items: Type.Array(reviewViewSchema),
   page: Type.Integer(),
@@ -445,8 +359,6 @@ export const projectArtifactListResponseSchema = apiResponseSchema(projectArtifa
 export const runVersionListResponseSchema = apiResponseSchema(runVersionListSchema)
 export const runVersionViewResponseSchema = apiResponseSchema(runVersionViewSchema)
 export const runVersionHistoryResponseSchema = apiResponseSchema(runVersionHistoryListSchema)
-export const pipelineRunDetailResponseSchema = apiResponseSchema(pipelineRunDetailSchema)
-export const pipelineRunListResponseSchema = apiResponseSchema(pipelineRunListSchema)
 export const reviewViewResponseSchema = apiResponseSchema(reviewViewSchema)
 export const reviewListResponseSchema = apiResponseSchema(reviewListSchema)
 export const releaseViewResponseSchema = apiResponseSchema(releaseViewSchema)
@@ -454,8 +366,6 @@ export const releaseListResponseSchema = apiResponseSchema(releaseListSchema)
 
 export type ProjectArtifactListQuery = Static<typeof projectArtifactListQuerySchema>
 export type ConfirmRunVersionBody = Static<typeof confirmRunVersionBodySchema>
-export type ReportPipelineRunBody = Static<typeof reportPipelineRunBodySchema>
-export type PipelineRunListQuery = Static<typeof pipelineRunListQuerySchema>
 export type CreateReviewBody = Static<typeof createReviewBodySchema>
 export type UpdateReviewBody = Static<typeof updateReviewBodySchema>
 export type ReviewListQuery = Static<typeof reviewListQuerySchema>

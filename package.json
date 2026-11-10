@@ -17,7 +17,7 @@
     "prepare:clients": "pnpm api:generate && pnpm --filter @dev-ops/api-client build",
     "build": "pnpm api:generate && pnpm -r build",
     "check": "pnpm lint && pnpm format:check && pnpm ui:check && pnpm build && pnpm check:boundaries && pnpm test:tooling && pnpm -r check && pnpm test:e2e",
-    "check:boundaries": "depcruise --config tooling/dependency-rules.mjs apps/web/src apps/server/src apps/cli/src apps/bot/src packages/api-client/src",
+    "check:boundaries": "depcruise --config tooling/dependency-rules.mjs apps/web/src apps/server/src apps/cli/src apps/bot/src apps/pipeline-agent/src packages/api-client/src packages/pipeline-protocol/src",
     "test:tooling": "node --test tooling/test/*.test.mjs",
     "test:e2e": "node --test tests/e2e/*.test.mjs",
     "test:db": "pnpm --filter @dev-ops/server test:db",
@@ -30,7 +30,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "ui:check": "node tooling/scripts/check-ui.mjs",
-    "ui:baseline": "node tooling/scripts/check-ui.mjs --update-baseline"
+    "ui:baseline": "node tooling/scripts/check-ui.mjs --update-baseline",
+    "dev:worker": "pnpm --filter @dev-ops/server dev:worker",
+    "dev:agent": "pnpm --filter @dev-ops/pipeline-agent dev"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -175,67 +175,6 @@ export const serviceRunVersionChange = appSchema.table(
   ],
 )
 
-/** 外部流水线一次运行；按项目＋来源＋来源运行标识幂等。 */
-export const pipelineRun = appSchema.table(
-  'pipeline_run',
-  {
-    id: uuid('id').notNull(),
-    team_id: uuid('team_id').notNull(),
-    project_id: uuid('project_id').notNull(),
-    service_id: uuid('service_id'),
-    pipeline_name: text('pipeline_name').notNull(),
-    pipeline_key: text('pipeline_key').notNull(),
-    commit_ref: text('commit_ref'),
-    trigger_source: text('trigger_source').notNull(),
-    status: text('status').notNull(),
-    started_at: timestamp('started_at', { withTimezone: true, mode: 'date' }),
-    finished_at: timestamp('finished_at', { withTimezone: true, mode: 'date' }),
-    result_url: text('result_url'),
-    source: text('source').notNull(),
-    source_run_id: text('source_run_id').notNull(),
-    last_reported_at: timestamp('last_reported_at', { withTimezone: true, mode: 'date' }).notNull(),
-    created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
-    updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
-  },
-  (table) => [
-    primaryKey({ name: 'pk_pipeline_run_id', columns: [table.id] }),
-    unique('uk_pipeline_run_identity').on(table.project_id, table.source, table.source_run_id),
-    check(
-      'ck_pipeline_run_status',
-      sql`${table.status} in ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'unknown')`,
-    ),
-    check(
-      'ck_pipeline_run_trigger',
-      sql`${table.trigger_source} in ('manual', 'push', 'schedule', 'external', 'unknown')`,
-    ),
-    index('idx_pipeline_run_project_time').on(table.project_id, table.started_at),
-  ],
-)
-
-/** 流水线运行状态历史；只增不改，记录每次实际生效的上报。 */
-export const pipelineRunStatus = appSchema.table(
-  'pipeline_run_status',
-  {
-    id: uuid('id').notNull(),
-    team_id: uuid('team_id').notNull(),
-    project_id: uuid('project_id').notNull(),
-    pipeline_run_id: uuid('pipeline_run_id').notNull(),
-    status: text('status').notNull(),
-    reported_at: timestamp('reported_at', { withTimezone: true, mode: 'date' }).notNull(),
-    note: text('note'),
-    created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
-    updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
-  },
-  (table) => [
-    primaryKey({ name: 'pk_pipeline_run_status_id', columns: [table.id] }),
-    index('idx_pipeline_run_status_run').on(table.pipeline_run_id, table.reported_at, table.id),
-    check(
-      'ck_pipeline_run_status_value',
-      sql`${table.status} in ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'unknown')`,
-    ),
-  ],
-)
-
 /** 外部提审一次记录；重新提审新增记录，不覆盖旧记录。 */
 export const externalReview = appSchema.table(
   'external_review',

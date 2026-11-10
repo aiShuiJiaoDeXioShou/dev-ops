@@ -13,7 +13,7 @@
     "start": "node --env-file-if-exists=.env dist/entrypoints/http.js",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
-    "test": "node --import tsx --test test/*.test.ts test/http/*.test.ts",
+    "test": "node --import tsx --test test/*.test.ts test/http/*.test.ts test/unit/*.test.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "db:setup": "node --import tsx scripts/setup-db.ts",
     "db:up": "docker compose --env-file .env.database -f ../../deploy/compose.yaml up -d --wait postgres",
@@ -24,10 +24,13 @@
     "db:migrate": "node --env-file-if-exists=.env.database --import tsx src/entrypoints/migrate.ts",
     "test:db": "node --env-file=.env --env-file=.env.database --import tsx --test test/integration/*.test.ts",
     "api:export": "node --import tsx scripts/export-openapi.ts",
-    "seed:root": "node --env-file-if-exists=.env --import tsx scripts/seed-root.ts"
+    "seed:root": "node --env-file-if-exists=.env --import tsx scripts/seed-root.ts",
+    "dev:worker": "node --env-file-if-exists=.env --import tsx --watch src/entrypoints/worker.ts",
+    "start:worker": "node --env-file-if-exists=.env dist/entrypoints/worker.js"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.18",
+    "@dev-ops/pipeline-protocol": "workspace:*",
     "@fastify/swagger": "^9.9.3",
     "@fastify/swagger-ui": "^5.2.6",
     "@fastify/type-provider-typebox": "^6.3.0",
@@ -39,7 +42,8 @@
     "fastify": "^5.12.8",
     "nodemailer": "10.4.0",
     "pg": "8.23.1",
-    "typebox": "^1.4.3"
+    "typebox": "^1.4.3",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

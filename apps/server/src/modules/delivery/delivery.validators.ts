@@ -37,14 +37,6 @@ export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number]
 export const RUN_VERSION_SOURCES = ['manual', 'deployment_receipt'] as const
 export type RunVersionSource = (typeof RUN_VERSION_SOURCES)[number]
 
-/** 流水线运行状态；只记录外部上报，不执行外部流水线。 */
-export const PIPELINE_STATUSES = ['queued', 'running', 'succeeded', 'failed', 'cancelled', 'unknown'] as const
-export type PipelineStatus = (typeof PIPELINE_STATUSES)[number]
-
-/** 流水线触发来源。 */
-export const PIPELINE_TRIGGER_SOURCES = ['manual', 'push', 'schedule', 'external', 'unknown'] as const
-export type PipelineTriggerSource = (typeof PIPELINE_TRIGGER_SOURCES)[number]
-
 /** 外部提审对象类型。 */
 export const REVIEW_TARGET_TYPES = ['mini_program', 'mobile_app'] as const
 export type ReviewTargetType = (typeof REVIEW_TARGET_TYPES)[number]
@@ -65,8 +57,6 @@ const ARTIFACT_SOURCE_SET = new Set<string>(ARTIFACT_SOURCES)
 const TARGET_TYPE_SET = new Set<string>(TARGET_TYPES)
 const VERIFICATION_STATUS_SET = new Set<string>(VERIFICATION_STATUSES)
 const RUN_VERSION_SOURCE_SET = new Set<string>(RUN_VERSION_SOURCES)
-const PIPELINE_STATUS_SET = new Set<string>(PIPELINE_STATUSES)
-const PIPELINE_TRIGGER_SOURCE_SET = new Set<string>(PIPELINE_TRIGGER_SOURCES)
 const REVIEW_TARGET_TYPE_SET = new Set<string>(REVIEW_TARGET_TYPES)
 const REVIEW_STATUS_SET = new Set<string>(REVIEW_STATUSES)
 const RELEASE_STATUS_SET = new Set<string>(RELEASE_STATUSES)
@@ -263,28 +253,6 @@ export function validateRunVersionSource(value: string): RunVersionSource {
   return value
 }
 
-/** 判断字符串是否为流水线运行状态。 */
-export function isPipelineStatus(value: string): value is PipelineStatus {
-  return PIPELINE_STATUS_SET.has(value)
-}
-
-/** 校验流水线运行状态。 */
-export function validatePipelineStatus(value: string): PipelineStatus {
-  if (!isPipelineStatus(value)) validationError('流水线运行状态不合法')
-  return value
-}
-
-/** 判断字符串是否为流水线触发来源。 */
-export function isPipelineTriggerSource(value: string): value is PipelineTriggerSource {
-  return PIPELINE_TRIGGER_SOURCE_SET.has(value)
-}
-
-/** 校验流水线触发来源。 */
-export function validatePipelineTriggerSource(value: string): PipelineTriggerSource {
-  if (!isPipelineTriggerSource(value)) validationError('流水线触发来源不合法')
-  return value
-}
-
 /** 判断字符串是否为外部提审对象类型。 */
 export function isReviewTargetType(value: string): value is ReviewTargetType {
   return REVIEW_TARGET_TYPE_SET.has(value)
@@ -405,28 +373,6 @@ export function toVerificationStatus(value: string): VerificationStatus {
  */
 export function toRunVersionSource(value: string): RunVersionSource {
   if (!isRunVersionSource(value)) throw new Error(`数据库运行版本来源不合法: ${value}`)
-  return value
-}
-
-/**
- * 将数据库中的流水线状态收窄为业务类型；不合法说明持久化异常。
- * @param value 数据库值。
- * @returns 流水线状态。
- * @throws 数据不合法时抛出普通 Error。
- */
-export function toPipelineStatus(value: string): PipelineStatus {
-  if (!isPipelineStatus(value)) throw new Error(`数据库流水线状态不合法: ${value}`)
-  return value
-}
-
-/**
- * 将数据库中的流水线触发来源收窄为业务类型；不合法说明持久化异常。
- * @param value 数据库值。
- * @returns 触发来源。
- * @throws 数据不合法时抛出普通 Error。
- */
-export function toPipelineTriggerSource(value: string): PipelineTriggerSource {
-  if (!isPipelineTriggerSource(value)) throw new Error(`数据库流水线触发来源不合法: ${value}`)
   return value
 }
 

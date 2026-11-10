@@ -18,6 +18,14 @@ import { findGitConnectionById } from '../modules/integrations/integrations.repo
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
 import { verifySessionPassword } from '../modules/identity/identity.password.ts'
 import { createDeliveryService } from '../modules/delivery/delivery.service.ts'
+import { createPipelineService } from '../modules/pipeline/pipeline.service.ts'
+import { createPipelineNodesService } from '../modules/pipeline/pipeline.nodes.service.ts'
+import { createPipelineAgentService } from '../modules/pipeline/pipeline.agent.service.ts'
+import {
+  createPipelineCredentialProvider,
+  type PipelineCredentialProvider,
+} from '../modules/pipeline/pipeline.credentials.ts'
+import { createPipelineStorage } from '../modules/pipeline/pipeline.storage.ts'
 import { createProjectDashboardService } from '../modules/projects/projects.dashboard.service.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createIntegrationsService, type GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
@@ -38,6 +46,8 @@ export function createServices(
     gitAdapterResolver?: (connectionId: string) => Promise<GitAdapter>
     activeConnectionIds?: (teamId: string) => Promise<string[]>
     gitAdapterFactory?: (connection: Parameters<GitAdapterFactory>[0]) => Promise<GitAdapter>
+    /** 测试或部署可替换 Git 凭据来源；默认由 integrations/configuration 与 CLI/App 凭据签发。 */
+    pipelineCredentials?: PipelineCredentialProvider
   } = {},
 ) {
   const database = createDatabase(config, onDatabaseIdleError)
@@ -45,10 +55,13 @@ export function createServices(
   const mailer = options.mailer ?? createSmtpMailer(config)
   const identity = createIdentityService({ db: database.db, auth, config, mailer })
   const tokens = createTokenService({ db: database.db })
-  const configuration = config.GIT_CREDENTIAL_ENCRYPTION_KEY
+  const secretCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY
+    ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY)
+    : null
+  const configuration = secretCipher
     ? createConfigurationService({
         db: database.db,
-        cipher: createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY),
+        cipher: secretCipher,
         verifyPassword: (headers, password) => verifySessionPassword(auth, headers, password),
       })
     : null
@@ -105,6 +118,42 @@ export function createServices(
     codeReferences: code.listReferencesForTarget,
   })
   const delivery = createDeliveryService({ db: database.db })
+  const pipelineStorage = createPipelineStorage({
+    rootDir: config.PIPELINE_STORAGE_DIR,
+    maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
+    maxArtifactBytes: config.PIPELINE_ARTIFACT_MAX_BYTES,
+  })
+  const pipelineCredentials =
+    options.pipelineCredentials ??
+    createPipelineCredentialProvider({
+      db: database.db,
+      config,
+      cipher: secretCipher,
+    })
+  const pipelineNodes = createPipelineNodesService({
+    db: database.db,
+    config: { leaseTtlSeconds: config.PIPELINE_LEASE_TTL_SECONDS },
+  })
+  const pipelineAgent = createPipelineAgentService({
+    db: database.db,
+    config: {
+      leaseTtlSeconds: config.PIPELINE_LEASE_TTL_SECONDS,
+      maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
+      maxArtifactBytes: config.PIPELINE_ARTIFACT_MAX_BYTES,
+    },
+    storage: pipelineStorage,
+    credentials: pipelineCredentials,
+  })
+  const pipeline = createPipelineService({
+    db: database.db,
+    code,
+    storage: pipelineStorage,
+    credentials: pipelineCredentials,
+    config: {
+      runTimeoutSeconds: config.PIPELINE_RUN_TIMEOUT_SECONDS,
+      workflowMaxBytes: config.PIPELINE_WORKFLOW_MAX_BYTES,
+    },
+  })
   const projects = createProjectsService({
     db: database.db,
     counts: async (projectIds) => {
@@ -138,6 +187,9 @@ export function createServices(
     integrations,
     code,
     delivery,
+    pipeline,
+    pipelineNodes,
+    pipelineAgent,
     projectDashboard,
     projects,
     async close() {

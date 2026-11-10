@@ -14,6 +14,13 @@ test('configuration applies defaults without reading the host environment', () =
   assert.equal(config.HOST, '127.0.0.1')
   assert.equal(config.NODE_ENV, 'development')
   assert.equal(config.DOCS_ENABLED, true)
+  assert.equal(config.PIPELINE_STORAGE_DIR, './pipeline-data')
+  assert.equal(config.PIPELINE_RUN_TIMEOUT_SECONDS, 3600)
+  assert.equal(config.PIPELINE_LEASE_TTL_SECONDS, 90)
+  assert.equal(config.PIPELINE_HEARTBEAT_TIMEOUT_SECONDS, 60)
+  assert.equal(config.PIPELINE_WORKFLOW_MAX_BYTES, 131_072)
+  assert.equal(config.PIPELINE_LOG_CHUNK_MAX_BYTES, 262_144)
+  assert.equal(config.PIPELINE_ARTIFACT_MAX_BYTES, 524_288_000)
 })
 
 test('configuration parses environment strings and production defaults', () => {

@@ -31,14 +31,21 @@ export {
 export { gitConnection } from '../modules/integrations/integrations.tables.ts'
 export { gitRepository, projectRepository, codeReference } from '../modules/code/code.tables.ts'
 export {
+  pipelineRun,
+  pipelineRunStep,
+  pipelineRunLog,
+  pipelineArtifact,
+  pipelineNode,
+  pipelineNodeToken,
+  pipelineLease,
+} from '../modules/pipeline/pipeline.tables.ts'
+export {
   buildRecord,
   buildRecordCorrection,
   buildArtifact,
   buildRecordTarget,
   serviceRunVersion,
   serviceRunVersionChange,
-  pipelineRun,
-  pipelineRunStatus,
   externalReview,
   releaseResult,
 } from '../modules/delivery/delivery.tables.ts'

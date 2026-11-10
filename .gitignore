@@ -20,3 +20,4 @@ packages/api-client/src/generated/
 specs
 .pnpm-store/
 .tmp/
+pipeline-data/
