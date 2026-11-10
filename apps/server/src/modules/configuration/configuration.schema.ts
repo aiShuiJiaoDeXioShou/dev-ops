@@ -18,6 +18,7 @@ const usageActionSchema = Type.Union([
   Type.Literal('grant'),
   Type.Literal('revoke_grant'),
   Type.Literal('read_metadata'),
+  Type.Literal('reveal'),
 ])
 const usageResultSchema = Type.Union([
   Type.Literal('success'),
@@ -76,6 +77,11 @@ const credentialViewFields = {
 }
 
 const credentialViewSchema = Type.Object(credentialViewFields)
+const credentialRevealViewSchema = Type.Object({
+  value: Type.String(),
+  version: Type.Integer(),
+  revealedAt: Type.String(),
+})
 const credentialDetailViewSchema = Type.Object({
   ...credentialViewFields,
   recentUsage: Type.Array(usageViewSchema),
@@ -167,6 +173,10 @@ export const revokeGrantBodySchema = Type.Object(
   { reason: Type.String({ minLength: 1, maxLength: 1000 }) },
   { additionalProperties: false },
 )
+export const revealCredentialBodySchema = Type.Object(
+  { password: Type.String({ minLength: 1, maxLength: 128 }) },
+  { additionalProperties: false },
+)
 
 export const createEnvVarBodySchema = Type.Object(
   {
@@ -196,6 +206,7 @@ export const credentialListResponseSchema = apiResponseSchema(
 )
 export const credentialDetailResponseSchema = apiResponseSchema(credentialDetailViewSchema)
 export const credentialResponseSchema = apiResponseSchema(credentialViewSchema)
+export const credentialRevealResponseSchema = apiResponseSchema(credentialRevealViewSchema)
 export const credentialUsageListResponseSchema = apiResponseSchema(
   Type.Object({ items: Type.Array(usageViewSchema), ...pageSchema }),
 )

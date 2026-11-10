@@ -38,6 +38,11 @@ test('凭据接口未登录返回 HTTP 200 + UNAUTHENTICATED 信封，且不回�
       payload: { reason: '项目结束' },
     },
     { method: 'GET' as const, url: `/api/v1/credentials/${credentialId}/usage` },
+    {
+      method: 'POST' as const,
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: { password: 'guess-password-123' },
+    },
   ]
   for (const item of cases) {
     const response = await app.inject(item)
@@ -62,6 +67,7 @@ test('凭据接口只注册 GET/POST；非法路径参数与未知字段被 sche
     { method: 'PATCH' as const, url: `/api/v1/credentials/${credentialId}/rotate`, payload: {} },
     { method: 'DELETE' as const, url: `/api/v1/credentials/${credentialId}/grants/${randomUUID()}`, payload: {} },
     { method: 'DELETE' as const, url: `/api/v1/credentials/${credentialId}/usage` },
+    { method: 'GET' as const, url: `/api/v1/credentials/${credentialId}/reveal-value` },
   ]
   for (const item of wrongMethods) {
     const response = await app.inject(item)
@@ -80,6 +86,16 @@ test('凭据接口只注册 GET/POST；非法路径参数与未知字段被 sche
       method: 'POST',
       url: `/api/v1/teams/${teamId}/credentials`,
       payload: { name: '密钥', kind: 'unsupported', value: 'x' },
+    }),
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: {},
+    }),
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: { password: 'x', remember: true },
     }),
   ]
   for (const response of invalidResponses) {

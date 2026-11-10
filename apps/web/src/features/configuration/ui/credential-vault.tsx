@@ -16,6 +16,7 @@ import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
 import { EmptyState, PageLoading } from '@/shared/ui/page-state'
 import { credentialUsageQueryOptions, credentialsQueryOptions, type CredentialList } from '../api/queries'
+import { CredentialValueReveal } from './credential-value-dialog'
 
 type CreateCredentialBody = ApiBody<'/api/v1/teams/{teamId}/credentials', 'post'>
 type CredentialKind = 'api_key' | 'account_password' | 'ssh_key'
@@ -36,6 +37,7 @@ const USAGE_ACTION_LABELS: Record<string, string> = {
   grant: '授权',
   revoke_grant: '撤销授权',
   read_metadata: '读取元数据',
+  reveal: '查看明文',
 }
 const USAGE_RESULT_LABELS: Record<string, string> = {
   success: '成功',
@@ -47,10 +49,12 @@ const ACTION_TITLES = { rotate: '轮换凭据', revoke: '撤销凭据', grant: '
 type ActionKind = keyof typeof ACTION_TITLES
 const EMPTY_FORM = { name: '', kind: 'api_key' as CredentialKind, description: '', value: '' }
 
-/** 团队凭据库：管理员管理凭据与授权，开发者只读被授权元数据，明文不展示。 */
+/** 团队凭据库：管理员管理凭据与授权，开发者只读被授权元数据；明文需登录密码二次确认后短暂展示。 */
 export function CredentialVault() {
   const { currentTeam, role } = useSession()
   const canManage = role === 'admin'
+  // 查看明文与只读元数据分离：管理员和开发者可用，浏览者不可见（页面入口本身也限制浏览者）。
+  const canViewValue = role === 'admin' || role === 'developer'
   const teamId = currentTeam?.id ?? ''
   const queryClient = useQueryClient()
   const { showToast } = useToast()
@@ -226,15 +230,21 @@ export function CredentialVault() {
           <section aria-label="凭据详情" className="vault-detail">
             {selected ? (
               <>
-                <div className="row spread">
-                  <div className="vault-detail-identity">
+                <div className="vault-detail-identity">
+                  <div className="row spread">
                     <h2>{selected.name}</h2>
-                    <p className="muted small">
-                      {KIND_LABELS[selected.kind] ?? selected.kind} · v{selected.currentVersion} · 掩码{' '}
-                      {selected.maskedValue}
-                    </p>
+                    <span className="badge">{KIND_LABELS[selected.status] ?? selected.status}</span>
                   </div>
-                  <span className="badge">{KIND_LABELS[selected.status] ?? selected.status}</span>
+                  <p className="muted small">
+                    {KIND_LABELS[selected.kind] ?? selected.kind} · v{selected.currentVersion}
+                  </p>
+                  {/* key 绑定凭据 id 与版本/状态：切换选中凭据或轮换、撤销后重建组件，立即清除明文、密码与倒计时。 */}
+                  <CredentialValueReveal
+                    key={`${selected.id}:${selected.currentVersion}:${selected.status}`}
+                    credentialId={selected.id}
+                    maskedValue={selected.maskedValue}
+                    canReveal={canViewValue}
+                  />
                 </div>
                 <dl className="vault-properties">
                   <dt>说明</dt>

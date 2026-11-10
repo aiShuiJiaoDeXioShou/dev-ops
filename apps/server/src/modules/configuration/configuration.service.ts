@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { IncomingHttpHeaders } from 'node:http'
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
@@ -22,12 +23,14 @@ export interface SecretMetadata {
 export interface ConfigurationServiceDeps {
   db: Database
   cipher: SecretCipher
+  /** 会话密码二次校验；由身份模块注入，配置模块不直接依赖认证实现。 */
+  verifyPassword: (headers: IncomingHttpHeaders, password: string) => Promise<boolean>
 }
 
 /**
  * 创建凭据配置服务。
- * @param deps 数据库与加解密器。
- * @returns 凭据创建、列表、撤销与内部解密用例。
+ * @param deps 数据库、加解密器与密码二次校验依赖。
+ * @returns 凭据创建、列表、撤销、明文查看与内部解密用例。
  */
 export function createConfigurationService(deps: ConfigurationServiceDeps) {
   const { db } = deps

@@ -1,0 +1,3 @@
+ALTER TABLE "app"."credential_usage" DROP CONSTRAINT "ck_credential_usage_action";--> statement-breakpoint
+CREATE INDEX "idx_credential_usage_actor_action" ON "app"."credential_usage" USING btree ("actor_user_id","action","created_at");--> statement-breakpoint
+ALTER TABLE "app"."credential_usage" ADD CONSTRAINT "ck_credential_usage_action" CHECK ("app"."credential_usage"."action" in ('use', 'create', 'rotate', 'revoke', 'grant', 'revoke_grant', 'read_metadata', 'reveal'));

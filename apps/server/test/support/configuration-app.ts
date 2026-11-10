@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { createConfigurationService } from '../../src/modules/configuration/configuration.service.ts'
 import { createSecretCipher } from '../../src/modules/configuration/configuration.crypto.ts'
+import { verifySessionPassword } from '../../src/modules/identity/identity.password.ts'
 import { configurationRoutes } from '../../src/modules/configuration/configuration.routes.ts'
 import { createTestConfig } from './test-config.ts'
 
@@ -19,7 +20,11 @@ import { createTestConfig } from './test-config.ts'
 export function registerConfigurationRoutes(app: FastifyInstance, encryptionKey: string): void {
   app.register(configurationRoutes, {
     prefix: '/api/v1',
-    service: createConfigurationService({ db: app.db, cipher: createSecretCipher(encryptionKey) }),
+    service: createConfigurationService({
+      db: app.db,
+      cipher: createSecretCipher(encryptionKey),
+      verifyPassword: (headers, password) => verifySessionPassword(app.auth, headers, password),
+    }),
   })
 }
 

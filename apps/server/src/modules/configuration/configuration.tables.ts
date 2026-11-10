@@ -172,7 +172,7 @@ export const credentialUsage = appSchema.table(
     primaryKey({ name: 'pk_credential_usage_id', columns: [table.id] }),
     check(
       'ck_credential_usage_action',
-      sql`${table.action} in ('use', 'create', 'rotate', 'revoke', 'grant', 'revoke_grant', 'read_metadata')`,
+      sql`${table.action} in ('use', 'create', 'rotate', 'revoke', 'grant', 'revoke_grant', 'read_metadata', 'reveal')`,
     ),
     check('ck_credential_usage_result', sql`${table.result} in ('success', 'denied', 'expired', 'failed')`),
     check(
@@ -181,5 +181,7 @@ export const credentialUsage = appSchema.table(
     ),
     index('idx_credential_usage_credential').on(table.credential_id, table.created_at),
     index('idx_credential_usage_team').on(table.team_id, table.created_at),
+    // 明文查看按用户限流，按操作者、动作与时间统计最近尝试次数。
+    index('idx_credential_usage_actor_action').on(table.actor_user_id, table.action, table.created_at),
   ],
 )

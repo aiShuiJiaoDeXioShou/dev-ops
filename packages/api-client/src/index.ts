@@ -1551,6 +1551,19 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 输入登录密码后查看凭据明文；响应不可缓存，明文不落库。 */
+    async revealCredentialValue(
+      credentialId: string,
+      body: ApiBody<'/api/v1/credentials/{credentialId}/reveal-value', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/credentials/{credentialId}/reveal-value', 'post'>>(
+        `/api/v1/credentials/${segment(credentialId)}/reveal-value`,
+        'POST',
+        body,
+        options,
+      )
+    },
     /** 撤销凭据。 */
     async revokeCredential(
       credentialId: string,

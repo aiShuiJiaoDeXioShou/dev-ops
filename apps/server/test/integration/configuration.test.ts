@@ -11,6 +11,7 @@ import { createAuthenticatedUser } from '../support/auth.ts'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { createConfigurationService } from '../../src/modules/configuration/configuration.service.ts'
 import { createSecretCipher } from '../../src/modules/configuration/configuration.crypto.ts'
+import { verifySessionPassword } from '../../src/modules/identity/identity.password.ts'
 import { FakeMailer } from '../support/fake-mailer.ts'
 
 test('AES-256-GCM 凭据加密、列表脱敏、撤销与密文篡改拒绝', { timeout: 60_000 }, async (t) => {
@@ -89,7 +90,11 @@ test('AES-256-GCM 凭据加密、列表脱敏、撤销与密文篡改拒绝', { 
     await database.close()
   })
   const cipher = createSecretCipher(encryptionKey)
-  const service = createConfigurationService({ db: database.db, cipher })
+  const service = createConfigurationService({
+    db: database.db,
+    cipher,
+    verifyPassword: (headers, password) => verifySessionPassword(app.auth, headers, password),
+  })
   const actor = { id: user.userId, email: user.email, name: user.name }
 
   const created = await service.createSecret(actor, teamId, {

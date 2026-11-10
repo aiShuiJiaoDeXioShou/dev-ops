@@ -1251,3 +1251,33 @@ a.skill-title:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* 凭据详情：掩码行内放置查看入口；明文只在内存中短暂展示，按等宽字体呈现。 */
+.vault-secret {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.vault-secret-meta {
+  margin: 0 auto 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 18px;
+}
+.vault-secret-revealed {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--soft);
+}
+.vault-secret-value {
+  flex: 1 1 100%;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--foreground);
+  user-select: all;
+}

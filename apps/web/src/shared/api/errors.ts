@@ -11,6 +11,9 @@ const BUSINESS_MESSAGES: Record<string, string> = {
   LAST_ADMIN_PROTECTED: '至少保留一位正常管理员。',
   IDEMPOTENCY_CONFLICT: '请求已处理，请刷新后查看结果。',
   INVALID_TRANSITION: '当前状态不允许该操作。',
+  PASSWORD_INVALID: '登录密码错误，请重试。',
+  RATE_LIMITED: '操作过于频繁，请稍后再试。',
+  CREDENTIAL_UNAVAILABLE: '凭据已撤销或已过期。',
 }
 
 /** 将请求错误转成安全、可展示的说明与请求标识。 */

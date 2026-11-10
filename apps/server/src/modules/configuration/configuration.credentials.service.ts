@@ -1,17 +1,21 @@
 import { randomUUID } from 'node:crypto'
+import type { IncomingHttpHeaders } from 'node:http'
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
-import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { ERROR_CODES, type ErrorCode } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
-import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
+import type { Actor } from '../identity/identity.actor.ts'
+import { requireTeamMember, type SessionUser, type TeamRole } from '../identity/identity.session.ts'
 import type { SecretCipher } from './configuration.crypto.ts'
 import {
   countActiveGrants,
+  countRecentCredentialRevealAttempts,
   findActiveGrantProjectIds,
   findActiveGrantedCredentialIds,
   findCredentialById,
   findCredentialByName,
+  findCredentialVersionCiphertext,
   findProjectRefById,
   findProjectRefsByIds,
   insertCredential,
@@ -33,6 +37,7 @@ import {
   toGrantViews,
   type CredentialDetailView,
   type CredentialGrantView,
+  type CredentialRevealView,
   type CredentialUsageView,
   type CredentialView,
 } from './configuration.credentials.view.ts'
@@ -83,20 +88,34 @@ export interface CredentialListFilters {
   pageSize: number
 }
 
-/** 凭据服务依赖：数据库连接与 AES-256-GCM 加解密器。 */
+/** 凭据服务依赖：数据库连接、AES-256-GCM 加解密器与会话密码二次校验。 */
 export interface CredentialsServiceDeps {
   db: Database
   cipher: SecretCipher
+  verifyPassword: (headers: IncomingHttpHeaders, password: string) => Promise<boolean>
+}
+
+/** 可查看凭据明文的团队角色；调整权限时必须同步更新契约文档与角色矩阵测试。 */
+export const CREDENTIAL_VALUE_VIEW_ROLES: readonly TeamRole[] = ['admin', 'developer']
+
+/** 明文查看的二次验证输入；密码只用于本次校验，不落库、不写日志。 */
+export interface RevealCredentialInput {
+  password: string
+  headers: IncomingHttpHeaders
 }
 
 const RECENT_USAGE_LIMIT = 5
+/** 同一用户 5 分钟内最多尝试查看明文的次数，成功与失败都计入。 */
+const REVEAL_ATTEMPT_LIMIT = 10
+const REVEAL_ATTEMPT_WINDOW_MS = 5 * 60_000
 const CREDENTIAL_STATUS_FILTERS: ReadonlySet<string> = new Set(['active', 'revoked'])
 
 /**
  * 创建凭据库服务。
- * @param deps 数据库连接与加解密器。
- * @returns 凭据创建、列表、详情、轮换、撤销、项目授权与使用记录用例。
- * @remarks 所有返回视图只含元数据与掩码；明文仅用于加密，不进入响应、活动与使用记录。
+ * @param deps 数据库连接、加解密器与会话密码校验依赖。
+ * @returns 凭据创建、列表、详情、轮换、撤销、项目授权、使用记录与明文查看用例。
+ * @remarks 列表和详情只含元数据与掩码；明文只在密码二次确认后的查看响应中出现，
+ * 不进入日志、活动或使用记录。查看动作本身会写入审计记录。
  */
 export function createCredentialsService(deps: CredentialsServiceDeps) {
   const { db } = deps
@@ -504,6 +523,98 @@ export function createCredentialsService(deps: CredentialsServiceDeps) {
     return toPageResult(rows.map(toCredentialUsageView), filters.page, filters.pageSize, total)
   }
 
+  /** 记录一次明文查看尝试；只写引用、版本与结果，不写密码或明文。 */
+  async function recordRevealAttempt(
+    record: { id: string; team_id: string; current_version: number },
+    actorUserId: string,
+    result: 'denied' | 'expired',
+    errorCode: ErrorCode,
+  ) {
+    await insertCredentialUsage(db, {
+      id: randomUUID(),
+      teamId: record.team_id,
+      credentialId: record.id,
+      credentialVersion: record.current_version,
+      projectId: null,
+      environment: null,
+      action: 'reveal',
+      actorUserId,
+      result,
+      errorCode,
+    })
+  }
+
+  /**
+   * 输入本人登录密码后查看凭据当前版本明文。
+   * @param actor 当前操作身份；必须是登录会话，API Token 被拒绝。
+   * @param credentialId 凭据标识。
+   * @param input 本次输入的登录密码与原始请求头；密码只用于校验，不落库。
+   * @returns 当前版本明文、版本号与查看时间；明文只在本次响应出现。
+   * @throws 无权限或非会话身份抛 FORBIDDEN；密码错误抛 PASSWORD_INVALID；
+   * 尝试过于频繁抛 RATE_LIMITED；凭据已撤销或过期抛 CREDENTIAL_UNAVAILABLE。
+   * @remarks 成功与失败尝试都写入使用记录，成功查看同时写入活动；两者都不包含明文。
+   */
+  async function revealCredentialValue(
+    actor: Actor,
+    credentialId: string,
+    input: RevealCredentialInput,
+  ): Promise<CredentialRevealView> {
+    // 二次密码确认依赖登录会话；API Token 不能代替用户本人确认。
+    if (actor.credential !== 'session') {
+      throw new ApiError(ERROR_CODES.FORBIDDEN, '查看凭据值需要登录会话，不能使用 API Token')
+    }
+    const record = await requireCredential(credentialId)
+    const membership = await requireTeamMember(db, actor.user.id, record.team_id, [...CREDENTIAL_VALUE_VIEW_ROLES])
+    // 开发者只能查看已授权条目的明文，与管理端可见范围保持一致。
+    if (membership.role === 'developer' && (await countActiveGrants(db, credentialId)) === 0) {
+      throw new ApiError(ERROR_CODES.FORBIDDEN, '无权查看该凭据')
+    }
+    const since = new Date(Date.now() - REVEAL_ATTEMPT_WINDOW_MS)
+    if ((await countRecentCredentialRevealAttempts(db, actor.user.id, since)) >= REVEAL_ATTEMPT_LIMIT) {
+      throw new ApiError(ERROR_CODES.RATE_LIMITED, '查看凭据值过于频繁，请稍后再试')
+    }
+    if (!(await deps.verifyPassword(input.headers, input.password))) {
+      await recordRevealAttempt(record, actor.user.id, 'denied', ERROR_CODES.PASSWORD_INVALID)
+      throw new ApiError(ERROR_CODES.PASSWORD_INVALID, '登录密码错误，无法查看凭据值')
+    }
+    const now = new Date()
+    if (record.status !== 'active' || (record.expires_at !== null && record.expires_at.getTime() <= now.getTime())) {
+      await recordRevealAttempt(record, actor.user.id, 'expired', ERROR_CODES.CREDENTIAL_UNAVAILABLE)
+      throw new ApiError(ERROR_CODES.CREDENTIAL_UNAVAILABLE, '凭据已撤销或已过期')
+    }
+    const version = await findCredentialVersionCiphertext(db, credentialId, record.current_version)
+    if (!version) throw new Error('数据库缺少凭据当前版本密文')
+    const value = deps.cipher.decrypt({
+      ciphertext: version.ciphertext,
+      iv: version.iv,
+      authTag: version.auth_tag,
+      keyVersion: version.key_version,
+    })
+    await db.transaction(async (tx) => {
+      await insertCredentialUsage(tx, {
+        id: randomUUID(),
+        teamId: record.team_id,
+        credentialId,
+        credentialVersion: record.current_version,
+        projectId: null,
+        environment: null,
+        action: 'reveal',
+        actorUserId: actor.user.id,
+        result: 'success',
+        errorCode: null,
+      })
+      await appendActivity(tx, {
+        teamId: record.team_id,
+        entityType: 'credential',
+        entityId: credentialId,
+        action: 'credential_revealed',
+        actorUserId: actor.user.id,
+        changes: { version: record.current_version },
+      })
+    })
+    return { value, version: record.current_version, revealedAt: now.toISOString() }
+  }
+
   return {
     createCredential,
     listCredentials: listTeamCredentials,
@@ -513,5 +624,6 @@ export function createCredentialsService(deps: CredentialsServiceDeps) {
     grantProject,
     revokeProjectGrant,
     listUsage,
+    revealCredentialValue,
   }
 }

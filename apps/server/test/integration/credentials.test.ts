@@ -560,6 +560,16 @@ test('凭据库与环境变量：加密、授权、轮换、撤销、过期阻�
     .from(credentialUsage)
     .where(and(eq(credentialUsage.credential_id, credentialId), eq(credentialUsage.result, 'expired')))
   assert.ok(expiredUsage.length >= 1)
+  // 过期凭据即使密码正确也不能查看明文，并留下过期审计。
+  expectFailure(
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: { password: admin.password },
+      headers: { cookie: admin.cookie },
+    }),
+    'CREDENTIAL_UNAVAILABLE',
+  )
 
   // 清除期限后继续验证撤销流程。
   await app.db
@@ -568,7 +578,149 @@ test('凭据库与环境变量：加密、授权、轮换、撤销、过期阻�
     .where(eq(credential.id, credentialId))
   assert.equal((await findRefVariable())?.status, 'active')
 
-  // 12. 撤销凭据：后续引用被阻断，相关环境变量显示失效，历史使用记录保留。
+  // 12. 明文查看：必须输入登录密码；管理员与开发者可用，其他身份与 API Token 被拒绝。
+  const revealResponse = await app.inject({
+    method: 'POST',
+    url: `/api/v1/credentials/${credentialId}/reveal-value`,
+    payload: { password: admin.password },
+    headers: { cookie: admin.cookie },
+  })
+  const revealView = expectSuccess(revealResponse)
+  assert.equal(revealView.value, rotatedValue)
+  assert.equal(revealView.version, 2)
+  assert.equal(typeof revealView.revealedAt, 'string')
+  assert.equal(revealResponse.headers['cache-control'], 'no-store')
+  assert.equal(revealResponse.headers['pragma'], 'no-cache')
+  assertNoPlaintext(
+    await app.inject({
+      method: 'GET',
+      url: `/api/v1/credentials/${credentialId}/usage`,
+      headers: { cookie: admin.cookie },
+    }),
+    secretValues,
+  )
+
+  // 密码错误不返回明文，写入拒绝审计，弹窗可继续尝试。
+  const wrongPasswordResponse = await app.inject({
+    method: 'POST',
+    url: `/api/v1/credentials/${credentialId}/reveal-value`,
+    payload: { password: 'wrong-password-123' },
+    headers: { cookie: admin.cookie },
+  })
+  expectFailure(wrongPasswordResponse, 'PASSWORD_INVALID')
+  assertNoPlaintext(wrongPasswordResponse, secretValues)
+  const deniedReveals = await app.db
+    .select()
+    .from(credentialUsage)
+    .where(
+      and(
+        eq(credentialUsage.credential_id, credentialId),
+        eq(credentialUsage.action, 'reveal'),
+        eq(credentialUsage.result, 'denied'),
+      ),
+    )
+  assert.equal(deniedReveals.length, 1)
+  assert.equal(deniedReveals[0]?.error_code, 'PASSWORD_INVALID')
+
+  // 开发者可查看已授权条目的明文，不能查看未授权条目。
+  const developerReveal = expectSuccess(
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: { password: developer.password },
+      headers: { cookie: developer.cookie },
+    }),
+  )
+  assert.equal(developerReveal.value, rotatedValue)
+  expectFailure(
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${ungrantedCredentialId}/reveal-value`,
+      payload: { password: developer.password },
+      headers: { cookie: developer.cookie },
+    }),
+    'FORBIDDEN',
+  )
+
+  // 浏览者、外团队管理员被拒绝，且不触发密码校验。
+  for (const cookie of [viewer.cookie, outsider.cookie]) {
+    expectFailure(
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/credentials/${credentialId}/reveal-value`,
+        payload: { password: 'any-password-123' },
+        headers: { cookie },
+      }),
+      'FORBIDDEN',
+    )
+  }
+
+  // API Token 不能代替用户本人输入密码。
+  const revealToken = expectSuccess(
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/me/tokens',
+      payload: { name: '明文查看测试 Token' },
+      headers: { cookie: admin.cookie },
+    }),
+  ).token as string
+  expectFailure(
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: { password: admin.password },
+      headers: { authorization: `Bearer ${revealToken}` },
+    }),
+    'FORBIDDEN',
+  )
+
+  // 同一用户 5 分钟内超过 10 次尝试会被限流，避免暴力猜密码。
+  const rateLimitUser = await createAuthenticatedUser(app, { name: '限流测试管理员' })
+  await app.db
+    .insert(teamMember)
+    .values({ id: randomUUID(), team_id: teamId, user_id: rateLimitUser.userId, role: 'admin', status: 'active' })
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    expectFailure(
+      await app.inject({
+        method: 'POST',
+        url: `/api/v1/credentials/${credentialId}/reveal-value`,
+        payload: { password: 'wrong-password-123' },
+        headers: { cookie: rateLimitUser.cookie },
+      }),
+      'PASSWORD_INVALID',
+    )
+  }
+  expectFailure(
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: { password: rateLimitUser.password },
+      headers: { cookie: rateLimitUser.cookie },
+    }),
+    'RATE_LIMITED',
+  )
+
+  // 查看动作写入活动审计，审计内容不含明文；列表与详情仍只返回掩码。
+  const revealActivities = await app.db
+    .select()
+    .from(activity)
+    .where(
+      and(
+        eq(activity.entity_type, 'credential'),
+        eq(activity.entity_id, credentialId),
+        eq(activity.action, 'credential_revealed'),
+      ),
+    )
+  assert.ok(revealActivities.length >= 1)
+  assert.equal(JSON.stringify(revealActivities).includes(rotatedValue), false)
+  const detailAfterReveal = await app.inject({
+    method: 'GET',
+    url: `/api/v1/teams/${teamId}/credentials/${credentialId}`,
+    headers: { cookie: admin.cookie },
+  })
+  assertCredentialViewMasked(detailAfterReveal, expectSuccess(detailAfterReveal), secretValues)
+
+  // 13. 撤销凭据：后续引用被阻断，相关环境变量显示失效，历史使用记录保留。
   expectSuccess(
     await app.inject({
       method: 'POST',
@@ -608,16 +760,27 @@ test('凭据库与环境变量：加密、授权、轮换、撤销、过期阻�
     }),
     'INVALID_TRANSITION',
   )
+  // 撤销后即使密码正确也不能查看明文。
+  expectFailure(
+    await app.inject({
+      method: 'POST',
+      url: `/api/v1/credentials/${credentialId}/reveal-value`,
+      payload: { password: admin.password },
+      headers: { cookie: admin.cookie },
+    }),
+    'CREDENTIAL_UNAVAILABLE',
+  )
   // 撤销不删除历史版本与使用记录。
   assert.equal(
     (await app.db.select().from(credentialVersion).where(eq(credentialVersion.credential_id, credentialId))).length,
     2,
   )
 
-  // 13. 使用记录：管理员可看全部，开发者只看到已授权项目范围，均不含明文。
+  // 14. 使用记录：管理员可看全部，开发者只看到已授权项目范围，均不含明文。
+  // 明文查看会追加审计记录，这里放大分页以覆盖全部动作。
   const usageResponse = await app.inject({
     method: 'GET',
-    url: `/api/v1/credentials/${credentialId}/usage`,
+    url: `/api/v1/credentials/${credentialId}/usage?pageSize=100`,
     headers: { cookie: admin.cookie },
   })
   const usageData = expectSuccess(usageResponse)
@@ -653,7 +816,7 @@ test('凭据库与环境变量：加密、授权、轮换、撤销、过期阻�
     'FORBIDDEN',
   )
 
-  // 14. 环境变量更新使用乐观锁，改名/改值写活动但不记录取值。
+  // 15. 环境变量更新使用乐观锁，改名/改值写活动但不记录取值。
   const updateAppName = expectSuccess(
     await app.inject({
       method: 'POST',
@@ -702,7 +865,7 @@ test('凭据库与环境变量：加密、授权、轮换、撤销、过期阻�
     '删除后列表不得再出现该变量',
   )
 
-  // 15. 跨团队凭据引用被拒绝：其他团队凭据不能进入本项目环境变量。
+  // 16. 跨团队凭据引用被拒绝：其他团队凭据不能进入本项目环境变量。
   const otherCredentialResponse = await app.inject({
     method: 'POST',
     url: `/api/v1/teams/${otherTeamId}/credentials`,
@@ -725,7 +888,7 @@ test('凭据库与环境变量：加密、授权、轮换、撤销、过期阻�
     'CREDENTIAL_NOT_GRANTED',
   )
 
-  // 16. 数据库保证密钥引用不复制值；活动与使用记录均不含明文。
+  // 17. 数据库保证密钥引用不复制值；活动与使用记录均不含明文。
   const refRow = await app.db.select().from(projectEnvVar).where(eq(projectEnvVar.id, refVariableId))
   assert.equal(refRow[0]?.value_text, null)
   assert.equal(refRow[0]?.credential_id, credentialId)

@@ -1,6 +1,8 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
+import { ApiError } from '../../platform/http/errors.ts'
+import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { success } from '../../platform/http/response.ts'
-import { requireActor } from '../identity/identity.actor.ts'
+import { requireActor, resolveActor } from '../identity/identity.actor.ts'
 import type { ConfigurationService } from './configuration.service.ts'
 import {
   createCredentialBodySchema,
@@ -11,6 +13,7 @@ import {
   credentialListResponseSchema,
   credentialParamsSchema,
   credentialResponseSchema,
+  credentialRevealResponseSchema,
   teamCredentialParamsSchema,
   credentialUsageListResponseSchema,
   envVarListResponseSchema,
@@ -19,6 +22,7 @@ import {
   grantCredentialBodySchema,
   projectEnvironmentParamsSchema,
   removeEnvVarBodySchema,
+  revealCredentialBodySchema,
   revokeCredentialBodySchema,
   revokeGrantBodySchema,
   rotateCredentialBodySchema,
@@ -31,7 +35,7 @@ import {
 /**
  * 团队凭据库与项目环境变量路由。
  * @remarks 只使用 GET/POST；所有响应为 HTTP 200 统一信封，权限校验在 service 层完成。
- * 凭据明文只在创建与轮换请求体出现，响应只返回元数据与掩码。
+ * 凭据明文只在创建/轮换请求体与密码二次确认后的查看响应中出现；列表和详情只返回元数据与掩码。
  */
 export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: ConfigurationService }> = async (
   app,
@@ -157,6 +161,31 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
           request.params.projectId,
           request.body,
         ),
+        request.id,
+      )
+    },
+  )
+
+  app.post(
+    '/credentials/:credentialId/reveal-value',
+    {
+      schema: {
+        params: credentialParamsSchema,
+        body: revealCredentialBodySchema,
+        response: { 200: credentialRevealResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const actor = await resolveActor(request.server.auth, request.server.tokenService, request.headers)
+      if (!actor) throw new ApiError(ERROR_CODES.UNAUTHENTICATED, '请先登录或提供有效 API Token')
+      // 明文响应禁止任何层缓存，避免通过代理或浏览器历史再次取到。
+      reply.header('cache-control', 'no-store')
+      reply.header('pragma', 'no-cache')
+      return success(
+        await credentials.revealCredentialValue(actor, request.params.credentialId, {
+          password: request.body.password,
+          headers: request.headers,
+        }),
         request.id,
       )
     },

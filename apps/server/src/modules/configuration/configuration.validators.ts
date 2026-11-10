@@ -14,7 +14,8 @@ export type EnvVarKind = 'plain' | 'credential_ref'
 /** 环境变量状态：引用失效时为 invalid。 */
 export type EnvVarStatus = 'active' | 'invalid'
 /** 凭据与使用记录动作。 */
-export type CredentialUsageAction = 'use' | 'create' | 'rotate' | 'revoke' | 'grant' | 'revoke_grant' | 'read_metadata'
+export type CredentialUsageAction =
+  'use' | 'create' | 'rotate' | 'revoke' | 'grant' | 'revoke_grant' | 'read_metadata' | 'reveal'
 /** 凭据使用结果；失败不保存密钥值。 */
 export type CredentialUsageResult = 'success' | 'denied' | 'expired' | 'failed'
 
@@ -31,6 +32,7 @@ const USAGE_ACTIONS: ReadonlySet<string> = new Set([
   'grant',
   'revoke_grant',
   'read_metadata',
+  'reveal',
 ])
 const USAGE_RESULTS: ReadonlySet<string> = new Set(['success', 'denied', 'expired', 'failed'])
 

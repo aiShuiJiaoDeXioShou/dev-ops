@@ -16,6 +16,7 @@ import { createGitHubAppAdapter } from '../adapters/git/github.adapter.ts'
 import { createGiteaAdapter } from '../adapters/git/gitea.adapter.ts'
 import { findGitConnectionById } from '../modules/integrations/integrations.repository.ts'
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
+import { verifySessionPassword } from '../modules/identity/identity.password.ts'
 import { createDeliveryService } from '../modules/delivery/delivery.service.ts'
 import { createProjectDashboardService } from '../modules/projects/projects.dashboard.service.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
@@ -45,7 +46,11 @@ export function createServices(
   const identity = createIdentityService({ db: database.db, auth, config, mailer })
   const tokens = createTokenService({ db: database.db })
   const configuration = config.GIT_CREDENTIAL_ENCRYPTION_KEY
-    ? createConfigurationService({ db: database.db, cipher: createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY) })
+    ? createConfigurationService({
+        db: database.db,
+        cipher: createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY),
+        verifyPassword: (headers, password) => verifySessionPassword(auth, headers, password),
+      })
     : null
   type ConnectionRow = Parameters<GitAdapterFactory>[0]
   async function buildGitAdapter(connection: ConnectionRow): Promise<GitAdapter> {

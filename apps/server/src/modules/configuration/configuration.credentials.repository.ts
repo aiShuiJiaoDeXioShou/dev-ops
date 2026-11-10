@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ilike, inArray, isNull, or } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { project } from '../projects/projects.tables.ts'
 import { credential, credentialProjectGrant, credentialUsage, credentialVersion } from './configuration.tables.ts'
@@ -419,6 +419,49 @@ export async function listCredentialUsage(db: Database, credentialId: string, fi
     db.select({ value: count() }).from(credentialUsage).where(where),
   ])
   return { rows, total: total?.value ?? 0 }
+}
+
+/**
+ * 按凭据与版本号读取该版本的密文材料。
+ * @param db 数据库连接。
+ * @param credentialId 凭据标识。
+ * @param version 凭据版本号。
+ * @returns 当前版本的密文、初始化向量、认证标签与密钥版本；不存在时返回 null。
+ * @remarks 仅供服务端解密使用，不得把返回值放入接口响应或日志。
+ */
+export async function findCredentialVersionCiphertext(db: Database, credentialId: string, version: number) {
+  const [row] = await db
+    .select({
+      ciphertext: credentialVersion.ciphertext,
+      iv: credentialVersion.iv,
+      auth_tag: credentialVersion.auth_tag,
+      key_version: credentialVersion.key_version,
+    })
+    .from(credentialVersion)
+    .where(and(eq(credentialVersion.credential_id, credentialId), eq(credentialVersion.version, version)))
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * 统计指定用户在时间窗内的明文查看尝试次数，供二次验证限流。
+ * @param db 数据库连接。
+ * @param actorUserId 发起查看的用户标识。
+ * @param since 统计起点，包含该时间之后写入的尝试记录。
+ * @returns 成功与失败的明文查看尝试总数。
+ */
+export async function countRecentCredentialRevealAttempts(db: Database, actorUserId: string, since: Date) {
+  const [row] = await db
+    .select({ value: count() })
+    .from(credentialUsage)
+    .where(
+      and(
+        eq(credentialUsage.actor_user_id, actorUserId),
+        eq(credentialUsage.action, 'reveal'),
+        gte(credentialUsage.created_at, since),
+      ),
+    )
+  return row?.value ?? 0
 }
 
 /** 查询凭据最近使用记录，供详情页展示使用摘要。 */

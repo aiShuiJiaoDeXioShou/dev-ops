@@ -134,6 +134,13 @@
       "when": 1794296278355,
       "tag": "0018_skill_file_package",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794302080957,
+      "tag": "0019_nasty_wendigo",
+      "breakpoints": true
     }
   ]
 }

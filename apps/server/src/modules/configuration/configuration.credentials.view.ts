@@ -12,7 +12,7 @@ import {
   type Environment,
 } from './configuration.validators.ts'
 
-/** 响应中固定返回的掩码，真实值永不进入接口。 */
+/** 列表与详情固定返回的掩码；真实值只在密码二次确认后的查看接口单独返回。 */
 const MASKED_CREDENTIAL_VALUE = '••••••••'
 
 /** 凭据元数据行投影；密文保存在版本表，本投影不含密文。 */
@@ -92,6 +92,13 @@ export interface CredentialUsageView {
 /** 凭据详情视图：在元数据之外附带最近使用摘要。 */
 export interface CredentialDetailView extends CredentialView {
   recentUsage: CredentialUsageView[]
+}
+
+/** 明文查看视图：仅在通过二次密码确认后返回一次，不进入列表、详情或审计记录。 */
+export interface CredentialRevealView {
+  value: string
+  version: number
+  revealedAt: string
 }
 
 /**
