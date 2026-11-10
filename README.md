@@ -16,6 +16,8 @@ GitHub App 授权、成员与 Bot 的权限和凭据、统一 Git 接口及执�
 
 Git 连接、仓库/PR 读取与自研流水线的分层结构见[Git、PR 与流水线架构](docs/architecture/code-pr-pipeline-architecture.md)，含 Mermaid 组件图与时序图。
 
+独立 Bot、会话、任务、Agent 执行与平台 API 隔离的建议见 [Bots 独立子系统架构草案](docs/architecture/bots-architecture.md)，包含开源参考、权限边界、恢复机制与实施顺序。
+
 前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。V0.1 后端、共享 API 客户端与认证流程已实现；前端页面由 UI 线程按任务继续接入。
 
 界面与主要操作可查看 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](docs/desgin/interactive-prototype-v1/README.md)。
