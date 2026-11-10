@@ -7,7 +7,7 @@
 - `apps/web/`：React、TypeScript、Vite 前端；`src/app/` 组装应用，`pages/` 组合页面，`features/` 按业务组织，`shared/` 提供公共基础。
 - `apps/cli/`：Node.js、TypeScript 命令行工具；入口位于 `src/index.ts`，命令位于 `src/commands/`，测试位于 `test/`。
 - `apps/server/`：Node.js、Fastify、TypeScript 后端；`src/entrypoints/` 是进程入口，`bootstrap/` 负责依赖组装。
-- `apps/server/src/modules/`：业务模块；当前包含 identity、projects、requirements、bugs、code、collaboration、configuration、integrations、health。
+- `apps/server/src/modules/`：业务模块；当前包含 identity、projects、requirements、bugs、code、collaboration、delivery、configuration、integrations、knowledge、health。
 - `apps/server/src/platform/`：进程配置、HTTP 公共能力、数据库连接与迁移执行器，不依赖业务模块。
 - `apps/server/src/bootstrap/database-schema.ts`：聚合模块表定义，供 Drizzle 生成迁移；`apps/server/drizzle/` 保存版本化 SQL 与元数据。
 - `packages/api-client/`：Web 和 CLI 共用的类型化客户端，类型与运行时校验器从后端 OpenAPI 生成。
