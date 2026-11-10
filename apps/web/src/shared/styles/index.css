@@ -770,3 +770,69 @@
   border-radius: 10px;
   background: #fff;
 }
+
+/* 项目设置弹窗中的基础信息与代码仓库分组。 */
+.project-settings-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.settings-divider {
+  height: 1px;
+  background: var(--line);
+  margin-bottom: 20px;
+}
+.settings-section-title {
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.project-settings-sections .repo-settings {
+  gap: 14px;
+}
+.project-settings-sections .repo-settings .card {
+  padding: 16px;
+}
+
+/* 代码页不再额外套 catalog padding；压缩 Git 条与标题间距。 */
+.code-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 2px;
+}
+.code-page .git-strip {
+  margin-bottom: 18px;
+}
+.code-page .section-heading {
+  margin-bottom: 14px;
+}
+.code-page .file-browser {
+  flex: 1;
+  min-height: 0;
+}
+.code-page .file-tree {
+  padding: 10px 8px;
+}
+.code-page .file {
+  padding: 8px;
+}
+.tree-caret {
+  width: 0;
+  height: 0;
+  flex-shrink: 0;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 4px solid var(--quiet);
+  transition: transform 0.12s ease;
+}
+.file.directory.expanded .tree-caret {
+  transform: rotate(90deg);
+}
+.file.directory {
+  color: var(--muted);
+}
+.code-page .file .icon {
+  width: 15px;
+  height: 15px;
+}

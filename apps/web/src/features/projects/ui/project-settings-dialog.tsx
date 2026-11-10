@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/public'
+import { RepositoryPicker } from '@/features/code/public'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectQueryOptions } from '../api/queries'
@@ -27,7 +28,7 @@ export function ProjectSettingsDialog({
       <DialogContent className="w-[min(640px,calc(100vw-32px))]">
         <DialogHeader>
           <DialogTitle>项目设置</DialogTitle>
-          <DialogDescription>修改项目资料、负责人和状态；代码仓库在“代码”页管理。</DialogDescription>
+          <DialogDescription>修改项目资料、负责人和状态，并管理代码仓库与 Git 连接。</DialogDescription>
         </DialogHeader>
         {project.isPending ? (
           <PageSkeleton />
@@ -39,12 +40,19 @@ export function ProjectSettingsDialog({
             </button>
           </div>
         ) : (
-          <ProjectSettingsForm
-            project={project.data.data}
-            readOnly={!canManage}
-            onCancel={() => onOpenChange(false)}
-            onSaved={() => onOpenChange(false)}
-          />
+          <div className="project-settings-sections">
+            <ProjectSettingsForm
+              project={project.data.data}
+              readOnly={!canManage}
+              onCancel={() => onOpenChange(false)}
+              onSaved={() => onOpenChange(false)}
+            />
+            <section>
+              <div className="settings-divider" />
+              <h3 className="settings-section-title">代码仓库</h3>
+              <RepositoryPicker projectId={projectId} teamId={project.data.data.teamId} canManage={canManage} />
+            </section>
+          </div>
         )}
       </DialogContent>
     </Dialog>
