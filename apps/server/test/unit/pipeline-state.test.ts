@@ -100,7 +100,10 @@ test('日志与错误脱敏覆盖令牌、连接串与已知明文密钥', () =>
     false,
   )
   assert.equal(maskErrorMessage('  '), null)
+  assert.equal(maskErrorMessage(''), null)
   assert.equal(maskErrorMessage('token=abc'), 'token=***')
+  assert.equal(maskErrorMessage('runtime-secret-value', ['runtime-secret-value']), '***')
+  assert.equal(maskErrorMessage('  runtime-secret-value  ', ['runtime-secret-value']), '***')
 })
 
 test('触发输入摘要按字段名脱敏且限制长度', () => {

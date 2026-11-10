@@ -53,15 +53,19 @@ export function maskSensitiveText(text: string, knownSecrets: readonly string[] 
 }
 
 /**
- * 脱敏错误摘要；错误消息可能包含 Git 凭据或连接串。
+ * 脱敏错误摘要；错误消息可能包含 Git 凭据、连接串或运行时密钥。
  * @param message 原始错误消息。
- * @returns 脱敏并截断后的消息；空值返回 null。
+ * @param knownSecrets 已知明文密钥，用于按原文脱敏。
+ * @returns 脱敏并截断后的消息；null/空字符串/纯空白返回 null，避免详情出现空白说明。
  */
-export function maskErrorMessage(message: string | null | undefined): string | null {
+export function maskErrorMessage(
+  message: string | null | undefined,
+  knownSecrets: readonly string[] = [],
+): string | null {
   if (message === null || message === undefined) return null
   const trimmed = message.trim()
   if (trimmed.length === 0) return null
-  return maskSensitiveText(trimmed)
+  return maskSensitiveText(trimmed, knownSecrets)
 }
 
 /**

@@ -687,7 +687,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       cancelRequestedAt,
       cancelRequestedByUserId: actor.id,
       errorCode: 'CANCELLED',
-      errorMessage: reason.length > 0 ? maskErrorMessage(reason) : '用户取消',
+      errorMessage: maskErrorMessage(reason),
       ...(terminalDirectly ? { finishedAt: cancelRequestedAt } : {}),
     })
     if (!updated) throw new ApiError(ERROR_CODES.PIPELINE_STATE_CONFLICT, '运行状态已变化，请刷新后重试')

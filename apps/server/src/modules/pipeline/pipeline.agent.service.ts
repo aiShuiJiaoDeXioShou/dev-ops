@@ -43,7 +43,7 @@ import {
   updatePipelineRunStatus,
   updatePipelineRunStepStatus,
 } from './pipeline.repository.ts'
-import { maskSensitiveText } from './pipeline.mask.ts'
+import { maskErrorMessage, maskSensitiveText } from './pipeline.mask.ts'
 import { materializeRunPlan, type RunPlanTemplate } from './pipeline.planner.ts'
 import type { PipelineCredentialProvider } from './pipeline.credentials.ts'
 import {
@@ -238,7 +238,7 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
     const updated = await updatePipelineRunStatus(db, run.id, [run.status], {
       status: 'failed',
       errorCode,
-      errorMessage: maskSensitiveText(message),
+      errorMessage: maskErrorMessage(message),
       finishedAt: new Date(),
     })
     if (!updated) return
@@ -440,9 +440,7 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
       status: input.status,
       ...(input.exitCode === undefined ? {} : { exitCode: input.exitCode }),
       ...(input.errorCode === undefined ? {} : { errorCode: input.errorCode }),
-      ...(input.errorMessage === undefined
-        ? {}
-        : { errorMessage: maskSensitiveText(input.errorMessage ?? '', knownSecrets) }),
+      ...(input.errorMessage === undefined ? {} : { errorMessage: maskErrorMessage(input.errorMessage, knownSecrets) }),
       ...(input.status === 'running' ? { startedAt: step.started_at ?? now } : {}),
       ...(input.status === 'succeeded' ||
       input.status === 'failed' ||
@@ -625,7 +623,9 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
         const updated = await updatePipelineRunStatus(tx, run.id, [run.status], {
           status: targetStatus,
           errorCode,
-          errorMessage: maskSensitiveText(input.errorMessage ?? '', knownSecrets),
+          // Agent 未提供说明时保留取消/失败已有原因；两者都为空则写入 null，不写空字符串。
+          errorMessage:
+            maskErrorMessage(input.errorMessage, knownSecrets) ?? maskErrorMessage(run.error_message) ?? null,
           finishedAt: now,
         })
         if (!updated) throw new ApiError(ERROR_CODES.AGENT_LEASE_INVALID, '运行状态已变化')

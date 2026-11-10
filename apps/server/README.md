@@ -183,6 +183,8 @@ apps/server/
 
 租约领取幂等口径（P1 已知限制）：数据库只保存 `lease_token_hash`，无法重放同一明文令牌，因此**节点已有活动租约时重复领取返回 `data: null`**；Agent 首次领取响应丢失时应依赖租约过期由 Worker 收口为 `interrupted`，不重复获取已分配运行。可重放的幂等租约令牌方案（如加密暂存明文或一次性重放窗口）留待 P2 评估。契约文档 `contracts/agent-protocol.md` 由 Lead 同步该偏差。
 
+节点 os/arch 历史数据：D8 修复前注册的旧节点会保留 `unknown`，需要重新注册（或重建节点后用新注册令牌注册）才会更新为 Agent 实际上报值；新注册节点会持久化请求中的 `os`/`arch`。
+
 节点状态与注册口径：管理员停用节点时会撤销其全部令牌，因此停用后再次注册返回 `AGENT_REGISTRATION_TOKEN_INVALID`；已注册节点在停用后调用心跳返回 `AGENT_NODE_DISABLED`。日志分片与产物的 HTTP 层只保留一个宽松的协议上限（日志单分片 1 MB、产物上限 + 1 MB 缓冲），超过平台业务上限（`PIPELINE_LOG_CHUNK_MAX_BYTES` / `PIPELINE_ARTIFACT_MAX_BYTES`）时由服务层返回 `AGENT_LOG_LIMIT_EXCEEDED` / `AGENT_ARTIFACT_LIMIT_EXCEEDED`，避免被 schema 提前拦成 `VALIDATION_ERROR`。
 
 ### 错误码登记（集中定义于 platform/http/error-codes.ts）
