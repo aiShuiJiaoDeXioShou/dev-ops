@@ -1,55 +1,106 @@
-# Dev Ops CLI
+# Dev Ops CLI（devops）
 
-命令行工具使用 Node.js 和 TypeScript，提供帮助、版本和后端进程健康检查。入口是 [src/index.ts](src/index.ts)，参数解析与退出码处理位于 [src/cli.ts](src/cli.ts)，网络命令位于 [src/commands/health.ts](src/commands/health.ts)。
-
-CLI 通过共享 `@dev-ops/api-client` 调用后端，不直连 PostgreSQL。项目、PR、issue 和 bot 管理命令尚未实现。
+`devops` 是平台面向命令行、脚本与 AI/自动化工具的业务入口。它不实现登录/退出或设备授权；API Token 在 Web 个人页面创建，CLI 通过本地配置、环境变量或标准输入读取。
 
 ## 安装与运行
 
-以下命令在项目根目录执行，Node.js 版本使用根目录 `.nvmrc`，pnpm 版本由本目录 [package.json](package.json) 固定。
+在仓库根目录执行：
 
 ```bash
 nvm use
 pnpm install --frozen-lockfile
 pnpm prepare:clients
-pnpm --dir apps/cli dev --help
-pnpm --dir apps/cli dev --version
+pnpm --dir apps/cli build
+node apps/cli/dist/index.js --help
 ```
 
-后端按[后端说明](../server/README.md)启动后，可以执行：
+构建后可通过 `node apps/cli/dist/index.js` 运行；声明了 `devops` bin 的包在安装到 PATH 后也可直接执行 `devops`。
+
+## 创建并配置 API Token
+
+1. 登录 Web，点击首页头像进入 `/settings/profile`。
+2. 在“API Token”区域新建 Token（名称必填、有效期默认 90 天）。
+3. 完整 Token 只显示一次，请复制保存。
+4. 在终端配置：
 
 ```bash
-pnpm --dir apps/cli dev health
-pnpm --dir apps/cli dev health --server http://127.0.0.1:3001 --timeout 5000 --json
+devops config set server https://devops.example.com
+devops config set token          # 隐藏输入
+# 或
+printf '%s' 'devops_pat_...' | devops config set token
+
+devops config get                 # Token 掩码
+devops whoami
 ```
 
-`health` 请求服务基础地址下的 `api/v1/health`，仅检查后端进程存活，不检查数据库或其他依赖。基础地址支持反向代理前缀，例如 `https://example.com/platform` 对应 `/platform/api/v1/health`；不要将 `/api/v1` 重复写入基础地址。
+本地配置保存在 `$XDG_CONFIG_HOME/devops/config.json`（未设置时为平台配置目录），目录 0700、文件 0600、原子写。Token 与 server origin 绑定；修改 server 会清空旧 Token，需要重新设置。`config set token` 只保存已有 Token，不创建 Token。
 
-## 参数与输出
+环境变量/标准输入可用于 CI，优先级高于本地配置：
 
-| 参数 | 默认值 | 用途 |
-| --- | --- | --- |
-| `-h` / `--help` | 无参数时显示帮助 | 无需服务在线 |
-| `-v` / `--version` | 来自包版本 | 无需服务在线 |
-| `--server <地址>` | `DEV_OPS_SERVER`，未设置时为 `http://127.0.0.1:3001` | 仅允许 HTTP/HTTPS，不允许 URL 凭据、查询参数和片段 |
-| `--timeout <毫秒>` | `5000` | 整数范围为 `1-300000`，覆盖连接和读取响应体 |
-| `--json` | 关闭 | 成功时输出 `{"status":"ok"}` |
+```bash
+export DEV_OPS_SERVER=https://devops.example.com
+export DEV_OPS_TOKEN=devops_pat_...
+devops whoami --json
 
-配置优先级为命令参数、环境变量、默认值。CLI 读取当前进程的 `DEV_OPS_SERVER`，不会自动加载 `.env`，也不会自动重试或跟随 HTTP 重定向。
+printf '%s' "$DEV_OPS_TOKEN" | devops whoami --token-stdin --json
+```
 
-结果写入 stdout，错误写入 stderr。退出码为 `0`（成功）、`1`（请求或运行失败）或 `2`（参数错误）。`--json` 仅控制成功结果，失败时 stdout 为空，错误仍是中文文本。
+Token 不允许通过命令行参数传入；CLI 不刷新/撤销 Token，过期后在个人页面重新创建。
+
+## 常用命令
+
+```bash
+devops health
+devops ready
+devops whoami --json
+
+devops team list
+devops project list --search 平台 --status active
+devops project repository branches <projectId> --repository <repositoryId>
+
+devops requirement list --project <projectId>
+devops requirement get <requirementId> --json
+devops requirement submit-test <requirementId> --test-owner <userId> --scope-note "登录页" --self-test-result passed
+
+devops bug list --project <projectId>
+devops bug create --project <projectId> --title "登录失败" --phenomenon "..." --expected "..." --reproduction "..."
+
+devops git provider list
+devops git connection list
+devops project code-reference add <projectId> --repository <repositoryId> --target-type requirement --target-id <requirementId> --object-type commit --remote-id <sha>
+```
+
+### 交付上报（V0.2）
+
+```bash
+devops delivery report --project <projectId> --file ./build.json --json
+cat build.json | devops delivery report --project <projectId> --file -
+devops delivery list --project <projectId> --result-status failed --json
+devops delivery get <buildId> --json
+```
+
+`--file` 读取构建上报 JSON（项目、服务/环境可选、构建标识、版本、来源、采集时间、结果、说明、产物引用与事项关联）；重复上报按「项目＋来源＋构建标识」幂等；失败信息只写入 stderr，退出码 0/1/2。
+
+完整命令面与参数见 [CLI 契约](../../specs/002-cli-business-commands/contracts/cli-commands.md)。
+
+## 输出与退出码
+
+- 默认输出人类可读文本；`--json` 时 stdout 只包含平台成功信封。
+- 列表统一为 `{ items, page, pageSize, total }`，裸数组在 CLI 边界归一化。
+- 失败时 stdout 为空，错误写 stderr；`--json` 模式 stderr 为错误 JSON。
+- 退出码：`0` 成功，`1` 请求/业务/网络/认证/运行失败，`2` 参数/本地配置错误。
+- 危险操作非交互环境需显式 `--yes`；长文本可用 `--content-file -` 从 stdin 读取。
+- CLI 不缓存业务数据，按服务端实时权限校验。
+
+## 第三方库
+
+CLI 使用 `commander`（命令解析/帮助）、`zod`（配置与输入校验）、`@inquirer/prompts`（隐藏 Token 输入/交互确认）、`env-paths`（配置目录）、`write-file-atomic`（原子写）；HTTP 使用 Node 内置 `fetch`，测试使用 `node:test`。
 
 ## 构建与验证
 
 ```bash
 pnpm --dir apps/cli check
 pnpm --dir apps/cli build
-pnpm --dir apps/cli start --help
-node apps/cli/dist/index.js --version
 ```
 
-`check` 执行类型检查、Oxlint 和 Node 测试，测试使用临时本地 HTTP 服务，无需预先启动后端。`build` 将源码编译到 `dist/`。编译后从任意目录使用入口文件的完整路径运行即可。
-
-脚本需要读取纯 JSON 时，直接运行 `node apps/cli/dist/index.js health --json`，避免包管理器的脚本提示影响输出。包内已声明 `dev-ops` 可执行入口，但初始化不会进行全局安装或发布。
-
-新增命令时，在 `src/commands/` 实现命令，在 `src/cli.ts` 注册参数和分派逻辑，并同步更新帮助、本文档和 `test/` 中的行为测试。应用依赖在本目录声明，锁文件由根工作区统一维护。
+测试使用本地 HTTP 桩，不依赖公网或生产服务。真实 Gitea/GitHub App/邮件资源未提供时，相关端到端项标记为未验证。

@@ -1,5 +1,5 @@
-import { createHttpApp } from '../bootstrap/create-http-app.js'
-import { loadConfig } from '../platform/config/env.js'
+import { createHttpApp } from '../bootstrap/create-http-app.ts'
+import { loadConfig } from '../platform/config/env.ts'
 
 const config = loadConfig()
 const app = createHttpApp(config)
@@ -26,8 +26,12 @@ async function shutdown(signal: string) {
   }
 }
 
-process.once('SIGINT', () => { void shutdown('SIGINT') })
-process.once('SIGTERM', () => { void shutdown('SIGTERM') })
+process.once('SIGINT', () => {
+  void shutdown('SIGINT')
+})
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM')
+})
 
 try {
   await app.listen({ port: config.PORT, host: config.HOST })

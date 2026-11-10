@@ -8,10 +8,14 @@ import { apiClient } from '@/shared/api/client'
 
 describe('请求契约与错误策略', () => {
   it('HTTP 失败保留状态和请求标识，不暴露原始错误内容', async () => {
-    server.use(http.get('http://localhost/api/v1/ready', () => HttpResponse.json(
-      { message: 'SQL 和凭据等内部信息' },
-      { status: 403, headers: { 'x-request-id': 'denied-request' } },
-    )))
+    server.use(
+      http.get('http://localhost/api/v1/ready', () =>
+        HttpResponse.json(
+          { message: 'SQL 和凭据等内部信息' },
+          { status: 403, headers: { 'x-request-id': 'denied-request' } },
+        ),
+      ),
+    )
     const request = apiClient.ready()
     await expect(request).rejects.toMatchObject({ code: 'HTTP_ERROR', status: 403, requestId: 'denied-request' })
     await expect(request).rejects.not.toHaveProperty('message', 'SQL 和凭据等内部信息')
@@ -50,10 +54,12 @@ describe('请求契约与错误策略', () => {
 
   it('错误的数据库就绪状态不会被缓存为成功结果', async () => {
     let requests = 0
-    server.use(http.get('http://localhost/api/v1/ready', () => {
-      requests += 1
-      return HttpResponse.json({ status: 'ok', database: 'invalid' })
-    }))
+    server.use(
+      http.get('http://localhost/api/v1/ready', () => {
+        requests += 1
+        return HttpResponse.json({ status: 'ok', database: 'invalid' })
+      }),
+    )
     const client = createQueryClient()
     try {
       await expect(client.fetchQuery(readinessQueryOptions)).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })

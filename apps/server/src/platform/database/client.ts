@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { sql } from 'drizzle-orm'
 import { Pool } from 'pg'
-import type { AppConfig } from '../config/env.js'
+import type { AppConfig } from '../config/env.ts'
 
 /**
  * 创建应用专属连接池和 Drizzle 客户端，连接在首次查询时建立。
@@ -22,7 +22,9 @@ export function createDatabase(config: AppConfig, onIdleError: (code: string | u
     options: '-c timezone=UTC',
     application_name: 'dev-ops-api',
   })
-  pool.on('error', (error) => { onIdleError('code' in error ? String(error.code) : undefined) })
+  pool.on('error', (error) => {
+    onIdleError('code' in error ? String(error.code) : undefined)
+  })
   const db = drizzle(pool)
 
   return {

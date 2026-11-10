@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { migrate } from 'drizzle-orm/node-postgres/migrator'
 import { Pool } from 'pg'
-import { validateDatabaseUrl } from '../config/database.js'
+import { validateDatabaseUrl } from '../config/database.ts'
 
 /**
  * 使用独立账号执行版本化 SQL 迁移，并确保连接在成功或失败后关闭。

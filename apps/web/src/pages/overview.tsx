@@ -22,7 +22,13 @@ export function Component() {
           <EmptyState
             title="项目功能尚未开放"
             description="项目、需求和 Bug 管理将在后续版本接入。当前可以先查看系统连接状态。"
-            action={<Button asChild><Link to="/system/status">查看系统状态 <ArrowRight aria-hidden="true" /></Link></Button>}
+            action={
+              <Button asChild>
+                <Link to="/system/status">
+                  查看系统状态 <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+            }
           />
         </CardContent>
       </Card>

@@ -1,4 +1,4 @@
-import { migrateDatabase } from '../platform/database/migrate.js'
+import { migrateDatabase } from '../platform/database/migrate.ts'
 
 try {
   const connectionString = process.env.MIGRATION_DATABASE_URL

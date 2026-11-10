@@ -8,6 +8,118 @@
       "when": 1793876018442,
       "tag": "0000_initialize_app_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794245001718,
+      "tag": "0001_identity_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794245211945,
+      "tag": "0002_collaboration",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794245332049,
+      "tag": "0003_identity_teams",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794245684135,
+      "tag": "0004_projects",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794245810265,
+      "tag": "0005_requirements",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794246040747,
+      "tag": "0006_bugs",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794246283429,
+      "tag": "0007_requirement_test_submissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794246460102,
+      "tag": "0008_idempotency",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794246501756,
+      "tag": "0009_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794246590446,
+      "tag": "0010_git_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794246712256,
+      "tag": "0011_code_references",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794255052281,
+      "tag": "0012_add_list_updated_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794291272221,
+      "tag": "0013_good_loners",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794292170166,
+      "tag": "0014_peaceful_shooting_star",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1794293209144,
+      "tag": "0015_clammy_star_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794293495400,
+      "tag": "0016_configuration_comments",
+      "breakpoints": true
     }
   ]
 }

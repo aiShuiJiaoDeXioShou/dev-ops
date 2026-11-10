@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter } from 'react-router'
 import { createAppRoutes } from '@/app/router/routes'
+import '@/prototype/styles/layered.css'
 import './shared/styles/index.css'
 import App from './app/providers/application.tsx'
 

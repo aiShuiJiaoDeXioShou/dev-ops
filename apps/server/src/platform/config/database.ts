@@ -8,8 +8,13 @@
 export function validateDatabaseUrl(value: string, name: string): void {
   try {
     const url = new URL(value)
-    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname
-      || !url.pathname.slice(1) || url.pathname.slice(1).includes('/') || url.hash) {
+    if (
+      !['postgres:', 'postgresql:'].includes(url.protocol) ||
+      !url.hostname ||
+      !url.pathname.slice(1) ||
+      url.pathname.slice(1).includes('/') ||
+      url.hash
+    ) {
       throw new Error('连接地址格式错误')
     }
   } catch {

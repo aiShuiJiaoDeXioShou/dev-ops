@@ -7,11 +7,11 @@ import { test } from 'node:test'
 import { eq, sql } from 'drizzle-orm'
 import { bigint, text } from 'drizzle-orm/pg-core'
 import { Client } from 'pg'
-import { createHttpApp } from '../../src/bootstrap/create-http-app.js'
-import { loadConfig } from '../../src/platform/config/env.js'
-import { createDatabase } from '../../src/platform/database/client.js'
-import { migrateDatabase } from '../../src/platform/database/migrate.js'
-import { appSchema } from '../../src/platform/database/namespace.js'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import { loadConfig } from '../../src/platform/config/env.ts'
+import { createDatabase } from '../../src/platform/database/client.ts'
+import { migrateDatabase } from '../../src/platform/database/migrate.ts'
+import { appSchema } from '../../src/platform/database/namespace.ts'
 
 // 此表仅在随机命名的测试库中创建，不写入业务 schema 或正式迁移。
 const record = appSchema.table('integration_record', {
@@ -24,7 +24,11 @@ test('PostgreSQL 真实迁移、权限、事务和后端生命周期', { timeout
   t.after(async () => {
     const errors: unknown[] = []
     for (const dispose of cleanup.reverse()) {
-      try { await dispose() } catch (error) { errors.push(error) }
+      try {
+        await dispose()
+      } catch (error) {
+        errors.push(error)
+      }
     }
     if (errors.length > 0) throw new AggregateError(errors, '测试资源清理失败')
   })
@@ -44,11 +48,15 @@ test('PostgreSQL 真实迁移、权限、事务和后端生命周期', { timeout
   const admin = new Client({
     host: runtimeUrl.hostname,
     port: Number(runtimeUrl.port || '5432'),
-    user: 'postgres', password: adminPassword, database: 'postgres',
+    user: 'postgres',
+    password: adminPassword,
+    database: 'postgres',
     connectionTimeoutMillis: 5_000,
   })
   await admin.connect()
-  cleanup.push(async () => { await admin.end() })
+  cleanup.push(async () => {
+    await admin.end()
+  })
   // 数据库名只来自固定前缀及随机十六进制字符，不接收外部输入。
   await admin.query(`CREATE DATABASE "${databaseName}" OWNER dev_ops_migrator`)
   cleanup.push(async () => {
@@ -61,16 +69,27 @@ test('PostgreSQL 真实迁移、权限、事务和后端生命周期', { timeout
 
   const owner = new Client({ connectionString: migrationUrl.href, connectionTimeoutMillis: 5_000 })
   await owner.connect()
-  cleanup.push(async () => { await owner.end() })
+  cleanup.push(async () => {
+    await owner.end()
+  })
   const config = loadConfig({
-    NODE_ENV: 'test', LOG_LEVEL: 'silent', DATABASE_URL: runtimeUrl.href,
-    DB_STATEMENT_TIMEOUT_MS: '500', DB_LOCK_TIMEOUT_MS: '50',
+    NODE_ENV: 'test',
+    LOG_LEVEL: 'silent',
+    DATABASE_URL: runtimeUrl.href,
+    DB_STATEMENT_TIMEOUT_MS: '500',
+    DB_LOCK_TIMEOUT_MS: '50',
+    AUTH_SECRET: 'test-secret-at-least-32-characters-long',
   })
   const app = createHttpApp(config)
-  cleanup.push(async () => { await app.close() })
+  cleanup.push(async () => {
+    await app.close()
+  })
 
   await t.test('空库就绪失败，迁移成功后返回 200，重复迁移不重复记录', async () => {
-    assert.equal((await app.inject('/api/v1/ready')).statusCode, 503)
+    const notReady = await app.inject('/api/v1/ready')
+    assert.equal(notReady.statusCode, 200)
+    assert.equal(notReady.json().success, false)
+    assert.equal(notReady.json().code, 'DATABASE_UNAVAILABLE')
     assert.equal((await app.inject('/api/v1/health')).statusCode, 200)
     await migrateDatabase(migrationUrl.href)
     const before = await owner.query('SELECT count(*)::int AS count FROM drizzle.__drizzle_migrations')
@@ -80,7 +99,8 @@ test('PostgreSQL 真实迁移、权限、事务和后端生命周期', { timeout
     assert.equal(after.rows[0].count, before.rows[0].count)
     const response = await app.inject('/api/v1/ready')
     assert.equal(response.statusCode, 200)
-    assert.deepEqual(response.json(), { status: 'ok', database: 'ok' })
+    assert.equal(response.json().success, true)
+    assert.deepEqual(response.json().data, { status: 'ok', database: 'ok' })
   })
 
   await t.test('迁移后的已有数据可保留，后续表自动获得应用读写权限', async () => {
@@ -122,26 +142,39 @@ test('PostgreSQL 真实迁移、权限、事务和后端生命周期', { timeout
       await mkdir(join(folder, 'meta'))
       const history = await owner.query('SELECT max(created_at) AS latest FROM drizzle.__drizzle_migrations')
       const timestamp = Number(history.rows[0].latest) + 1
-      await writeFile(join(folder, 'meta/_journal.json'), JSON.stringify({
-        version: '7', dialect: 'postgresql', entries: [
-          { idx: 0, version: '7', when: timestamp, tag: 'upgrade', breakpoints: true },
-        ],
-      }))
+      await writeFile(
+        join(folder, 'meta/_journal.json'),
+        JSON.stringify({
+          version: '7',
+          dialect: 'postgresql',
+          entries: [{ idx: 0, version: '7', when: timestamp, tag: 'upgrade', breakpoints: true }],
+        }),
+      )
       await writeFile(join(folder, 'upgrade.sql'), 'ALTER TABLE app.integration_record ADD COLUMN description text;')
       await migrateDatabase(migrationUrl.href, folder)
       assert.equal((await app.db.select().from(record).where(eq(record.key, 'unique'))).length, 1)
       await app.db.execute(sql`UPDATE app.integration_record SET description = '升级成功' WHERE key = 'unique'`)
 
       // 失败用例使用独立的新迁移文件，不改写已执行迁移。
-      await writeFile(join(folder, 'meta/_journal.json'), JSON.stringify({
-        version: '7', dialect: 'postgresql', entries: [
-          { idx: 0, version: '7', when: timestamp, tag: 'upgrade', breakpoints: true },
-          { idx: 1, version: '7', when: timestamp + 1, tag: 'failure', breakpoints: true },
-        ],
-      }))
-      await writeFile(join(folder, 'failure.sql'), 'ALTER TABLE app.integration_record ADD COLUMN rollback_probe text;\n--> statement-breakpoint\nSELECT 1 / 0;')
+      await writeFile(
+        join(folder, 'meta/_journal.json'),
+        JSON.stringify({
+          version: '7',
+          dialect: 'postgresql',
+          entries: [
+            { idx: 0, version: '7', when: timestamp, tag: 'upgrade', breakpoints: true },
+            { idx: 1, version: '7', when: timestamp + 1, tag: 'failure', breakpoints: true },
+          ],
+        }),
+      )
+      await writeFile(
+        join(folder, 'failure.sql'),
+        'ALTER TABLE app.integration_record ADD COLUMN rollback_probe text;\n--> statement-breakpoint\nSELECT 1 / 0;',
+      )
       await assert.rejects(migrateDatabase(migrationUrl.href, folder))
-      const columns = await owner.query("SELECT column_name FROM information_schema.columns WHERE table_schema = 'app' AND table_name = 'integration_record' AND column_name = 'rollback_probe'")
+      const columns = await owner.query(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'app' AND table_name = 'integration_record' AND column_name = 'rollback_probe'",
+      )
       assert.equal(columns.rowCount, 0)
       const applied = await owner.query('SELECT max(created_at) AS latest FROM drizzle.__drizzle_migrations')
       assert.equal(Number(applied.rows[0].latest), timestamp)
@@ -151,10 +184,13 @@ test('PostgreSQL 真实迁移、权限、事务和后端生命周期', { timeout
   })
 
   await t.test('事务失败回滚全部写入，连接仍可继续使用', async () => {
-    await assert.rejects(app.db.transaction(async (tx) => {
-      await tx.insert(record).values({ key: 'rollback' })
-      throw new Error('模拟业务失败')
-    }), /模拟业务失败/)
+    await assert.rejects(
+      app.db.transaction(async (tx) => {
+        await tx.insert(record).values({ key: 'rollback' })
+        throw new Error('模拟业务失败')
+      }),
+      /模拟业务失败/,
+    )
     assert.equal((await app.db.select().from(record).where(eq(record.key, 'rollback'))).length, 0)
     assert.equal((await app.inject('/api/v1/ready')).statusCode, 200)
   })
@@ -210,7 +246,9 @@ test('PostgreSQL 真实迁移、权限、事务和后端生命周期', { timeout
 
   await t.test('空闲连接断开触发处理函数，连接池能重新建立连接', async () => {
     const errors: (string | undefined)[] = []
-    const database = createDatabase(config, (code) => { errors.push(code) })
+    const database = createDatabase(config, (code) => {
+      errors.push(code)
+    })
     try {
       const result = await database.db.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`)
       const pid = result.rows[0]?.pid

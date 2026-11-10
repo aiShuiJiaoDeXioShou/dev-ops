@@ -1,0 +1,304 @@
+/* V0.1 原型新增页面：认证与流程入口。沿用原型 tokens 与字体，不引入新视觉体系。 */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 44px 20px;
+  background: var(--soft);
+  color: var(--ink);
+}
+.auth-card {
+  width: min(430px, 100%);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 32px #1623400d;
+  padding: 30px 30px 26px;
+}
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.auth-brand img {
+  width: 29px;
+  height: 29px;
+  display: block;
+}
+.auth-card h1 {
+  font-size: 23px;
+  line-height: 1.3;
+  margin: 24px 0 7px;
+  letter-spacing: -0.025em;
+}
+.auth-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.auth-form {
+  display: grid;
+  gap: 15px;
+  margin-top: 23px;
+}
+.auth-form .field input,
+.auth-form .field select {
+  width: 100%;
+}
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.auth-row a,
+.auth-link {
+  color: var(--blue);
+  text-decoration: none;
+}
+.auth-row a:hover,
+.auth-link:hover {
+  text-decoration: underline;
+}
+.auth-submit {
+  width: 100%;
+  justify-content: center;
+  min-height: 38px;
+  margin-top: 3px;
+}
+.auth-footer {
+  margin: 20px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  text-align: center;
+}
+.auth-footer a {
+  color: var(--blue);
+  text-decoration: none;
+}
+.auth-demo {
+  margin-top: 18px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  background: var(--side);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.auth-demo strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.auth-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid #cde8d7;
+  background: #f3fbf6;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.auth-success .icon {
+  width: 18px;
+  height: 18px;
+  color: var(--green);
+  margin-top: 1px;
+}
+.auth-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.auth-inline .badge {
+  font-size: 11px;
+}
+.auth-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 20px 0;
+}
+.v01-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+.v01-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  background: #fff;
+  min-width: 0;
+}
+.v01-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.v01-card-head .icon {
+  width: 19px;
+  height: 19px;
+  color: var(--blue);
+}
+.v01-card h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.v01-card p {
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+.v01-card .btn {
+  align-self: flex-start;
+}
+.v01-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.v01-card-footer .small {
+  color: var(--muted);
+}
+.v01-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.v01-steps li {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 13px 14px;
+  background: #fff;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.v01-steps .step-no {
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.v01-steps strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+.v01-steps small {
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+.v01-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+.v01-page .page-head {
+  padding-top: 7px;
+}
+.v01-section-note {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+/* 登录页：保留 OpenBot 的结构与节奏，取第二版浅色风格的值：
+   浅灰蓝画布、白色登录区、产品蓝强调色、状态色小面积使用。 */
+.login-shell{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(420px,.75fr);background:#f4f6f9;color:#111318}
+.login-stage{position:relative;display:flex;flex-direction:column;min-height:100vh;overflow:hidden;padding:46px clamp(38px,5vw,76px) 34px;background:linear-gradient(150deg,#f9fafb 0%,#f1f4f9 58%,#f7f4ef 100%)}
+.login-stage::before{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(#c8d1dc 1px,transparent 1px);background-size:25px 25px;opacity:.46;mask-image:linear-gradient(180deg,#000 0%,#000 64%,transparent 100%)}
+.login-stage::after{content:"";position:absolute;left:-18%;top:-32%;width:900px;height:900px;pointer-events:none;background:radial-gradient(circle,#b9ceff30 0%,#d9e5ff14 40%,transparent 70%)}
+.login-topline{position:relative;z-index:1;display:flex;align-items:center;gap:10px}
+.login-brand{display:flex;align-items:center;gap:10px;color:#111318;text-decoration:none;font-size:18px;font-weight:600;letter-spacing:-.03em}
+.login-brand img{width:29px;height:29px;display:block}
+.login-version{margin-left:auto;border:1px solid #d9dfe7;border-radius:999px;background:#ffffff9e;padding:6px 11px;color:#7c8592;font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase}
+.login-copy{position:relative;z-index:1;margin-top:clamp(48px,8vh,96px);max-width:720px}
+.login-stage h2{margin:0;max-width:690px;color:#111318;font-size:clamp(42px,4.7vw,68px);font-weight:600;letter-spacing:-.055em;line-height:1.04}
+.login-bot-note{display:flex;flex-direction:column;align-items:flex-start;gap:13px;max-width:540px;margin-top:26px}
+.login-bot-badge{display:inline-flex;align-items:center;gap:7px;border-radius:999px;background:#e7efff;color:#2f5fce;font-size:11px;font-weight:600;letter-spacing:.01em;padding:6px 11px}
+.login-bot-badge img{width:18px;height:18px;display:block;border-radius:5px}
+.login-bot-note p{margin:0;color:#5f6875;font-size:15px;line-height:1.7}
+.login-collab{position:relative;z-index:1;width:min(620px,100%);margin-top:36px;border:1px solid #e1e6ed;border-radius:28px;background:#fff;box-shadow:0 18px 55px #2c3d570f;padding:20px 20px 17px}
+.login-collab-head{display:flex;align-items:center;gap:11px;min-width:0;padding:2px 2px 16px;border-bottom:1px solid #edf0f4}
+.login-collab-icon{width:34px;height:34px;flex-shrink:0;border-radius:10px;background:#eaf0ff;color:#4176e6;display:grid;place-items:center}
+.login-collab-icon .icon{width:18px;height:18px}
+.login-collab-name{min-width:0}
+.login-collab-name strong{display:block;color:#202631;font-size:13px;font-weight:600;letter-spacing:-.01em;line-height:1.4}
+.login-collab-name small{display:block;margin-top:2px;color:#858e99;font-size:10.5px}
+.login-collab-status{display:flex;align-items:center;gap:6px;margin-left:auto;border:1px solid #cfe7d8;border-radius:999px;background:#f0faf4;color:#2f7a50;font-size:10.5px;padding:4px 8px;white-space:nowrap}
+.login-collab-status .dot{width:5px;height:5px}
+.login-collab-avatars{display:flex;align-items:center;margin-left:6px}
+.login-collab-avatars img{width:25px;height:25px;margin-left:-6px;border:2px solid #fff;border-radius:7px;background:#fff}
+.login-collab-avatars img:first-child{margin-left:0}
+.login-collab-messages{display:flex;flex-direction:column;gap:0;padding:4px 0 2px}
+.login-message{display:flex;align-items:flex-start;gap:9px;padding:11px 2px}
+.login-message + .login-message{border-top:1px solid #f0f2f5}
+.login-message img{width:23px;height:23px;flex-shrink:0;margin-top:1px;border-radius:6px}
+.login-message strong{margin-right:7px;color:#202631;font-size:11px;font-weight:600}
+.login-message time{color:#9aa2ad;font-size:9.5px;font-variant-numeric:tabular-nums}
+.login-message p{margin:3px 0 0;color:#5f6875;font-size:11.5px;line-height:1.6}
+.login-task{display:flex;align-items:center;gap:9px;margin-top:2px;border:1px solid #e8ecf1;border-radius:12px;background:#f7f8fa;padding:10px 11px;color:#4b5563;font-size:11px}
+.login-task .icon{width:16px;height:16px;color:#4176e6}
+.login-task span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.login-task .login-task-chip{margin-left:auto;flex-shrink:0;border:1px solid #e0e5eb;border-radius:999px;background:#fff;padding:3px 7px;color:#7c8592;font-size:9.5px}
+.login-principles{position:relative;z-index:1;display:flex;align-items:center;gap:0;margin-top:auto;padding-top:26px;width:min(620px,100%);color:#7d8794;font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase}
+.login-principles li{display:flex;align-items:center;gap:8px;list-style:none;white-space:nowrap}
+.login-principles li + li::before{content:"";display:block;width:1px;height:10px;margin:0 18px;background:#d9dfe7}
+.login-principles .dot{width:5px;height:5px;border-radius:50%;background:#4176e6}
+.login-principles li:nth-child(2) .dot{background:#61c985}
+.login-principles li:nth-child(3) .dot{background:#e3b866}
+.login-side{display:grid;place-items:center;min-height:100vh;padding:40px clamp(28px,4vw,56px);border-left:1px solid #e7eaf0;background:#fff;color:#111318}
+.login-card{width:min(378px,100%);border:0;border-radius:0;background:transparent;padding:0;box-shadow:none;color:#111318}
+.login-card-brand{display:flex;align-items:center;gap:8px;color:#111318;font-size:14px;font-weight:600;letter-spacing:-.02em}
+.login-card-brand img{width:25px;height:25px;display:block}
+.login-card-brand span{margin-left:2px;color:#8b929d;font-size:10.5px;font-weight:400}
+.login-card h1{margin:32px 0 8px;font-size:25px;line-height:1.28;font-weight:600;letter-spacing:-.035em;color:#111318}
+.login-card .auth-sub{margin:0;color:#707783;font-size:12.5px;line-height:1.65}
+.login-form{margin-top:22px;gap:13px}
+.login-form .field{color:#3f4650;font-size:11.5px;font-weight:500}
+.login-form .field input{height:43px;border:1px solid #dfe3e9;border-radius:10px;background:#fff;color:#111318;font-size:13px}
+.login-form .field input::placeholder{color:#a4a9b1}
+.login-form .field input:focus{border-color:#4176e6;box-shadow:0 0 0 3px #4176e614}
+.login-form .auth-row{font-size:11px;color:#7b838f}
+.login-form .auth-row a{color:#4176e6;text-decoration:none}
+.login-form .auth-row a:hover{text-decoration:underline}
+.login-submit{display:flex;align-items:center;justify-content:center;width:100%;height:44px;margin-top:2px;border:0;border-radius:999px;background:#4176e6;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .15s ease,transform .15s ease}
+.login-submit:hover{background:#3567d8;transform:translateY(-1px)}
+.login-submit:disabled{opacity:.6;cursor:not-allowed}
+.login-invite{margin:20px 0 0;padding-top:17px;border-top:1px solid #e7eaf0;text-align:center;color:#7b838f;font-size:11.5px}
+.login-invite a{color:#4176e6;font-weight:500;text-decoration:none}
+.login-invite a:hover{text-decoration:underline}
+.login-trust{margin:18px 0 0;color:#9aa1ab;font-size:10px;line-height:1.65;text-align:center}
+.login-side-foot{position:absolute;bottom:24px;left:0;right:0;text-align:center;color:#a1a8b1;font-size:9.5px;letter-spacing:.04em}
+@media (max-width: 1080px){.login-shell{grid-template-columns:1fr}.login-stage{min-height:auto;padding:30px 24px 32px}.login-copy{margin-top:40px}.login-stage h2{font-size:clamp(36px,7vw,52px)}.login-collab{width:100%;margin-top:28px}.login-principles{margin-top:24px}.login-side{min-height:auto;border-left:0;border-top:1px solid #e7eaf0;padding:36px 24px 52px}.login-side-foot{display:none}}
+@media (max-width: 560px){.login-stage{padding:24px 18px 28px}.login-version{display:none}.login-stage h2{font-size:34px}.login-bot-note{margin-top:20px}.login-bot-note p{font-size:13px}.login-collab{padding:16px 14px 13px;border-radius:22px}.login-collab-avatars{display:none}.login-message{padding:10px 0}.login-principles{flex-wrap:wrap;row-gap:8px;font-size:9.5px;margin-top:20px;padding-top:18px}.login-principles li + li::before{margin:0 10px}.login-side{padding:28px 18px 40px}.login-card h1{margin-top:26px;font-size:23px}}

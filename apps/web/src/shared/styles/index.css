@@ -1,29 +1,31 @@
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import '@fontsource-variable/geist';
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.985 0.003 250);
-  --foreground: oklch(0.205 0.015 250);
-  --card: oklch(1 0 0);
+  --background: #ffffff;
+  --foreground: #0f1115;
+  --card: #ffffff;
   --card-foreground: var(--foreground);
-  --popover: oklch(1 0 0);
+  --popover: #ffffff;
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.44 0.09 175);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.005 250);
+  --primary: #4176e6;
+  --primary-foreground: #ffffff;
+  --secondary: #f9fafb;
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.96 0.005 250);
-  --muted-foreground: oklch(0.50 0.015 250);
-  --accent: oklch(0.96 0.005 250);
+  --muted: #f5f6f7;
+  --muted-foreground: #61666b;
+  --accent: #ebeef2;
   --accent-foreground: var(--foreground);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.006 250);
-  --input: var(--border);
-  --ring: var(--primary);
+  --destructive: #ce5252;
+  --border: rgba(15, 17, 21, 0.08);
+  --input: rgba(15, 17, 21, 0.12);
+  --ring: #4176e6;
+  --sidebar: #f9fafb;
+  --sidebar-foreground: #0f1115;
   --radius: 0.625rem;
 }
 
@@ -34,8 +36,8 @@
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
-  --primary: oklch(0.78 0.12 175);
-  --primary-foreground: oklch(0.18 0.03 175);
+  --primary: #7aa0f0;
+  --primary-foreground: #0b1220;
   --secondary: oklch(0.26 0.012 250);
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
@@ -49,7 +51,7 @@
 }
 
 @theme inline {
-  --font-sans: "Geist Variable", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans: 'Geist Variable', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-heading: var(--font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -69,6 +71,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-success: #269650;
+  --color-warning: #c98719;
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -98,4 +104,948 @@
   #root {
     min-height: 100svh;
   }
+}
+
+/* 工作区账号区：用户名与当前团队压缩为两行，避免团队状态占用侧栏顶部。 */
+.user-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+.user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--quiet);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* 公共空状态：统一使用品牌 Bot 吉祥物或线性图标，避免各页面各自拼装。 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 24px;
+  text-align: center;
+}
+.empty-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 190px;
+  height: 150px;
+  margin-bottom: 22px;
+}
+.empty-art::before {
+  position: absolute;
+  width: 158px;
+  height: 158px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(65, 118, 230, 0.12) 0%, rgba(65, 118, 230, 0.03) 52%, transparent 72%);
+  content: '';
+}
+.empty-art img {
+  position: relative;
+  z-index: 1;
+  width: 96px;
+  height: 96px;
+  filter: drop-shadow(0 10px 16px rgba(23, 36, 43, 0.08));
+}
+.empty-state .empty-orbit {
+  position: absolute;
+  width: 156px;
+  height: 62px;
+  border: 1px dashed rgba(65, 118, 230, 0.24);
+  border-radius: 50%;
+  transform: rotate(-14deg);
+}
+.empty-state .empty-orbit-dot {
+  position: absolute;
+  top: 43px;
+  right: 16px;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 4px rgba(65, 118, 230, 0.1);
+}
+.empty-art-icon .empty-mark {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  border: 1px solid rgba(65, 118, 230, 0.14);
+  border-radius: 20px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  transform: rotate(-4deg);
+}
+.empty-art-icon .empty-mark svg {
+  width: 28px;
+  height: 28px;
+}
+.empty-art-group {
+  width: 224px;
+  height: 164px;
+}
+.empty-art-group .empty-orbit {
+  width: 190px;
+  height: 72px;
+  top: 54px;
+}
+.empty-art-group .bot-main {
+  position: absolute;
+  bottom: 2px;
+  left: 68px;
+  z-index: 2;
+  width: 88px;
+  height: 88px;
+}
+.empty-art-group .bot-side {
+  position: absolute;
+  z-index: 1;
+  width: 54px;
+  height: 54px;
+  opacity: 0.9;
+}
+.empty-art-group .bot-side.left {
+  left: 12px;
+  bottom: 22px;
+  transform: rotate(-8deg);
+}
+.empty-art-group .bot-side.right {
+  right: 10px;
+  bottom: 16px;
+  transform: rotate(8deg);
+}
+.empty-art-project {
+  width: 264px;
+  height: 176px;
+}
+.empty-art-project .empty-orbit {
+  width: 224px;
+  height: 84px;
+  top: 52px;
+}
+.empty-art-project > .bot-main {
+  position: absolute;
+  bottom: 4px;
+  left: 14px;
+  z-index: 2;
+  width: 84px;
+  height: 84px;
+}
+.empty-project-preview {
+  position: absolute;
+  top: 12px;
+  right: 4px;
+  z-index: 3;
+  width: 164px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(23, 36, 43, 0.1);
+  transform: rotate(3deg);
+}
+.empty-project-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.empty-project-row:last-child {
+  border-bottom: 0;
+}
+.empty-project-folder {
+  width: 18px;
+  height: 13px;
+  border: 1.5px solid var(--blue);
+  border-radius: 3px;
+  background: var(--blue-soft);
+  flex-shrink: 0;
+}
+.empty-project-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c3c8d1;
+  flex-shrink: 0;
+}
+.empty-project-dot.green {
+  background: var(--green);
+}
+.empty-project-dot.blue {
+  background: var(--blue);
+}
+.empty-project-dot.amber {
+  background: var(--amber);
+}
+.empty-project-bar {
+  width: 72px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e9edf3;
+}
+.empty-project-bar.long {
+  width: 88px;
+}
+.empty-project-bar.short {
+  width: 54px;
+}
+.empty-state h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.empty-state p {
+  max-width: 520px;
+  margin: 10px 0 22px;
+  color: var(--quiet);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.empty-state .empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.empty-state .empty-actions .btn {
+  min-width: 104px;
+}
+@media (max-width: 640px) {
+  .empty-state {
+    padding: 40px 18px;
+  }
+  .empty-art {
+    width: 160px;
+    height: 130px;
+    margin-bottom: 12px;
+  }
+  .empty-art::before {
+    width: 132px;
+    height: 132px;
+  }
+  .empty-art img {
+    width: 82px;
+    height: 82px;
+  }
+  .empty-state .empty-orbit {
+    width: 132px;
+    height: 54px;
+  }
+  .empty-state .empty-orbit-dot {
+    top: 34px;
+    right: 8px;
+  }
+}
+
+/* 页面骨架屏：首屏与懒加载路由共用，保持与最终布局同尺寸。 */
+.skeleton-line,
+.skeleton-block {
+  background: linear-gradient(90deg, #f1f3f6 25%, #e7ebf1 37%, #f1f3f6 63%);
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.5s ease infinite;
+  border-radius: 6px;
+}
+.skeleton-line {
+  display: block;
+  height: 10px;
+}
+.skeleton-mark {
+  width: 29px;
+  height: 29px;
+  border-radius: 8px;
+}
+.skeleton-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 13px;
+}
+.skeleton-brand-text {
+  width: 88px;
+  height: 15px;
+}
+.skeleton-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.skeleton-nav-item {
+  width: 100%;
+  height: 43px;
+  border-radius: 9px;
+}
+.skeleton-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+}
+.skeleton-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+.skeleton-user-name {
+  width: 92px;
+  height: 11px;
+}
+.skeleton-page-head {
+  padding: 32px 28px 25px;
+  border-bottom: 1px solid var(--line);
+}
+.skeleton-title {
+  width: 164px;
+  height: 24px;
+}
+.skeleton-subtitle {
+  width: 270px;
+  height: 11px;
+  margin-top: 12px;
+}
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 28px;
+}
+.skeleton-card {
+  height: 142px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.skeleton-card-title {
+  width: 45%;
+  height: 16px;
+  margin-bottom: 20px;
+}
+.skeleton-card-line {
+  width: 82%;
+  height: 10px;
+  margin-bottom: 10px;
+}
+.skeleton-card-line.short {
+  width: 56%;
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line,
+  .skeleton-block {
+    animation: none;
+  }
+}
+
+/* 无团队/空项目引导占满内容区并垂直居中。 */
+.empty-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+@media (max-width: 640px) {
+  .empty-art-group {
+    width: 180px;
+    height: 140px;
+  }
+  .empty-art-group .bot-main {
+    left: 50px;
+    width: 78px;
+    height: 78px;
+  }
+  .empty-art-group .bot-side {
+    width: 44px;
+    height: 44px;
+  }
+  .empty-art-group .empty-orbit {
+    width: 150px;
+  }
+  .empty-art-project {
+    width: 224px;
+    height: 156px;
+  }
+  .empty-art-project > .bot-main {
+    width: 68px;
+    height: 68px;
+  }
+  .empty-project-preview {
+    width: 142px;
+    right: 0;
+  }
+}
+
+/* 退出登录使用侧栏导航的图标主色，避免填充图标继承正文黑色。 */
+.logout-btn .icon {
+  color: var(--blue);
+}
+
+/* 图标与文字使用 grid 两列对齐，避免 flex 基线与中文字体行高造成上下偏移。 */
+.btn {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  justify-content: center;
+  column-gap: 7px;
+  line-height: 1.2;
+}
+.nav-btn {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 13px;
+}
+.btn > .icon,
+.nav-btn > .icon {
+  display: block;
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* 登录页只保留忘记密码入口时靠右对齐，避免无意义占位文案。 */
+.auth-row-end {
+  justify-content: flex-end;
+}
+
+/* 账号区角色徽标不参与压缩，避免侧栏较窄时文字被挤没。 */
+.user .badge {
+  flex-shrink: 0;
+}
+
+/* 弹窗内控件统一放大；原型根字号为 14px，这里使用 px 保证视觉尺寸稳定。 */
+[data-slot='dialog-content'] {
+  gap: 24px;
+  padding: 24px;
+}
+[data-slot='dialog-header'] {
+  gap: 10px;
+}
+[data-slot='dialog-content'] input:not([type='checkbox']):not([type='radio']),
+[data-slot='dialog-content'] select {
+  height: 44px;
+  font-size: 14px;
+}
+[data-slot='dialog-content'] textarea {
+  min-height: 120px;
+  font-size: 14px;
+}
+[data-slot='dialog-content'] [data-slot='button'] {
+  height: 44px;
+  min-width: 120px;
+  padding-inline: 20px;
+  font-size: 14px;
+}
+[data-slot='dialog-content'] [data-slot='dialog-footer'] {
+  padding-top: 2px;
+}
+
+/* 原型与 Tailwind 都定义了 --muted 等变量；工作区/认证容器内恢复原型 token，
+   避免 shadcn theme 的低对比度 --muted 让原型文字和徽标变浅。 */
+.shell,
+.login-shell,
+.auth-shell {
+  --blue: #4176e6;
+  --blue-soft: #edf3fe;
+  --side: #f9fafb;
+  --soft: #f5f6f7;
+  --selected: #ebeef2;
+  --ink: #0f1115;
+  --muted: #61666b;
+  --quiet: #81858c;
+  --line: rgba(0, 0, 0, 0.08);
+  --green: #269650;
+  --amber: #c98719;
+  --red: #ce5252;
+}
+
+/* 弹窗表单字段：标签与输入框保持 8px 间距，避免中文标签直接贴住控件。 */
+[data-slot='dialog-content'] form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+[data-slot='dialog-content'] form label > :not(:first-child) {
+  margin-top: 0;
+}
+
+/* Toast 语义图标：与提示文字一起做 flex 中线对齐，不用无意义圆点。 */
+#toast {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.toast-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: currentColor;
+  color: #9aa3ae;
+}
+#toast[data-variant='success'] .toast-icon {
+  color: #7ee2a8;
+}
+#toast[data-variant='error'] .toast-icon {
+  color: #ffb4b4;
+}
+
+/* 接受邀请时说明已有账号需要原密码，避免把登录密码误认为新密码。 */
+.field-hint {
+  margin-top: -4px;
+  color: var(--quiet);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.field-hint a {
+  margin: 0 2px;
+}
+
+/* 与原型一致：导航默认正文色，仅当前项使用主题蓝；避免 <a> 默认蓝色让所有图标变蓝。 */
+.nav-btn {
+  color: var(--ink);
+}
+.nav-btn.active {
+  color: var(--blue);
+}
+
+/* 成员表格的表头不响应行 hover；各管理分组之间保留明确间距。 */
+[data-slot='table-header'] [data-slot='table-row']:hover {
+  background: transparent;
+}
+.team-admin-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* 团队管理主操作使用固定 px 尺寸，避免根字号 14px 让 rem 按钮偏小。 */
+.team-invite-button {
+  height: 40px;
+  padding-inline: 20px;
+  font-size: 14px;
+}
+
+/* 侧栏导航是链接但不是文本链接，hover 不显示下划线。 */
+.brand,
+.nav-btn,
+.brand:hover,
+.nav-btn:hover {
+  text-decoration: none;
+}
+
+/* 原型 badge 补充危险态，用于失效引用和需复核状态。 */
+.badge.red {
+  color: var(--red);
+  background: #fff0f0;
+}
+
+/* 代码仓库设置：卡片分组、行式仓库/连接列表，避免表单和按钮挤成一排。 */
+.repo-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.repo-settings .card {
+  padding: 20px;
+}
+.repo-settings .section-heading {
+  margin-bottom: 10px;
+}
+.repo-list {
+  margin-top: 6px;
+}
+.repo-row,
+.connection-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.repo-row:last-child,
+.connection-item:last-child {
+  border-bottom: 0;
+}
+.repo-name {
+  color: var(--blue);
+  font-weight: 500;
+}
+.repo-name:hover {
+  text-decoration: underline;
+}
+.repo-link-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.repo-select {
+  flex: 1;
+  min-width: 240px;
+  max-width: 420px;
+}
+.repo-select select {
+  height: 38px;
+}
+.connection-item {
+  align-items: flex-start;
+}
+.connection-item p {
+  margin-top: 5px;
+}
+.connection-item .btn {
+  min-height: 32px;
+  font-size: 12px;
+}
+.connection-form {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.connection-form summary {
+  cursor: pointer;
+  color: var(--blue);
+  font-size: 13px;
+}
+.connection-form .form-grid {
+  margin-top: 16px;
+}
+
+/* 项目卡片：与原型一致的设置按钮、两列指标和进入项目入口。 */
+.project-settings-button {
+  margin-left: auto;
+  color: var(--quiet);
+}
+.project-metrics.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.project-card-footer .text-btn {
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.project-card-footer .text-btn:hover {
+  text-decoration: none;
+}
+
+/* 已关联仓库后的代码页：仓库概览 + 文件浏览占位 + 折叠管理区。 */
+.code-overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.code-overview-page .card {
+  padding: 20px;
+}
+.code-browser-placeholder .empty-state {
+  padding: 40px 20px;
+}
+.code-settings-details {
+  margin-top: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+/* 项目设置弹窗中的基础信息与代码仓库分组。 */
+.project-settings-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.settings-divider {
+  height: 1px;
+  background: var(--line);
+  margin-bottom: 20px;
+}
+.settings-section-title {
+  margin-bottom: 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.project-settings-sections .repo-settings {
+  gap: 14px;
+}
+.project-settings-sections .repo-settings .card {
+  padding: 16px;
+}
+
+/* 代码页不再额外套 catalog padding；压缩 Git 条与标题间距。 */
+.code-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-top: 2px;
+}
+.code-page .git-strip {
+  margin-bottom: 18px;
+}
+.code-page .section-heading {
+  margin-bottom: 14px;
+}
+.code-page .file-browser {
+  flex: 1;
+  min-height: 0;
+}
+.code-page .file-tree {
+  padding: 10px 8px;
+}
+.code-page .file {
+  padding: 8px;
+}
+.file.directory {
+  color: var(--muted);
+}
+.code-page .file .icon {
+  width: 15px;
+  height: 15px;
+}
+
+/* 文件树骨架与行内图标中线对齐。 */
+.file-tree-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px;
+}
+.file-tree-skeleton .skeleton-line {
+  height: 12px;
+}
+.file {
+  align-items: center;
+}
+.file .tree-caret {
+  width: 12px;
+  height: 12px;
+  color: var(--quiet);
+  transform: rotate(-90deg);
+  transition: transform 0.12s ease;
+}
+.file.directory.expanded .tree-caret {
+  transform: rotate(0deg);
+}
+.file.directory .icon {
+  width: 15px;
+  height: 15px;
+}
+.code-markdown-preview {
+  padding: 20px 24px;
+  min-height: 380px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.file-tabs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.file-tab {
+  color: var(--quiet);
+  font-size: 12px;
+  padding: 4px 0;
+}
+.file-tab.active {
+  color: var(--blue);
+  border-bottom: 1px solid var(--blue);
+}
+
+/* 账号行与上方导航文字对齐：15px 左内边距 + 头像 26 + 5px 间距 = 导航文字起点。 */
+.side-bottom {
+  gap: 6px;
+}
+.user {
+  min-height: 42px;
+  padding: 0 15px;
+  gap: 0;
+}
+.user-copy {
+  flex: 1;
+  padding-right: 4px;
+}
+.user .avatar-slot {
+  width: 18px;
+  flex-shrink: 0;
+  display: flex;
+  margin-right: 13px;
+}
+.user .avatar {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+.user .badge {
+  margin-left: 2px;
+}
+
+/* Markdown 预览：md-body 提供正文/行内代码样式，这里补齐 fenced code block。 */
+.md-body pre {
+  margin: 16px 0;
+  padding: 16px;
+  overflow-x: auto;
+  border-radius: 12px;
+  background: var(--md-soft, #f9fafb);
+  color: var(--md-ink, #0f1115);
+  font: 11px/19px var(--md-code-font, ui-monospace, monospace);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.md-body pre code {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+}
+
+/* 需求/Bug 筛选下拉统一自定义箭头，避免浏览器默认控件差异。 */
+.filter-select {
+  appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+}
+
+/* 代码分支触发器和下拉菜单按 GitHub 风格收敛。 */
+.git-branch-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 5px;
+}
+.git-branch-button:hover {
+  background: var(--soft);
+}
+.git-branch-button .icon {
+  width: 15px;
+  height: 15px;
+}
+.git-branch-menu [data-slot='dropdown-menu-item'] {
+  gap: 8px;
+  font-size: 12px;
+}
+.git-branch-menu .icon {
+  width: 14px;
+  height: 14px;
+  color: var(--quiet);
+}
+
+/* 其余原生 select 统一箭头与右侧留白；shadcn Select 已有自绘 Chevron，不重复处理。 */
+.project-select {
+  appearance: none;
+  padding-right: 22px;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 2px center;
+}
+.git-strip select {
+  appearance: none;
+  padding-right: 20px;
+  background: transparent
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 2px center;
+}
+.field select:not([data-slot='select']) {
+  appearance: none;
+  padding-right: 30px;
+  background: #fff
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+}
+
+/*
+ * 侧栏底部统一为同一套三列网格：图标列 18px、文字列、右侧状态列。
+ * 团队管理、账号、退出登录共用列宽与行高，避免不同 icon/avatar 宽度造成视觉错位。
+ */
+.side-bottom {
+  --sidebar-icon-size: 18px;
+  --sidebar-icon-gap: 13px;
+  gap: 6px;
+}
+.side-bottom .nav-btn,
+.user {
+  display: grid;
+  grid-template-columns: var(--sidebar-icon-size) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--sidebar-icon-gap);
+  min-height: 46px;
+  padding: 0 15px;
+}
+.side-bottom .nav-btn {
+  padding-inline: 15px;
+}
+.side-bottom .nav-btn .icon {
+  width: var(--sidebar-icon-size);
+  height: var(--sidebar-icon-size);
+  margin: 0;
+}
+.user .avatar-slot {
+  grid-column: 1;
+  width: var(--sidebar-icon-size);
+  margin: 0;
+  display: flex;
+  justify-content: center;
+}
+.user .avatar {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  font-size: 10px;
+}
+.user .user-copy {
+  grid-column: 2;
+  padding: 0;
+}
+.user .badge {
+  grid-column: 3;
+  margin: 0;
+  padding: 1px 3px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+/*
+ * SVG 图标的视觉边界并不等于 18px 盒子：users 路径几乎贴边，logout 路径左侧留了 2px。
+ * 只偏移可见描边，不移动网格列，保证三行文字仍然从同一 x 坐标开始。
+ */
+.side-bottom {
+  --logout-icon-optical-offset: -2px;
+  --avatar-optical-offset: -2px;
+}
+.logout-btn .icon {
+  transform: translateX(var(--logout-icon-optical-offset));
+}
+.user .avatar-slot {
+  transform: translateX(var(--avatar-optical-offset));
 }

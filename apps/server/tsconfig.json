@@ -1,9 +1,4 @@
 {
-  "include": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "scripts/**/*.ts",
-    "drizzle.config.ts"
-  ],
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "drizzle.config.ts"],
   "extends": "../../tooling/typescript/node.json"
 }

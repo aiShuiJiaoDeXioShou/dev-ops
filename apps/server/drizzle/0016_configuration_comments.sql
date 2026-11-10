@@ -1,0 +1,67 @@
+-- 凭据库与项目环境变量：中文表/字段注释，建议作为独立迁移执行（0015 已应用，勿回改）。
+COMMENT ON TABLE "app"."credential" IS '团队凭据元数据；密文按版本保存，接口只返回元数据与掩码';
+COMMENT ON COLUMN "app"."credential"."id" IS '凭据主键（UUID）';
+COMMENT ON COLUMN "app"."credential"."team_id" IS '所属团队标识';
+COMMENT ON COLUMN "app"."credential"."name" IS '凭据名称，团队内唯一，1-120 字符';
+COMMENT ON COLUMN "app"."credential"."kind" IS '凭据分类：api_key／account_password／ssh_key';
+COMMENT ON COLUMN "app"."credential"."description" IS '凭据说明，不得包含明文';
+COMMENT ON COLUMN "app"."credential"."status" IS '状态：active 可用／revoked 已撤销；过期由 expires_at 判断';
+COMMENT ON COLUMN "app"."credential"."current_version" IS '当前版本号，轮换时递增';
+COMMENT ON COLUMN "app"."credential"."expires_at" IS '有效期，为空表示长期有效';
+COMMENT ON COLUMN "app"."credential"."created_by_user_id" IS '创建者用户标识';
+COMMENT ON COLUMN "app"."credential"."created_at" IS '创建时间';
+COMMENT ON COLUMN "app"."credential"."updated_at" IS '更新时间';
+
+COMMENT ON TABLE "app"."credential_version" IS '凭据版本密文；旧版本只用于审计与使用记录追溯';
+COMMENT ON COLUMN "app"."credential_version"."id" IS '版本记录主键（UUID）';
+COMMENT ON COLUMN "app"."credential_version"."team_id" IS '所属团队标识';
+COMMENT ON COLUMN "app"."credential_version"."credential_id" IS '所属凭据标识';
+COMMENT ON COLUMN "app"."credential_version"."version" IS '版本号，同一凭据内唯一，从 1 开始';
+COMMENT ON COLUMN "app"."credential_version"."ciphertext" IS 'AES-256-GCM 密文（base64）';
+COMMENT ON COLUMN "app"."credential_version"."iv" IS 'AES-256-GCM 初始化向量（base64）';
+COMMENT ON COLUMN "app"."credential_version"."auth_tag" IS 'AES-256-GCM 认证标签（base64）';
+COMMENT ON COLUMN "app"."credential_version"."key_version" IS '加密密钥版本，用于后续密钥轮换';
+COMMENT ON COLUMN "app"."credential_version"."rotated_from_version" IS '轮换来源版本号，首个版本为空';
+COMMENT ON COLUMN "app"."credential_version"."created_by_user_id" IS '写入该版本的用户标识';
+COMMENT ON COLUMN "app"."credential_version"."created_at" IS '创建时间';
+COMMENT ON COLUMN "app"."credential_version"."updated_at" IS '更新时间';
+
+COMMENT ON TABLE "app"."credential_project_grant" IS '凭据对项目的授权与期限；撤销只更新 revoked_at 并保留行';
+COMMENT ON COLUMN "app"."credential_project_grant"."id" IS '授权主键（UUID）';
+COMMENT ON COLUMN "app"."credential_project_grant"."team_id" IS '所属团队标识';
+COMMENT ON COLUMN "app"."credential_project_grant"."credential_id" IS '凭据标识';
+COMMENT ON COLUMN "app"."credential_project_grant"."project_id" IS '被授权项目标识，必须与凭据同团队';
+COMMENT ON COLUMN "app"."credential_project_grant"."expires_at" IS '授权期限，为空表示长期有效';
+COMMENT ON COLUMN "app"."credential_project_grant"."granted_by_user_id" IS '授权操作者用户标识';
+COMMENT ON COLUMN "app"."credential_project_grant"."revoked_at" IS '撤销时间，为空表示授权有效';
+COMMENT ON COLUMN "app"."credential_project_grant"."created_at" IS '创建时间';
+COMMENT ON COLUMN "app"."credential_project_grant"."updated_at" IS '更新时间';
+
+COMMENT ON TABLE "app"."project_env_var" IS '项目环境变量；按开发/测试/生产隔离，密钥只保存凭据引用';
+COMMENT ON COLUMN "app"."project_env_var"."id" IS '环境变量主键（UUID）';
+COMMENT ON COLUMN "app"."project_env_var"."team_id" IS '所属团队标识';
+COMMENT ON COLUMN "app"."project_env_var"."project_id" IS '所属项目标识';
+COMMENT ON COLUMN "app"."project_env_var"."environment" IS '环境：development／test／production，环境之间不继承';
+COMMENT ON COLUMN "app"."project_env_var"."name" IS '变量名，同项目同环境唯一，匹配 [A-Za-z_][A-Za-z0-9_]*';
+COMMENT ON COLUMN "app"."project_env_var"."kind" IS '类型：plain 普通变量／credential_ref 凭据引用';
+COMMENT ON COLUMN "app"."project_env_var"."value_text" IS '普通变量取值，仅 plain 保存；不得保存密钥';
+COMMENT ON COLUMN "app"."project_env_var"."credential_id" IS '引用的凭据标识，仅 credential_ref 使用，不复制密钥值';
+COMMENT ON COLUMN "app"."project_env_var"."status" IS '状态：active 可用／invalid 引用已撤销、过期或失效';
+COMMENT ON COLUMN "app"."project_env_var"."version" IS '乐观锁版本号，更新时递增';
+COMMENT ON COLUMN "app"."project_env_var"."created_by_user_id" IS '创建者用户标识';
+COMMENT ON COLUMN "app"."project_env_var"."created_at" IS '创建时间';
+COMMENT ON COLUMN "app"."project_env_var"."updated_at" IS '更新时间';
+
+COMMENT ON TABLE "app"."credential_usage" IS '凭据使用与管理动作审计；不记录密钥值、来源请求体或明文参数';
+COMMENT ON COLUMN "app"."credential_usage"."id" IS '记录主键（UUID）';
+COMMENT ON COLUMN "app"."credential_usage"."team_id" IS '所属团队标识';
+COMMENT ON COLUMN "app"."credential_usage"."credential_id" IS '凭据标识';
+COMMENT ON COLUMN "app"."credential_usage"."credential_version" IS '使用或操作发生时的凭据版本号';
+COMMENT ON COLUMN "app"."credential_usage"."project_id" IS '项目标识，团队级管理动作为空';
+COMMENT ON COLUMN "app"."credential_usage"."environment" IS '环境，团队级管理动作为空';
+COMMENT ON COLUMN "app"."credential_usage"."action" IS '动作：use／create／rotate／revoke／grant／revoke_grant／read_metadata';
+COMMENT ON COLUMN "app"."credential_usage"."actor_user_id" IS '操作者用户标识，来源未知时为空';
+COMMENT ON COLUMN "app"."credential_usage"."result" IS '结果：success／denied／expired／failed';
+COMMENT ON COLUMN "app"."credential_usage"."error_code" IS '失败时的业务错误码';
+COMMENT ON COLUMN "app"."credential_usage"."created_at" IS '发生时间';
+COMMENT ON COLUMN "app"."credential_usage"."updated_at" IS '更新时间';

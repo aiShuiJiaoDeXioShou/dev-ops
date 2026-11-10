@@ -1,23 +1,84 @@
-import type { RouteObject } from 'react-router'
+import { Navigate, type RouteObject } from 'react-router'
 import { AppLayout } from '@/app/layouts/app-layout'
+import { RequireAuth } from '@/features/identity/public'
 import { PageLoading } from '@/shared/ui/page-state'
+import { AppShellSkeleton, PageSkeleton } from '@/shared/ui/page-skeleton'
 import { NotFoundPage } from '@/pages/not-found'
 import { RouteErrorPage } from './route-error'
 
 /**
- * 创建应用路由，业务页面按需加载，共用布局和错误边界。
+ * 创建应用路由；认证页公开，业务页统一经过 RequireAuth 与会话上下文。
  * @returns 可交给浏览器或内存路由器的配置；调用本身不发起 API 请求。
  */
 export function createAppRoutes(): RouteObject[] {
-  return [{
-    path: '/',
-    Component: AppLayout,
-    ErrorBoundary: RouteErrorPage,
-    HydrateFallback: PageLoading,
-    children: [
-      { index: true, lazy: () => import('@/pages/overview') },
-      { path: 'system/status', lazy: () => import('@/pages/system-status') },
-      { path: '*', Component: NotFoundPage },
-    ],
-  }]
+  const routes: RouteObject[] = [
+    { path: '/login', lazy: () => import('@/pages/auth/login-page'), HydrateFallback: PageLoading },
+    {
+      path: '/accept-invitation',
+      lazy: () => import('@/pages/auth/accept-invitation-page'),
+      HydrateFallback: PageLoading,
+    },
+    { path: '/forgot-password', lazy: () => import('@/pages/auth/forgot-password-page'), HydrateFallback: PageLoading },
+    { path: '/reset-password', lazy: () => import('@/pages/auth/reset-password-page'), HydrateFallback: PageLoading },
+    {
+      element: <RequireAuth />,
+      HydrateFallback: AppShellSkeleton,
+      children: [
+        {
+          path: '/',
+          Component: AppLayout,
+          ErrorBoundary: RouteErrorPage,
+          HydrateFallback: PageSkeleton,
+          children: [
+            { index: true, element: <Navigate to="/projects" replace /> },
+            {
+              path: 'projects',
+              lazy: () => import('@/pages/projects/project-list-page'),
+              HydrateFallback: PageSkeleton,
+            },
+            {
+              path: 'projects/:projectId',
+              lazy: () => import('@/pages/project/project-layout'),
+              HydrateFallback: PageSkeleton,
+              children: [
+                { index: true, element: <Navigate to="requirements" replace /> },
+                {
+                  path: 'requirements',
+                  lazy: () => import('@/pages/project/requirements-page'),
+                  HydrateFallback: PageSkeleton,
+                },
+                { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: PageSkeleton },
+                { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: PageSkeleton },
+                { path: 'prs', lazy: () => import('@/pages/project/prs-page'), HydrateFallback: PageSkeleton },
+                {
+                  path: 'pipelines',
+                  lazy: () => import('@/pages/project/pipelines-page'),
+                  HydrateFallback: PageSkeleton,
+                },
+                {
+                  path: 'artifacts',
+                  lazy: () => import('@/pages/project/artifacts-page'),
+                  HydrateFallback: PageSkeleton,
+                },
+              ],
+            },
+            {
+              path: 'settings/profile',
+              lazy: () => import('@/pages/settings/profile-page'),
+              HydrateFallback: PageSkeleton,
+            },
+            {
+              path: 'settings/team',
+              lazy: () => import('@/pages/settings/team-settings-page'),
+              HydrateFallback: PageSkeleton,
+            },
+            { path: 'system/status', lazy: () => import('@/pages/system-status'), HydrateFallback: PageSkeleton },
+            { path: '*', Component: NotFoundPage },
+          ],
+        },
+      ],
+    },
+  ]
+  if (import.meta.env.DEV) routes.push({ path: '/prototype/*', lazy: () => import('@/prototype/prototype-app') })
+  return routes
 }

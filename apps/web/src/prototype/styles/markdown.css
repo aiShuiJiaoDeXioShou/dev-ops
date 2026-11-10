@@ -1,0 +1,260 @@
+/* Markdown 正文样式对齐 DSH：14px/24px 正文、浅色代码块 banner、紧凑表格与引用。 */
+.md-body {
+  --md-ink: #0f1115;
+  --md-secondary: #61666b;
+  --md-tertiary: #81858c;
+  --md-caption: #adb2b8;
+  --md-line-1: #0000000a;
+  --md-line-2: #0000001a;
+  --md-line-3: #0000001f;
+  --md-soft: #f9fafb;
+  --md-inline: #fafafa;
+  --md-blue: #4176e6;
+  --md-font:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --md-code-font:
+    'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, 'PingFang SC',
+    'Microsoft YaHei', monospace;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: 400 14px/24px var(--md-font);
+  color: var(--md-ink);
+}
+.md-body > *:first-child {
+  margin-top: 0 !important;
+}
+.md-body > *:last-child {
+  margin-bottom: 0 !important;
+}
+.md-body p {
+  margin: 16px 0;
+}
+.md-body h1 {
+  margin: 32px 0 16px;
+  font: 700 21px/30px var(--md-font);
+}
+.md-body h2 {
+  margin: 32px 0 16px;
+  font: 700 19px/28px var(--md-font);
+}
+.md-body h3 {
+  margin: 32px 0 16px;
+  font: 700 18px/26px var(--md-font);
+}
+.md-body h4 {
+  margin: 16px 0;
+  font: 600 14px/24px var(--md-font);
+}
+.md-body h5,
+.md-body h6 {
+  margin: 16px 0;
+  font: 600 14px/24px var(--md-font);
+}
+.md-body :where(ul, ol) {
+  margin: 16px 0;
+  padding-left: 18px;
+}
+.md-body :where(ul, ol) :where(ul, ol) {
+  margin: 4px 0;
+}
+.md-body li {
+  margin: 4px 0;
+}
+.md-body li p {
+  margin: 8px 0;
+}
+.md-body ::marker {
+  color: var(--md-secondary);
+}
+.md-body a {
+  color: var(--md-blue);
+  text-decoration: none;
+}
+.md-body a:hover {
+  text-decoration: underline;
+}
+.md-body strong {
+  font-weight: 600;
+}
+.md-body hr {
+  display: block;
+  height: 0.5px;
+  margin: 32px 0;
+  border: none;
+  background: var(--md-line-2);
+}
+.md-body blockquote {
+  margin: 16px 0 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--md-caption);
+  color: var(--md-secondary);
+}
+.md-body blockquote p {
+  margin: 8px 0;
+}
+.md-body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0;
+  border-radius: 12px;
+}
+.md-body :not(pre) > code {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border: 0.5px solid var(--md-line-1);
+  border-radius: 8px;
+  background: var(--md-inline);
+  font: 12px/19px var(--md-code-font);
+  font-size: 0.875em !important;
+}
+.md-body :where(h1, h2, h3, h4, h5, h6) code {
+  font: inherit;
+  font-family: var(--md-code-font);
+}
+
+/* 代码块：沿用 DSH 的浅色 banner + 长代码换行，不再使用深色头。 */
+.md-code {
+  position: relative;
+  margin: 16px 0;
+  border-radius: 16px;
+  background: var(--md-soft);
+  color: var(--md-ink);
+  overflow: hidden;
+}
+.md-code:not(:last-child) {
+  margin-bottom: 11px;
+}
+.md-code-head {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  background: var(--md-soft);
+  font: 11px/18px var(--md-font);
+}
+.md-code-lang {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--md-ink);
+  font: 11px/18px var(--md-code-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-code-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}
+.md-code-actions button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--md-secondary);
+  font: inherit;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.md-code-actions button:hover {
+  color: var(--md-ink);
+}
+.md-code-actions button[data-copied='true'] {
+  color: var(--md-blue);
+}
+.md-code pre {
+  margin: 0 !important;
+  padding: 16px;
+  overflow-x: auto;
+  background: var(--md-soft);
+  color: var(--md-ink);
+  font: 11px/19px var(--md-code-font);
+  white-space: pre-wrap;
+  word-break: break-all;
+  tab-size: 2;
+}
+.md-code pre code {
+  background: none;
+  padding: 0;
+  font: inherit;
+}
+.md-code pre .line {
+  display: block;
+}
+
+/* 语法着色采用 GitHub Light 近似色，与 DSH 的浅色代码块保持一致。 */
+.tok-com {
+  color: #6e7781;
+}
+.tok-str {
+  color: #0a3069;
+}
+.tok-num {
+  color: #0550ae;
+}
+.tok-key {
+  color: #cf222e;
+}
+.tok-fn {
+  color: #8250df;
+}
+.tok-bool {
+  color: #0550ae;
+}
+
+/* 表格：细线、左对齐，可横向滚动查看宽表。 */
+.md-table-wrap {
+  max-width: 100%;
+  margin: 16px 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.md-table-wrap table {
+  width: max-content;
+  max-width: max-content;
+  border-collapse: collapse;
+  font: 13px/22px var(--md-font);
+}
+.md-table-wrap th {
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--md-line-3);
+  color: var(--md-ink);
+  font-weight: 500;
+  text-align: left;
+  max-width: 320px;
+  max-width: min(30vw, 320px);
+  min-width: 100px;
+}
+.md-table-wrap td {
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--md-line-2);
+  color: var(--md-ink);
+  max-width: 320px;
+  max-width: min(30vw, 320px);
+  min-width: 100px;
+}
+.md-table-wrap th:first-child,
+.md-table-wrap td:first-child {
+  padding-left: 0;
+}
+.md-table-wrap td:last-child {
+  padding-right: 0;
+}
+.md-table-wrap code {
+  font-size: 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md-code-actions button {
+    transition: none;
+  }
+}

@@ -14,18 +14,38 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 const execute = promisify(execFile)
 
 test('真实 Server、Web 代理及编译后的 CLI 共用现有接口', { timeout: 30_000 }, async (t) => {
-  const app = createHttpApp(loadConfig({
-    NODE_ENV: 'test', LOG_LEVEL: 'silent', DB_CONNECT_TIMEOUT_MS: '100',
-    DATABASE_URL: 'postgresql://smoke@127.0.0.1:1/unavailable',
-  }))
+  const app = createHttpApp(
+    loadConfig({
+      NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      DB_CONNECT_TIMEOUT_MS: '100',
+      DATABASE_URL: 'postgresql://smoke@127.0.0.1:1/unavailable',
+      AUTH_SECRET: 'test-secret-at-least-32-characters-long',
+    }),
+  )
   t.after(() => app.close())
   const address = await app.listen({ port: 0, host: '127.0.0.1' })
   const client = createApiClient({ baseUrl: address })
   assert.equal((await client.health()).data.status, 'ok')
-  await assert.rejects(client.ready(), error => error instanceof RequestError && error.status === 503 && error.responseValid)
+  await assert.rejects(
+    client.ready(),
+    (error) =>
+      error instanceof RequestError &&
+      error.code === 'BUSINESS_ERROR' &&
+      error.status === 200 &&
+      error.serverCode === 'DATABASE_UNAVAILABLE',
+  )
 
-  const cli = await execute(process.execPath, ['apps/cli/dist/index.js', 'health', '--server', address, '--json'], { cwd: root })
-  assert.deepEqual(JSON.parse(cli.stdout), { status: 'ok' })
+  const cli = await execute(process.execPath, ['apps/cli/dist/index.js', 'health', '--server', address, '--json'], {
+    cwd: root,
+  })
+  assert.deepEqual(JSON.parse(cli.stdout), {
+    success: true,
+    code: 'OK',
+    message: 'OK',
+    requestId: JSON.parse(cli.stdout).requestId,
+    data: { status: 'ok' },
+  })
   assert.equal(cli.stderr, '')
 
   const requireWeb = createRequire(new URL('../../apps/web/package.json', import.meta.url))
@@ -39,19 +59,34 @@ test('真实 Server、Web 代理及编译后的 CLI 共用现有接口', { timeo
   t.after(async () => {
     web.kill('SIGTERM')
     const force = setTimeout(() => web.kill('SIGKILL'), 5_000)
-    try { await exited } finally { clearTimeout(force) }
+    try {
+      await exited
+    } finally {
+      clearTimeout(force)
+    }
   })
   let output = ''
   let errors = ''
-  web.stderr.on('data', chunk => { errors += chunk })
+  web.stderr.on('data', (chunk) => {
+    errors += chunk
+  })
   const webAddress = await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error(`Web 启动超时：${errors}`)), 15_000)
-    web.once('error', error => { clearTimeout(timeout); reject(error) })
-    web.once('exit', () => { clearTimeout(timeout); reject(new Error(`Web 提前退出：${errors}`)) })
-    web.stdout.on('data', chunk => {
+    web.once('error', (error) => {
+      clearTimeout(timeout)
+      reject(error)
+    })
+    web.once('exit', () => {
+      clearTimeout(timeout)
+      reject(new Error(`Web 提前退出：${errors}`))
+    })
+    web.stdout.on('data', (chunk) => {
       output += stripVTControlCharacters(String(chunk))
       const match = output.match(/http:\/\/127\.0\.0\.1:\d+\//)
-      if (match) { clearTimeout(timeout); resolve(match[0]) }
+      if (match) {
+        clearTimeout(timeout)
+        resolve(match[0])
+      }
     })
   })
   const page = await fetch(new URL('system/status', webAddress))
@@ -59,8 +94,13 @@ test('真实 Server、Web 代理及编译后的 CLI 共用现有接口', { timeo
   assert.match(await page.text(), /id="root"/)
   const response = await fetch(new URL('api/v1/health', webAddress))
   assert.equal(response.status, 200)
-  assert.deepEqual(await response.json(), { status: 'ok' })
+  const healthBody = await response.json()
+  assert.equal(healthBody.success, true)
+  assert.equal(healthBody.code, 'OK')
+  assert.deepEqual(healthBody.data, { status: 'ok' })
   const ready = await fetch(new URL('api/v1/ready', webAddress))
-  assert.equal(ready.status, 503)
-  assert.equal((await ready.json()).code, 'DATABASE_UNAVAILABLE')
+  assert.equal(ready.status, 200)
+  const readyBody = await ready.json()
+  assert.equal(readyBody.success, false)
+  assert.equal(readyBody.code, 'DATABASE_UNAVAILABLE')
 })

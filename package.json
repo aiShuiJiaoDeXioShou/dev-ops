@@ -16,7 +16,7 @@
     "api:generate": "pnpm --filter @dev-ops/server api:export && node tooling/scripts/generate-api-client.mjs",
     "prepare:clients": "pnpm api:generate && pnpm --filter @dev-ops/api-client build",
     "build": "pnpm api:generate && pnpm -r build",
-    "check": "pnpm build && pnpm check:boundaries && pnpm test:tooling && pnpm -r check && pnpm test:e2e",
+    "check": "pnpm lint && pnpm format:check && pnpm ui:check && pnpm build && pnpm check:boundaries && pnpm test:tooling && pnpm -r check && pnpm test:e2e",
     "check:boundaries": "depcruise --config tooling/dependency-rules.mjs apps/web/src apps/server/src apps/cli/src packages/api-client/src",
     "test:tooling": "node --test tooling/test/*.test.mjs",
     "test:e2e": "node --test tests/e2e/*.test.mjs",
@@ -24,12 +24,26 @@
     "db:setup": "pnpm --filter @dev-ops/server db:setup",
     "db:up": "pnpm --filter @dev-ops/server db:up",
     "db:down": "pnpm --filter @dev-ops/server db:down",
-    "db:migrate": "pnpm --filter @dev-ops/server db:migrate"
+    "db:migrate": "pnpm --filter @dev-ops/server db:migrate",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "ui:check": "node tooling/scripts/check-ui.mjs",
+    "ui:baseline": "node tooling/scripts/check-ui.mjs --update-baseline"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "ajv": "8.20.0",
     "dependency-cruiser": "18.7.2",
-    "typescript": "5.9.3",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import-x": "^4.18.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
     "openapi-typescript": "7.13.0",
-    "ajv": "8.20.0"
+    "prettier": "^3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.1"
   }
 }

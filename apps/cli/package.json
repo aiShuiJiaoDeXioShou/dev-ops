@@ -8,19 +8,19 @@
     "node": ">=24.15.0 <25"
   },
   "bin": {
-    "dev-ops": "dist/index.js"
+    "devops": "dist/index.js"
   },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
-    "dev": "node --import tsx src/index.ts",
+    "dev": "node --env-file-if-exists=.env --import tsx src/index.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
+    "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
-    "test": "node --import tsx --test test/*.test.ts",
+    "test": "NODE_ENV=test node --import tsx --test test/*.test.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test"
   },
   "devDependencies": {
@@ -30,6 +30,11 @@
     "typescript": "~7.0.2"
   },
   "dependencies": {
-    "@dev-ops/api-client": "workspace:*"
+    "@dev-ops/api-client": "workspace:*",
+    "@inquirer/prompts": "^8.7.5",
+    "commander": "^15.1.0",
+    "env-paths": "^4.0.0",
+    "write-file-atomic": "^8.0.0",
+    "zod": "^4.6.7"
   }
 }
