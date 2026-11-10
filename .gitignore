@@ -19,3 +19,4 @@ packages/api-client/src/generated/
 .specify
 specs
 .pnpm-store/
+.tmp/
