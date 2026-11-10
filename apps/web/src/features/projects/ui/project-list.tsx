@@ -5,10 +5,9 @@ import { SearchX } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
-import { formatDateTime } from '@/shared/lib/format'
 import { EmptyState } from '@/shared/ui/page-state'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
-import { projectListQueryOptions } from '../api/queries'
+import { projectActivityQueryOptions, projectListQueryOptions } from '../api/queries'
 import {
   parseProjectFilters,
   PROJECT_STATUS_LABELS,
@@ -18,6 +17,7 @@ import {
 } from '../model/filters'
 import { ProjectForm } from './project-form'
 import { ProjectSettingsDialog } from './project-settings-dialog'
+import { ActivityBarometer } from './activity-barometer'
 
 /** 项目列表：项目卡片、状态筛选、搜索与创建入口。 */
 export function ProjectList() {
@@ -34,6 +34,14 @@ export function ProjectList() {
       pageSize: filters.pageSize,
     }),
   )
+  const activity = useQuery(
+    projectActivityQueryOptions(currentTeam?.id ?? '', {
+      ...(filters.search ? { search: filters.search } : {}),
+      ...(filters.status ? { status: filters.status as ProjectStatus } : {}),
+      source: 'all',
+    }),
+  )
+  const activityByProject = new Map((activity.data?.data.projects ?? []).map((summary) => [summary.projectId, summary]))
   const update = (patch: Parameters<typeof updateProjectFilters>[1]) =>
     setParams(projectFilterParams(updateProjectFilters(filters, patch)))
   if (!currentTeam)
@@ -92,7 +100,8 @@ export function ProjectList() {
           {currentTeam.name} · 共 {query.data.data.total} 个项目
         </p>
       </header>
-      <div className="catalog">
+      <div className="catalog project-home">
+        <ActivityBarometer teamId={currentTeam.id} search={filters.search} status={filters.status} />
         <div className="filters">
           <select
             className="btn project-filter"
@@ -110,7 +119,7 @@ export function ProjectList() {
             <PrototypeIcon name="search" />
             <input
               aria-label="搜索项目"
-              placeholder="搜索项目名称"
+              placeholder="搜索项目、仓库或负责人"
               value={filters.search}
               onChange={(event) => update({ search: event.target.value })}
             />
@@ -174,24 +183,54 @@ export function ProjectList() {
                     {project.owner.name}
                   </span>
                 </div>
-                <div className="project-metrics compact">
-                  <div>
-                    <strong>{project.counts.openRequirements}</strong>
-                    <span>待处理需求</span>
-                  </div>
-                  <div>
-                    <strong>{project.counts.openBugs}</strong>
-                    <span>待处理 Bug</span>
-                  </div>
-                </div>
-                <div className="project-card-footer">
-                  <span className="quiet">更新于 {formatDateTime(project.updatedAt)}</span>
-                  <span className="spacer" />
-                  <Link className="text-btn row" to={`/projects/${project.id}/requirements`}>
-                    进入项目
-                    <PrototypeIcon name="arrow" />
-                  </Link>
-                </div>
+                {(() => {
+                  const summary = activityByProject.get(project.id)
+                  const done = summary?.items.completed ?? 0
+                  const total = summary?.items.total ?? 0
+                  const percent = total > 0 ? Math.round((done / total) * 100) : 0
+                  const pendingPr = summary ? (summary.pendingPullRequests ?? '—') : '—'
+                  return (
+                    <>
+                      <div className="project-metrics">
+                        <Link to={`/projects/${project.id}/requirements`}>
+                          <strong>{summary?.pendingRequirements ?? project.counts.openRequirements}</strong>
+                          <span>待处理需求</span>
+                        </Link>
+                        <Link to={`/projects/${project.id}/bugs`}>
+                          <strong>{summary?.pendingBugs ?? project.counts.openBugs}</strong>
+                          <span>待处理 Bug</span>
+                        </Link>
+                        <Link to={`/projects/${project.id}/prs`}>
+                          <strong>{pendingPr}</strong>
+                          <span>待审 PR</span>
+                        </Link>
+                        <span className="project-metric-muted">
+                          <strong>—</strong>
+                          <span>Bots</span>
+                        </span>
+                      </div>
+                      <div className="project-card-footer">
+                        <div className="project-progress">
+                          <div className="progress-caption">
+                            <span>
+                              完成度 <b>{percent}%</b>
+                            </span>
+                            <span>
+                              {done}/{total}
+                            </span>
+                          </div>
+                          <progress max={100} value={percent} aria-label={`${project.name}事项完成度`}>
+                            {percent}%
+                          </progress>
+                        </div>
+                        <Link className="text-btn row" to={`/projects/${project.id}/requirements`}>
+                          进入项目
+                          <PrototypeIcon name="arrow" />
+                        </Link>
+                      </div>
+                    </>
+                  )
+                })()}
               </article>
             ))}
           </div>

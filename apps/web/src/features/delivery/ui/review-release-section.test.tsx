@@ -45,6 +45,7 @@ describe('ReviewReleaseSection', () => {
       </QueryClientProvider>,
     )
     expect(await screen.findByText('已通过')).toBeInTheDocument()
-    expect(await screen.findByText(/尚未记录实际发布/)).toBeInTheDocument()
+    expect(await screen.findByText('实际发布')).toBeInTheDocument()
+    expect(screen.queryByText(/审核通过不代表已发布/)).not.toBeInTheDocument()
   })
 })

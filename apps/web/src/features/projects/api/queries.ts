@@ -43,3 +43,19 @@ export function projectServicesQueryOptions(projectId: string) {
     enabled: Boolean(projectId),
   })
 }
+
+/** 项目首页晴雨表与摘要查询。 */
+export function projectActivityQueryOptions(
+  teamId: string,
+  filters: {
+    search?: string
+    status?: 'active' | 'paused' | 'ended'
+    source?: 'all' | 'activity' | 'code' | 'pull_request'
+  },
+) {
+  return queryOptions({
+    queryKey: ['projects', 'activity', teamId, filters],
+    queryFn: ({ signal }) => apiClient.getProjectActivity(teamId, filters, { signal }),
+    enabled: Boolean(teamId),
+  })
+}

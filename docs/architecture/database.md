@@ -73,6 +73,24 @@ pnpm --dir apps/server test:db
 | `pnpm --dir apps/server db:migrate` | 执行尚未应用的迁移 | 使用迁移账号修改数据库 |
 | `pnpm --dir apps/server test:db` | 执行真实数据库测试 | 创建并删除独立测试库 |
 
+## V0.2 新增表（迁移 0014–0016）
+
+V0.2 在无外键前提下新增以下业务表，关联一致性由 service 事务与条件更新保证：
+
+| 表 | 归属 | 说明 |
+| --- | --- | --- |
+| `build_record`、`build_record_correction`、`build_artifact`、`build_record_target` | delivery | 交付上报、更正与三类产物引用 |
+| `service_run_version`、`service_run_version_change` | delivery | 服务三环境实际运行版本与变更历史 |
+| `pipeline_run`、`pipeline_run_status` | delivery | 外部流水线运行记录与状态历史 |
+| `external_review`、`release_result` | delivery | 外部提审与实际发布，两者分离 |
+| `credential`、`credential_version`、`credential_project_grant`、`credential_usage` | configuration | 团队凭据元数据、版本密文、授权与使用记录 |
+| `project_env_var` | configuration | 项目三环境变量与凭据引用 |
+| `project_service`、`project_service_repository` | projects | 服务目录与仓库映射 |
+| `team.icon_text`、`team.description`、`team.version` | identity | 团队资料与乐观锁版本 |
+| `agent_skill`、`agent_template` 等 | knowledge | V0.3 知识资产模块（并行分支合并） |
+
+凭据明文只在创建/轮换请求体出现，使用 AES-256-GCM 加密后写入 `credential_version`，响应只返回元数据与固定掩码；环境变量引用凭据时只保存整数标识，撤销或授权缩小时同事务将引用变量置为失效。上述表均通过版本化迁移生成，迁移编号以 `apps/server/drizzle/meta/_journal.json` 为准。
+
 ## 部署边界
 
 部署后端时，编译产物需连同 `apps/server/drizzle/` 迁移目录和运行依赖一起提供。在 `apps/server/` 目录使用 `node dist/entrypoints/migrate.js` 运行编译后的迁移入口，凭据通过环境变量注入。运行 `node dist/entrypoints/http.js` 启动应用，网关或编排系统使用 `/api/v1/ready` 判断数据库就绪。

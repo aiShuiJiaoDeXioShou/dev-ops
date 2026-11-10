@@ -12,6 +12,7 @@ import { identityAuthRoutes } from '../modules/identity/identity.routes.ts'
 import { identityTeamRoutes } from '../modules/identity/identity.team.routes.ts'
 import { identityTokenRoutes } from '../modules/identity/identity.tokens.routes.ts'
 import { projectRoutes } from '../modules/projects/projects.routes.ts'
+import { projectDashboardRoutes } from '../modules/projects/projects.dashboard.routes.ts'
 import { requirementRoutes } from '../modules/requirements/requirements.routes.ts'
 import { bugRoutes } from '../modules/bugs/bugs.routes.ts'
 import type { MailSender } from '../adapters/mail/mail.types.ts'
@@ -102,6 +103,7 @@ export function createHttpApp(
   app.register(identityTeamRoutes, { prefix: '/api/v1', auth: services.auth, service: services.identity })
   app.register(identityTokenRoutes, { prefix: '/api/v1', tokenService: services.tokens, service: services.identity })
   app.register(projectRoutes, { prefix: '/api/v1', auth: services.auth, service: services.projects })
+  app.register(projectDashboardRoutes, { prefix: '/api/v1', service: services.projectDashboard })
   app.register(requirementRoutes, { prefix: '/api/v1', auth: services.auth, service: services.requirements })
   app.register(bugRoutes, { prefix: '/api/v1', auth: services.auth, service: services.bugs })
   app.register(codeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.code })

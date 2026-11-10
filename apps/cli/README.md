@@ -83,6 +83,22 @@ devops delivery get <buildId> --json
 
 完整命令面与参数见 [CLI 契约](../../specs/002-cli-business-commands/contracts/cli-commands.md)。
 
+### 代码与 PR 读取（V0.2）
+
+```bash
+devops code branches <projectId> --repository <repositoryId>
+devops code tree <projectId> --repository <repositoryId> --ref main
+devops code file <projectId> --repository <repositoryId> --path src/main.ts
+
+devops project repository commits <projectId> --repository <repositoryId> --ref main
+devops project repository commit <projectId> --repository <repositoryId> --ref <sha>
+devops project repository pull-requests <projectId> --repository <repositoryId> --state open
+devops project repository pull-request <projectId> --repository <repositoryId> --number 12
+devops project repository pull-request-diff <projectId> --repository <repositoryId> --number 12
+```
+
+代码与 PR 读取全部只读；来源失败按 `EXTERNAL_AUTH_FAILED`／`EXTERNAL_UNAVAILABLE`／`EXTERNAL_UNSUPPORTED` 返回，空列表只表示来源真实为空。交互式确认、`--yes` 与 Token 只从环境变量或标准输入读取等统一规则见上节；流水线执行、审核与发布、晴雨表当前仅 Web 提供，CLI 不提供命令属于已登记例外。
+
 ## 输出与退出码
 
 - 默认输出人类可读文本；`--json` 时 stdout 只包含平台成功信封。

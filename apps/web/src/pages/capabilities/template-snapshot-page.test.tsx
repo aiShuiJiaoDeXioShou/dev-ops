@@ -41,7 +41,7 @@ describe('TemplateSnapshotPage', () => {
     expect(await screen.findByText('默认协作约定 · AGENTS.md')).toBeInTheDocument()
     expect(screen.getByText(/v2 快照/)).toBeInTheDocument()
     expect(screen.getByText(/记录验证/)).toBeInTheDocument()
-    expect(screen.getByText(/未发布到公网/)).toBeInTheDocument()
+    expect(screen.getByText('分享时的版本快照。')).toBeInTheDocument()
   })
 
   it('无效令牌展示错误与重试', async () => {

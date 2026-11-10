@@ -7,6 +7,7 @@ import {
   pullRequestQueryOptions,
   pullRequestsQueryOptions,
 } from '@/features/code/public'
+import { SearchX } from 'lucide-react'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
 import { Select } from '@/shared/ui/controls/select'
@@ -52,7 +53,7 @@ export function Component() {
     return <EmptyState title="仓库加载失败" description={describeRequestError(repositories.error).description} />
   }
   if (repositories.data.data.length === 0) {
-    return <EmptyState title="尚未关联仓库" description="请先在项目设置中关联代码仓库。" />
+    return <EmptyState mascot="aperture" title="尚未关联仓库" description="请先在项目设置中关联代码仓库。" />
   }
   return (
     <div className="project-tab-panel">
@@ -88,7 +89,7 @@ export function Component() {
       ) : list.isError ? (
         <EmptyState title="PR 加载失败" description={describeRequestError(list.error).description} />
       ) : list.data.data.items.length === 0 ? (
-        <EmptyState title="没有匹配的 PR" description="调整状态筛选或切换仓库。" />
+        <EmptyState icon={<SearchX />} title="没有匹配的 PR" description="调整状态筛选或切换仓库后再试。" />
       ) : (
         <ul className="plain-list pr-list">
           {list.data.data.items.map((pullRequest) => (

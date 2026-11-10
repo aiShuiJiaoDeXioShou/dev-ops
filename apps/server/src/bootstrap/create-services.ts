@@ -17,6 +17,7 @@ import { createGiteaAdapter } from '../adapters/git/gitea.adapter.ts'
 import { findGitConnectionById } from '../modules/integrations/integrations.repository.ts'
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
 import { createDeliveryService } from '../modules/delivery/delivery.service.ts'
+import { createProjectDashboardService } from '../modules/projects/projects.dashboard.service.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createIntegrationsService, type GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createSmtpMailer } from '../adapters/mail/smtp-mailer.ts'
@@ -88,6 +89,10 @@ export function createServices(
       }),
     listActiveConnectionIds: options.activeConnectionIds ?? integrations.listActiveConnections,
   })
+  const projectDashboard = createProjectDashboardService({
+    db: database.db,
+    git: { listCommits: code.listRepositoryCommits, listPullRequests: code.listRepositoryPullRequests },
+  })
   const bugs = createBugsService({ db: database.db, codeReferences: code.listReferencesForTarget })
   const requirements = createRequirementsService({
     db: database.db,
@@ -128,6 +133,7 @@ export function createServices(
     integrations,
     code,
     delivery,
+    projectDashboard,
     projects,
     async close() {
       await database.close()
