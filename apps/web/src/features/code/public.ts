@@ -20,3 +20,5 @@ export {
   type PullRequestList,
   type PullRequestQuery,
 } from './api/pr-queries'
+export { CommitHistoryDialog } from './ui/commit-history-dialog'
+export { commitsQueryOptions, commitQueryOptions, type CommitListQuery } from './api/commit-queries'

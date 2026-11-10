@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { projectQueryOptions } from '@/features/projects/public'
 import {
+  CommitHistoryDialog,
   projectRepositoriesQueryOptions,
   repositoryBranchesQueryOptions,
   repositoryFileQueryOptions,
@@ -12,6 +13,7 @@ import {
 import { describeRequestError } from '@/shared/api/errors'
 import { PageError } from '@/shared/ui/page-state'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { Button } from '@/shared/ui/controls/button'
 import { useToast } from '@/shared/ui/toast'
 import {
   DropdownMenu,
@@ -165,6 +167,7 @@ export function Component() {
   const [selectedRepositoryId, setSelectedRepositoryId] = useState('')
   const [selectedBranch, setSelectedBranch] = useState('')
   const [selectedPath, setSelectedPath] = useState('')
+  const [commitsOpen, setCommitsOpen] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview')
   const linkedRepositories = repositories.data?.data ?? []
@@ -317,10 +320,20 @@ export function Component() {
           </span>
         )}
         <span className="spacer" />
+        <Button type="button" variant="outline" size="sm" onClick={() => setCommitsOpen(true)}>
+          提交记录
+        </Button>
         <a className="btn" href={repository.webUrl} target="_blank" rel="noreferrer">
           <PrototypeIcon name="external" />在 {providerLabel} 打开
         </a>
       </div>
+      <CommitHistoryDialog
+        projectId={projectId}
+        repositoryId={repository.id}
+        ref={currentBranch}
+        open={commitsOpen}
+        onOpenChange={setCommitsOpen}
+      />
       <div className="section-heading">
         <h2>代码</h2>
         <span className="badge">只读</span>

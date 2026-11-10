@@ -12,6 +12,7 @@ import {
   BuildDetailPanel,
   BuildReportDialog,
   projectArtifactsQueryOptions,
+  ReviewReleaseSection,
   runVersionsQueryOptions,
 } from '@/features/delivery/public'
 import { describeRequestError } from '@/shared/api/errors'
@@ -191,6 +192,8 @@ export function Component() {
           </ul>
         )}
       </section>
+
+      <ReviewReleaseSection projectId={projectId} />
 
       {selectedBuildId ? (
         <section aria-label="构建详情">

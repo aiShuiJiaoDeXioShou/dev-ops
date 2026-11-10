@@ -14,3 +14,4 @@ export {
   type ProjectArtifactQuery,
 } from './api/artifact-queries'
 export { pipelineRunsQueryOptions, type PipelineRunQuery } from './api/pipeline-queries'
+export { ReviewReleaseSection } from './ui/review-release-section'
