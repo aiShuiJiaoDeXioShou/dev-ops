@@ -47,6 +47,12 @@ function createFakeDocker(options: { createError?: Error } = {}): FakeDocker {
     async ensureImage(image: string): Promise<void> {
       images.push(image)
     },
+    async listManagedContainers(): Promise<{ id: string; name: string }[]> {
+      return []
+    },
+    async removeContainer(): Promise<void> {
+      return undefined
+    },
     async createJobContainer(input): Promise<JobContainer> {
       if (options.createError) throw options.createError
       const container: JobContainer = {

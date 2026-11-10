@@ -10,6 +10,13 @@ import type { AgentLogger } from './logger.ts'
 
 /** 任务容器内的工作区挂载点；工作区在宿主侧由 Agent 准备。 */
 export const CONTAINER_WORKSPACE_DIR = '/workspace'
+/** 任务容器标记标签；启动清理只处理带该标签的容器，避免误删宿主机其他容器。 */
+export const MANAGED_CONTAINER_LABEL = 'devops.agent.managed'
+/** 运行标识标签；启动清理与按运行定向清理使用。 */
+export const RUN_ID_CONTAINER_LABEL = 'devops.agent.run-id'
+/** JOB 标识标签；仅用于排障定位。 */
+export const JOB_ID_CONTAINER_LABEL = 'devops.agent.job-id'
+const MANAGED_CONTAINER_LABEL_VALUE = 'true'
 /** 容器保持运行的常驻命令；具体步骤通过 docker exec 执行。 */
 const CONTAINER_KEEP_ALIVE_COMMAND = ['sh', '-c', 'while true; do sleep 3600; done']
 /** 停止容器后的收尾等待，避免 docker 事件丢失导致步骤永远挂起。 */
@@ -67,6 +74,14 @@ export interface DockerRuntimeOptions {
   logger: AgentLogger
 }
 
+/** 带 Agent 管理标签的遗留容器摘要。 */
+export interface ManagedContainer {
+  id: string
+  name: string
+  /** 所属运行；历史容器可能缺失该标签，因此允许为空。 */
+  runId?: string
+}
+
 /** 任务容器所需的 Docker 能力；测试可注入实现，但真实路径必须由 dockerode 完成。 */
 export interface DockerRuntime {
   /** 检查 Docker Engine 是否可用；不可用时启动失败。 */
@@ -75,6 +90,10 @@ export interface DockerRuntime {
   ensureImage(image: string): Promise<void>
   /** 创建并启动任务容器，返回 exec/删除句柄。 */
   createJobContainer(input: CreateJobContainerInput): Promise<JobContainer>
+  /** 列出带 `devops.agent.managed=true` 标签的容器（含已停止），用于启动清理。 */
+  listManagedContainers(): Promise<ManagedContainer[]>
+  /** 按容器 id 强制删除；容器已不存在视为成功。 */
+  removeContainer(containerId: string): Promise<void>
 }
 
 /** 从 dockerode 错误中安全读取 HTTP 状态码，用于忽略“已删除/已停止”等幂等场景。 */
@@ -205,9 +224,9 @@ export function createDockerRuntime(options: DockerRuntimeOptions): DockerRuntim
       AttachStdout: false,
       AttachStderr: false,
       Labels: {
-        'devops.agent.run-id': input.runId,
-        'devops.agent.job-id': input.jobId,
-        'devops.agent.managed': 'true',
+        [RUN_ID_CONTAINER_LABEL]: input.runId,
+        [JOB_ID_CONTAINER_LABEL]: input.jobId,
+        [MANAGED_CONTAINER_LABEL]: MANAGED_CONTAINER_LABEL_VALUE,
       },
       HostConfig: hostConfig,
     }
@@ -288,12 +307,42 @@ export function createDockerRuntime(options: DockerRuntimeOptions): DockerRuntim
     return { exitCode, timedOut: false, cancelled: false }
   }
 
+  async function listManagedContainers(): Promise<ManagedContainer[]> {
+    let containers
+    try {
+      containers = await docker.listContainers({
+        all: true,
+        filters: { label: [`${MANAGED_CONTAINER_LABEL}=${MANAGED_CONTAINER_LABEL_VALUE}`] },
+      })
+    } catch (error) {
+      throw new Error(`列出遗留任务容器失败：${describeError(error)}`)
+    }
+    return containers.map((container) => {
+      const name = container.Names[0]?.replace(/^\//, '') ?? container.Id.slice(0, 12)
+      const runId = container.Labels[RUN_ID_CONTAINER_LABEL]
+      return { id: container.Id, name, ...(runId ? { runId } : {}) }
+    })
+  }
+
+  async function removeContainerById(containerId: string): Promise<void> {
+    try {
+      await docker.getContainer(containerId).remove({ force: true })
+    } catch (error) {
+      if (dockerStatusCode(error) === 404) return
+      throw new Error(`删除遗留任务容器失败：${describeError(error)}`)
+    }
+  }
+
   return {
     async ping(): Promise<void> {
       await docker.ping()
     },
 
     ensureImage,
+
+    listManagedContainers,
+
+    removeContainer: removeContainerById,
 
     async createJobContainer(input: CreateJobContainerInput): Promise<JobContainer> {
       const created = await createContainer(input)
@@ -332,4 +381,57 @@ async function waitForOutcome(
     if (timer) clearTimeout(timer)
     if (abortListener) signal.removeEventListener('abort', abortListener)
   }
+}
+
+/** 启动清理结果；失败只告警不阻塞 Agent 启动。 */
+export interface OrphanContainerCleanupReport {
+  /** 已成功删除的容器名或 id。 */
+  removed: string[]
+  /** 删除或列举失败的原因；需要写日志，不中断启动。 */
+  failures: string[]
+}
+
+/**
+ * 清理上次 Agent 进程遗留的任务容器。
+ * @param docker 至少提供列举与删除能力的 Docker 运行时。
+ * @param logger 日志器；删除失败只告警。
+ * @param options.runId 可选，只清理指定运行；缺省清理全部带 managed 标签的容器。
+ * @returns 成功删除与失败的容器摘要。
+ * @remarks 只处理 `devops.agent.managed=true` 的容器，绝不触碰宿主机其他容器；
+ * 运行标识过滤用于测试与定向清理，正式启动不传该参数。
+ * P1 假设一台 Docker 主机只运行一个 Agent 进程；同机多实例同时启动时可能互相清理对方的运行容器。
+ */
+export async function cleanupManagedContainers(
+  docker: Pick<DockerRuntime, 'listManagedContainers' | 'removeContainer'>,
+  logger: AgentLogger,
+  options: { runId?: string } = {},
+): Promise<OrphanContainerCleanupReport> {
+  const report: OrphanContainerCleanupReport = { removed: [], failures: [] }
+  let containers: ManagedContainer[]
+  try {
+    containers = await docker.listManagedContainers()
+  } catch (error) {
+    const failure = `列举遗留任务容器失败：${describeError(error)}`
+    logger.warn(failure)
+    report.failures.push(failure)
+    return report
+  }
+  const targets = options.runId === undefined ? containers : containers.filter((item) => item.runId === options.runId)
+  for (const container of targets) {
+    try {
+      await docker.removeContainer(container.id)
+      report.removed.push(container.name)
+      logger.info(`已清理遗留任务容器：${container.name}${container.runId ? `（运行 ${container.runId}）` : ''}`)
+    } catch (error) {
+      const failure = `清理遗留任务容器失败：${describeError(error)}`
+      logger.warn(failure)
+      report.failures.push(failure)
+    }
+  }
+  if (targets.length > 0) {
+    logger.info(
+      `启动清理完成：遗留任务容器 ${String(targets.length)} 个，成功 ${String(report.removed.length)} 个，失败 ${String(report.failures.length)} 个`,
+    )
+  }
+  return report
 }

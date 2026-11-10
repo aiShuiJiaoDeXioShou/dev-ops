@@ -10,6 +10,7 @@ V0.4a 自托管执行节点 Agent。Agent 主动外连平台，领取租约后�
 - 回传：步骤状态、日志分片（单次 ≤20 片、总量 ≤256 KB）、产物 tar（SHA-256 与大小随请求头校验）。
 - 安全：容器限制 CPU/内存/进程数、禁用提权、不挂载宿主机 Docker socket；日志上传前脱敏一层。
 - 收口：取消、步骤/运行超时、租约失效都会终止容器并清理工作区；清理失败随完成上报。
+- 启动自愈：清理上次进程被强杀时遗留的 `devops.agent.managed=true` 任务容器与运行工作区；清理失败只告警，不阻塞启动。
 
 协议见 `specs/005-v04a-pipeline-runner/contracts/agent-protocol.md`，运行计划类型见 `packages/pipeline-protocol`。
 
@@ -44,7 +45,7 @@ pnpm --dir apps/pipeline-agent build
 node apps/pipeline-agent/dist/index.js
 ```
 
-启动顺序：校验配置 → 创建工作目录 → 检查 Docker 可用性 → 注册/复用令牌 → 清理遗留工作区 → 心跳与租约循环。收到 `SIGINT`/`SIGTERM` 时停止领取新任务，并把当前租约按 `interrupted` 收口（尽力而为）。
+启动顺序：校验配置 → 创建工作目录 → 检查 Docker 可用性 → 清理遗留任务容器 → 清理遗留工作区 → 注册/复用令牌 → 心跳与租约循环。收到 `SIGINT`/`SIGTERM` 时停止领取新任务，并把当前租约按 `interrupted` 收口（尽力而为）。
 
 建议用 systemd 或容器编排守护进程；Agent 崩溃后重新启动会继续清理遗留工作区。
 

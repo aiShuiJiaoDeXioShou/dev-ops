@@ -5,7 +5,7 @@ import { createAgentClient } from './agent.ts'
 import { AGENT_VERSION } from './version.ts'
 import { createPlatformHttp } from './client.ts'
 import type { AgentConfig } from './config.ts'
-import { createDockerRuntime } from './docker.ts'
+import { cleanupManagedContainers, createDockerRuntime } from './docker.ts'
 import type { DockerRuntime } from './docker.ts'
 import { classifyFatalError, describeError, isLeaseLostError } from './errors.ts'
 import { createRunStopSignal, executeRunPlan } from './executor.ts'
@@ -116,6 +116,8 @@ export async function runAgentDaemon(options: AgentDaemonOptions): Promise<void>
     })
 
   await docker.ping()
+  // 上次进程被强杀时任务容器会成为孤儿；启动时先清理带 managed 标签的遗留容器，失败不阻塞启动。
+  await cleanupManagedContainers(docker, logger)
   await cleanupStaleRunWorkspaces(config.workDir, logger)
   const session = await client.ensureRegistered()
   logger.info(`节点 ${config.nodeName} 已启动：agent ${AGENT_VERSION}，标签 ${config.labels.join(',')}`)

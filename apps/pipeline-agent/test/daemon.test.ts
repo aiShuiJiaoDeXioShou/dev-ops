@@ -98,14 +98,31 @@ function createFakeClient(options: {
 }
 
 /** 假的 Docker 运行时：exec 等待信号中止或 5 秒后成功，用于验证取消/中断路径。 */
-function createFakeDocker(): { docker: DockerRuntime; state: { execRecords: string[]; removed: number } } {
-  const state = { execRecords: [] as string[], removed: 0 }
+function createFakeDocker(initialOrphans: readonly string[] = []): {
+  docker: DockerRuntime
+  state: { execRecords: string[]; removed: number; orphans: string[]; orphanRemovals: number }
+} {
+  const state = {
+    execRecords: [] as string[],
+    removed: 0,
+    orphans: [...initialOrphans],
+    orphanRemovals: 0,
+  }
   const docker: DockerRuntime = {
     async ping(): Promise<void> {
       return undefined
     },
     async ensureImage(): Promise<void> {
       return undefined
+    },
+    async listManagedContainers(): Promise<{ id: string; name: string }[]> {
+      return state.orphans.map((id) => ({ id, name: id }))
+    },
+    async removeContainer(containerId: string): Promise<void> {
+      const index = state.orphans.indexOf(containerId)
+      if (index < 0) throw new Error(`容器不存在：${containerId}`)
+      state.orphans.splice(index, 1)
+      state.orphanRemovals += 1
     },
     async createJobContainer(_input: CreateJobContainerInput): Promise<JobContainer> {
       return {
@@ -139,7 +156,7 @@ interface DaemonTestContext {
   controller: AbortController
   client: FakeClient
   docker: DockerRuntime
-  dockerState: { execRecords: string[]; removed: number }
+  dockerState: { execRecords: string[]; removed: number; orphans: string[]; orphanRemovals: number }
   logLines: string[]
   cleanup(): Promise<void>
 }
@@ -148,6 +165,7 @@ async function createDaemonContext(options: {
   cancelRunningLease: boolean
   registerError?: Error
   leaseExpiredOnStatus?: boolean
+  orphans?: readonly string[]
 }): Promise<DaemonTestContext> {
   const workDir = await mkdtemp(join(tmpdir(), 'devops-agent-daemon-'))
   const plan = createRunPlan({
@@ -176,7 +194,7 @@ async function createDaemonContext(options: {
     ...(options.registerError ? { registerError: options.registerError } : {}),
     ...(options.leaseExpiredOnStatus ? { leaseExpiredOnStatus: options.leaseExpiredOnStatus } : {}),
   })
-  const fakeDocker = createFakeDocker()
+  const fakeDocker = createFakeDocker(options.orphans ?? [])
   return {
     workDir,
     controller: new AbortController(),
@@ -302,6 +320,33 @@ test('daemon：租约过期时停止本地执行、清理且不上报完成', as
     assert.ok(
       context.logLines.some((line) => line.includes('租约已失效')),
       '应记录租约失效原因',
+    )
+  } finally {
+    await context.cleanup()
+  }
+})
+
+test('daemon：启动时清理带 managed 标签的遗留任务容器', async () => {
+  const { runAgentDaemon } = await import('../src/daemon.ts')
+  const context = await createDaemonContext({
+    cancelRunningLease: false,
+    orphans: ['orphan-container-1', 'orphan-container-2'],
+  })
+  try {
+    const daemon = runAgentDaemon({
+      config: configFor(context.workDir),
+      signal: context.controller.signal,
+      client: context.client,
+      docker: context.docker,
+      writeLog: (line) => context.logLines.push(line),
+    })
+    await pollUntil(() => context.dockerState.orphans.length === 0, 20_000, '遗留容器清理完成')
+    context.controller.abort()
+    await daemon
+    assert.equal(context.dockerState.orphanRemovals, 2, '启动时应删除全部遗留容器')
+    assert.ok(
+      context.logLines.some((line) => line.includes('已清理遗留任务容器')),
+      '清理遗留容器应记录日志',
     )
   } finally {
     await context.cleanup()
