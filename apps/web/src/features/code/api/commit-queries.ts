@@ -4,11 +4,7 @@ import { apiClient } from '@/shared/api/client'
 
 export type CommitListQuery = ApiQuery<'/api/v1/projects/{projectId}/repositories/{repositoryId}/commits', 'get'>
 
-export function commitsQueryOptions(
-  projectId: string,
-  repositoryId: string,
-  query: CommitListQuery,
-) {
+export function commitsQueryOptions(projectId: string, repositoryId: string, query: CommitListQuery) {
   return queryOptions({
     queryKey: ['code', 'commits', projectId, repositoryId, query],
     queryFn: ({ signal }) => apiClient.listCommits(projectId, repositoryId, query, { signal }),

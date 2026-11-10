@@ -33,9 +33,7 @@ describe('ReviewReleaseSection', () => {
       http.get('*/api/v1/projects/project-1/reviews', () =>
         success({ items: [review], page: 1, pageSize: 50, total: 1 }),
       ),
-      http.get('*/api/v1/projects/project-1/releases', () =>
-        success({ items: [], page: 1, pageSize: 50, total: 0 }),
-      ),
+      http.get('*/api/v1/projects/project-1/releases', () => success({ items: [], page: 1, pageSize: 50, total: 0 })),
     )
     render(
       <QueryClientProvider client={createQueryClient()}>

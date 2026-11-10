@@ -21,8 +21,14 @@ export function CommitHistoryDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const [selectedRef, setSelectedRef] = useState('')
-  const list = useQuery({ ...commitsQueryOptions(projectId, repositoryId, { ref, page: 1, pageSize: 30 }), enabled: open })
-  const detail = useQuery({ ...commitQueryOptions(projectId, repositoryId, selectedRef), enabled: open && Boolean(selectedRef) })
+  const list = useQuery({
+    ...commitsQueryOptions(projectId, repositoryId, { ref, page: 1, pageSize: 30 }),
+    enabled: open,
+  })
+  const detail = useQuery({
+    ...commitQueryOptions(projectId, repositoryId, selectedRef),
+    enabled: open && Boolean(selectedRef),
+  })
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -40,12 +46,7 @@ export function CommitHistoryDialog({
             <ul className="plain-list">
               {list.data.data.items.map((commit) => (
                 <li key={commit.sha}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedRef(commit.sha)}
-                  >
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedRef(commit.sha)}>
                     {commit.sha.slice(0, 8)} {commit.title}
                   </Button>
                   <span className="muted">{commit.authorName}</span>

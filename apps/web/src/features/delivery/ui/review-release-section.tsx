@@ -255,9 +255,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               审核状态
               <Select
                 value={statusForm.reviewStatus}
-                onChange={(event) =>
-                  setStatusForm({ ...statusForm, reviewStatus: event.target.value as ReviewStatus })
-                }
+                onChange={(event) => setStatusForm({ ...statusForm, reviewStatus: event.target.value as ReviewStatus })}
               >
                 <option value="pending">待审核</option>
                 <option value="approved">通过</option>
@@ -311,7 +309,10 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <Select
                 value={releaseForm.releaseStatus}
                 onChange={(event) =>
-                  setReleaseForm({ ...releaseForm, releaseStatus: event.target.value as typeof releaseForm.releaseStatus })
+                  setReleaseForm({
+                    ...releaseForm,
+                    releaseStatus: event.target.value as typeof releaseForm.releaseStatus,
+                  })
                 }
               >
                 <option value="released">已发布</option>
