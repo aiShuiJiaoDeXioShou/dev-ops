@@ -100,7 +100,7 @@ function FileTree({
             >
               {isDirectory ? (
                 <>
-                  <span className="tree-caret" />
+                  <PrototypeIcon name="down" className="tree-caret" />
                   <PrototypeIcon name="folder" />
                 </>
               ) : (

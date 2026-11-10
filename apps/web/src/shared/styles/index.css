@@ -817,18 +817,6 @@
 .code-page .file {
   padding: 8px;
 }
-.tree-caret {
-  width: 0;
-  height: 0;
-  flex-shrink: 0;
-  border-top: 3px solid transparent;
-  border-bottom: 3px solid transparent;
-  border-left: 4px solid var(--quiet);
-  transition: transform 0.12s ease;
-}
-.file.directory.expanded .tree-caret {
-  transform: rotate(90deg);
-}
 .file.directory {
   color: var(--muted);
 }
@@ -850,27 +838,15 @@
 .file {
   align-items: center;
 }
-.tree-caret {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 10px;
-  height: 10px;
-  position: relative;
-  border: 0;
-  transform: none;
-}
-.tree-caret::before {
-  content: '';
-  position: absolute;
-  left: 1px;
-  border-top: 3px solid transparent;
-  border-bottom: 3px solid transparent;
-  border-left: 4px solid var(--quiet);
+.file .tree-caret {
+  width: 12px;
+  height: 12px;
+  color: var(--quiet);
+  transform: rotate(-90deg);
   transition: transform 0.12s ease;
 }
-.file.directory.expanded .tree-caret::before {
-  transform: rotate(90deg);
+.file.directory.expanded .tree-caret {
+  transform: rotate(0deg);
 }
 .file.directory .icon {
   width: 15px;
