@@ -836,3 +836,64 @@
   width: 15px;
   height: 15px;
 }
+
+/* 文件树骨架与行内图标中线对齐。 */
+.file-tree-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px;
+}
+.file-tree-skeleton .skeleton-line {
+  height: 12px;
+}
+.file {
+  align-items: center;
+}
+.tree-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  position: relative;
+  border: 0;
+  transform: none;
+}
+.tree-caret::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-left: 4px solid var(--quiet);
+  transition: transform 0.12s ease;
+}
+.file.directory.expanded .tree-caret::before {
+  transform: rotate(90deg);
+}
+.file.directory .icon {
+  width: 15px;
+  height: 15px;
+}
+.code-markdown-preview {
+  padding: 20px 24px;
+  min-height: 380px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.file-tabs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.file-tab {
+  color: var(--quiet);
+  font-size: 12px;
+  padding: 4px 0;
+}
+.file-tab.active {
+  color: var(--blue);
+  border-bottom: 1px solid var(--blue);
+}

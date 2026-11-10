@@ -13,6 +13,9 @@ import { describeRequestError } from '@/shared/api/errors'
 import { PageError } from '@/shared/ui/page-state'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { useToast } from '@/shared/ui/toast'
+import { Markdown } from '@/shared/lib/markdown'
+import { highlightCode } from '@/shared/lib/highlight'
+import 'highlight.js/styles/github.css'
 
 interface FileTreeNode {
   name: string
@@ -135,6 +138,7 @@ export function Component() {
   const [selectedBranch, setSelectedBranch] = useState('')
   const [selectedPath, setSelectedPath] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview')
   const linkedRepositories = repositories.data?.data ?? []
   const repository = linkedRepositories.find((item) => item.id === selectedRepositoryId) ?? linkedRepositories[0]
   const branches = useQuery(repositoryBranchesQueryOptions(projectId, repository?.id ?? ''))
@@ -147,6 +151,9 @@ export function Component() {
   const defaultPath = files.find((path) => path.toLowerCase() === 'readme.md') ?? files[0] ?? ''
   const activePath = files.includes(selectedPath) ? selectedPath : defaultPath
   const file = useQuery(repositoryFileQueryOptions(projectId, repository?.id ?? '', tree.data?.data.branch, activePath))
+  useEffect(() => {
+    setViewMode('preview')
+  }, [activePath])
   useEffect(() => {
     if (!activePath) return
     const parents = activePath.split('/').slice(0, -1)
@@ -273,7 +280,11 @@ export function Component() {
         <div className="file-browser">
           <nav className="file-tree" aria-label="文件目录">
             {tree.isPending ? (
-              <p className="section-note">正在读取文件树…</p>
+              <div className="file-tree-skeleton" role="status" aria-label="文件树加载中">
+                {[68, 52, 76, 44, 62, 58, 48, 70].map((width, index) => (
+                  <span key={index} className="skeleton-line" style={{ width: `${width}%` }} />
+                ))}
+              </div>
             ) : treeNodes.length === 0 ? (
               <p className="section-note">仓库没有可展示的文件。</p>
             ) : (
@@ -288,7 +299,27 @@ export function Component() {
           </nav>
           <section style={{ minWidth: 0 }}>
             <div className="file-head">
-              <span>{activePath || '选择文件'}</span>
+              <span className="row">
+                <span>{activePath || '选择文件'}</span>
+                {/\.(md|mdx)$/i.test(activePath) && (
+                  <span className="file-tabs">
+                    <button
+                      type="button"
+                      className={`file-tab ${viewMode === 'preview' ? 'active' : ''}`}
+                      onClick={() => setViewMode('preview')}
+                    >
+                      预览
+                    </button>
+                    <button
+                      type="button"
+                      className={`file-tab ${viewMode === 'code' ? 'active' : ''}`}
+                      onClick={() => setViewMode('code')}
+                    >
+                      代码
+                    </button>
+                  </span>
+                )}
+              </span>
               <span className="row">
                 <button type="button" className="text-btn" disabled={!file.data} onClick={() => void copyContent()}>
                   复制内容
@@ -308,9 +339,19 @@ export function Component() {
               </p>
             ) : file.data ? (
               <>
-                <pre className="code">
-                  <code>{file.data.data.content}</code>
-                </pre>
+                {/\.(md|mdx)$/i.test(activePath) && viewMode === 'preview' ? (
+                  <div className="code-markdown-preview">
+                    <Markdown>{file.data.data.content}</Markdown>
+                  </div>
+                ) : (
+                  <pre className="code">
+                    {/* highlight.js 先转义源码再生成高亮 HTML，不直接注入远端原始 HTML。 */}
+                    <code
+                      className="hljs"
+                      dangerouslySetInnerHTML={{ __html: highlightCode(file.data.data.content, activePath) }}
+                    />
+                  </pre>
+                )}
                 {file.data.data.truncated && <p className="section-note">文件较大，仅展示前 200000 个字符。</p>}
               </>
             ) : (
