@@ -888,16 +888,16 @@
   padding-right: 4px;
 }
 .user .avatar-slot {
-  width: 22px;
+  width: 18px;
   flex-shrink: 0;
   display: flex;
-  margin-right: 9px;
+  margin-right: 13px;
 }
 .user .avatar {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 10px;
 }
 .user .badge {
   margin-left: 2px;
