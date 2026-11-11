@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { authUser, personalAccessToken } from './identity.tables.ts'
@@ -27,12 +28,6 @@ export interface TokenMetadata {
 export interface CreateTokenInput {
   name: string
   expiresInDays?: number
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === '23505') return true
-  return 'cause' in error && isUniqueViolation(error.cause)
 }
 
 /** 计算 Token 摘要，数据库只保存该值。 */

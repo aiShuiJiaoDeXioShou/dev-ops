@@ -53,10 +53,8 @@ export function createInvitationToken(): string {
   return randomBytes(32).toString('base64url')
 }
 
-/** 判断 PostgreSQL 唯一约束冲突。 */
-export function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505'
-}
+/** 判断 PostgreSQL 唯一约束冲突；统一从平台数据库工具导入，避免各模块重复实现。 */
+export { isUniqueViolation } from '../../platform/database/errors.ts'
 
 /**
  * 判断成员更新是否会移除最后一位正常管理员。

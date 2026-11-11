@@ -62,8 +62,8 @@ export function createServices(
   } = {},
 ) {
   const database = createDatabase(config, onDatabaseIdleError)
-  const auth = createIdentityAuth(database.db, config)
   const mailer = options.mailer ?? createSmtpMailer(config)
+  const auth = createIdentityAuth(database.db, config, mailer)
   const identity = createIdentityService({ db: database.db, auth, config, mailer })
   const tokens = createTokenService({ db: database.db })
   const secretCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY

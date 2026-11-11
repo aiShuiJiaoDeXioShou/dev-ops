@@ -189,6 +189,54 @@ test('团队邀请、开通、角色与最后管理员保护通过真实 HTTP �
   assert.equal(lastAdmin.json().success, false)
   assert.equal(lastAdmin.json().code, 'LAST_ADMIN_PROTECTED')
 
+  // 忘记密码：请求重置邮件并通过邮件中的 token 完成重置，再用新密码登录。
+  const resetRequest = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/request-password-reset',
+    payload: { email: devEmail, redirectTo: `${config.APP_ORIGIN}/reset-password` },
+    headers: { origin: config.APP_ORIGIN },
+  })
+  assert.equal(resetRequest.statusCode, 200, resetRequest.body)
+  const resetMail = mailer.sent.at(-1)
+  assert.ok(resetMail, '应发送重置密码邮件')
+  const resetToken = /reset-password\?token=([A-Za-z0-9_-]+)/.exec(resetMail.text)?.[1]
+  assert.ok(resetToken, '重置邮件应包含 token')
+  const resetResponse = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/reset-password',
+    payload: { token: decodeURIComponent(resetToken), newPassword: 'new-password-456' },
+    headers: { origin: config.APP_ORIGIN },
+  })
+  assert.equal(resetResponse.statusCode, 200, resetResponse.body)
+  const relogin = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/sign-in/email',
+    payload: { email: devEmail, password: 'new-password-456' },
+    headers: { origin: config.APP_ORIGIN },
+  })
+  assert.equal(relogin.statusCode, 200, relogin.body)
+  assert.equal(relogin.json().user.email, devEmail)
+
+  // 同一邮箱重复待接受邀请应返回业务冲突（HTTP 200 + DUPLICATE_RELATION），
+  // 不能被 Drizzle 包装的唯一约束错误冒泡成 500。
+  const duplicateInviteEmail = `dup-${randomBytes(3).toString('hex')}@example.test`
+  const firstInvite = await app.inject({
+    method: 'POST',
+    url: `/api/v1/teams/${teamId}/invitations`,
+    payload: { email: duplicateInviteEmail, role: 'viewer' },
+    headers: { cookie: adminCookie, origin: config.APP_ORIGIN },
+  })
+  assert.equal(firstInvite.json().success, true, firstInvite.body)
+  const duplicateInvite = await app.inject({
+    method: 'POST',
+    url: `/api/v1/teams/${teamId}/invitations`,
+    payload: { email: duplicateInviteEmail, role: 'viewer' },
+    headers: { cookie: adminCookie, origin: config.APP_ORIGIN },
+  })
+  assert.equal(duplicateInvite.statusCode, 200)
+  assert.equal(duplicateInvite.json().success, false)
+  assert.equal(duplicateInvite.json().code, 'DUPLICATE_RELATION')
+
   // 跨团队访问被拒绝。
   const secondTeam = `team-${randomBytes(3).toString('hex')}`
   const secondCreated = await app.inject({

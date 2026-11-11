@@ -11,7 +11,7 @@ function readRequired(name: 'ROOT_EMAIL' | 'ROOT_INITIAL_PASSWORD'): string {
 
 const config = loadConfig(process.env)
 const database = createDatabase(config, () => {})
-const auth = createIdentityAuth(database.db, config)
+const auth = createIdentityAuth(database.db, config, null)
 
 try {
   const result = await seedRootAccount(
