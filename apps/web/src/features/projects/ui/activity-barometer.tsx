@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import type { ApiSuccessData } from '@dev-ops/api-client'
 import { Select } from '@/shared/ui/controls/select'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { describeRequestError } from '@/shared/api/errors'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageLoading } from '@/shared/ui/page-state'
-import { projectActivityQueryOptions } from '../api/queries'
 
 const SOURCES = [
   { value: 'all', label: '全部' },
@@ -39,35 +38,48 @@ interface CalendarDay {
   future?: boolean
 }
 
+type ActivityResult = ApiSuccessData<'/api/v1/teams/{teamId}/project-activity', 'get'>
+
+interface ActivityBarometerProps {
+  /** 已加载的晴雨表数据；筛选切换时可为上一份结果。 */
+  result: ActivityResult | undefined
+  isPending: boolean
+  isError: boolean
+  error: unknown
+  source: Source
+  onSourceChange: (source: Source) => void
+}
+
 /**
  * 项目首页活动晴雨表：严格沿用原型的热力图、来源筛选、月份/星期刻度与日期弹窗。
- * @param props.teamId 当前团队；search/status 与项目列表筛选保持一致。
+ * 查询由项目列表页统一持有，筛选变化时用旧数据静默替换，避免整块重复请求与闪烁。
+ * @param props 晴雨表结果、加载/错误状态与受控的活动来源。
  * @returns 过去一年 UTC 日历热力图；来源未知时在文案中标注，不伪造为 0。
  */
-export function ActivityBarometer({ teamId, search, status }: { teamId: string; search: string; status: string }) {
-  const [source, setSource] = useState<Source>('all')
+export function ActivityBarometer({
+  result,
+  isPending,
+  isError,
+  error,
+  source,
+  onSourceChange,
+}: ActivityBarometerProps) {
   const [selected, setSelected] = useState<CalendarDay | null>(null)
-  const query = useQuery(
-    projectActivityQueryOptions(teamId, {
-      ...(search ? { search } : {}),
-      ...(status ? { status: status as 'active' | 'paused' | 'ended' } : {}),
-      source,
-    }),
-  )
-  if (query.isPending)
+  if (!result && isPending)
     return (
       <DelayedLoading pending>
         <PageLoading message="项目晴雨表加载中…" />
       </DelayedLoading>
     )
-  if (query.isError) {
+  if (!result && isError) {
     return (
       <p className="section-note" role="alert">
-        项目晴雨表加载失败：{describeRequestError(query.error).description}
+        项目晴雨表加载失败：{describeRequestError(error).description}
       </p>
     )
   }
-  const data = query.data.data
+  if (!result) return null
+  const data = result
   const days: CalendarDay[] = data.days.map((day) => ({
     date: day.date,
     total: day.total,
@@ -111,7 +123,7 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
           className="activity-source"
           aria-label="活动来源"
           value={source}
-          onChange={(event) => setSource(event.target.value as Source)}
+          onChange={(event) => onSourceChange(event.target.value as Source)}
         >
           {SOURCES.map((item) => (
             <option key={item.value} value={item.value}>
@@ -120,6 +132,11 @@ export function ActivityBarometer({ teamId, search, status }: { teamId: string; 
           ))}
         </Select>
       </div>
+      {isError && (
+        <p className="section-note" role="status">
+          晴雨表刷新失败，继续显示上一次结果。
+        </p>
+      )}
       <div className="activity-scroll">
         <div className="activity-calendar">
           <div className="activity-months">

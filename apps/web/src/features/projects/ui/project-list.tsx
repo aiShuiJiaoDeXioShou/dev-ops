@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
@@ -25,6 +25,8 @@ export function ProjectList() {
   const filters = parseProjectFilters(params)
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null)
+  const [activitySource, setActivitySource] = useState<'all' | 'activity' | 'code' | 'pull_request'>('all')
+  const [searchInput, setSearchInput] = useState(filters.search)
   const query = useQuery(
     projectListQueryOptions(currentTeam?.id ?? '', {
       search: filters.search || undefined,
@@ -37,9 +39,21 @@ export function ProjectList() {
     projectActivityQueryOptions(currentTeam?.id ?? '', {
       ...(filters.search ? { search: filters.search } : {}),
       ...(filters.status ? { status: filters.status as ProjectStatus } : {}),
-      source: 'all',
+      source: activitySource,
     }),
   )
+  useEffect(() => {
+    setSearchInput(filters.search)
+  }, [filters.search])
+  useEffect(() => {
+    if (searchInput === filters.search) return
+    // 搜索输入防抖后再改 URL 和查询条件，避免逐字触发项目列表和耗时晴雨表请求。
+    const timer = window.setTimeout(() => {
+      const next = updateProjectFilters(parseProjectFilters(params), { search: searchInput })
+      setParams(projectFilterParams(next))
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [searchInput, filters.search, params, setParams])
   const activityByProject = new Map((activity.data?.data.projects ?? []).map((summary) => [summary.projectId, summary]))
   const update = (patch: Parameters<typeof updateProjectFilters>[1]) =>
     setParams(projectFilterParams(updateProjectFilters(filters, patch)))
@@ -97,7 +111,14 @@ export function ProjectList() {
         </div>
       </header>
       <div className="catalog project-home">
-        <ActivityBarometer teamId={currentTeam.id} search={filters.search} status={filters.status} />
+        <ActivityBarometer
+          result={activity.data?.data}
+          isPending={activity.isPending}
+          isError={activity.isError}
+          error={activity.error}
+          source={activitySource}
+          onSourceChange={setActivitySource}
+        />
         <div className="filters">
           <select
             className="btn project-filter"
@@ -116,8 +137,8 @@ export function ProjectList() {
             <input
               aria-label="搜索项目"
               placeholder="搜索项目、仓库或负责人"
-              value={filters.search}
-              onChange={(event) => update({ search: event.target.value })}
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
             />
           </label>
         </div>

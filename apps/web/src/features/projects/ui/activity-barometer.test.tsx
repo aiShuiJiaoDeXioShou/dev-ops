@@ -1,10 +1,6 @@
-import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import { http } from 'msw'
-import { MemoryRouter } from 'react-router'
+import type { ApiSuccessData } from '@dev-ops/api-client'
 import { describe, expect, it } from 'vitest'
-import { createQueryClient } from '@/shared/api/query-client'
-import { server, success } from '@/test/server'
 import { ActivityBarometer } from './activity-barometer'
 
 const days = [
@@ -12,7 +8,7 @@ const days = [
   { date: '2026-11-10', total: 1, counts: { activity: 1, code: 0, pullRequest: 0 } },
 ]
 
-const activityFixture = {
+const activityFixture: ApiSuccessData<'/api/v1/teams/{teamId}/project-activity', 'get'> = {
   timezone: 'UTC',
   from: '2025-11-05',
   to: '2026-11-10',
@@ -34,16 +30,33 @@ const activityFixture = {
 }
 
 describe('ActivityBarometer', () => {
-  it('渲染热力图总数与项目摘要，未同步来源显示未知', async () => {
-    server.use(http.get('*/api/v1/teams/team-1/project-activity', () => success(activityFixture)))
+  it('渲染热力图总数与项目摘要，未同步来源显示未知', () => {
     render(
-      <QueryClientProvider client={createQueryClient()}>
-        <MemoryRouter>
-          <ActivityBarometer teamId="team-1" search="" status="" />
-        </MemoryRouter>
-      </QueryClientProvider>,
+      <ActivityBarometer
+        result={activityFixture}
+        isPending={false}
+        isError={false}
+        error={null}
+        source="all"
+        onSourceChange={() => undefined}
+      />,
     )
-    expect(await screen.findByText(/过去一年 · 4 次活动/)).toBeInTheDocument()
+    expect(screen.getByText(/过去一年 · 4 次活动/)).toBeInTheDocument()
     expect(screen.getByText(/PR 未同步/)).toBeInTheDocument()
+  })
+
+  it('已有结果时刷新失败保留上一份热力图并提示静默失败', () => {
+    render(
+      <ActivityBarometer
+        result={activityFixture}
+        isPending={false}
+        isError
+        error={new Error('超时')}
+        source="all"
+        onSourceChange={() => undefined}
+      />,
+    )
+    expect(screen.getByText(/过去一年 · 4 次活动/)).toBeInTheDocument()
+    expect(screen.getByText(/晴雨表刷新失败/)).toBeInTheDocument()
   })
 })
