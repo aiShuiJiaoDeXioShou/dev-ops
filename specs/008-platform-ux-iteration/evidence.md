@@ -65,6 +65,7 @@
 | `pnpm ui:check` | 通过（96 处存量，0 新增） |
 | 浏览器回归 | 见第 4 节截图路径 |
 | 流水线 | `platform-smoke` 运行 `succeeded`，产物 `build-info` 可下载 |
+| `pnpm check` | 通过（2026-11-11，最终 HEAD；含 e2e 11/11） |
 
 ## 4. 浏览器回归证据
 
