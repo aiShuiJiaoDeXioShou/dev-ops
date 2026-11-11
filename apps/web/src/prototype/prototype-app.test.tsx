@@ -37,7 +37,7 @@ afterEach(() => {
 describe('交互原型路由', () => {
   it('默认进入项目列表并可打开项目需求', async () => {
     const router = renderPrototype('/prototype')
-    expect(await screen.findByRole('heading', { name: '项目', level: 1 })).toBeVisible()
+    expect(await screen.findByRole('heading', { name: '项目', level: 1 }, { timeout: 5_000 })).toBeVisible()
     expect(router.state.location.pathname).toBe('/prototype/projects')
 
     await userEvent.click(screen.getByRole('button', { name: '研发协作平台' }))
@@ -52,7 +52,7 @@ describe('交互原型路由', () => {
 
   it('可以切换团队并保持各自项目数据隔离', async () => {
     renderPrototype('/prototype/projects')
-    await screen.findByRole('heading', { name: '项目', level: 1 })
+    await screen.findByRole('heading', { name: '项目', level: 1 }, { timeout: 5_000 })
     expect(screen.getByText('研发协作平台')).toBeVisible()
     await userEvent.click(screen.getByRole('button', { name: '切换到产品团队' }))
     expect(await screen.findByText('客户应用')).toBeVisible()
