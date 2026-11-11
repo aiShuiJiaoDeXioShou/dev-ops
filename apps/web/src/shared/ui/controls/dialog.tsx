@@ -39,6 +39,11 @@ function DialogContent({
   /** default：整块内容滚动（既有行为）；form：仅字段区滚动，标题与底部操作栏固定。 */
   layout?: DialogContentLayout
 }) {
+  // 受控弹窗没有 DialogTrigger 时 Radix 会把焦点交还 body；在打开时记录触发元素，
+  // 关闭时归还焦点，满足键盘/读屏用户的连续操作预期。
+  const triggerElementRef = React.useRef<HTMLElement | null>(
+    typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null),
+  )
   const layoutClassName =
     layout === 'form'
       ? `form-dialog-content flex flex-col gap-0 overflow-hidden rounded-xl border border-border bg-background p-0 ${DIALOG_SHADOW} outline-none`
@@ -51,6 +56,12 @@ function DialogContent({
         data-layout={layout}
         className={cn('fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2', layoutClassName, className)}
         {...props}
+        onCloseAutoFocus={(event) => {
+          props.onCloseAutoFocus?.(event)
+          if (event.defaultPrevented) return
+          event.preventDefault()
+          triggerElementRef.current?.focus()
+        }}
       >
         {children}
         {showCloseButton && (

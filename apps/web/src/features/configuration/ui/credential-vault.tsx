@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Lock, Plus, Search } from 'lucide-react'
 import type { ApiBody } from '@dev-ops/api-client'
@@ -69,8 +69,14 @@ export function CredentialVault() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [category, setCategory] = useState<CredentialCategory>('')
   const [selectedId, setSelectedId] = useState('')
+  useEffect(() => {
+    // 凭据搜索防抖：避免每次击键都查询一次。
+    const timer = window.setTimeout(() => setSearch(searchInput), 350)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
   const list = useQuery(
     credentialsQueryOptions(teamId, {
       ...(search ? { search } : {}),
@@ -140,6 +146,7 @@ export function CredentialVault() {
   }
   const clearFilters = () => {
     setSearch('')
+    setSearchInput('')
     setCategory('')
   }
   const hasFilters = Boolean(search.trim() || category)
@@ -166,10 +173,10 @@ export function CredentialVault() {
               <Input
                 aria-label="搜索凭据"
                 placeholder="搜索凭据"
-                value={search}
+                value={searchInput}
                 maxLength={200}
                 className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </label>
             {canManage ? (

@@ -9,7 +9,14 @@ import { SKILL_CATEGORY_OPTIONS } from '../model/labels'
 import type { SkillDetail, SkillFileDraft, SkillListItem } from '../model/types'
 import { pickSkillDirectory, readSkillPackageDirectory } from '../lib/skill-package'
 import { Button } from '@/shared/ui/controls/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFormBody,
+  DialogFormFooter,
+  DialogFormHeader,
+  DialogTitle,
+} from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
@@ -111,87 +118,89 @@ export function SkillForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="knowledge-dialog w-full max-w-3xl">
-        <form className="space-y-4" onSubmit={submit}>
-          <DialogHeader>
+      <DialogContent layout="form" className="knowledge-dialog w-full max-w-3xl">
+        <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+          <DialogFormHeader>
             <DialogTitle>{skill ? '编辑 Skill' : '发布团队 Skill'}</DialogTitle>
-          </DialogHeader>
-          <div className="form-grid">
-            <label className="field">
-              名称
-              <Input value={name} maxLength={30} onChange={(event) => setName(event.target.value)} autoFocus />
-            </label>
-            <label className="field">
-              调用标识
-              <Input
-                value={identifier}
-                maxLength={40}
-                readOnly={Boolean(skill)}
-                placeholder="如 code-review"
-                onChange={(event) => setIdentifier(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              分类
-              <Select
-                value={category}
-                onChange={(event) => setCategory(event.target.value as SkillListItem['category'])}
-              >
-                {SKILL_CATEGORY_OPTIONS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="field">
-              内容版本
-              <Input
-                value={contentVersion}
-                maxLength={20}
-                placeholder="1.0.0"
-                onChange={(event) => setContentVersion(event.target.value)}
-              />
-            </label>
-            <label className="field full">
-              简述
-              <Input value={summary} maxLength={100} onChange={(event) => setSummary(event.target.value)} />
-            </label>
-            <label className="field full">
-              SKILL.md 正文
-              <Textarea
-                value={content}
-                maxLength={50000}
-                rows={12}
-                className="font-mono text-xs"
-                onChange={(event) => setContent(event.target.value)}
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => void importDirectory()}>
-              <FolderUp className="size-4" />
-              导入技能包目录
-            </Button>
-            <span className="text-xs text-muted-foreground">
-              支持包含 SKILL.md、scripts/、references/、assets/ 的目录；图片等二进制文件将转为可下载资源。
-            </span>
-          </div>
-          <SkillFilesEditor files={files} onChange={setFiles} />
-          <p className="text-xs text-muted-foreground">请勿在技能中写入密钥、访问令牌或平台凭据；只引用凭据名称。</p>
-          {error && (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          )}
-          <DialogFooter>
+          </DialogFormHeader>
+          <DialogFormBody className="space-y-4">
+            <div className="form-grid">
+              <label className="field">
+                名称
+                <Input value={name} maxLength={30} onChange={(event) => setName(event.target.value)} autoFocus />
+              </label>
+              <label className="field">
+                调用标识
+                <Input
+                  value={identifier}
+                  maxLength={40}
+                  readOnly={Boolean(skill)}
+                  placeholder="如 code-review"
+                  onChange={(event) => setIdentifier(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                分类
+                <Select
+                  value={category}
+                  onChange={(event) => setCategory(event.target.value as SkillListItem['category'])}
+                >
+                  {SKILL_CATEGORY_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="field">
+                内容版本
+                <Input
+                  value={contentVersion}
+                  maxLength={20}
+                  placeholder="1.0.0"
+                  onChange={(event) => setContentVersion(event.target.value)}
+                />
+              </label>
+              <label className="field full">
+                简述
+                <Input value={summary} maxLength={100} onChange={(event) => setSummary(event.target.value)} />
+              </label>
+              <label className="field full">
+                SKILL.md 正文
+                <Textarea
+                  value={content}
+                  maxLength={50000}
+                  rows={12}
+                  className="font-mono text-xs"
+                  onChange={(event) => setContent(event.target.value)}
+                />
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => void importDirectory()}>
+                <FolderUp className="size-4" />
+                导入技能包目录
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                支持包含 SKILL.md、scripts/、references/、assets/ 的目录；图片等二进制文件将转为可下载资源。
+              </span>
+            </div>
+            <SkillFilesEditor files={files} onChange={setFiles} />
+            <p className="text-xs text-muted-foreground">请勿在技能中写入密钥、访问令牌或平台凭据；只引用凭据名称。</p>
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+          </DialogFormBody>
+          <DialogFormFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               取消
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? '提交中…' : skill ? '保存修改' : '发布到团队'}
             </Button>
-          </DialogFooter>
+          </DialogFormFooter>
         </form>
       </DialogContent>
     </Dialog>

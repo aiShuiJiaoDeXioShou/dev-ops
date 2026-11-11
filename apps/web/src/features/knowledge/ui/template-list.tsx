@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { FileText, Link2, Plus, Search } from 'lucide-react'
@@ -25,12 +25,23 @@ export function TemplateList({ teamId }: { teamId: string }) {
   const { showToast } = useToast()
   const [params, setParams] = useSearchParams()
   const search = params.get('search') ?? ''
+  const [searchInput, setSearchInput] = useState(search)
   const selected = params.get('template')
   const page = Number(params.get('page') ?? '1')
   const [createOpen, setCreateOpen] = useState(false)
   const canWrite = canWriteKnowledge(role)
   const filters = useMemo(() => ({ search: search || undefined, page, pageSize: 20 }), [search, page])
   const query = useQuery(templateListQueryOptions(teamId, filters))
+  useEffect(() => {
+    setSearchInput(search)
+  }, [search])
+  useEffect(() => {
+    if (searchInput === search) return
+    // 输入防抖后再写 URL，避免逐字回写覆盖用户输入并触发多次查询。
+    const timer = window.setTimeout(() => updateParam('search', searchInput), 350)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput, search, params, setParams])
   const updateParam = (key: string, value: string) => {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
@@ -95,10 +106,10 @@ export function TemplateList({ teamId }: { teamId: string }) {
               <Input
                 aria-label="搜索模板名称或分类"
                 placeholder="搜索模板名称或分类"
-                value={search}
+                value={searchInput}
                 maxLength={200}
                 className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                onChange={(event) => updateParam('search', event.target.value)}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </label>
             {query.data.data.items.length === 0 ? (

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ApiSuccessData } from '@dev-ops/api-client'
 import { Select } from '@/shared/ui/controls/select'
 import { Button } from '@/shared/ui/controls/button'
@@ -65,6 +65,14 @@ export function ActivityBarometer({
   onSourceChange,
 }: ActivityBarometerProps) {
   const [selected, setSelected] = useState<CalendarDay | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const days: CalendarDay[] = (result?.days ?? []).map((day) => ({
+    date: day.date,
+    total: day.total,
+    counts: day.counts,
+  }))
+  const focusableDays = days.filter((day) => !day.future)
+  const [activeDate, setActiveDate] = useState('')
   if (!result && isPending)
     return (
       <DelayedLoading pending>
@@ -80,11 +88,6 @@ export function ActivityBarometer({
   }
   if (!result) return null
   const data = result
-  const days: CalendarDay[] = data.days.map((day) => ({
-    date: day.date,
-    total: day.total,
-    counts: day.counts,
-  }))
   // API 默认窗口从周日开始；把当前周剩余日期补成 future 占位，保持 53×7 网格。
   const lastDate = days.at(-1)?.date
   if (lastDate) {
@@ -149,24 +152,36 @@ export function ActivityBarometer({
               <span key={label}>{label}</span>
             ))}
           </div>
-          <div className="activity-grid" role="grid" aria-label="过去一年活动热力图">
+          <div ref={gridRef} className="activity-grid" role="grid" aria-label="过去一年活动热力图">
             {days.map((day) => {
               if (day.future) return <span key={day.date} className="activity-day future" />
               const label = `${day.date} · ${day.total} 次活动`
+              const index = focusableDays.findIndex((item) => item.date === day.date)
               return (
                 <span
                   key={day.date}
-                  role="button"
-                  tabIndex={0}
+                  role="gridcell"
+                  tabIndex={day.date === (activeDate || focusableDays[0]?.date) ? 0 : -1}
+                  data-date={day.date}
                   title={label}
                   aria-label={label}
                   className={`activity-day level-${levelOf(day.total)}`}
                   onClick={() => setSelected(day)}
+                  onFocus={() => setActiveDate(day.date)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
                       setSelected(day)
+                      return
                     }
+                    const offsets: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 7, ArrowUp: -7 }
+                    const offset = offsets[event.key]
+                    if (offset === undefined) return
+                    const next = focusableDays[index + offset]
+                    if (!next) return
+                    event.preventDefault()
+                    // 移动焦点而不是给每个日期都建立 Tab 停靠点，365 个格子只需一次 Tab。
+                    gridRef.current?.querySelector<HTMLElement>(`[data-date="${next.date}"]`)?.focus()
                   }}
                 />
               )

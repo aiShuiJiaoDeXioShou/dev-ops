@@ -20,7 +20,13 @@ const BUSINESS_MESSAGES: Record<string, string> = {
 export function describeRequestError(error: unknown): { description: string; requestId: string | null } {
   if (error instanceof RequestError) {
     const mapped = error.serverCode ? BUSINESS_MESSAGES[error.serverCode] : undefined
-    return { description: mapped ?? error.message, requestId: error.requestId }
+    // 参数校验保留服务端的具体字段原因；其他业务码继续使用稳定的本地说明。
+    const serverMessage = error.message.trim()
+    const description =
+      error.serverCode === 'VALIDATION_ERROR' && serverMessage
+        ? serverMessage
+        : (mapped ?? serverMessage ?? '请求失败，请稍后重试。')
+    return { description, requestId: error.requestId }
   }
   return { description: '请求失败，请检查网络后重试。', requestId: null }
 }

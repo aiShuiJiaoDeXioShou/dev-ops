@@ -39,8 +39,24 @@ async function authRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
   }
   if (!response.ok) {
     const code = response.status === 401 ? 'UNAUTHENTICATED' : response.status === 403 ? 'FORBIDDEN' : 'AUTH_ERROR'
-    const message = response.status === 401 ? '邮箱或密码不正确。' : '认证请求失败，请稍后重试。'
-    throw new AuthRequestError(message, code, response.status)
+    // 优先展示认证库返回的可读原因（如重置未启用、请求过于频繁），避免所有失败都被统一文案掩盖。
+    const serverMessage = await response
+      .clone()
+      .json()
+      .then((payload: unknown) =>
+        typeof payload === 'object' && payload !== null && 'message' in payload && typeof payload.message === 'string'
+          ? payload.message.trim()
+          : '',
+      )
+      .catch(() => '')
+    const fallback =
+      response.status === 401
+        ? '邮箱或密码不正确。'
+        : response.status === 429
+          ? '请求过于频繁，请稍后再试。'
+          : '认证请求失败，请稍后重试。'
+    // 401 固定使用安全文案；其余状态优先显示认证库的具体原因（如重置功能不可用）。
+    throw new AuthRequestError(response.status === 401 ? fallback : serverMessage || fallback, code, response.status)
   }
   if (response.status === 204) return undefined as T
   try {
@@ -67,7 +83,7 @@ export async function signOut(): Promise<void> {
 
 /** 请求密码重置邮件；协议端点保留认证库语义。 */
 export async function requestPasswordReset(email: string): Promise<void> {
-  await authRequest('/forget-password', {
+  await authRequest('/request-password-reset', {
     method: 'POST',
     body: JSON.stringify({ email, redirectTo: `${window.location.origin}/reset-password` }),
   })
@@ -76,4 +92,17 @@ export async function requestPasswordReset(email: string): Promise<void> {
 /** 使用重置令牌设置新密码。 */
 export async function resetPassword(token: string, password: string): Promise<void> {
   await authRequest('/reset-password', { method: 'POST', body: JSON.stringify({ token, newPassword: password }) })
+}
+
+/** 修改当前账号密码；错误密码由认证库返回 INVALID_PASSWORD。 */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  await authRequest('/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword, revokeOtherSessions: false }),
+  })
+}
+
+/** 修改当前账号显示名称。 */
+export async function updateUserName(name: string): Promise<void> {
+  await authRequest('/update-user', { method: 'POST', body: JSON.stringify({ name }) })
 }

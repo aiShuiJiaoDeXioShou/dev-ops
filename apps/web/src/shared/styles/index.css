@@ -1656,3 +1656,26 @@ a.skill-title:hover {
   width: min(720px, calc(100vw - 32px));
   max-height: calc(100vh - 64px);
 }
+
+/* 移动端优先展示登录表单：营销内容在表单之后，避免高频入口被推到首屏外。 */
+@media (max-width: 560px) {
+  .login-shell {
+    display: flex;
+    flex-direction: column;
+  }
+  .login-side {
+    order: -1;
+    min-height: auto;
+    border-top: 0;
+    border-bottom: 1px solid #e7eaf0;
+  }
+}
+
+/* 窄屏表格保留可读列宽并允许横向滚动，避免列被压成逐字竖排。 */
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll table {
+  min-width: 640px;
+}

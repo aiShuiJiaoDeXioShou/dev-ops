@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Folder, FileText } from 'lucide-react'
 import { AuthRequestError, sessionQueryOptions, signInEmail } from '@/features/identity/public'
 
@@ -21,6 +21,13 @@ export function Component() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const session = useQuery(sessionQueryOptions)
+  // 已登录访问登录页时直接回到工作台，避免重复登录或误以为会话失效。
+  useEffect(() => {
+    if (!session.data) return
+    const redirect = params.get('redirect')
+    navigate(redirect && redirect.startsWith('/') ? redirect : '/projects', { replace: true })
+  }, [session.data, params, navigate])
   const mutation = useMutation({
     mutationFn: () => signInEmail(email.trim(), password),
     onSuccess: async () => {

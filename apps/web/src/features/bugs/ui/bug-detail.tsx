@@ -119,19 +119,27 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
   })
   if (query.isPending)
     return (
-      <DelayedLoading pending>
-        <PageLoading message="Bug 加载中…" />
-      </DelayedLoading>
+      <aside className="details" aria-label="Bug 详情">
+        <div className="detail-scroll">
+          <DelayedLoading pending>
+            <PageLoading message="Bug 加载中…" />
+          </DelayedLoading>
+        </div>
+      </aside>
     )
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (
-      <PageError
-        title="Bug 加载失败"
-        description={described.description}
-        requestId={described.requestId}
-        onRetry={() => void query.refetch()}
-      />
+      <aside className="details" aria-label="Bug 详情">
+        <div className="detail-scroll">
+          <PageError
+            title="Bug 加载失败"
+            description={described.description}
+            requestId={described.requestId}
+            onRetry={() => void query.refetch()}
+          />
+        </div>
+      </aside>
     )
   }
   const bug = query.data.data
@@ -156,7 +164,7 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={onClose}>
-              关闭
+              返回列表
             </Button>
           </header>
           <div className="flex flex-wrap gap-2">
@@ -280,6 +288,17 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
             <p className="text-xs text-muted-foreground">预期：{bug.expectedBehavior}</p>
             {bug.reproduction && <p className="whitespace-pre-wrap text-muted-foreground">复现：{bug.reproduction}</p>}
             {bug.reproductionUnknown && <p className="text-muted-foreground">复现：明确无法稳定复现</p>}
+            {bug.evidenceText || bug.evidenceUrl ? (
+              <div className="space-y-1 pt-1">
+                <h3 className="font-semibold">证据</h3>
+                {bug.evidenceText ? <p className="whitespace-pre-wrap">{bug.evidenceText}</p> : null}
+                {bug.evidenceUrl ? (
+                  <a className="text-primary underline" href={bug.evidenceUrl} target="_blank" rel="noreferrer">
+                    查看外部证据
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
           </section>
           <section className="space-y-2" aria-label="附件">
             <h3 className="text-sm font-semibold">附件</h3>

@@ -4,10 +4,17 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
-import { projectListQueryOptions } from '@/features/projects/public'
+import { projectListQueryOptions, projectServicesQueryOptions } from '@/features/projects/public'
 import { Button } from '@/shared/ui/controls/button'
 import { Badge } from '@/shared/ui/controls/badge'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogFormBody,
+  DialogFormFooter,
+  DialogFormHeader,
+  DialogTitle,
+} from '@/shared/ui/controls/dialog'
 import { FormField } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
@@ -82,6 +89,7 @@ export function Component() {
   const filters = useMemo(() => parseFilters(searchParams), [searchParams])
   const plans = useQuery(changePlanListQueryOptions(teamId, filters))
   const projects = useQuery(projectListQueryOptions(teamId, { page: 1, pageSize: 100 }))
+  const services = useQuery(projectServicesQueryOptions(form.projectId))
   const canCreate = role === 'admin' || role === 'developer'
 
   const createPlan = useMutation({
@@ -95,9 +103,10 @@ export function Component() {
         scopeSummary: form.scopeSummary,
         evidence: form.evidence,
         rollbackPlan: form.rollbackPlan,
-        executionMode: 'platform_pipeline',
-        workflowPath: form.workflowPath || null,
-        workflowRef: form.workflowRef || null,
+        // 仅部署版本接入平台流水线；其余类型本版只保留计划记录，不提供执行入口。
+        executionMode: form.operationKind === 'deploy_version' ? 'platform_pipeline' : 'external_system',
+        workflowPath: form.operationKind === 'deploy_version' ? form.workflowPath || null : null,
+        workflowRef: form.operationKind === 'deploy_version' ? form.workflowRef || null : null,
       })
       return result
     },
@@ -261,93 +270,115 @@ export function Component() {
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent layout="form">
+          <DialogFormHeader>
             <DialogTitle>新建变更计划</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <FormField label="项目" required>
-              <Select
-                value={form.projectId}
-                onChange={(event) => setForm({ ...form, projectId: event.target.value, serviceId: '' })}
-              >
-                <option value="">请选择项目</option>
-                {projectItems.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="操作类型" required>
-              <Select
-                value={form.operationKind}
-                onChange={(event) => setForm({ ...form, operationKind: event.target.value })}
-              >
-                {KIND_OPTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {OPERATION_KIND_LABELS[value]}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="目标环境" required>
-              <Select
-                value={form.environment}
-                onChange={(event) => setForm({ ...form, environment: event.target.value })}
-              >
-                {ENVIRONMENT_OPTIONS.map((value) => (
-                  <option key={value} value={value}>
-                    {ENVIRONMENT_LABELS[value]}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            {form.operationKind === 'deploy_version' ? (
-              <FormField label="部署工作流" required>
+          </DialogFormHeader>
+          <DialogFormBody>
+            <div className="space-y-4">
+              <FormField label="项目" required>
+                <Select
+                  value={form.projectId}
+                  onChange={(event) => setForm({ ...form, projectId: event.target.value, serviceId: '' })}
+                >
+                  <option value="">请选择项目</option>
+                  {projectItems.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="操作类型" required>
+                <Select
+                  value={form.operationKind}
+                  onChange={(event) => setForm({ ...form, operationKind: event.target.value })}
+                >
+                  {KIND_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {OPERATION_KIND_LABELS[value]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="目标环境" required>
+                <Select
+                  value={form.environment}
+                  onChange={(event) => setForm({ ...form, environment: event.target.value })}
+                >
+                  {ENVIRONMENT_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {ENVIRONMENT_LABELS[value]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              {form.operationKind === 'deploy_version' ? (
+                <FormField label="部署工作流" required>
+                  <Input
+                    value={form.workflowPath}
+                    onChange={(event) => setForm({ ...form, workflowPath: event.target.value })}
+                    placeholder=".devops/workflows/deploy-test.yml"
+                  />
+                </FormField>
+              ) : null}
+              {form.operationKind === 'deploy_version' ? (
+                <FormField label="服务" required help="部署到哪个项目服务；服务需先在项目设置中维护。">
+                  <Select
+                    value={form.serviceId}
+                    onChange={(event) => setForm({ ...form, serviceId: event.target.value })}
+                  >
+                    <option value="">请选择服务</option>
+                    {(services.data?.data ?? []).map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                      </option>
+                    ))}
+                  </Select>
+                  {form.projectId && services.isSuccess && (services.data?.data.length ?? 0) === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      该项目还没有服务，请先在项目设置中创建服务后再发起部署计划。
+                    </p>
+                  ) : null}
+                </FormField>
+              ) : null}
+              <FormField label="目标服务或资源" required>
                 <Input
-                  value={form.workflowPath}
-                  onChange={(event) => setForm({ ...form, workflowPath: event.target.value })}
-                  placeholder=".devops/workflows/deploy-test.yml"
+                  value={form.targetResource}
+                  onChange={(event) => setForm({ ...form, targetResource: event.target.value })}
+                  placeholder="web"
                 />
               </FormField>
-            ) : null}
-            <FormField label="目标服务或资源" required>
-              <Input
-                value={form.targetResource}
-                onChange={(event) => setForm({ ...form, targetResource: event.target.value })}
-                placeholder="web"
-              />
-            </FormField>
-            <FormField label="版本或迁移标识" required>
-              <Input
-                value={form.versionLabel}
-                onChange={(event) => setForm({ ...form, versionLabel: event.target.value })}
-                placeholder="v1.4.0"
-              />
-            </FormField>
-            <FormField label="变更范围" required>
-              <Textarea
-                value={form.scopeSummary}
-                onChange={(event) => setForm({ ...form, scopeSummary: event.target.value })}
-                placeholder="写清本次版本、环境、资源与动作"
-              />
-            </FormField>
-            <FormField label="核对依据" required>
-              <Textarea
-                value={form.evidence}
-                onChange={(event) => setForm({ ...form, evidence: event.target.value })}
-              />
-            </FormField>
-            <FormField label="恢复方案" required>
-              <Textarea
-                value={form.rollbackPlan}
-                onChange={(event) => setForm({ ...form, rollbackPlan: event.target.value })}
-                placeholder="回滚版本或不可回滚时的处理办法"
-              />
-            </FormField>
-          </div>
-          <DialogFooter>
+              <FormField label="版本或迁移标识" required>
+                <Input
+                  value={form.versionLabel}
+                  onChange={(event) => setForm({ ...form, versionLabel: event.target.value })}
+                  placeholder="v1.4.0"
+                />
+              </FormField>
+              <FormField label="变更范围" required>
+                <Textarea
+                  value={form.scopeSummary}
+                  onChange={(event) => setForm({ ...form, scopeSummary: event.target.value })}
+                  placeholder="写清本次版本、环境、资源与动作"
+                />
+              </FormField>
+              <FormField label="核对依据" required>
+                <Textarea
+                  value={form.evidence}
+                  onChange={(event) => setForm({ ...form, evidence: event.target.value })}
+                />
+              </FormField>
+              <FormField label="恢复方案" required>
+                <Textarea
+                  value={form.rollbackPlan}
+                  onChange={(event) => setForm({ ...form, rollbackPlan: event.target.value })}
+                  placeholder="回滚版本或不可回滚时的处理办法"
+                />
+              </FormField>
+            </div>
+          </DialogFormBody>
+          <DialogFormFooter>
             <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
               取消
             </Button>
@@ -357,6 +388,7 @@ export function Component() {
               disabled={
                 createPlan.isPending ||
                 !form.projectId ||
+                (form.operationKind === 'deploy_version' && !form.serviceId) ||
                 !form.targetResource ||
                 !form.versionLabel ||
                 !form.scopeSummary ||
@@ -366,7 +398,7 @@ export function Component() {
             >
               {createPlan.isPending ? '保存中…' : '保存计划'}
             </Button>
-          </DialogFooter>
+          </DialogFormFooter>
         </DialogContent>
       </Dialog>
     </div>

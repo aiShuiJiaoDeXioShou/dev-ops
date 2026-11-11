@@ -111,7 +111,17 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
   }
   if (variables.isPending) return <DelayedPageLoading />
   if (variables.isError) {
-    return <EmptyState title="环境变量加载失败" description={describeRequestError(variables.error).description} />
+    return (
+      <EmptyState
+        title="环境变量加载失败"
+        description={describeRequestError(variables.error).description}
+        action={
+          <Button type="button" variant="outline" onClick={() => void variables.refetch()}>
+            重新加载
+          </Button>
+        }
+      />
+    )
   }
   return (
     <div className="project-tab-panel">
@@ -151,7 +161,7 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
           }
         />
       ) : (
-        <ul className="plain-list">
+        <ul className="plain-list stacked-list">
           {variables.data.data.items.map((item) => (
             <li key={item.id}>
               <span>{item.name}</span>

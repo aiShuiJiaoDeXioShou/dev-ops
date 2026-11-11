@@ -774,6 +774,11 @@ h3 {
   font-size: 15px;
 }
 .page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
   padding: 32px 28px 25px;
   border-bottom: 1px solid var(--line);
 }
@@ -858,6 +863,28 @@ h3 {
 .diff-line.remove {
   background: #fff1f0;
   color: #b54444;
+}
+.stacked-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stacked-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.stacked-list > li > :first-child {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.stacked-list > li > .muted {
+  font-size: 12px;
 }
 .plain-list {
   display: flex;
@@ -1168,6 +1195,29 @@ dialog h2 {
   .shell.menu-open .sidebar {
     display: flex;
   }
+  .nav-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 14;
+    background: rgba(15, 17, 21, 0.36);
+  }
+  .sidebar-close {
+    display: grid;
+    position: absolute;
+    top: 18px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--quiet);
+    cursor: pointer;
+  }
+  .sidebar-close:hover {
+    background: var(--selected);
+  }
   .mobile-menu {
     display: inline-flex;
   }
@@ -1217,7 +1267,18 @@ dialog h2 {
     min-width: 570px;
   }
   .file-browser {
-    grid-template-columns: 150px minmax(0, 1fr);
+    grid-template-columns: 1fr;
+  }
+  .git-strip {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .git-strip > * {
+    min-width: 0;
+  }
+  .file-tree {
+    max-height: 220px;
+    overflow-y: auto;
   }
   .code {
     padding: 14px;
@@ -2772,7 +2833,7 @@ dialog h2 {
 .activity-day.future {
   visibility: hidden;
 }
-.activity-grid button:hover {
+.activity-grid .activity-day:hover {
   outline: 1px solid #0f1115;
   outline-offset: 1px;
 }
@@ -2817,7 +2878,7 @@ dialog h2 {
 .activity-breakdown span {
   display: block;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   margin-bottom: 10px;
 }
 .activity-breakdown strong {
@@ -3289,4 +3350,15 @@ select.btn:hover:not(:disabled) {
 }
 .select-menu [aria-selected='true'] .select-check {
   visibility: visible;
+}
+
+
+/* 桌面端不显示移动抽屉的关闭按钮；窄屏抽屉内显示。 */
+.sidebar-close {
+  display: none;
+}
+@media (max-width: 700px) {
+  .sidebar .sidebar-close {
+    display: grid;
+  }
 }

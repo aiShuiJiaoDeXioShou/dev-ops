@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
+import { XIcon } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { cn } from '@/shared/lib/utils'
 import { signOut, useSession } from '@/features/identity/public'
@@ -25,12 +26,31 @@ export function AppLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (!menuOpen) return
+    // 打开抽屉后把焦点移入第一个可操作项，并把 Tab 限制在抽屉内；Esc/关闭时归还触发按钮。
+    const focusables = sidebarRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )
+    focusables?.[0]?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      setMenuOpen(false)
-      menuButtonRef.current?.focus()
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+        menuButtonRef.current?.focus()
+        return
+      }
+      if (event.key !== 'Tab' || !focusables || focusables.length === 0) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      if (!first || !last) return
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
@@ -49,10 +69,25 @@ export function AppLayout() {
   ]
   return (
     <div className={cn('shell', menuOpen && 'menu-open')}>
+      {menuOpen ? <div className="nav-scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" /> : null}
       <aside
+        ref={sidebarRef}
         className="sidebar"
         {...(menuOpen ? { role: 'dialog', 'aria-modal': true, 'aria-label': '工作区导航' } : {})}
       >
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="sidebar-close"
+          aria-label="关闭导航"
+          onClick={() => {
+            setMenuOpen(false)
+            menuButtonRef.current?.focus()
+          }}
+        >
+          <XIcon className="size-4" aria-hidden="true" />
+        </Button>
         <Link className="brand" to="/projects" aria-label="项目列表">
           <img src="/prototype/brand.svg" width={29} height={29} alt="" />
           DevOps

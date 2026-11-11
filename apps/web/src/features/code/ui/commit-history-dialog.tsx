@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { describeRequestError } from '@/shared/api/errors'
+import { formatDateTime } from '@/shared/lib/format'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
@@ -46,15 +47,15 @@ export function CommitHistoryDialog({
           ) : list.data.data.items.length === 0 ? (
             <p className="muted">该分支没有提交记录。</p>
           ) : (
-            <ul className="plain-list">
+            <ul className="plain-list stacked-list">
               {list.data.data.items.map((commit) => (
                 <li key={commit.sha}>
                   <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedRef(commit.sha)}>
                     {commit.sha.slice(0, 8)} {commit.title}
                   </Button>
                   <span className="muted">{commit.authorName}</span>
-                  <span className="muted">{commit.committedAt}</span>
-                  <span className="muted">核对：{commit.lastCheckedAt}</span>
+                  <span className="muted">{formatDateTime(commit.committedAt)}</span>
+                  <span className="muted">核对：{formatDateTime(commit.lastCheckedAt)}</span>
                 </li>
               ))}
             </ul>
@@ -71,14 +72,14 @@ export function CommitHistoryDialog({
                 <>
                   <h4>{detail.data.data.title}</h4>
                   <p className="muted">
-                    {detail.data.data.authorName} · {detail.data.data.committedAt}
+                    {detail.data.data.authorName} · {formatDateTime(detail.data.data.committedAt)}
                   </p>
                   {detail.data.data.filesUnsupported ? (
                     <p className="muted">来源不支持变更文件。</p>
                   ) : detail.data.data.files.length === 0 ? (
                     <p className="muted">该提交没有变更文件。</p>
                   ) : (
-                    <ul className="plain-list">
+                    <ul className="plain-list stacked-list">
                       {detail.data.data.files.map((file) => (
                         <li key={file.path}>
                           <span>{file.path}</span>

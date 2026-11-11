@@ -112,19 +112,27 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   })
   if (query.isPending)
     return (
-      <DelayedLoading pending>
-        <PageLoading message="需求加载中…" />
-      </DelayedLoading>
+      <aside className="details" aria-label="需求详情">
+        <div className="detail-scroll">
+          <DelayedLoading pending>
+            <PageLoading message="需求加载中…" />
+          </DelayedLoading>
+        </div>
+      </aside>
     )
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (
-      <PageError
-        title="需求加载失败"
-        description={described.description}
-        requestId={described.requestId}
-        onRetry={() => void query.refetch()}
-      />
+      <aside className="details" aria-label="需求详情">
+        <div className="detail-scroll">
+          <PageError
+            title="需求加载失败"
+            description={described.description}
+            requestId={described.requestId}
+            onRetry={() => void query.refetch()}
+          />
+        </div>
+      </aside>
     )
   }
   const detail = query.data.data
@@ -152,7 +160,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={onClose}>
-              关闭
+              返回列表
             </Button>
           </header>
           {detail.status === 'in_testing' && (

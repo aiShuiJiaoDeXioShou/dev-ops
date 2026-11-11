@@ -86,7 +86,13 @@ export function RepositoryPicker({ projectId, canManage }: { projectId: string; 
                   <p className="small quiet">项目仓库 · {repository.defaultBranch ?? '未知分支'}</p>
                 </div>
                 <span className="spacer" />
-                <Tag variant={repository.status === 'available' ? 'green' : 'red'}>{repository.status}</Tag>
+                <Tag variant={repository.status === 'available' ? 'green' : 'red'}>
+                  {repository.status === 'available'
+                    ? '可用'
+                    : repository.status === 'unavailable'
+                      ? '不可用'
+                      : '已移除'}
+                </Tag>
                 {canManage && (
                   <Button
                     type="button"

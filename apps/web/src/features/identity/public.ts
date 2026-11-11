@@ -6,6 +6,7 @@ export {
   signInEmail,
   signOut,
 } from './api/auth-client'
+export { changePassword, updateUserName } from './api/auth-client'
 export type { AuthSession, AuthUser } from './api/auth-client'
 export { myTeamsQueryOptions, sessionQueryOptions } from './api/queries'
 export { SessionProvider, useSession, type TeamRole, type TeamSummary } from './model/session'

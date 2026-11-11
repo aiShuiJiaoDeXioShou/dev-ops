@@ -5,6 +5,11 @@ import { activitiesQueryOptions, type CollabTarget } from '../api/queries'
 
 const ACTION_LABELS: Record<string, string> = {
   requirement_created: '创建需求',
+  development_started: '开始开发',
+  requirement_collaborators_changed: '调整协作人员',
+  bug_collaborators_changed: '调整 Bug 协作人员',
+  attachment_uploaded: '上传附件',
+  attachment_removed: '删除附件',
   requirement_updated: '更新需求',
   test_submitted: '提测',
   test_started: '开始测试',

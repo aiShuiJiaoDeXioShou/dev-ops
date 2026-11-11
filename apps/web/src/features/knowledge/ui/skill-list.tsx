@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { ArrowUpRight, Layers, Plus, Search } from 'lucide-react'
@@ -23,6 +23,7 @@ export function SkillList({ teamId }: { teamId: string }) {
   const { role } = useSession()
   const [params, setParams] = useSearchParams()
   const search = params.get('search') ?? ''
+  const [searchInput, setSearchInput] = useState(search)
   const category = (params.get('category') ?? '') as SkillListItem['category'] | ''
   const selected = params.get('skill')
   const page = Number(params.get('page') ?? '1')
@@ -33,6 +34,16 @@ export function SkillList({ teamId }: { teamId: string }) {
     [search, category, page],
   )
   const query = useQuery(skillListQueryOptions(teamId, filters))
+  useEffect(() => {
+    setSearchInput(search)
+  }, [search])
+  useEffect(() => {
+    if (searchInput === search) return
+    // 输入防抖后再写 URL，避免逐字回写覆盖用户输入并触发多次查询。
+    const timer = window.setTimeout(() => updateParam('search', searchInput), 350)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput, search, params, setParams])
   const updateParam = (key: string, value: string) => {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
@@ -92,10 +103,10 @@ export function SkillList({ teamId }: { teamId: string }) {
                 <Input
                   aria-label="搜索团队技能"
                   placeholder="搜索团队技能"
-                  value={search}
+                  value={searchInput}
                   maxLength={200}
                   className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                  onChange={(event) => updateParam('search', event.target.value)}
+                  onChange={(event) => setSearchInput(event.target.value)}
                 />
               </label>
             </div>
