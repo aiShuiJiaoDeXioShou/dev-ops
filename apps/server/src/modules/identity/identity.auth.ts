@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import type { AppConfig } from '../../platform/config/env.ts'
-import type { MailSender } from '../../adapters/mail/mail.types.ts'
 import type { Database } from '../../platform/database/client.ts'
 import { authAccount, authSession, authUser, authVerification } from './identity.tables.ts'
 
@@ -13,7 +12,12 @@ import { authAccount, authSession, authUser, authVerification } from './identity
  * @returns 可交给 HTTP 桥接和测试使用的认证实例。
  * @throws 缺少 AUTH_SECRET 时抛出错误，阻止在未配置认证密钥时启动。
  */
-export function createIdentityAuth(db: Database, config: AppConfig, mailer?: MailSender | null) {
+/** 认证邮件发送能力；只暴露重置密码所需的字段，避免业务模块依赖具体邮件适配器。 */
+export interface AuthMailer {
+  send(message: { to: string; subject: string; text: string }): Promise<void>
+}
+
+export function createIdentityAuth(db: Database, config: AppConfig, mailer?: AuthMailer | null) {
   if (!config.AUTH_SECRET) {
     throw new Error('AUTH_SECRET 必须配置后才能启用认证')
   }
