@@ -5,7 +5,6 @@ import { Link } from 'react-router'
 export function CapabilitiesHeader({ active, action }: { active: 'skills' | 'templates'; action?: ReactNode }) {
   return (
     <header className="page-head skills-header">
-      {action ? <div className="row">{action}</div> : null}
       <nav className="tabs" aria-label="能力内容">
         <Link to="/capabilities/skills" className="tab" role="tab" aria-selected={active === 'skills'}>
           技能库
@@ -14,6 +13,7 @@ export function CapabilitiesHeader({ active, action }: { active: 'skills' | 'tem
           AGENTS.md 模板
         </Link>
       </nav>
+      {action ? <div className="row">{action}</div> : null}
       <h1 className="sr-only">Skills</h1>
     </header>
   )

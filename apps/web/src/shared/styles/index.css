@@ -1980,3 +1980,30 @@ a.skill-title:hover {
 .vault-keychain .keychain-categories::-webkit-scrollbar {
   height: 0;
 }
+
+/* 能力页头：页签在左、主操作在右，同一行对齐，底边发丝线。 */
+.skills-header {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+.skills-header .tabs {
+  flex: 1;
+  margin: 0;
+  border-bottom: 0;
+  min-width: 0;
+  overflow-x: auto;
+}
+.skills-header > .row {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: auto;
+}
+.skills-header .tabs {
+  flex: 1 1 auto;
+  min-width: 240px;
+}
