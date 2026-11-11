@@ -40,7 +40,7 @@ export function ProjectSettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         layout="form"
-        className="w-[min(720px,calc(100vw-32px))]"
+        className="dialog-w-lg"
         onOpenAutoFocus={(event) => {
           // 不把初始焦点放进名称输入框，避免打开设置时浏览器全选已有文本。
           event.preventDefault()

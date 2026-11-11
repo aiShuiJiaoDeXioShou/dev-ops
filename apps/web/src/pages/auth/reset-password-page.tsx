@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { resetPassword } from '@/features/identity/public'
+import { Button } from '@/shared/ui/controls/button'
+import { Input } from '@/shared/ui/controls/input'
 
 /** 使用重置令牌设置新密码。 */
 export function Component() {
@@ -39,20 +41,22 @@ export function Component() {
         <form className="auth-form" onSubmit={submit}>
           <label className="field">
             新密码
-            <input
+            <Input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
+              className="h-11"
             />
           </label>
           <label className="field">
             确认密码
-            <input
+            <Input
               type="password"
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
               autoComplete="new-password"
+              className="h-11"
             />
           </label>
           {message && (
@@ -67,9 +71,9 @@ export function Component() {
               </p>
             ) : null}
           </div>
-          <button type="submit" className="login-submit" disabled={pending}>
+          <Button type="submit" className="login-submit" disabled={pending}>
             {pending ? '提交中…' : '更新密码'}
-          </button>
+          </Button>
         </form>
         <p className="auth-footer">
           <Link to="/login">返回登录</Link>

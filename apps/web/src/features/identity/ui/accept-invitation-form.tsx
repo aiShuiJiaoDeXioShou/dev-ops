@@ -5,6 +5,8 @@ import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { DelayedPageLoading } from '@/shared/ui/page-state'
+import { Button } from '@/shared/ui/controls/button'
+import { Input } from '@/shared/ui/controls/input'
 import { sessionQueryOptions } from '../api/queries'
 
 /**
@@ -84,15 +86,16 @@ export function AcceptInvitationForm() {
       </div>
       <label className="field">
         显示名称
-        <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+        <Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" className="h-11" />
       </label>
       <label className="field">
         密码
-        <input
+        <Input
           type="password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           autoComplete="current-password"
+          className="h-11"
         />
       </label>
       <p className="field-hint">
@@ -101,11 +104,12 @@ export function AcceptInvitationForm() {
       </p>
       <label className="field">
         确认密码
-        <input
+        <Input
           type="password"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
           autoComplete="new-password"
+          className="h-11"
         />
       </label>
       <div className="auth-error-slot" aria-live="polite">
@@ -115,9 +119,9 @@ export function AcceptInvitationForm() {
           </p>
         ) : null}
       </div>
-      <button type="submit" className="login-submit" disabled={mutation.isPending}>
+      <Button type="submit" className="login-submit" disabled={mutation.isPending}>
         {mutation.isPending ? '加入中…' : '加入团队'}
-      </button>
+      </Button>
     </form>
   )
 }

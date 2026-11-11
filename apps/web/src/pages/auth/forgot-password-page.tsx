@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { requestPasswordReset } from '@/features/identity/public'
+import { Button } from '@/shared/ui/controls/button'
+import { Input } from '@/shared/ui/controls/input'
 
 /** 请求密码重置邮件；沿用认证卡片布局。 */
 export function Component() {
@@ -33,7 +35,13 @@ export function Component() {
         <form className="auth-form" onSubmit={submit}>
           <label className="field">
             邮箱
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" />
+            <Input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              className="h-11"
+            />
           </label>
           {message && (
             <p className="field-success" role="status">
@@ -47,9 +55,9 @@ export function Component() {
               </p>
             ) : null}
           </div>
-          <button type="submit" className="login-submit" disabled={pending}>
+          <Button type="submit" className="login-submit" disabled={pending}>
             {pending ? '发送中…' : '发送重置邮件'}
-          </button>
+          </Button>
         </form>
         <p className="auth-footer">
           <Link to="/login">返回登录</Link>

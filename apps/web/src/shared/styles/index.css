@@ -2304,3 +2304,173 @@ button:disabled,
     outline-offset: 1px;
   }
 }
+
+/* 列表 + 详情左栏；替代页面内联 flex 样式。 */
+.items-workspace-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 共享 Select/Input 嵌入轻量筛选条时的视觉收口。 */
+.filter-select select {
+  height: 30px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  padding-left: 8px;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+.filter-select select:hover {
+  background: var(--secondary);
+}
+.search .search-input {
+  height: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  font-size: 12px;
+}
+.search .search-input:focus-visible {
+  box-shadow: none;
+}
+
+/* 列表标题按钮：共享 Button 的默认内边距/高度会打断表格行高，这里统一回原型尺寸。 */
+.item-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--foreground);
+}
+.item-title:hover {
+  background: transparent;
+  color: var(--primary);
+}
+
+/* 弹窗宽度：统一响应式宽度，避免页面里散落任意 Tailwind 值。 */
+.dialog-w-sm {
+  width: min(420px, calc(100vw - 32px));
+}
+.dialog-w-md {
+  width: min(560px, calc(100vw - 32px));
+}
+.dialog-w-lg {
+  width: min(720px, calc(100vw - 32px));
+}
+
+/* 系统连接状态：替代行内排版样式。 */
+.connection-status-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+}
+.connection-status-dot {
+  margin-top: 7px;
+}
+.connection-status-line {
+  font-weight: 500;
+}
+.connection-status-time {
+  margin-top: 6px;
+}
+.connection-status-actions {
+  margin-top: 18px;
+}
+
+/* 项目头部返回按钮与页签：复用共享 Button 后回退到原型密度。 */
+.breadcrumb-back {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 400;
+}
+.breadcrumb-back:hover {
+  background: transparent;
+  color: var(--foreground);
+}
+.project-header .tabs .tab {
+  height: auto;
+  min-height: 0;
+  padding: 7px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.project-header .tabs .tab:hover {
+  background: transparent;
+  color: var(--foreground);
+}
+.project-header .tabs .tab.active {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+/* 侧栏导航复用共享 Button 后回退到原型密度。 */
+.side-bottom .nav-btn.logout-btn {
+  display: flex;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--ink);
+}
+.side-bottom .nav-btn.logout-btn:hover {
+  background: var(--soft);
+}
+.team-switcher .team-token {
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+}
+
+/* 共享 Button 的 inline-flex 会覆盖原型层的桌面隐藏规则，这里显式恢复。 */
+.main > .mobile-menu {
+  display: none;
+}
+@media (max-width: 700px) {
+  .main > .mobile-menu {
+    display: inline-flex;
+  }
+}
+
+/* 认证主按钮：共享 Button 默认高度偏紧凑，这里恢复认证卡片的整行主操作尺寸。 */
+.login-submit {
+  width: 100%;
+  height: 38px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}

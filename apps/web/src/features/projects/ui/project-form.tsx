@@ -96,7 +96,7 @@ export function ProjectForm({ teamId, open, onOpenChange, onCreated }: ProjectFo
         onOpenChange(next)
       }}
     >
-      <DialogContent className="w-[min(560px,calc(100vw-32px))]">
+      <DialogContent className="dialog-w-md">
         <DialogHeader>
           <DialogTitle>创建项目</DialogTitle>
           <DialogDescription>创建项目并关联团队已同步的 Git 仓库。</DialogDescription>

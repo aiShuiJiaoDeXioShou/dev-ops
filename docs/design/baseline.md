@@ -4,6 +4,8 @@
 
 现有代码已有历史遗留的裸控件、任意 Tailwind 值和 `@/prototype` 依赖。为了先建立门禁而不阻塞业务，`tooling/design/ui-baseline.json` 记录这些存量数量。
 
+2026-11 已把认证页、项目/需求/Bug 列表、项目头部、侧栏、团队与系统状态迁移到 shared UI，baseline 从 **96 处降至 15 处**；剩余仅 `pages/project/code-page.tsx`（文件树、分支切换、文件操作按钮与内联宽度），下一步按同一模式归零。
+
 `pnpm ui:check` 的规则：
 
 - 当前违规数量 > baseline：失败；

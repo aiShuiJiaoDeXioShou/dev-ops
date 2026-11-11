@@ -3,7 +3,9 @@
 ## 唯一来源
 
 `design/tokens.json` 是 token 的唯一来源。  
-`apps/web/src/shared/styles/index.css` 是它在 Tailwind / CSS 中的运行时映射。`pnpm ui:check` 会校验两者是否一致，禁止只改一边。
+`apps/web/src/shared/styles/index.css` 是它在 Tailwind / CSS 中的运行时映射。
+
+> 2026-11 校准：侧栏 232px、桌面内容区 padding 24px、移动端 16px、页面标题 19px，与截图/页面实测一致；修改布局先改 token 和 CSS，再同步本表。`pnpm ui:check` 会校验两者是否一致，禁止只改一边。
 
 ## 颜色（浅色主题）
 
@@ -56,7 +58,7 @@
 | 字体 | `'Geist Variable', 'PingFang SC', 'Microsoft YaHei', sans-serif` |
 | 正文 | 14px / 1.5 |
 | 辅助文字 | 12px |
-| 页面标题 | 20px |
+| 页面标题 | 19px |
 | 展示标题 | 25px |
 
 ## 间距与布局
@@ -65,9 +67,9 @@
 | --- | --- |
 | 基础单位 | 4px |
 | xs / sm / md / lg / xl / 2xl | 4 / 8 / 12 / 16 / 24 / 32px |
-| 侧栏宽度 | 225px |
-| 桌面内容区左右 padding | 28px |
-| 移动端内容区左右 padding | 18px |
+| 侧栏宽度 | 232px |
+| 桌面内容区左右 padding | 24px |
+| 移动端内容区左右 padding | 16px |
 
 ## 动效
 

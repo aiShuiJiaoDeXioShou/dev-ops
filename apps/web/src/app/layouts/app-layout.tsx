@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { XIcon } from 'lucide-react'
-import { PrototypeIcon } from '@/prototype/icons/icon'
+import { Activity, Box, Folder, LayoutGrid, LogOut, Menu, Shield, Users, X as XIcon } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { signOut, useSession } from '@/features/identity/public'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
@@ -81,6 +80,7 @@ export function AppLayout() {
     queryClient.clear()
     navigate('/login', { replace: true })
   }
+  const navIcons = { folder: Folder, activity: Activity, capabilities: LayoutGrid, shield: Shield } as const
   const primaryNavItems = [
     { to: '/projects', label: '项目', icon: 'folder' as const },
     { to: '/operations/changes', label: '运维', icon: 'activity' as const },
@@ -123,7 +123,10 @@ export function AppLayout() {
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
-              <PrototypeIcon name={item.icon} />
+              {(() => {
+                const Icon = navIcons[item.icon]
+                return <Icon className="size-4.5" aria-hidden="true" />
+              })()}
               {item.label}
             </NavLink>
           ))}
@@ -136,7 +139,7 @@ export function AppLayout() {
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
-              <PrototypeIcon name="box" />
+              <Box className="size-4.5" aria-hidden="true" />
               储存桶
             </NavLink>
           )}
@@ -146,7 +149,7 @@ export function AppLayout() {
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
-              <PrototypeIcon name="users" />
+              <Users className="size-4.5" aria-hidden="true" />
               团队管理
             </NavLink>
           )}
@@ -168,16 +171,17 @@ export function AppLayout() {
             </span>
             <span className="badge">{ROLE_LABELS[role]}</span>
           </Link>
-          <button type="button" className="nav-btn logout-btn" onClick={() => setLogoutOpen(true)}>
-            <PrototypeIcon name="logout" />
+          <Button type="button" variant="ghost" className="nav-btn logout-btn" onClick={() => setLogoutOpen(true)}>
+            <LogOut className="size-4.5" aria-hidden="true" />
             退出登录
-          </button>
+          </Button>
           {teams.length > 1 && (
             <div className="team-switcher" aria-label="切换团队">
               {teams.map((team) => (
-                <button
+                <Button
                   key={team.id}
                   type="button"
+                  variant="ghost"
                   className={cn('team-token', team.id === currentTeam?.id && 'active')}
                   title={team.name}
                   aria-label={`切换到${team.name}`}
@@ -185,7 +189,7 @@ export function AppLayout() {
                   onClick={() => setCurrentTeam(team.id)}
                 >
                   <span>{team.name.slice(0, 1)}</span>
-                </button>
+                </Button>
               ))}
             </div>
           )}
@@ -193,21 +197,23 @@ export function AppLayout() {
       </aside>
       <div className="surface">
         <main className="main">
-          <button
+          <Button
             ref={menuButtonRef}
             type="button"
+            variant="ghost"
+            size="icon-sm"
             className="icon-btn mobile-menu"
             aria-label="打开导航"
             onClick={() => setMenuOpen(true)}
           >
-            <PrototypeIcon name="menu" />
-          </button>
+            <Menu className="size-5" aria-hidden="true" />
+          </Button>
           {isReady ? <Outlet /> : <DelayedPageSkeleton />}
           <div id="workspace-detail-host" />
         </main>
       </div>
       <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
-        <DialogContent className="w-[min(420px,calc(100vw-32px))]">
+        <DialogContent className="dialog-w-sm">
           <DialogHeader className="items-center gap-3 pr-0 text-center">
             <DialogTitle className="text-xl">退出登录</DialogTitle>
             <DialogDescription className="max-w-sm text-sm leading-6">

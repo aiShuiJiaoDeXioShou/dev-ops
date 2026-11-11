@@ -2,74 +2,10 @@
   "version": 1,
   "description": "存量 UI 违规；只能减少，不能通过更新 baseline 放行新违规。",
   "violations": {
-    "apps/web/src/app/layouts/app-layout.tsx": {
-      "raw-control": 3,
-      "arbitrary-value": 1,
-      "prototype-import": 1
-    },
-    "apps/web/src/pages/auth/forgot-password-page.tsx": {
-      "raw-control": 2
-    },
-    "apps/web/src/pages/auth/login-page.tsx": {
-      "raw-control": 3
-    },
-    "apps/web/src/pages/auth/reset-password-page.tsx": {
-      "raw-control": 3
-    },
     "apps/web/src/pages/project/code-page.tsx": {
       "raw-control": 8,
       "prototype-import": 1,
       "inline-style": 6
-    },
-    "apps/web/src/pages/project/project-layout.tsx": {
-      "raw-control": 4,
-      "prototype-import": 1
-    },
-    "apps/web/src/pages/settings/team-settings-page.tsx": {
-      "raw-control": 1,
-      "prototype-import": 1
-    },
-    "apps/web/src/features/bugs/ui/bug-form.tsx": {
-      "raw-control": 1,
-      "arbitrary-value": 1
-    },
-    "apps/web/src/features/bugs/ui/bug-list.tsx": {
-      "raw-control": 9,
-      "prototype-import": 1,
-      "inline-style": 2
-    },
-    "apps/web/src/features/code/ui/repository-picker.tsx": {
-      "raw-control": 9
-    },
-    "apps/web/src/features/identity/ui/accept-invitation-form.tsx": {
-      "raw-control": 4
-    },
-    "apps/web/src/features/identity/ui/create-team-dialog.tsx": {
-      "arbitrary-value": 1
-    },
-    "apps/web/src/features/projects/ui/project-form.tsx": {
-      "arbitrary-value": 1
-    },
-    "apps/web/src/features/projects/ui/project-list.tsx": {
-      "raw-control": 9,
-      "prototype-import": 1
-    },
-    "apps/web/src/features/projects/ui/project-settings-dialog.tsx": {
-      "raw-control": 1,
-      "arbitrary-value": 1
-    },
-    "apps/web/src/features/requirements/ui/requirement-form.tsx": {
-      "raw-control": 1,
-      "arbitrary-value": 1
-    },
-    "apps/web/src/features/requirements/ui/requirement-list.tsx": {
-      "raw-control": 9,
-      "prototype-import": 1,
-      "inline-style": 2
-    },
-    "apps/web/src/features/system/ui/connection-status.tsx": {
-      "raw-control": 1,
-      "inline-style": 5
     }
   }
 }

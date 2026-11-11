@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
-import { ShieldAlert } from 'lucide-react'
-import { PrototypeIcon } from '@/prototype/icons/icon'
+import { Plus, ShieldAlert } from 'lucide-react'
 import { TeamGitConnections } from '@/features/code/public'
 import { pipelineNodesQueryOptions } from '@/features/pipeline/public'
 import {
@@ -47,7 +46,7 @@ export function Component() {
           description="团队空间会承载项目、需求、Bug 和成员协作。请让平台管理员邀请你加入，或由平台管理员直接创建一个新团队。"
           action={
             <Button type="button" onClick={() => setCreateOpen(true)}>
-              <PrototypeIcon name="plus" />
+              <Plus className="size-4" aria-hidden="true" />
               创建团队
             </Button>
           }

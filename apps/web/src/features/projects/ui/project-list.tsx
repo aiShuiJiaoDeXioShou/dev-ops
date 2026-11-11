@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { PrototypeIcon } from '@/prototype/icons/icon'
+import { ArrowRight, Folder, Plus, Search, Settings, TriangleAlert, Users } from 'lucide-react'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { EmptyState } from '@/shared/ui/page-state'
+import { Button } from '@/shared/ui/controls/button'
+import { Input } from '@/shared/ui/controls/input'
+import { Select } from '@/shared/ui/controls/select'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectActivityQueryOptions, projectListQueryOptions } from '../api/queries'
 import {
@@ -68,10 +71,12 @@ export function ProjectList() {
           title="还没有加入团队"
           description="团队空间会承载项目、需求、Bug 和成员协作。请让平台管理员邀请你加入，或前往团队管理创建第一个团队。"
           action={
-            <Link className="btn primary" to="/settings/team">
-              <PrototypeIcon name="users" />
-              团队管理
-            </Link>
+            <Button asChild>
+              <Link to="/settings/team">
+                <Users className="size-4" aria-hidden="true" />
+                团队管理
+              </Link>
+            </Button>
           }
         />
       </div>
@@ -81,12 +86,12 @@ export function ProjectList() {
     const described = describeRequestError(query.error)
     return (
       <div className="empty">
-        <PrototypeIcon name="warning" />
+        <TriangleAlert className="size-5" aria-hidden="true" />
         <h3>项目列表加载失败</h3>
         <p>{described.description}</p>
-        <button type="button" className="btn" onClick={() => void query.refetch()}>
+        <Button type="button" variant="outline" onClick={() => void query.refetch()}>
           重新加载
-        </button>
+        </Button>
       </div>
     )
   }
@@ -101,15 +106,10 @@ export function ProjectList() {
         <div className="row">
           <h1>项目</h1>
           <span className="spacer" />
-          <button
-            type="button"
-            className="btn primary"
-            disabled={role === 'viewer'}
-            onClick={() => setCreateOpen(true)}
-          >
-            <PrototypeIcon name="plus" />
+          <Button type="button" disabled={role === 'viewer'} onClick={() => setCreateOpen(true)}>
+            <Plus className="size-4" aria-hidden="true" />
             创建项目
-          </button>
+          </Button>
         </div>
       </header>
       <div className="catalog project-home">
@@ -122,8 +122,8 @@ export function ProjectList() {
           onSourceChange={setActivitySource}
         />
         <div className="filters">
-          <select
-            className="btn project-filter"
+          <Select
+            className="filter-select"
             aria-label="项目状态"
             value={filters.status}
             onChange={(event) => update({ status: event.target.value })}
@@ -133,10 +133,11 @@ export function ProjectList() {
                 {option.value ? option.label : '全部状态'}
               </option>
             ))}
-          </select>
+          </Select>
           <label className="search">
-            <PrototypeIcon name="search" />
-            <input
+            <Search className="size-4" aria-hidden="true" />
+            <Input
+              className="search-input"
               aria-label="搜索项目"
               placeholder="搜索项目、仓库或负责人"
               value={searchInput}
@@ -155,14 +156,14 @@ export function ProjectList() {
             }
             action={
               filters.search || filters.status ? (
-                <button type="button" className="btn" onClick={() => setParams(new URLSearchParams())}>
+                <Button type="button" variant="outline" onClick={() => setParams(new URLSearchParams())}>
                   清除筛选
-                </button>
+                </Button>
               ) : role !== 'viewer' ? (
-                <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-                  <PrototypeIcon name="plus" />
+                <Button type="button" onClick={() => setCreateOpen(true)}>
+                  <Plus className="size-4" aria-hidden="true" />
                   创建项目
-                </button>
+                </Button>
               ) : undefined
             }
           />
@@ -179,7 +180,7 @@ export function ProjectList() {
               >
                 <div className="project-card-head">
                   <span className="project-symbol">
-                    <PrototypeIcon name="folder" />
+                    <Folder className="size-5" aria-hidden="true" />
                   </span>
                   <div className="project-identity">
                     <Link className="project-card-title" to={`/projects/${project.id}/requirements`}>
@@ -187,14 +188,16 @@ export function ProjectList() {
                     </Link>
                     <p className="repo-caption">{project.description || '暂无项目说明'}</p>
                   </div>
-                  <button
+                  <Button
                     type="button"
-                    className="icon-btn project-settings-button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="project-settings-button"
                     aria-label={`${project.name}项目设置`}
                     onClick={() => setSettingsProjectId(project.id)}
                   >
-                    <PrototypeIcon name="settings" />
-                  </button>
+                    <Settings className="size-4" aria-hidden="true" />
+                  </Button>
                 </div>
                 <div className="project-state-row">
                   <span className="status">
@@ -246,7 +249,7 @@ export function ProjectList() {
                         </div>
                         <Link className="text-btn row" to={`/projects/${project.id}/requirements`}>
                           进入项目
-                          <PrototypeIcon name="arrow" />
+                          <ArrowRight className="size-3.5" aria-hidden="true" />
                         </Link>
                       </div>
                     </>
@@ -258,23 +261,25 @@ export function ProjectList() {
         )}
         {query.data.data.total > filters.pageSize && (
           <div className="pagination">
-            <button
+            <Button
               type="button"
-              className="btn"
+              variant="outline"
+              size="sm"
               disabled={filters.page <= 1}
               onClick={() => update({ page: filters.page - 1 })}
             >
               上一页
-            </button>
+            </Button>
             <span className="quiet">第 {filters.page} 页</span>
-            <button
+            <Button
               type="button"
-              className="btn"
+              variant="outline"
+              size="sm"
               disabled={filters.page * filters.pageSize >= query.data.data.total}
               onClick={() => update({ page: filters.page + 1 })}
             >
               下一页
-            </button>
+            </Button>
           </div>
         )}
       </div>

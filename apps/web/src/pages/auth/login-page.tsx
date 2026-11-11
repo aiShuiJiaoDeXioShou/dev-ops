@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Folder, FileText } from 'lucide-react'
 import { AuthRequestError, sessionQueryOptions, signInEmail } from '@/features/identity/public'
+import { Button } from '@/shared/ui/controls/button'
+import { Input } from '@/shared/ui/controls/input'
 
 const loginBots = [
   { name: '项目助手', mark: 'orbit' },
@@ -154,21 +156,23 @@ export function Component() {
           <form className="auth-form login-form" onSubmit={submit} noValidate>
             <label className="field">
               邮箱
-              <input
+              <Input
                 type="email"
                 value={email}
                 autoComplete="email"
                 placeholder="name@company.com"
+                className="h-11"
                 onChange={(event) => setEmail(event.target.value)}
               />
             </label>
             <label className="field">
               密码
-              <input
+              <Input
                 type="password"
                 value={password}
                 autoComplete="current-password"
                 placeholder="输入密码"
+                className="h-11"
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
@@ -182,9 +186,9 @@ export function Component() {
                 </p>
               ) : null}
             </div>
-            <button type="submit" className="login-submit" disabled={mutation.isPending}>
+            <Button type="submit" className="login-submit" disabled={mutation.isPending}>
               {mutation.isPending ? '登录中…' : '登录'}
-            </button>
+            </Button>
           </form>
           <p className="login-invite">
             还没有账号？<Link to="/accept-invitation">通过团队邀请加入</Link>

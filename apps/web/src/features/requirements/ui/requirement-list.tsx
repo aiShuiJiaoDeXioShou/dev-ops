@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { PrototypeIcon } from '@/prototype/icons/icon'
+import { FileText, Plus, Search, TriangleAlert } from 'lucide-react'
 import { EmptyState } from '@/shared/ui/page-state'
+import { Button } from '@/shared/ui/controls/button'
+import { Input } from '@/shared/ui/controls/input'
+import { Select } from '@/shared/ui/controls/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
@@ -39,12 +43,12 @@ export function RequirementList({ projectId }: { projectId: string }) {
     const described = describeRequestError(query.error)
     return (
       <div className="empty">
-        <PrototypeIcon name="warning" />
+        <TriangleAlert className="size-5" aria-hidden="true" />
         <h3>需求列表加载失败</h3>
         <p>{described.description}</p>
-        <button type="button" className="btn" onClick={() => void query.refetch()}>
+        <Button type="button" variant="outline" onClick={() => void query.refetch()}>
           重新加载
-        </button>
+        </Button>
       </div>
     )
   }
@@ -53,10 +57,10 @@ export function RequirementList({ projectId }: { projectId: string }) {
   const filtered = Boolean(state.search || state.status)
   return (
     <div className="row items-workspace">
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="items-workspace-main">
         <div className="list-toolbar">
           <div className="filters">
-            <select
+            <Select
               className="filter-select"
               aria-label="需求状态"
               value={state.status}
@@ -68,10 +72,11 @@ export function RequirementList({ projectId }: { projectId: string }) {
                   {label}
                 </option>
               ))}
-            </select>
+            </Select>
             <label className="search">
-              <PrototypeIcon name="search" />
-              <input
+              <Search className="size-4" aria-hidden="true" />
+              <Input
+                className="search-input"
                 aria-label="搜索需求"
                 placeholder="搜索标题或编号"
                 value={state.search}
@@ -80,10 +85,10 @@ export function RequirementList({ projectId }: { projectId: string }) {
             </label>
           </div>
           {canWrite && (
-            <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-              <PrototypeIcon name="plus" />
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" aria-hidden="true" />
               新建需求
-            </button>
+            </Button>
           )}
         </div>
         {isEmpty ? (
@@ -97,79 +102,84 @@ export function RequirementList({ projectId }: { projectId: string }) {
             }
             action={
               filtered ? (
-                <button type="button" className="btn" onClick={() => setParams(new URLSearchParams())}>
+                <Button type="button" variant="outline" onClick={() => setParams(new URLSearchParams())}>
                   清除筛选
-                </button>
+                </Button>
               ) : undefined
             }
           />
         ) : (
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>事项</th>
-                  <th>负责人</th>
-                  <th>业务进度</th>
-                  <th>更新时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={`clickable-row${state.openId === item.id ? ' selected' : ''}`}
-                    onClick={(event) => {
-                      if (isNestedInteractiveTarget(event.target)) return
-                      update({ openId: item.id })
-                    }}
-                  >
-                    <td>
-                      <div className="item-cell">
-                        <PrototypeIcon name="file" />
-                        <button type="button" className="item-title" onClick={() => update({ openId: item.id })}>
-                          <span className="item-id">#{item.number}</span>
-                          {item.title}
-                        </button>
-                        <span className="mobile-status">
-                          <StatusBadge tone={requirementStatusTone(item.status)}>
-                            {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
-                          </StatusBadge>
-                        </span>
-                      </div>
-                    </td>
-                    <td>{item.devOwner?.name ?? '未指定'}</td>
-                    <td>
-                      <StatusBadge tone={requirementStatusTone(item.status)}>
-                        {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
-                      </StatusBadge>
-                    </td>
-                    <td className="quiet">{formatDateTime(item.updatedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table className="table">
+            <TableHeader>
+              <TableRow>
+                <TableHead>事项</TableHead>
+                <TableHead>负责人</TableHead>
+                <TableHead>业务进度</TableHead>
+                <TableHead>更新时间</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow
+                  key={item.id}
+                  className={`clickable-row${state.openId === item.id ? ' selected' : ''}`}
+                  onClick={(event) => {
+                    if (isNestedInteractiveTarget(event.target)) return
+                    update({ openId: item.id })
+                  }}
+                >
+                  <TableCell>
+                    <div className="item-cell">
+                      <FileText className="size-4" aria-hidden="true" />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="item-title"
+                        onClick={() => update({ openId: item.id })}
+                      >
+                        <span className="item-id">#{item.number}</span>
+                        {item.title}
+                      </Button>
+                      <span className="mobile-status">
+                        <StatusBadge tone={requirementStatusTone(item.status)}>
+                          {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
+                        </StatusBadge>
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>{item.devOwner?.name ?? '未指定'}</TableCell>
+                  <TableCell>
+                    <StatusBadge tone={requirementStatusTone(item.status)}>
+                      {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
+                    </StatusBadge>
+                  </TableCell>
+                  <TableCell className="quiet">{formatDateTime(item.updatedAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
         {!isEmpty && (
           <div className="pagination">
             <span className="quiet">共 {query.data.data.total} 条</span>
-            <button
+            <Button
               type="button"
-              className="btn"
+              variant="outline"
+              size="sm"
               disabled={state.page <= 1}
               onClick={() => update({ page: state.page - 1 })}
             >
               上一页
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn"
+              variant="outline"
+              size="sm"
               disabled={state.page * state.pageSize >= query.data.data.total}
               onClick={() => update({ page: state.page + 1 })}
             >
               下一页
-            </button>
+            </Button>
           </div>
         )}
       </div>

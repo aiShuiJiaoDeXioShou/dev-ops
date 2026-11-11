@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { RequestError } from '@dev-ops/api-client'
+import { Button } from '@/shared/ui/controls/button'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { readinessQueryOptions } from '../api/queries'
 
 /**
@@ -18,7 +20,7 @@ export default function ConnectionStatus() {
     <section className="card">
       <div className="row spread">
         <h3>服务连接</h3>
-        <span className={query.isError ? 'badge red' : 'badge'}>{statusLabel}</span>
+        <StatusBadge tone={query.isError ? 'danger' : 'neutral'}>{statusLabel}</StatusBadge>
       </div>
       {query.isPending && <p className="section-note">正在检查后端与数据库…</p>}
       {query.isError && (
@@ -34,13 +36,13 @@ export default function ConnectionStatus() {
       )}
       {query.isSuccess && (
         <>
-          <div className="row" style={{ marginTop: 16, alignItems: 'flex-start' }}>
-            <span className="dot green" style={{ marginTop: 7 }} />
+          <div className="connection-status-row">
+            <span className="dot green connection-status-dot" />
             <div>
-              <p role="status" aria-live="polite" style={{ fontWeight: 500 }}>
+              <p role="status" aria-live="polite" className="connection-status-line">
                 {query.isFetching ? '正在更新连接状态…' : '已联通：前端 → API 代理 → 后端 → PostgreSQL'}
               </p>
-              <p className="quiet small" style={{ marginTop: 6 }}>
+              <p className="quiet small connection-status-time">
                 最近检查：{new Date(query.dataUpdatedAt).toLocaleTimeString('zh-CN', { hour12: false })}
               </p>
             </div>
@@ -48,11 +50,11 @@ export default function ConnectionStatus() {
           {query.data.requestId && <p className="request-id">请求标识：{query.data.requestId}</p>}
         </>
       )}
-      <div className="row" style={{ marginTop: 18 }}>
-        <button type="button" className="btn" onClick={refreshStatus} disabled={query.isFetching}>
+      <div className="connection-status-actions">
+        <Button type="button" variant="outline" onClick={refreshStatus} disabled={query.isFetching}>
           <RefreshCw className={query.isFetching ? 'animate-spin' : undefined} aria-hidden="true" />
           {query.isFetching ? '检查中…' : '重新检查'}
-        </button>
+        </Button>
       </div>
     </section>
   )

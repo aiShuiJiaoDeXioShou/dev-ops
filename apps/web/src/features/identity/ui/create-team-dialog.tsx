@@ -59,7 +59,7 @@ export function CreateTeamDialog({ open, onOpenChange }: { open: boolean; onOpen
         onOpenChange(next)
       }}
     >
-      <DialogContent className="w-[min(560px,calc(100vw-32px))]">
+      <DialogContent className="dialog-w-md">
         <DialogHeader>
           <DialogTitle>创建团队</DialogTitle>
           <DialogDescription>创建团队后，平台会向首位管理员发送邀请邮件。</DialogDescription>
