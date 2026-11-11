@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
@@ -114,6 +114,9 @@ describe('BugDetailPane 协作人与附件', () => {
     renderDetail()
     const attachmentSection = await screen.findByRole('region', { name: '附件' })
     expect(within(attachmentSection).getByRole('link', { name: '下载' })).toBeInTheDocument()
-    expect(within(attachmentSection).queryByRole('button', { name: /删除附件/ })).not.toBeInTheDocument()
+    // 团队角色来自异步 /me/teams；等待只读状态生效后再断言，避免并行测试下的竞态。
+    await waitFor(() =>
+      expect(within(attachmentSection).queryByRole('button', { name: /删除附件/ })).not.toBeInTheDocument(),
+    )
   })
 })
