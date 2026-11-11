@@ -127,3 +127,18 @@ V0.4a 新增 `pipeline` 模块的 7 张表，替代已下线的 `delivery` 外�
 部署后端时，编译产物需连同 `apps/server/drizzle/` 迁移目录和运行依赖一起提供。在 `apps/server/` 目录使用 `node dist/entrypoints/migrate.js` 运行编译后的迁移入口，凭据通过环境变量注入。运行 `node dist/entrypoints/http.js` 启动应用，网关或编排系统使用 `/api/v1/ready` 判断数据库就绪。
 
 非本地环境应由管理员预建数据库及两个独立角色，按本地初始化脚本的权限边界配置；基础迁移中的应用角色名为 `dev_ops_app`。远程连接按数据库服务要求启用并验证 TLS，不通过关闭证书校验绕过错误。连接池上限应结合进程数量和数据库连接容量设置。迁移成功不代表所有业务数据升级均已验证，发布前仍需针对实际表结构验证备份恢复和升级路径。
+
+## 补充：V0.4b 表与迁移（2026-11-11）
+
+- 迁移 `0022_v04b_deploy_release.sql` 新建：`project_capability_grant`、`tool_invocation`、`code_change`、`change_plan`、`change_plan_approval`、`change_execution`、`change_plan_event`，并为 `pipeline_run` 增加 `run_kind`（默认 `workflow`）与 `secret_environment`（默认 `production`）。
+- 部分唯一索引：`uk_project_capability_grant_active` 保证同一项目/用户/能力只有一条有效授权；`uk_change_plan_active_target` 保证同一服务 + 环境只有一条 `approved/executing/verifying` 计划。
+- 迁移只新增表与列，不改写 V0.4a 数据；已在本地 PostgreSQL 18 完成空库迁移验证。生产升级前仍需按实际数据备份并验证升级路径。
+- 事件表 `change_plan_event` 只增不改；计划/放行/执行/事件均不保存凭据明文、补丁正文或远端响应全文。
+
+## V0.5 附件与储存桶（迁移 0023）
+
+- 迁移 `0023_attachments_storage.sql` 新建 `storage_bucket`（平台级桶配置、内置本地桶与 S3 兼容桶、凭据密文列、探测结论）、`storage_bucket_event`（平台级配置审计）、`attachment`（业务附件，状态 `temp`/`bound`/`removed`）、`bug_collaborator`（缺陷协作人关系），并把 `activity` 实体类型白名单扩展到 `attachment`。
+- 部分唯一索引 `uk_storage_bucket_default` 保证同一时刻至多一个默认桶；`attachment` 部分索引分别服务详情列表、临时附件清理、`removed` 待删对象重试与桶引用计数。
+- 迁移内种入内置本地桶（固定 UUID `00000000-0000-4000-8000-000000000001`），服务启动时校验存在与不变量：缺失补建、被误改则阻止启动。
+- 附件内容写入 `ATTACHMENT_STORAGE_DIR` 或平台配置的 S3 兼容桶；数据库只保存 `bucket_id`/`storage_key`/大小/`sha256` 等元数据，读取按记录固定的桶解析，不随默认桶切换变化。
+- 对象删除不在数据库事务内执行：事务只把状态置为 `removed` 并写活动，提交后删除对象，失败由 Worker 清理任务重试。

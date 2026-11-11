@@ -15,6 +15,13 @@ import {
   type GitPullRequestListInput,
   type GitPullRequestSummary,
   type GitRemoteRepository,
+  type GitAddCommentInput,
+  type GitCommentRef,
+  type GitCreateIssueInput,
+  type GitCreatePullRequestInput,
+  type GitIssueRef,
+  type GitPullRequestRef,
+  GitWriteError,
   type GitReviewStatus,
   type GitTreeEntry,
   type GitTreeInput,
@@ -108,6 +115,39 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
       return await response.text()
     } catch {
       throw new GitAdapterError('invalid_response', 'Gitea 返回了无法解析的差异内容')
+    }
+  }
+
+  /** 发起 Gitea 写请求；409/422 归类为重复/冲突，便于调用方回读。 */
+  async function postWrite<T>(path: string, body: Record<string, unknown>): Promise<T> {
+    let response: Response
+    try {
+      response = await fetchImpl(`${baseUrl}/api/v1${path}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `token ${options.token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+    } catch (error) {
+      if (error instanceof GitAdapterError) throw error
+      throw new GitWriteError('unavailable', 'Gitea 写请求失败')
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new GitWriteError('auth_failed', 'Gitea 授权不可用')
+    }
+    if (response.status === 404) throw new GitWriteError('unsupported', 'Gitea 接口或资源不存在')
+    if (response.status === 409 || response.status === 422) {
+      throw new GitWriteError('duplicate', 'Gitea 已存在同类记录或参数冲突')
+    }
+    if (!response.ok) throw new GitWriteError('unavailable', 'Gitea 暂时不可用')
+    try {
+      return (await response.json()) as T
+    } catch {
+      throw new GitWriteError('invalid_response', 'Gitea 返回了无法解析的数据')
     }
   }
 
@@ -288,5 +328,45 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     listPullRequests,
     getPullRequest,
     getPullRequestDiff,
+    async createPullRequest(input: GitCreatePullRequestInput): Promise<GitPullRequestRef> {
+      const slug = `${input.repository.namespace}/${input.repository.name}`
+      const data = await postWrite<Record<string, unknown>>(`/repos/${slug}/pulls`, {
+        title: input.title,
+        body: input.body,
+        head: input.sourceBranch,
+        base: input.targetBranch,
+      })
+      const number = Number(data.number)
+      if (!Number.isSafeInteger(number) || number <= 0) {
+        throw new GitWriteError('invalid_response', 'Gitea 未返回 PR 编号')
+      }
+      return {
+        number,
+        url: typeof data.html_url === 'string' ? data.html_url : null,
+        sourceBranch: input.sourceBranch,
+        targetBranch: input.targetBranch,
+      }
+    },
+    async createIssue(input: GitCreateIssueInput): Promise<GitIssueRef> {
+      const slug = `${input.repository.namespace}/${input.repository.name}`
+      const data = await postWrite<Record<string, unknown>>(`/repos/${slug}/issues`, {
+        title: input.title,
+        body: input.body,
+      })
+      const number = Number(data.number)
+      if (!Number.isSafeInteger(number) || number <= 0) {
+        throw new GitWriteError('invalid_response', 'Gitea 未返回 Issue 编号')
+      }
+      return { number, url: typeof data.html_url === 'string' ? data.html_url : null }
+    },
+    async addComment(input: GitAddCommentInput): Promise<GitCommentRef> {
+      const slug = `${input.repository.namespace}/${input.repository.name}`
+      const data = await postWrite<Record<string, unknown>>(`/repos/${slug}/issues/${input.targetNumber}/comments`, {
+        body: input.body,
+      })
+      const id = Number(data.id)
+      if (!Number.isSafeInteger(id) || id <= 0) throw new GitWriteError('invalid_response', 'Gitea 未返回评论标识')
+      return { id: String(id), url: typeof data.html_url === 'string' ? data.html_url : null }
+    },
   }
 }

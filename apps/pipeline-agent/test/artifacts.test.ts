@@ -214,7 +214,7 @@ test('产物按 SHA-256 与长度流式上传，请求头符合协议', async ()
       return okEnvelope({
         nodeId: 'node-artifact',
         agentToken: 'agent-token-012345678901234567890123456789',
-        protocolVersion: 1,
+        protocolVersion: 2,
         heartbeatIntervalSeconds: 15,
         leaseTtlSeconds: 90,
       })

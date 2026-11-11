@@ -4,6 +4,8 @@ import { createPipelineScheduler, type PipelineSchedulerLogger } from '../module
 import { createStorageService } from '../modules/storage/storage.service.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createAttachmentCleanup } from '../modules/attachments/attachments.cleanup.ts'
+import { reconcileCodeChangeFromRun } from '../modules/tools/tools.code-change.service.ts'
+import { reconcileChangeExecutionFromRun } from '../modules/operations/operations.execution.service.ts'
 
 export type { PipelineSchedulerLogger } from '../modules/pipeline/pipeline.scheduler.ts'
 
@@ -34,6 +36,12 @@ export function createWorker(
       heartbeatTimeoutSeconds: config.PIPELINE_HEARTBEAT_TIMEOUT_SECONDS,
     },
     log,
+    onRunFinalized: async (runId) => {
+      await Promise.all([
+        reconcileCodeChangeFromRun(database.db, runId),
+        reconcileChangeExecutionFromRun(database.db, runId),
+      ])
+    },
   })
   const secretCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY
     ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY)

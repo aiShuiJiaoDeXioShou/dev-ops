@@ -4,6 +4,7 @@ import type {
   PipelineInputValue,
   PipelineInputs,
   RunPlan,
+  RunPlanCodeChange,
   RunPlanGit,
   RunPlanJob,
   RunPlanStep,
@@ -42,6 +43,8 @@ export interface RunPlanTemplate {
   env: PipelineEnv
   secretNames: string[]
   jobs: RunPlanJob[]
+  /** 仅在 run_kind='code_change' 时出现的受控代码修改参数。 */
+  codeChange?: RunPlanCodeChange
 }
 
 /** 计划生成错误；path 定位到 workflow 字段。 */
@@ -346,4 +349,95 @@ function resolveMaterializedEnv(
     resolved[name] = resolveTemplateString(value, context, true, name)
   }
   return resolved
+}
+
+/** 受控代码修改运行计划输入；平台固定步骤与仓库内校验步骤合并。 */
+export interface BuildCodeChangeRunPlanInput {
+  runId: string
+  baseRef: string
+  baseSha: string
+  repositoryFullName: string
+  branchName: string
+  commitMessage: string
+  authorName: string
+  authorEmail: string
+  patch: string
+  patchSha256: string
+  workflow: ParsedWorkflow
+  timeoutSeconds: number
+}
+
+/**
+ * 生成受控代码修改运行计划：检入基线 → 应用补丁 → 提交 → 校验工作流步骤 → 收集差异 → 推送分支。
+ * @param input 已校验的补丁元数据与校验工作流。
+ * @returns 固定后的运行计划模板；`codeChange` 只出现在该类型运行中。
+ * @throws PipelinePlanError 校验工作流缺少可执行步骤或不支持。
+ */
+export function buildCodeChangeRunPlan(input: BuildCodeChangeRunPlanInput): RunPlanTemplate {
+  const validation = generateRunPlan({
+    workflow: input.workflow,
+    runId: input.runId,
+    ref: input.baseRef,
+    commitSha: input.baseSha,
+    inputs: {},
+    github: { sha: input.baseSha, ref: input.baseRef, repository: input.repositoryFullName },
+    defaultRunTimeoutSeconds: input.timeoutSeconds,
+  })
+  const baseJob = validation.jobs[0]
+  if (!baseJob) throw new PipelinePlanError('校验工作流缺少可执行 job')
+  const validationSteps = baseJob.steps.filter((step) => step.kind === 'run')
+  if (validationSteps.length === 0) throw new PipelinePlanError('校验工作流缺少可执行的 run 步骤')
+  let index = 0
+  const step = (name: string, kind: RunPlanStep['kind'], extra: Partial<RunPlanStep> = {}): RunPlanStep => ({
+    index: index++,
+    name,
+    kind,
+    ...extra,
+  })
+  const steps: RunPlanStep[] = [
+    step('检出基线提交', 'builtin_checkout'),
+    step('应用代码补丁', 'builtin_apply_patch'),
+    step('提交工作分支', 'builtin_commit_changes'),
+    ...validationSteps.map((validationStep) =>
+      step(validationStep.name, 'run', {
+        run: validationStep.run,
+        ...(validationStep.env ? { env: validationStep.env } : {}),
+        ...(validationStep.workingDirectory ? { workingDirectory: validationStep.workingDirectory } : {}),
+        ...(validationStep.timeoutSeconds ? { timeoutSeconds: validationStep.timeoutSeconds } : {}),
+      }),
+    ),
+    step('收集差异', 'builtin_collect_diff'),
+    step('推送工作分支', 'builtin_push_branch'),
+  ]
+  return {
+    runId: input.runId,
+    workflowPath: 'platform/code-change',
+    workflowName: '受控代码修改',
+    ref: input.baseRef,
+    commitSha: input.baseSha,
+    repository: input.repositoryFullName,
+    timeoutSeconds: input.timeoutSeconds,
+    inputs: {},
+    env: validation.env,
+    secretNames: validation.secretNames,
+    jobs: [
+      {
+        id: 'code-change',
+        name: '受控代码修改',
+        image: baseJob.image,
+        runsOn: ['linux', 'code_change_v1'],
+        timeoutSeconds: input.timeoutSeconds,
+        steps,
+      },
+    ],
+    codeChange: {
+      baseSha: input.baseSha,
+      branchName: input.branchName,
+      commitMessage: input.commitMessage,
+      authorName: input.authorName,
+      authorEmail: input.authorEmail,
+      patch: input.patch,
+      patchSha256: input.patchSha256,
+    },
+  }
 }

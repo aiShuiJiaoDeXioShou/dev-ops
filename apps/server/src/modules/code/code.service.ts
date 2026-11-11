@@ -166,6 +166,24 @@ export interface GitReadPort {
     repository: { namespace: string; name: string }
     number: number
   }): Promise<GitPullRequestDiffPort>
+  createPullRequest?(input: {
+    repository: { namespace: string; name: string }
+    title: string
+    body: string
+    sourceBranch: string
+    targetBranch: string
+  }): Promise<{ number: number; url: string | null; sourceBranch: string; targetBranch: string }>
+  createIssue?(input: {
+    repository: { namespace: string; name: string }
+    title: string
+    body: string
+  }): Promise<{ number: number; url: string | null }>
+  addComment?(input: {
+    repository: { namespace: string; name: string }
+    targetType: 'issue' | 'pull_request'
+    targetNumber: number
+    body: string
+  }): Promise<{ id: string; url: string | null }>
 }
 
 export interface RepositoryView {
@@ -408,6 +426,23 @@ function gitAdapterErrorCode(error: unknown): string | null {
  * @param deps 数据库、连接适配器解析器与团队可用连接读取器。
  * @returns 项目仓库、可关联仓库与代码引用用例。
  */
+/**
+ * 把 Git 写失败映射为业务错误码；不返回来源响应正文。
+ * 模块不直接依赖 adapters，按适配器错误的 code 字段做结构化收窄。
+ */
+function mapGitWriteError(error: unknown, action: string): never {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : undefined
+  if (code === 'duplicate' || code === 'conflict') {
+    throw new ApiError(ERROR_CODES.PULL_REQUEST_CONFLICT, `远端已存在同类记录或冲突：${action}`)
+  }
+  if (code === 'auth_failed') throw new ApiError(ERROR_CODES.EXTERNAL_AUTH_FAILED, `${action}失败：授权不可用`)
+  if (code === 'unsupported') throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, `${action}失败：来源不支持`)
+  throw new ApiError(ERROR_CODES.EXTERNAL_UNAVAILABLE, `${action}失败：来源暂时不可用`)
+}
+
 export function createCodeService(deps: CodeServiceDeps) {
   const { db } = deps
 
@@ -969,6 +1004,86 @@ export function createCodeService(deps: CodeServiceDeps) {
     }
   }
 
+  /**
+   * 创建远端 PR／MR。
+   * @param actor 当前用户；需要项目写权限。
+   * @param projectId 项目标识。
+   * @param repositoryId 项目已关联仓库。
+   * @param input 标题、正文、源分支与目标分支。
+   * @returns 远端 PR 引用。
+   * @throws 无写权限、适配器不支持或来源失败时抛出业务错误；重复 PR 映射为 PULL_REQUEST_CONFLICT。
+   */
+  async function createPullRequest(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: { title: string; body: string; sourceBranch: string; targetBranch: string },
+  ): Promise<{ number: number; url: string | null; sourceBranch: string; targetBranch: string }> {
+    await requireProjectWrite(actor, projectId)
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.createPullRequest) {
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持创建 PR')
+    }
+    try {
+      return await adapter.createPullRequest({
+        repository: repositoryRef(repository),
+        title: input.title,
+        body: input.body,
+        sourceBranch: input.sourceBranch,
+        targetBranch: input.targetBranch,
+      })
+    } catch (error) {
+      mapGitWriteError(error, '创建 PR')
+    }
+  }
+
+  /**
+   * 创建远端 Issue。
+   * @returns 远端 Issue 引用。
+   * @throws 无写权限、适配器不支持或来源失败时抛出业务错误。
+   */
+  async function createRemoteIssue(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: { title: string; body: string },
+  ): Promise<{ number: number; url: string | null }> {
+    await requireProjectWrite(actor, projectId)
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.createIssue) throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持创建 Issue')
+    try {
+      return await adapter.createIssue({ repository: repositoryRef(repository), title: input.title, body: input.body })
+    } catch (error) {
+      mapGitWriteError(error, '创建 Issue')
+    }
+  }
+
+  /**
+   * 为远端 Issue 或 PR 添加评论。
+   * @returns 远端评论引用。
+   * @throws 无写权限、适配器不支持或来源失败时抛出业务错误。
+   */
+  async function addRemoteComment(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: { targetType: 'issue' | 'pull_request'; targetNumber: number; body: string },
+  ): Promise<{ id: string; url: string | null }> {
+    await requireProjectWrite(actor, projectId)
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    if (!adapter.addComment) throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持评论')
+    try {
+      return await adapter.addComment({
+        repository: repositoryRef(repository),
+        targetType: input.targetType,
+        targetNumber: input.targetNumber,
+        body: input.body,
+      })
+    } catch (error) {
+      mapGitWriteError(error, '添加评论')
+    }
+  }
+
   return {
     listProjectRepositories,
     listRepositoryBranches,
@@ -989,6 +1104,9 @@ export function createCodeService(deps: CodeServiceDeps) {
     listRepositoryPullRequests,
     getRepositoryPullRequest,
     getRepositoryPullRequestDiff,
+    createPullRequest,
+    createRemoteIssue,
+    addRemoteComment,
   }
 }
 

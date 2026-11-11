@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
-import { mkdir, readdir, rm } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import { join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -45,6 +46,33 @@ export interface RunWorkspace {
    * @throws 凭据过期、远端不可达、提交不存在或 HEAD 校验失败时抛出，错误信息已脱敏。
    */
   ensureCheckout(git: RunPlanGit, timeoutMs?: number): Promise<void>
+  /**
+   * 校验并应用统一差异补丁。
+   * @param patch 补丁正文。
+   * @param patchSha256 期望摘要。
+   * @param maxBytes 补丁大小上限。
+   * @throws 摘要/大小不符或补丁无法应用时抛出，工作区不保留部分修改。
+   */
+  applyPatch(patch: string, patchSha256: string, maxBytes: number): Promise<void>
+  /**
+   * 提交工作区变更到工作分支。
+   * @param input 提交信息与作者。
+   * @throws 无变更或 git 提交失败时抛出。
+   */
+  commitChanges(input: { message: string; authorName: string; authorEmail: string }): Promise<void>
+  /**
+   * 收集基线到 HEAD 的统一差异。
+   * @param baseSha 基线提交。
+   * @returns 差异正文、摘要、大小与是否截断。
+   */
+  collectDiff(baseSha: string): Promise<{ patch: string; sha256: string; sizeBytes: number; truncated: boolean }>
+  /**
+   * 推送 HEAD 到工作分支，禁止强推。
+   * @param git 短期 Git 凭据。
+   * @param branchName 工作分支；不得等于基线分支。
+   * @throws 远端分支已存在且内容不同、凭据过期或推送失败时抛出。
+   */
+  pushBranch(git: RunPlanGit, branchName: string): Promise<void>
   /**
    * 删除整个运行工作区；进程被中断时也必须尽力执行。
    * @throws 删除失败时抛出，调用方需要把清理失败上报平台。
@@ -162,6 +190,79 @@ export async function createRunWorkspace(options: RunWorkspaceOptions): Promise<
     options.logger.info(`已检出提交 ${head.slice(0, 12)}`)
   }
 
+  async function applyPatch(patch: string, patchSha256: string, maxBytes: number): Promise<void> {
+    const sizeBytes = Buffer.byteLength(patch, 'utf8')
+    if (sizeBytes === 0 || sizeBytes > maxBytes) throw new Error('补丁大小超出允许范围')
+    const digest = createHash('sha256').update(patch, 'utf8').digest('hex')
+    if (digest !== patchSha256) throw new Error('补丁摘要与计划不一致')
+    if (checkedOutCommit === undefined) throw new Error('尚未检出基线提交，不能应用补丁')
+    const patchPath = join(tempDir, 'change.patch')
+    await writeFile(patchPath, patch, 'utf8')
+    const env = { PATH: process.env.PATH ?? '', HOME: join(rootDir, 'home'), GIT_CONFIG_NOSYSTEM: '1' }
+    try {
+      await runGit(['apply', '--check', patchPath], env, gitTimeoutMs)
+      await runGit(['apply', patchPath], env, gitTimeoutMs)
+    } finally {
+      await rm(patchPath, { force: true })
+    }
+  }
+
+  async function commitChanges(input: { message: string; authorName: string; authorEmail: string }): Promise<void> {
+    const env = { PATH: process.env.PATH ?? '', HOME: join(rootDir, 'home'), GIT_CONFIG_NOSYSTEM: '1' }
+    const status = (await runGit(['status', '--porcelain'], env, gitTimeoutMs)).trim()
+    if (status.length === 0) throw new Error('补丁应用后没有产生变更')
+    await runGit(
+      ['-c', `user.name=${input.authorName}`, '-c', `user.email=${input.authorEmail}`, 'add', '-A'],
+      env,
+      gitTimeoutMs,
+    )
+    await runGit(
+      [
+        '-c',
+        `user.name=${input.authorName}`,
+        '-c',
+        `user.email=${input.authorEmail}`,
+        'commit',
+        '-q',
+        '-m',
+        input.message,
+      ],
+      env,
+      gitTimeoutMs,
+    )
+  }
+
+  async function collectDiff(baseSha: string): Promise<{
+    patch: string
+    sha256: string
+    sizeBytes: number
+    truncated: boolean
+  }> {
+    const env = { PATH: process.env.PATH ?? '', HOME: join(rootDir, 'home'), GIT_CONFIG_NOSYSTEM: '1' }
+    const patch = await runGit(['diff', '--binary', baseSha, 'HEAD'], env, gitTimeoutMs)
+    const sizeBytes = Buffer.byteLength(patch, 'utf8')
+    const sha256 = createHash('sha256').update(patch, 'utf8').digest('hex')
+    return { patch, sha256, sizeBytes, truncated: false }
+  }
+
+  async function pushBranch(git: RunPlanGit, branchName: string): Promise<void> {
+    if (!/^[A-Za-z0-9._/-]{1,200}$/.test(branchName) || branchName.startsWith('/') || branchName.endsWith('/')) {
+      throw new Error('工作分支名不合法')
+    }
+    if (branchName.includes('..')) throw new Error('工作分支名不能包含 ..')
+    if (Date.parse(git.expiresAt) <= Date.now()) throw new Error('Git 短期凭据已过期，无法推送')
+    const env = gitEnv(git.username, git.password)
+    const remoteRef = `refs/heads/${branchName}`
+    const head = (await runGit(['rev-parse', 'HEAD'], env, gitTimeoutMs)).trim()
+    const remote = (await runGit(['ls-remote', '--heads', 'origin', remoteRef], env, gitTimeoutMs)).trim()
+    if (remote.length > 0) {
+      const remoteSha = remote.split(/\s+/)[0]
+      if (remoteSha !== head) throw new Error('远端工作分支已存在且内容不同，拒绝覆盖')
+      return
+    }
+    await runGit(['push', 'origin', `HEAD:${remoteRef}`], env, gitTimeoutMs)
+  }
+
   return {
     rootDir,
     checkoutDir,
@@ -170,6 +271,10 @@ export async function createRunWorkspace(options: RunWorkspaceOptions): Promise<
       return checkedOutCommit
     },
     ensureCheckout: checkout,
+    applyPatch,
+    commitChanges,
+    collectDiff,
+    pushBranch,
     async remove(): Promise<void> {
       await rm(rootDir, { recursive: true, force: true, maxRetries: 3 })
     },

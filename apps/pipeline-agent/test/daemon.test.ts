@@ -43,7 +43,7 @@ function createFakeClient(options: {
   const state: FakeClientState = { heartbeats: [], statuses: [], completed: [], leaseCalls: 0 }
   const session: AgentSessionInfo = {
     nodeId: 'fake-node',
-    protocolVersion: 1,
+    protocolVersion: 2,
     heartbeatIntervalSeconds: 1,
     leaseTtlSeconds: 90,
   }

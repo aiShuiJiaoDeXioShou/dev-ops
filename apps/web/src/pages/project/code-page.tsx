@@ -3,6 +3,7 @@ import { useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { projectQueryOptions } from '@/features/projects/public'
+import { CodeChangeSection } from '@/features/tools/public'
 import {
   CommitHistoryDialog,
   pickDefaultPreviewPath,
@@ -335,6 +336,7 @@ export function Component() {
         open={commitsOpen}
         onOpenChange={setCommitsOpen}
       />
+      <CodeChangeSection projectId={projectId} repositoryId={repository.id} />
       <div className="section-heading">
         <h2>代码</h2>
         <span className="badge">只读</span>

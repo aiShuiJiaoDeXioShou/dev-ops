@@ -120,3 +120,37 @@ pnpm --dir apps/cli build
 ```
 
 测试使用本地 HTTP 桩，不依赖公网或生产服务。真实 Gitea/GitHub App/邮件资源未提供时，相关端到端项标记为未验证。
+
+## V0.4b change 与 tool 命令（2026-11-11）
+
+```bash
+# 变更计划
+devops change create --project <id> --kind deploy_version --environment test --service <id> \
+  --target web --version-label v1.4.0 --scope "..." --evidence "..." --rollback "..." \
+  --execution platform_pipeline --workflow .devops/workflows/deploy-test.yml
+devops change list [--project <id>] [--environment test] [--status pending]
+devops change show <planId>
+devops change approve <planId> --revision 1 [--note "..."]
+devops change execute <planId> --revision 1 --yes
+devops change verify <planId> --revision 1 --yes
+devops change retry <planId> --revision 2 --reason "已核对：未生效" --yes
+devops change cancel <planId> --revision 1 --reason "..." --yes
+devops change executions <planId>
+devops change events <planId>
+
+# 项目写能力
+devops tool capabilities --project <id>
+devops tool grants add --project <id> --user <userId> --capability code_change
+devops tool grants revoke --project <id> --grant <grantId> --yes
+devops tool code-change create --project <id> --repository <id> --base main --branch feature/x \
+  --message "..." --patch-file ./change.patch --validation-workflow .devops/workflows/validate.yml
+devops tool code-change list|show|diff|cancel <codeChangeId>
+devops tool pr <codeChangeId> --title "..." [--body-file -]
+devops tool issue create --project <id> --bug <bugId> --repository <id> --title "..."
+devops tool comment add --project <id> (--bug <id> | --requirement <id> | --remote-issue <n> --repository <id>) \
+  --body-file -
+```
+
+- 危险动作（approve/execute/verify/cancel/retry/revoke）要求 `--yes`；写请求默认生成幂等键，可用全局 `--idempotency-key` 覆盖。
+- 变更计划版本使用 `--version-label`，避免与全局 `--version` 冲突。
+- 未验证：真实 Gitea 写操作与真实部署闭环。

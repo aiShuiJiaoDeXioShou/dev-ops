@@ -17,6 +17,13 @@ import {
   type GitPullRequestListInput,
   type GitPullRequestSummary,
   type GitRemoteRepository,
+  type GitAddCommentInput,
+  type GitCommentRef,
+  type GitCreateIssueInput,
+  type GitCreatePullRequestInput,
+  type GitIssueRef,
+  type GitPullRequestRef,
+  GitWriteError,
   type GitRepositoryRef,
   type GitReviewStatus,
   type GitTreeEntry,
@@ -147,6 +154,26 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
       throw new GitAdapterError('invalid_response', 'GitHub CLI 输出超出上限')
     }
     return result.stdout
+  }
+
+  /** 执行 gh api 写请求并把错误转换为 GitWriteError，避免调用方解析命令输出。 */
+  async function write(args: string[]): Promise<unknown> {
+    try {
+      const output = await run(args)
+      return parseJson<unknown>(output)
+    } catch (error) {
+      if (error instanceof GitAdapterError) {
+        if (error.code === 'auth_failed') throw new GitWriteError('auth_failed', error.message)
+        if (error.code === 'not_found') throw new GitWriteError('unsupported', error.message)
+        if (error.code === 'timeout') throw new GitWriteError('unavailable', error.message)
+        if (error.code === 'unsupported') throw new GitWriteError('unsupported', error.message)
+      }
+      const text = error instanceof Error ? error.message : ''
+      if (/HTTP 422|HTTP 409|already exists/i.test(text)) {
+        throw new GitWriteError('duplicate', 'GitHub 已存在同类记录或参数冲突')
+      }
+      throw new GitWriteError('unavailable', 'GitHub CLI 写请求失败')
+    }
   }
 
   /** 校验仓库 allowlist 并返回 owner/repo 组合；不在范围内的仓库不发起来源请求。 */
@@ -341,5 +368,64 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
     listPullRequests,
     getPullRequest,
     getPullRequestDiff,
+    async createPullRequest(input: GitCreatePullRequestInput): Promise<GitPullRequestRef> {
+      const slug = requireAllowed(input)
+      const data = (await write([
+        'api',
+        '--method',
+        'POST',
+        `repos/${slug}/pulls`,
+        '-f',
+        `title=${input.title}`,
+        '-f',
+        `head=${input.sourceBranch}`,
+        '-f',
+        `base=${input.targetBranch}`,
+        '-f',
+        `body=${input.body}`,
+      ])) as Record<string, unknown>
+      const number = Number(data?.number)
+      if (!Number.isSafeInteger(number) || number <= 0) {
+        throw new GitWriteError('invalid_response', 'GitHub 未返回 PR 编号')
+      }
+      return {
+        number,
+        url: typeof data?.html_url === 'string' ? data.html_url : null,
+        sourceBranch: input.sourceBranch,
+        targetBranch: input.targetBranch,
+      }
+    },
+    async createIssue(input: GitCreateIssueInput): Promise<GitIssueRef> {
+      const slug = requireAllowed(input)
+      const data = (await write([
+        'api',
+        '--method',
+        'POST',
+        `repos/${slug}/issues`,
+        '-f',
+        `title=${input.title}`,
+        '-f',
+        `body=${input.body}`,
+      ])) as Record<string, unknown>
+      const number = Number(data?.number)
+      if (!Number.isSafeInteger(number) || number <= 0) {
+        throw new GitWriteError('invalid_response', 'GitHub 未返回 Issue 编号')
+      }
+      return { number, url: typeof data?.html_url === 'string' ? data.html_url : null }
+    },
+    async addComment(input: GitAddCommentInput): Promise<GitCommentRef> {
+      const slug = requireAllowed(input)
+      const data = (await write([
+        'api',
+        '--method',
+        'POST',
+        `repos/${slug}/issues/${input.targetNumber}/comments`,
+        '-f',
+        `body=${input.body}`,
+      ])) as Record<string, unknown>
+      const id = Number(data?.id)
+      if (!Number.isSafeInteger(id) || id <= 0) throw new GitWriteError('invalid_response', 'GitHub 未返回评论标识')
+      return { id: String(id), url: typeof data?.html_url === 'string' ? data.html_url : null }
+    },
   }
 }

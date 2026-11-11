@@ -15,6 +15,70 @@ export class GitAdapterError extends Error {
   }
 }
 
+/** 写操作错误分类；duplicate 表示远端已存在同类记录，可回读后按幂等成功处理。 */
+export type GitWriteErrorCode =
+  'duplicate' | 'conflict' | 'auth_failed' | 'unavailable' | 'unsupported' | 'invalid_response'
+
+/** Git 写操作错误；调用方按 code 映射业务错误码，不解析远端响应文本。 */
+export class GitWriteError extends Error {
+  readonly code: GitWriteErrorCode
+
+  /**
+   * 创建写操作错误。
+   * @param code 失败分类。
+   * @param message 面向用户的说明，不含令牌与远端响应全文。
+   */
+  constructor(code: GitWriteErrorCode, message: string) {
+    super(message)
+    this.name = 'GitWriteError'
+    this.code = code
+  }
+}
+
+/** 创建远端 PR／MR 的输入；目标分支默认为仓库默认分支。 */
+export interface GitCreatePullRequestInput {
+  repository: GitRepositoryRef
+  title: string
+  body: string
+  sourceBranch: string
+  targetBranch: string
+}
+
+/** 远端 PR／MR 引用。 */
+export interface GitPullRequestRef {
+  number: number
+  url: string | null
+  sourceBranch: string
+  targetBranch: string
+}
+
+/** 创建远端 Issue 的输入。 */
+export interface GitCreateIssueInput {
+  repository: GitRepositoryRef
+  title: string
+  body: string
+}
+
+/** 远端 Issue 引用。 */
+export interface GitIssueRef {
+  number: number
+  url: string | null
+}
+
+/** 添加评论的输入；PR 与 Issue 使用同一评论能力。 */
+export interface GitAddCommentInput {
+  repository: GitRepositoryRef
+  targetType: 'issue' | 'pull_request'
+  targetNumber: number
+  body: string
+}
+
+/** 远端评论引用。 */
+export interface GitCommentRef {
+  id: string
+  url: string | null
+}
+
 export interface GitRemoteRepository {
   remoteId: string
   namespace: string
@@ -202,6 +266,12 @@ export interface GitAdapter {
   getPullRequest?(input: GitPullRequestInput): Promise<GitPullRequestDetail>
   /** 读取 PR 合并差异文本；来源不提供差异时抛 unsupported，不返回空文本冒充成功。 */
   getPullRequestDiff?(input: GitPullRequestInput): Promise<GitPullRequestDiff>
+  /** 创建 PR／MR；来源不支持写能力时不实现，调用方映射 EXTERNAL_UNSUPPORTED。 */
+  createPullRequest?(input: GitCreatePullRequestInput): Promise<GitPullRequestRef>
+  /** 创建远端 Issue；来源不支持写能力时不实现。 */
+  createIssue?(input: GitCreateIssueInput): Promise<GitIssueRef>
+  /** 为远端 Issue 或 PR 添加评论；来源不支持写能力时不实现。 */
+  addComment?(input: GitAddCommentInput): Promise<GitCommentRef>
 }
 
 /** 按提供方、授权方式和凭据构造适配器。 */

@@ -1,4 +1,5 @@
-import { posix } from 'node:path'
+import { writeFile } from 'node:fs/promises'
+import { join, posix } from 'node:path'
 
 import type {
   AgentStepStatusRequest,
@@ -248,6 +249,197 @@ async function executeCheckoutStep(context: StepContext): Promise<StepResult> {
   return { status: 'succeeded', exitCode: null, errorCode: null, errorMessage: null, canContinue: true }
 }
 
+/** 执行 builtin_apply_patch：宿主侧校验并应用计划补丁。 */
+async function executeApplyPatchStep(context: StepContext): Promise<StepResult> {
+  const change = context.plan.codeChange
+  if (!change) return failure(context.step, 'INVALID_STEP_OPTION', '运行计划缺少 codeChange 参数')
+  if (context.stop.reason) return cancelledResult(null)
+  try {
+    await context.workspace.applyPatch(change.patch, change.patchSha256, 1_048_576)
+  } catch (error) {
+    if (context.stop.reason) return cancelledResult(null)
+    const message = truncateMessage(context.masker, describeError(error))
+    const code =
+      message.includes('摘要') || message.includes('大小') ? 'CODE_CHANGE_PATCH_INVALID' : 'CODE_CHANGE_PATCH_CONFLICT'
+    return failure(context.step, code, message)
+  }
+  context.collector.append(context.step.index, '补丁已应用\n')
+  return { status: 'succeeded', exitCode: null, errorCode: null, errorMessage: null, canContinue: true }
+}
+
+/** 执行 builtin_commit_changes：提交工作分支变更。 */
+async function executeCommitChangesStep(context: StepContext): Promise<StepResult> {
+  const change = context.plan.codeChange
+  if (!change) return failure(context.step, 'INVALID_STEP_OPTION', '运行计划缺少 codeChange 参数')
+  if (context.stop.reason) return cancelledResult(null)
+  try {
+    await context.workspace.commitChanges({
+      message: change.commitMessage,
+      authorName: change.authorName,
+      authorEmail: change.authorEmail,
+    })
+  } catch (error) {
+    if (context.stop.reason) return cancelledResult(null)
+    const message = truncateMessage(context.masker, describeError(error))
+    const code = message.includes('没有产生变更') ? 'CODE_CHANGE_EMPTY' : 'CODE_CHANGE_COMMIT_FAILED'
+    return failure(context.step, code, message)
+  }
+  context.collector.append(context.step.index, '工作分支已提交\n')
+  return { status: 'succeeded', exitCode: null, errorCode: null, errorMessage: null, canContinue: true }
+}
+
+/** 执行 builtin_collect_diff：收集基线到 HEAD 的差异并上传产物。 */
+async function executeCollectDiffStep(context: StepContext): Promise<StepResult> {
+  const change = context.plan.codeChange
+  if (!change) return failure(context.step, 'INVALID_STEP_OPTION', '运行计划缺少 codeChange 参数')
+  if (context.stop.reason) return cancelledResult(null)
+  let diff: Awaited<ReturnType<RunWorkspace['collectDiff']>>
+  try {
+    diff = await context.workspace.collectDiff(change.baseSha)
+  } catch (error) {
+    return failure(context.step, 'CODE_CHANGE_DIFF_FAILED', truncateMessage(context.masker, describeError(error)))
+  }
+  const fileName = 'code-change.diff'
+  const filePath = join(context.workspace.tempDir, fileName)
+  try {
+    await writeFile(filePath, diff.patch, 'utf8')
+    const packed = await packArtifact({
+      workspaceDir: context.workspace.tempDir,
+      artifactPath: fileName,
+      tempDir: context.workspace.tempDir,
+      maxBytes: context.artifactMaxBytes,
+      logger: context.logger,
+    })
+    try {
+      await context.sink.uploadArtifact({
+        stepIndex: context.step.index,
+        name: 'code-change-diff',
+        sha256: packed.sha256,
+        sizeBytes: packed.sizeBytes,
+        filePath: packed.filePath,
+      })
+    } finally {
+      await removePackedArtifact(packed)
+    }
+  } catch (error) {
+    return failure(context.step, 'CODE_CHANGE_DIFF_FAILED', truncateMessage(context.masker, describeError(error)))
+  }
+  context.collector.append(context.step.index, `差异已收集：${diff.sizeBytes} 字节\n`)
+  return { status: 'succeeded', exitCode: null, errorCode: null, errorMessage: null, canContinue: true }
+}
+
+/** 执行 builtin_push_branch：推送工作分支，禁止覆盖远端不同内容。 */
+async function executePushBranchStep(context: StepContext): Promise<StepResult> {
+  const change = context.plan.codeChange
+  if (!change) return failure(context.step, 'INVALID_STEP_OPTION', '运行计划缺少 codeChange 参数')
+  if (context.stop.reason) return cancelledResult(null)
+  try {
+    await context.workspace.pushBranch(context.plan.git, change.branchName)
+  } catch (error) {
+    if (context.stop.reason) return cancelledResult(null)
+    const message = truncateMessage(context.masker, describeError(error))
+    const code = message.includes('已存在') ? 'CODE_CHANGE_BRANCH_CONFLICT' : 'CODE_CHANGE_PUSH_FAILED'
+    return failure(context.step, code, message)
+  }
+  context.collector.append(context.step.index, `工作分支已推送：${change.branchName}\n`)
+  return { status: 'succeeded', exitCode: null, errorCode: null, errorMessage: null, canContinue: true }
+}
+
+/** 执行 builtin_verify_service：访问健康与版本地址，产出 `change-verification` 产物。 */
+async function executeVerifyServiceStep(context: StepContext): Promise<StepResult> {
+  const healthUrl = context.step.with?.healthUrl
+  const expectedVersion = context.step.with?.expectedVersion
+  const versionUrl = context.step.with?.versionUrl
+  if (!healthUrl || !expectedVersion) {
+    return failure(context.step, 'INVALID_STEP_OPTION', 'verify-service 缺少 healthUrl 或 expectedVersion')
+  }
+  if (context.stop.reason) return cancelledResult(null)
+  const timeoutSeconds = Math.min(
+    120,
+    Math.max(5, Number(context.step.with?.timeoutSeconds ?? context.step.timeoutSeconds ?? 30) || 30),
+  )
+  const budgetMs = Math.max(1, Math.min(timeoutSeconds * 1000, remainingMs(context.deadlineAt)))
+  let health: 'ok' | 'failing' | 'unknown' = 'unknown'
+  let httpStatus: number | null = null
+  let actualVersion: string | null = null
+  let versionMatched = false
+  try {
+    const response = await fetch(healthUrl, { signal: AbortSignal.timeout(budgetMs) })
+    httpStatus = response.status
+    health = response.ok ? 'ok' : 'failing'
+  } catch {
+    health = 'unknown'
+  }
+  if (versionUrl) {
+    try {
+      const response = await fetch(versionUrl, { signal: AbortSignal.timeout(budgetMs) })
+      if (response.ok) {
+        const text = (await response.text()).trim()
+        let candidate: string | null = null
+        try {
+          const parsed: unknown = JSON.parse(text)
+          if (typeof parsed === 'object' && parsed !== null && 'version' in parsed) {
+            const value = Reflect.get(parsed, 'version')
+            candidate = typeof value === 'string' ? value.trim() : null
+          }
+        } catch {
+          candidate = text
+        }
+        actualVersion = candidate
+        versionMatched = candidate === expectedVersion
+      }
+    } catch {
+      actualVersion = null
+    }
+  }
+  const payload = {
+    health,
+    httpStatus,
+    healthUrl,
+    versionUrl: versionUrl ?? null,
+    expectedVersion,
+    actualVersion,
+    versionMatched,
+    checkedAt: new Date().toISOString(),
+  }
+  const fileName = 'change-verification.json'
+  const filePath = join(context.workspace.tempDir, fileName)
+  try {
+    await writeFile(filePath, JSON.stringify(payload, null, 2), 'utf8')
+    const packed = await packArtifact({
+      workspaceDir: context.workspace.tempDir,
+      artifactPath: fileName,
+      tempDir: context.workspace.tempDir,
+      maxBytes: context.artifactMaxBytes,
+      logger: context.logger,
+    })
+    try {
+      await withDeadline(
+        context.sink.uploadArtifact({
+          stepIndex: context.step.index,
+          name: 'change-verification',
+          sha256: packed.sha256,
+          sizeBytes: packed.sizeBytes,
+          filePath: packed.filePath,
+        }),
+        { timeoutMs: Math.max(1, remainingMs(context.deadlineAt)), label: '验证产物上传' },
+      )
+    } finally {
+      await removePackedArtifact(packed)
+    }
+  } catch (error) {
+    if (context.stop.reason) return cancelledResult(null)
+    if (error instanceof ArtifactError) return failure(context.step, error.code, error.message)
+    const code = errorCodeOf(error) ?? 'VERIFY_ARTIFACT_FAILED'
+    return failure(context.step, code, truncateMessage(context.masker, describeError(error)))
+  }
+  context.collector.append(
+    context.step.index,
+    `验证结果：health=${health}，版本匹配=${String(versionMatched)}，实际版本=${actualVersion ?? '未知'}\n`,
+  )
+  return { status: 'succeeded', exitCode: null, errorCode: null, errorMessage: null, canContinue: true }
+}
+
 /** 执行 builtin_upload_artifact：打包、计算校验和并流式上传。 */
 async function executeArtifactStep(context: StepContext): Promise<StepResult> {
   const name = context.step.with?.name
@@ -366,8 +558,21 @@ async function executeStep(context: StepContext): Promise<StepResult> {
       return executeCheckoutStep(context)
     case 'builtin_upload_artifact':
       return executeArtifactStep(context)
+    case 'builtin_verify_service':
+      return executeVerifyServiceStep(context)
+    case 'builtin_apply_patch':
+      return executeApplyPatchStep(context)
+    case 'builtin_commit_changes':
+      return executeCommitChangesStep(context)
+    case 'builtin_collect_diff':
+      return executeCollectDiffStep(context)
+    case 'builtin_push_branch':
+      return executePushBranchStep(context)
     case 'run':
       return executeCommandStep(context)
+    default:
+      // 新协议步骤尚未实现时必须显式失败，不能跳过或当作成功。
+      return failure(context.step, 'AGENT_STEP_UNSUPPORTED', `Agent 不支持步骤类型：${context.step.kind}`)
   }
 }
 

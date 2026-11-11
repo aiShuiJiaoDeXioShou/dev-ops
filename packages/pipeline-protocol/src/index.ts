@@ -30,6 +30,13 @@ export const PipelineStepKindSchema = Type.Union([
   Type.Literal('run'),
   Type.Literal('builtin_checkout'),
   Type.Literal('builtin_upload_artifact'),
+  // V0.4b：平台生成的受控代码修改步骤（宿主侧执行，仅平台计划可用）。
+  Type.Literal('builtin_apply_patch'),
+  Type.Literal('builtin_commit_changes'),
+  Type.Literal('builtin_collect_diff'),
+  Type.Literal('builtin_push_branch'),
+  // V0.4b：部署工作流可声明的服务健康与版本验证步骤。
+  Type.Literal('builtin_verify_service'),
 ])
 export type PipelineStepKind = Static<typeof PipelineStepKindSchema>
 
@@ -79,6 +86,18 @@ export const RunPlanGitSchema = Type.Object({
 })
 export type RunPlanGit = Static<typeof RunPlanGitSchema>
 
+/** 受控代码修改参数；只在 run_kind='code_change' 时出现。 */
+export const RunPlanCodeChangeSchema = Type.Object({
+  baseSha: Type.String({ pattern: '^[0-9a-f]{7,64}$' }),
+  branchName: Type.String({ minLength: 1, maxLength: 200 }),
+  commitMessage: Type.String({ minLength: 1, maxLength: 500 }),
+  authorName: Type.String({ minLength: 1, maxLength: 200 }),
+  authorEmail: Type.String({ minLength: 3, maxLength: 320 }),
+  patch: Type.String({ minLength: 1, maxLength: 1_048_576 }),
+  patchSha256: Type.String({ pattern: '^[0-9a-f]{64}$' }),
+})
+export type RunPlanCodeChange = Static<typeof RunPlanCodeChangeSchema>
+
 /** 平台生成并固定下来的完整运行计划；Agent 只执行、不改写。 */
 export const RunPlanSchema = Type.Object({
   runId: Type.String({ minLength: 1, maxLength: 64 }),
@@ -91,6 +110,7 @@ export const RunPlanSchema = Type.Object({
   env: PipelineEnvSchema,
   git: RunPlanGitSchema,
   secrets: PipelineEnvSchema,
+  codeChange: Type.Optional(RunPlanCodeChangeSchema),
   jobs: Type.Array(RunPlanJobSchema, { minItems: 1, maxItems: 50 }),
 })
 export type RunPlan = Static<typeof RunPlanSchema>
@@ -273,4 +293,4 @@ export function validateRunPlan(value: unknown): value is RunPlan {
   return Value.Check(RunPlanSchema, value) && hasUniqueStepIndexes(value)
 }
 
-export const PROTOCOL_VERSION = 1 as const
+export const PROTOCOL_VERSION = 2 as const

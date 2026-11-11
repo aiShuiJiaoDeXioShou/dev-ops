@@ -1,0 +1,2 @@
+ALTER TABLE "app"."pipeline_run_step" DROP CONSTRAINT "ck_pipeline_run_step_kind";--> statement-breakpoint
+ALTER TABLE "app"."pipeline_run_step" ADD CONSTRAINT "ck_pipeline_run_step_kind" CHECK ("app"."pipeline_run_step"."kind" in ('run', 'builtin_checkout', 'builtin_upload_artifact', 'builtin_apply_patch', 'builtin_commit_changes', 'builtin_collect_diff', 'builtin_push_branch', 'builtin_verify_service'));

@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { createAppAuth } from '@octokit/auth-app'
@@ -9,6 +10,7 @@ import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import type { SecretCipher } from '../configuration/configuration.crypto.ts'
 import { findSecretForDecrypt } from '../configuration/configuration.repository.ts'
+import { insertCredentialUsage } from '../configuration/configuration.credentials.repository.ts'
 import {
   credential,
   credentialProjectGrant,
@@ -19,7 +21,6 @@ import { findGitConnectionById } from '../integrations/integrations.repository.t
 
 const execFileAsync = promisify(execFile)
 const GH_TOKEN_TIMEOUT_MS = 5_000
-const SECRET_ENVIRONMENT = 'production'
 
 /** Git 短期凭据签发失败；不包含底层令牌或错误详情，避免凭据进入日志。 */
 export class PipelineCredentialError extends Error {
@@ -52,7 +53,12 @@ export interface PipelineCredentialRepository {
 /** 流水线运行所需的外部凭据提供者；由 bootstrap 注入，便于测试替换。 */
 export interface PipelineCredentialProvider {
   issueGitCredential(repository: PipelineCredentialRepository): Promise<RunPlanGit>
-  resolveSecrets(input: { teamId: string; projectId: string; names: string[] }): Promise<Record<string, string>>
+  resolveSecrets(input: {
+    teamId: string
+    projectId: string
+    environment: 'development' | 'test' | 'production'
+    names: string[]
+  }): Promise<Record<string, string>>
 }
 
 export interface PipelineCredentialProviderDeps {
@@ -95,7 +101,7 @@ async function readGitHubCliToken(): Promise<string> {
  * @param deps 数据库、应用配置与可选的团队凭据解密器。
  * @returns 供租约生成使用的 Git 凭据与密钥解析能力。
  * @remarks 返回值只进入 Agent 租约响应，不写入运行记录、日志或活动；明文在内存中短时存在。
- * secrets 引用固定解析项目 `production` 环境变量，P1 不区分部署环境。
+ * secrets 引用按运行的目标环境解析，环境之间不自动继承。
  */
 export function createPipelineCredentialProvider(deps: PipelineCredentialProviderDeps): PipelineCredentialProvider {
   const { db, config, cipher } = deps
@@ -158,8 +164,12 @@ export function createPipelineCredentialProvider(deps: PipelineCredentialProvide
   async function resolveSecrets(input: {
     teamId: string
     projectId: string
+    environment: 'development' | 'test' | 'production'
     names: string[]
   }): Promise<Record<string, string>> {
+    if (!['development', 'test', 'production'].includes(input.environment)) {
+      throw new PipelineSecretError('运行目标环境不合法')
+    }
     const names = [...new Set(input.names)].filter(Boolean)
     if (names.length === 0) return {}
     const rows = await db
@@ -175,7 +185,7 @@ export function createPipelineCredentialProvider(deps: PipelineCredentialProvide
         and(
           eq(projectEnvVar.project_id, input.projectId),
           eq(projectEnvVar.team_id, input.teamId),
-          eq(projectEnvVar.environment, SECRET_ENVIRONMENT),
+          eq(projectEnvVar.environment, input.environment),
           inArray(projectEnvVar.name, names),
         ),
       )
@@ -243,6 +253,19 @@ export function createPipelineCredentialProvider(deps: PipelineCredentialProvide
           iv: version.iv,
           authTag: version.auth_tag,
           keyVersion: version.key_version,
+        })
+        // 每次注入记录使用事实，只保存凭据标识、版本与目标环境，不保存值。
+        await insertCredentialUsage(db, {
+          id: randomUUID(),
+          teamId: input.teamId,
+          credentialId: record.id,
+          credentialVersion: record.current_version,
+          projectId: input.projectId,
+          environment: input.environment,
+          action: 'use',
+          actorUserId: null,
+          result: 'success',
+          errorCode: null,
         })
       }
     }

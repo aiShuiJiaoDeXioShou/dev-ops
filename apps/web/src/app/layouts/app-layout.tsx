@@ -43,7 +43,7 @@ export function AppLayout() {
   }
   const primaryNavItems = [
     { to: '/projects', label: '项目', icon: 'folder' as const },
-    { to: '/system/status', label: '运维', accessibleLabel: '系统状态', icon: 'activity' as const },
+    { to: '/operations/changes', label: '运维', icon: 'activity' as const },
     { to: '/capabilities', label: '能力', icon: 'capabilities' as const },
     ...(role !== 'viewer' ? [{ to: '/vault', label: '凭据库', icon: 'shield' as const }] : []),
   ]
@@ -62,7 +62,6 @@ export function AppLayout() {
             <NavLink
               key={item.to}
               to={item.to}
-              aria-label={item.accessibleLabel}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >

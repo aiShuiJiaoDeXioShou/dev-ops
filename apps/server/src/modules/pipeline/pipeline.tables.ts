@@ -30,6 +30,8 @@ export const pipelineRun = appSchema.table(
     run_plan: jsonb('run_plan').$type<Record<string, unknown>>().notNull(),
     workflow_snapshot: text('workflow_snapshot').notNull(),
     workflow_hash: text('workflow_hash').notNull(),
+    run_kind: text('run_kind').notNull().default('workflow'),
+    secret_environment: text('secret_environment').notNull().default('production'),
     status: text('status').notNull(),
     trigger_source: text('trigger_source').notNull(),
     initiator_channel: text('initiator_channel').notNull(),
@@ -53,6 +55,11 @@ export const pipelineRun = appSchema.table(
     check(
       'ck_pipeline_run_status',
       sql`${table.status} in ('queued', 'assigned', 'running', 'cancelling', 'succeeded', 'failed', 'cancelled', 'interrupted')`,
+    ),
+    check('ck_pipeline_run_kind', sql`${table.run_kind} in ('workflow', 'code_change')`),
+    check(
+      'ck_pipeline_run_secret_environment',
+      sql`${table.secret_environment} in ('development', 'test', 'production')`,
     ),
     check('ck_pipeline_run_trigger', sql`${table.trigger_source} in ('manual')`),
     check('ck_pipeline_run_channel', sql`${table.initiator_channel} in ('web', 'api')`),
@@ -89,7 +96,10 @@ export const pipelineRunStep = appSchema.table(
       'ck_pipeline_run_step_status',
       sql`${table.status} in ('pending', 'running', 'succeeded', 'failed', 'skipped', 'cancelled')`,
     ),
-    check('ck_pipeline_run_step_kind', sql`${table.kind} in ('run', 'builtin_checkout', 'builtin_upload_artifact')`),
+    check(
+      'ck_pipeline_run_step_kind',
+      sql`${table.kind} in ('run', 'builtin_checkout', 'builtin_upload_artifact', 'builtin_apply_patch', 'builtin_commit_changes', 'builtin_collect_diff', 'builtin_push_branch', 'builtin_verify_service')`,
+    ),
     index('idx_pipeline_run_step_run').on(table.run_id, table.step_index),
   ],
 )

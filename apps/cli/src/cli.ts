@@ -8,6 +8,8 @@ import { registerGitCommands } from './commands/git.ts'
 import { registerCodeCommands } from './commands/code.ts'
 import { registerRequirementCommands } from './commands/requirement.ts'
 import { registerBugCommands } from './commands/bug.ts'
+import { registerChangeCommands } from './commands/change.ts'
+import { registerToolCommands } from './commands/tool.ts'
 import type { CliContext } from './lib/context.ts'
 import { CliError, reportError } from './lib/errors.ts'
 
@@ -44,6 +46,8 @@ function createProgram(context: CliContext): Command {
   registerRequirementCommands(program, context)
   registerBugCommands(program, context)
   registerDeliveryCommands(program, context)
+  registerChangeCommands(program, context)
+  registerToolCommands(program, context)
   return program
 }
 

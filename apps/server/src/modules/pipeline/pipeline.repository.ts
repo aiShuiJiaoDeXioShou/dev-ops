@@ -21,6 +21,8 @@ const runListColumns = {
   workflow_name: pipelineRun.workflow_name,
   git_ref: pipelineRun.git_ref,
   commit_sha: pipelineRun.commit_sha,
+  run_kind: pipelineRun.run_kind,
+  secret_environment: pipelineRun.secret_environment,
   status: pipelineRun.status,
   trigger_source: pipelineRun.trigger_source,
   initiator_channel: pipelineRun.initiator_channel,
@@ -139,6 +141,8 @@ export interface NewPipelineRun {
   triggeredByUserId: string
   idempotencyKey: string
   timeoutSeconds: number
+  runKind?: 'workflow' | 'code_change'
+  secretEnvironment?: 'development' | 'test' | 'production'
 }
 
 /** 把运行计划模板转换为 jsonb 可写入的普通对象；保留全部字段，不做断言。 */
@@ -232,6 +236,8 @@ export async function insertPipelineRun(executor: PipelineExecutor, input: NewPi
       triggered_by_user_id: input.triggeredByUserId,
       idempotency_key: input.idempotencyKey,
       timeout_seconds: input.timeoutSeconds,
+      run_kind: input.runKind ?? 'workflow',
+      secret_environment: input.secretEnvironment ?? 'production',
     })
     .returning(runListColumns)
   return row

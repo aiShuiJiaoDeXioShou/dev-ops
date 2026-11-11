@@ -343,3 +343,9 @@ PostgreSQL 持久作业记录领取租约、尝试次数和安全错误，中断
 ## 实施状态（2026-11-10）
 
 V0.1 已落地只读关联链路：GitHub App / GitHub CLI / Gitea 适配器、团队 Git 连接、仓库同步、项目仓库关系、代码引用核对与撤权拒绝。stg 使用 `GITHUB_AUTH_MODE=cli` 与 `GITHUB_ALLOWED_REPOS` 白名单；生产方向使用 GitHub App 安装身份。V0.1 不执行远端写操作，GitHub/Gitea 真实网络验收与历史摘要权限过滤仍按 quickstart 检查。
+
+## 补充：写权限与幂等（2026-11-11）
+
+- GitHub App 写入需要 `contents: write`、`pull_requests: write`、`issues: write`；GitHub CLI 模式沿用本机登录身份（仅开发/stg）；Gitea Token 需要仓库写与 Issue 写权限。
+- 创建 PR/Issue/评论以项目内幂等键 + 请求指纹锚定；来源返回 409/422 时归类为重复，由调用方回读已有记录，不创建第二个。
+- 写调用保持仓库 allowlist 与团队隔离；跨实例同名仓库仍以连接与实例标识区分。

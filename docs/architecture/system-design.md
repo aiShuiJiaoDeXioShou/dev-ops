@@ -427,3 +427,16 @@ Worker 进程增加了部署、停机恢复和任务观察的维护成本。出�
 ## 补充：CLI 认证（2026-11-10）
 
 Web 登录仍由 Better Auth 邮箱密码/会话负责。业务接口额外接受个人 API Token（`Authorization: Bearer devops_pat_...`），由 identity 模块的 actor 解析统一转换为当前用户；Token 管理接口只接受登录会话，Token 不能自举。CLI 使用 Token 调用现有 API，不直连数据库。详见 002 规格与契约。
+
+## 补充：V0.4b 写能力与运维变更模块（2026-11-11）
+
+- 新增 `tools` 模块：`project_capability_grant`（按项目 × 用户 × 能力授权）、`tool_invocation`（幂等调用记录）、`code_change`（受控代码修改）。模块只负责授权、幂等与调用编排，Git 读写仍由 `code` 模块与 `adapters/git` 承担。
+- 新增 `operations` 模块：`change_plan`、`change_plan_approval`、`change_execution`、`change_plan_event`。计划为团队级对象，放行绑定修订与快照；同一服务 + 环境通过部分唯一索引保证同时只有一条活动计划。
+- `pipeline` 增加平台运行用例（受控代码修改）与按目标环境解析 secret；`pipeline_run` 新增 `run_kind` 与 `secret_environment`。`delivery` 公开“验证通过后写入运行版本”用例，供 `operations` 与计划完成同事务执行。
+- 依赖方向：`operations` → `pipeline`/`delivery`；`tools` → `code`/`pipeline`；`bootstrap` 负责装配；不新增跨进程边界。
+
+## 补充：附件与储存桶（006）
+
+- 新增 `storage` 模块：平台级储存桶配置、凭据加密、适配器（本地目录 / S3 兼容）与配置审计；只回答"写到哪里、能否写入"。
+- 新增 `attachments` 模块：附件上传、下载、删除与业务绑定（需求/Bug），事务内绑定、提交后删除对象；只回答"附件是什么、绑定给谁"。
+- 需求与 Bug 模块在各自事务中调用附件的绑定/解绑用例；平台管理员标记通过 `GET /me/teams` 返回，桶管理接口由 `requirePlatformAdmin` 兜底。

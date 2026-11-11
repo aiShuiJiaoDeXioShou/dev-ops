@@ -44,6 +44,8 @@ export interface PipelineSchedulerDeps {
   db: Database
   config: PipelineSchedulerConfig
   log: PipelineSchedulerLogger
+  /** 运行进入终态后的回调；用于回填依赖运行结果的业务记录。 */
+  onRunFinalized?: (runId: string) => Promise<void>
 }
 
 /** 单次调度周期统计；用于 Worker 日志与排障。 */
@@ -86,6 +88,7 @@ export function createPipelineScheduler(deps: PipelineSchedulerDeps) {
     })
     if (!updated) return false
     await skipPendingPipelineRunSteps(db, runId)
+    await deps.onRunFinalized?.(runId).catch(() => undefined)
     return true
   }
 

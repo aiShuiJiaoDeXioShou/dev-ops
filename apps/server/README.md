@@ -193,9 +193,57 @@ apps/server/
 - 运行与产物：`PIPELINE_RUN_NOT_FOUND`、`PIPELINE_STATE_CONFLICT`、`PIPELINE_LOG_NOT_FOUND`、`PIPELINE_ARTIFACT_NOT_FOUND`、`PIPELINE_ARTIFACT_CONFLICT`、`PIPELINE_STORAGE_ERROR`、`PIPELINE_LEASE_EXPIRED`、`PIPELINE_NODE_OFFLINE`、`PIPELINE_NODE_NOT_FOUND`、`PIPELINE_NODE_NAME_CONFLICT`。
 - 凭据：`PIPELINE_GIT_CREDENTIAL_ERROR`、`PIPELINE_SECRET_UNAVAILABLE`；错误消息只说明不可用原因，不返回令牌、Git 凭据或连接串。
 - Agent 协议：`AGENT_TOKEN_INVALID`、`AGENT_REGISTRATION_TOKEN_INVALID`、`AGENT_NODE_DISABLED`、`AGENT_LEASE_EXPIRED`、`AGENT_LEASE_INVALID`、`AGENT_STEP_STATE_CONFLICT`、`AGENT_LOG_SEQ_CONFLICT`、`AGENT_LOG_LIMIT_EXCEEDED`、`AGENT_ARTIFACT_LIMIT_EXCEEDED`、`AGENT_VERSION_UNSUPPORTED`（`packages/pipeline-protocol` 同时导出 `AGENT_ERROR_CODES` 供 Agent 复用）。
+- 附件：`ATTACHMENT_NOT_FOUND`、`ATTACHMENT_INVALID`、`ATTACHMENT_LIMIT_EXCEEDED`、`ATTACHMENT_STATE_CONFLICT`、`ATTACHMENT_STORAGE_UNAVAILABLE`；错误消息不返回对象键、桶标识与桶凭据。绑定数量/保留期等业务失败由需求与缺陷接口透传同一批错误码。
+- 储存桶：`STORAGE_BUCKET_NOT_FOUND`、`STORAGE_BUCKET_NAME_CONFLICT`、`STORAGE_BUCKET_IN_USE`、`STORAGE_BUCKET_NOT_WRITABLE`、`STORAGE_BUCKET_PROBE_FAILED`、`STORAGE_BUCKET_BUILTIN_PROTECTED`；引用中的桶被删除或停用时消息与 `data.attachmentCount` 给出引用数量，消息不返回凭据、密文、Access Key 或服务端堆栈。
 
 ### 显式例外与安全约束
 
 - **文件传输显式例外**：`GET /pipeline-artifacts/:artifactId/download` 成功时返回 `application/octet-stream` 流，不套信封，响应头带 `X-Content-SHA256`；失败仍返回 HTTP 200 + 统一 JSON 信封。该例外与 Better Auth 协议端点例外分开登记。
+- **附件下载显式例外（第二条例外）**：`GET /attachments/:attachmentId/download` 成功时返回 `application/octet-stream` 流 + `Content-Disposition: attachment; filename*=UTF-8''…`、`Content-Length` 与 `X-Content-SHA256`，不套信封；失败（非项目成员、附件不存在、储存桶不可用）仍返回 HTTP 200 + 统一 JSON 信封。该例外与流水线产物下载例外分别登记；附件按记录固定的 `bucket_id`/`storage_key` 读取，不随默认桶切换变化，临时附件超期清理与 removed 重试由 worker 每 10 分钟执行。
 - 服务端不执行用户代码；API 进程只做控制面，容器执行在自托管节点。日志与错误在服务端和 Agent 侧各脱敏一次；节点令牌、Git 凭据、运行时密钥只保存哈希/密文，明文本只在必要时短暂出现在内存与一次性响应中。
 - 日志/产物大小与分片数量有上限；租约过期不自动改派，运行收口为 `interrupted` 并保留已有日志与产物。
+
+## 储存桶管理与 S3 兼容接入（平台管理员）
+
+`src/modules/storage/` 提供平台级储存桶配置、S3 兼容适配器与配置变更审计；附件功能只依赖 `StorageAdapter`（`put`/`get`/`remove`/`probe`），本地桶与 S3 兼容桶共用同一套附件用例，新增桶类型不修改需求与缺陷模块。平台管理员接口挂载在 `/api/v1`，只使用 GET/POST 与统一信封，全部由 `requirePlatformAdmin` 兜底。
+
+| 方法与路径                                             | 权限       | 说明                                                                                |
+| ------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------------- |
+| `GET /platform/storage-buckets`                        | 平台管理员 | 列表按内置桶 → 默认桶 → 创建时间倒序；只返回 Access Key 掩码与最近探测结论          |
+| `POST /platform/storage-buckets`                       | 平台管理员 | 创建 S3 兼容桶；首期 `kind` 只允许 `s3`；`setAsDefault=true` 时先验证可读写         |
+| `POST /platform/storage-buckets/:bucketId/update`      | 平台管理员 | 更新配置；`version` 乐观锁，Secret 省略即保留；内置桶只允许改名                     |
+| `POST /platform/storage-buckets/:bucketId/test`        | 平台管理员 | 写探针 → 读回校验 → 删除；归因 `read_write`/`read_only`/`unreachable`/`auth_failed` |
+| `POST /platform/storage-buckets/:bucketId/set-default` | 平台管理员 | 要求启用且最近探测为 `read_write`；同一时刻只允许一个默认桶                         |
+| `POST /platform/storage-buckets/:bucketId/remove`      | 平台管理员 | 拒绝内置桶、当前默认桶与仍被附件引用的桶；删除后审计事件保留                        |
+
+约束：
+
+- 凭据只保存 AES-256-GCM 密文（复用 `GIT_CREDENTIAL_ENCRYPTION_KEY`）；未配置加密密钥时创建或轮换凭据返回 `STORAGE_BUCKET_NOT_WRITABLE`，本地桶不受影响。
+- 响应、日志与审计均不出现明文凭据；`storage_bucket_event.changes` 中凭据字段记为 `"***"`，只记录字段名与掩码。列表与详情不含 `credential_*` 列。
+- S3 适配器固定 `forcePathStyle: true` 并允许自定义 `endpoint`/`region`；探测通过 `NodeHttpHandler` 设置 `connectionTimeout`/`requestTimeout`（`STORAGE_PROBE_TIMEOUT_MS`），普通对象读写只设置连接超时，避免固定请求超时误杀大文件传输。
+- 每次写操作（创建、更新、测试、设默认、删除）在同一事务内追加 `storage_bucket_event`；平台级事件没有团队归属，不进入团队 `activity` 流。附件记录固化上传时的 `bucket_id`，默认桶切换不影响历史附件下载。
+
+## V0.4b tools 与 operations 模块（2026-11-11）
+
+- `tools` 路由：
+  - `GET /api/v1/projects/{projectId}/tools/capabilities`
+  - `GET|POST /api/v1/projects/{projectId}/tools/grants`、`POST /api/v1/projects/{projectId}/tools/grants/{grantId}/revoke`
+  - `POST|GET /api/v1/projects/{projectId}/tools/code-changes`、`GET /api/v1/tools/code-changes/{codeChangeId}`、`GET /api/v1/tools/code-changes/{codeChangeId}/diff`、`POST /api/v1/tools/code-changes/{codeChangeId}/cancel`、`POST /api/v1/tools/code-changes/{codeChangeId}/pull-requests`
+  - `POST /api/v1/projects/{projectId}/tools/remote-issues`、`POST /api/v1/projects/{projectId}/tools/comments`
+- `operations` 路由：
+  - `POST|GET /api/v1/projects/{projectId}/change-plans`、`GET /api/v1/teams/{teamId}/change-plans`、`GET /api/v1/change-plans/{planId}`
+  - `POST /api/v1/change-plans/{planId}/update|approve|execute|verify|cancel|retry`
+  - `GET /api/v1/change-plans/{planId}/executions|events`
+- 写能力默认关闭，按“用户 × 项目 × 能力”授权；服务端逐次校验，不因角色或项目成员身份自动放行。
+- 放行绑定计划修订与内容快照；计划修改后旧放行失效；同一服务 + 环境只允许一条活动计划。
+- 验证读取节点产出的 `change-verification` 产物，健康与实际版本一致才完成计划并更新运行版本。
+- 新增配置：`CODE_CHANGE_PATCH_MAX_BYTES`、`CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES`、`CODE_CHANGE_TIMEOUT_SECONDS`、`DEPLOY_VERIFY_TIMEOUT_SECONDS`、`CHANGE_PLAN_LIST_MAX_PAGE_SIZE`，说明见 `.env.example`。
+- 新增错误码：`TOOL_CAPABILITY_NOT_GRANTED`、`TOOL_INVOCATION_CONFLICT`、`CODE_CHANGE_*`、`PULL_REQUEST_CONFLICT`、`REMOTE_WRITE_CONFLICT`、`CHANGE_PLAN_*`、`SELF_APPROVAL_FORBIDDEN`、`CHANGE_EXECUTION_*`、`CHANGE_VERIFICATION_MISMATCH`。
+- 未验证：真实 GitHub 写权限、真实 Gitea 写能力现场验收、非本机执行节点、生产部署与外部执行系统连接器。
+
+## 附件存储与部署（V0.5）
+
+- 默认使用本地存储桶，根目录由 `ATTACHMENT_STORAGE_DIR` 指定（默认 `./attachment-data`）。该目录必须可写、与数据库备份一同保留，并在部署层做持久化挂载或备份策略；当前 `deploy/compose.yaml` 只包含 PostgreSQL，应用与存储目录按实际部署方式挂载。
+- 平台管理员可在 `/settings/storage-buckets` 接入 S3 兼容桶并设为默认；桶凭据使用 `GIT_CREDENTIAL_ENCRYPTION_KEY` 加密保存，界面与接口只返回掩码，日志不记录凭据。
+- 附件下载是继流水线产物之后的第二条例外：成功返回二进制流并带 `X-Content-SHA256`，失败返回 HTTP 200 统一信封。
+- 未绑定临时附件保留 24 小时后由 Worker 每 10 分钟清理；已绑定附件的对象删除在事务提交后执行，失败由清理任务重试。

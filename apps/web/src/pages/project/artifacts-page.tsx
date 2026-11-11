@@ -189,6 +189,11 @@ export function Component() {
                             {STATUS_LABELS[item.verificationStatus] ?? item.verificationStatus}
                           </span>
                           <span className="muted">{item.confirmedAt ?? '尚未确认'}</span>
+                          {item.source === 'deployment_receipt' && item.evidenceUrl ? (
+                            <a className="text-btn" href={item.evidenceUrl} target="_blank" rel="noreferrer">
+                              来源：变更计划
+                            </a>
+                          ) : null}
                           {canManage ? (
                             <Button
                               type="button"

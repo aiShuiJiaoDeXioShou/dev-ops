@@ -175,7 +175,7 @@ test('真实 HTTP：邀请 → 项目 → 需求 → 提测 → Bug 回归 → �
   const devUser = acceptedDev.body.data
   cookieJar = savedAdminCookie
   const adminTeams = await request('/api/v1/me/teams')
-  assert.equal(adminTeams.body.data[0].role, 'admin')
+  assert.equal(adminTeams.body.data.teams[0].role, 'admin')
 
   // 管理员会话创建项目。
   cookieJar = savedAdminCookie

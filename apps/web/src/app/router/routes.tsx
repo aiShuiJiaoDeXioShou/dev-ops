@@ -104,6 +104,16 @@ export function createAppRoutes(): RouteObject[] {
               ],
             },
             {
+              path: 'operations/changes',
+              lazy: () => import('@/pages/operations/change-plans-page'),
+              HydrateFallback: DelayedPageSkeleton,
+            },
+            {
+              path: 'operations/changes/:planId',
+              lazy: () => import('@/pages/operations/change-plan-page'),
+              HydrateFallback: DelayedPageSkeleton,
+            },
+            {
               path: 'settings/profile',
               lazy: () => import('@/pages/settings/profile-page'),
               HydrateFallback: DelayedPageSkeleton,

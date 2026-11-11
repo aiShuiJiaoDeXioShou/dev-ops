@@ -106,6 +106,21 @@ test('无效配置在网络请求前被拒绝', () => {
   }
 })
 
+test('单次调用可覆盖客户端默认超时', async () => {
+  const client = createApiClient({
+    baseUrl: 'https://example.test',
+    timeoutMs: 5_000,
+    fetch: (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+      }),
+  })
+  await assert.rejects(
+    client.listMyTeams({ timeoutMs: 20 }),
+    (error: unknown) => error instanceof RequestError && error.code === 'TIMEOUT',
+  )
+})
+
 test('API Token 以 Bearer 头发送，未提供时不发送 Authorization', async () => {
   for (const token of [undefined, 'devops_pat_test']) {
     let authorization: string | null = null

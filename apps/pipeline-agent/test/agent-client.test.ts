@@ -57,7 +57,7 @@ function createHarness(platform: MockPlatform): TestHarness {
 const REGISTER_RESPONSE = {
   nodeId: 'node-test-1',
   agentToken: AGENT_TOKEN,
-  protocolVersion: 1,
+  protocolVersion: 2,
   heartbeatIntervalSeconds: 15,
   leaseTtlSeconds: 90,
 }

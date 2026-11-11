@@ -337,6 +337,18 @@ function createFakeWorkspace(ensureCheckout: () => Promise<void>): RunWorkspace 
       await ensureCheckout()
       checkedOutCommit = TEST_COMMIT_SHA
     },
+    async applyPatch(): Promise<void> {
+      return undefined
+    },
+    async commitChanges(): Promise<void> {
+      return undefined
+    },
+    async collectDiff() {
+      return { patch: '', sha256: '', sizeBytes: 0, truncated: false }
+    },
+    async pushBranch(): Promise<void> {
+      return undefined
+    },
     async remove(): Promise<void> {
       return undefined
     },

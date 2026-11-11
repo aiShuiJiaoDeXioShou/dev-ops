@@ -52,7 +52,7 @@ export interface NewRunVersionChange {
  * @param environment 环境。
  * @returns 运行版本行；尚无记录时返回 undefined。
  */
-export async function findRunVersion(db: Database, serviceId: string, environment: string) {
+export async function findRunVersion(db: DeliveryExecutor, serviceId: string, environment: string) {
   const [row] = await db
     .select()
     .from(serviceRunVersion)

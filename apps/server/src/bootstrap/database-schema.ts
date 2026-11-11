@@ -32,6 +32,13 @@ export {
 } from '../modules/configuration/configuration.tables.ts'
 export { gitConnection } from '../modules/integrations/integrations.tables.ts'
 export { gitRepository, projectRepository, codeReference } from '../modules/code/code.tables.ts'
+export { projectCapabilityGrant, toolInvocation, codeChange } from '../modules/tools/tools.tables.ts'
+export {
+  changePlan,
+  changePlanApproval,
+  changeExecution,
+  changePlanEvent,
+} from '../modules/operations/operations.tables.ts'
 export {
   pipelineRun,
   pipelineRunStep,

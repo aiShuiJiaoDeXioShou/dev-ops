@@ -159,8 +159,29 @@
     {
       "idx": 22,
       "version": "7",
+      "when": 1794333748578,
+      "tag": "0022_v04b_deploy_release",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
       "when": 1794334091010,
       "tag": "0023_attachments_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794336807535,
+      "tag": "0024_v04b_step_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794357822928,
+      "tag": "0025_v04b_execution_run_optional",
       "breakpoints": true
     }
   ]

@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { ActivityTimeline, CommentForm, CommentList } from '@/features/collaboration/public'
 import { CodeReferenceDialog } from '@/features/code/public'
+import { RemoteBugActions } from '@/features/tools/public'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
@@ -194,6 +195,7 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
                 编辑
               </Button>
             )}
+            <RemoteBugActions projectId={bug.projectId} bugId={bug.id} canWrite={canWrite} />
           </div>
           {error && (
             <p role="alert" className="text-sm text-destructive">

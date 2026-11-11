@@ -27,7 +27,7 @@ export interface WorkflowInputDefinition {
   options?: string[]
 }
 
-export type WorkflowStepKind = 'run' | 'builtin_checkout' | 'builtin_upload_artifact'
+export type WorkflowStepKind = 'run' | 'builtin_checkout' | 'builtin_upload_artifact' | 'builtin_verify_service'
 
 export interface WorkflowStepDefinition {
   name: string
@@ -79,7 +79,7 @@ const STEP_KEYS = new Set([
 ])
 const INPUT_KEYS = new Set(['description', 'type', 'required', 'default', 'options'])
 const INPUT_TYPES: ReadonlySet<string> = new Set(['string', 'boolean', 'number', 'choice'])
-const BUILTIN_ACTIONS = new Set(['builtin:checkout', 'builtin:upload-artifact'])
+const BUILTIN_ACTIONS = new Set(['builtin:checkout', 'builtin:upload-artifact', 'builtin:verify-service'])
 const JOB_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]{0,79}$/
 const ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/
 const ARTIFACT_NAME_PATTERN = /^[A-Za-z0-9._-]{1,80}$/
@@ -372,7 +372,7 @@ function parseSteps(value: unknown, jobPath: string, issues: WorkflowIssue[]): W
     }
     if (hasUses) {
       if (typeof raw.uses !== 'string' || !BUILTIN_ACTIONS.has(raw.uses)) {
-        addIssue(issues, 'WORKFLOW_UNSUPPORTED', '只支持 builtin:checkout 与 builtin:upload-artifact', `${path}.uses`)
+        addIssue(issues, 'WORKFLOW_UNSUPPORTED', '不支持的内置步骤', `${path}.uses`)
         continue
       }
       if (raw.uses === 'builtin:checkout') {
@@ -386,6 +386,57 @@ function parseSteps(value: unknown, jobPath: string, issues: WorkflowIssue[]): W
         steps.push({
           name,
           kind: 'builtin_checkout',
+          env,
+          continueOnError: continueOnError === true,
+          with: withValues,
+          ...(ifExpression ? { if: ifExpression } : {}),
+          ...(timeoutMinutes ? { timeoutMinutes } : {}),
+        })
+      } else if (raw.uses === 'builtin:verify-service') {
+        const allowedKeys = new Set(['healthUrl', 'versionUrl', 'expectedVersion', 'timeoutSeconds'])
+        for (const key of Object.keys(withValues)) {
+          if (!allowedKeys.has(key)) {
+            addIssue(issues, 'WORKFLOW_UNSUPPORTED', `verify-service 不支持参数：${key}`, `${path}.with.${key}`)
+          }
+        }
+        if (!withValues.healthUrl || !/^https?:\/\//.test(withValues.healthUrl)) {
+          addIssue(
+            issues,
+            'WORKFLOW_SCHEMA_ERROR',
+            'verify-service 需要合法的 with.healthUrl',
+            `${path}.with.healthUrl`,
+          )
+        }
+        if (withValues.versionUrl !== undefined && !/^https?:\/\//.test(withValues.versionUrl)) {
+          addIssue(
+            issues,
+            'WORKFLOW_SCHEMA_ERROR',
+            'verify-service 的 versionUrl 必须是 HTTP(S)',
+            `${path}.with.versionUrl`,
+          )
+        }
+        if (!withValues.expectedVersion) {
+          addIssue(
+            issues,
+            'WORKFLOW_SCHEMA_ERROR',
+            'verify-service 需要 with.expectedVersion',
+            `${path}.with.expectedVersion`,
+          )
+        }
+        if (withValues.timeoutSeconds !== undefined) {
+          const timeoutSeconds = Number(withValues.timeoutSeconds)
+          if (!Number.isInteger(timeoutSeconds) || timeoutSeconds < 5 || timeoutSeconds > 120) {
+            addIssue(
+              issues,
+              'WORKFLOW_SCHEMA_ERROR',
+              'timeoutSeconds 必须是 5–120 的整数',
+              `${path}.with.timeoutSeconds`,
+            )
+          }
+        }
+        steps.push({
+          name,
+          kind: 'builtin_verify_service',
           env,
           continueOnError: continueOnError === true,
           with: withValues,

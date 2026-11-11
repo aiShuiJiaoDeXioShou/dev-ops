@@ -104,3 +104,48 @@ test('Agent 错误码常量可被复用并按错误码收窄', () => {
   assert.equal(isAgentErrorCode(AGENT_ERROR_CODES.AGENT_LEASE_EXPIRED), true)
   assert.equal(isAgentErrorCode('NOT_AN_AGENT_CODE'), false)
 })
+
+test('协议 2：受控代码修改步骤与 codeChange 字段', () => {
+  const base = buildRunPlan()
+  const plan: RunPlan = {
+    ...base,
+    codeChange: {
+      baseSha: 'a'.repeat(40),
+      branchName: 'feature/demo',
+      commitMessage: '演示修改',
+      authorName: '开发者',
+      authorEmail: 'dev@example.test',
+      patch: 'diff --git a/a.ts b/a.ts\n',
+      patchSha256: 'b'.repeat(64),
+    },
+    jobs: [
+      {
+        ...base.jobs[0]!,
+        steps: [
+          { index: 0, name: '检出', kind: 'builtin_checkout' },
+          { index: 1, name: '应用补丁', kind: 'builtin_apply_patch' },
+          { index: 2, name: '提交', kind: 'builtin_commit_changes' },
+          { index: 3, name: '收集差异', kind: 'builtin_collect_diff' },
+          { index: 4, name: '推送', kind: 'builtin_push_branch' },
+          { index: 5, name: '验证', kind: 'builtin_verify_service', with: { healthUrl: 'http://x/health' } },
+        ],
+      },
+    ],
+  }
+  assert.equal(Value.Check(RunPlanSchema, plan), true)
+  assert.equal(validateRunPlan(plan), true)
+  assert.equal(
+    Value.Check(RunPlanSchema, {
+      ...plan,
+      codeChange: { ...plan.codeChange!, patchSha256: 'not-a-sha' },
+    }),
+    false,
+  )
+  assert.equal(
+    Value.Check(RunPlanSchema, {
+      ...plan,
+      jobs: [{ ...plan.jobs[0]!, steps: [{ index: 0, name: '未知', kind: 'builtin_unknown' }] }],
+    }),
+    false,
+  )
+})

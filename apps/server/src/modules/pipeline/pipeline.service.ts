@@ -11,7 +11,7 @@ import { appendPipelineActivity } from './pipeline.activity.ts'
 import type { PipelineCredentialProvider } from './pipeline.credentials.ts'
 import { maskErrorMessage, maskInputValue, maskSensitiveText } from './pipeline.mask.ts'
 import { findActivePipelineLeaseByRun, findPipelineNodeSummariesByIds } from './pipeline.nodes.repository.ts'
-import { generateRunPlan, PipelinePlanError, type RunPlanTemplate } from './pipeline.planner.ts'
+import { buildCodeChangeRunPlan, generateRunPlan, PipelinePlanError, type RunPlanTemplate } from './pipeline.planner.ts'
 import {
   aggregatePipelineRunLogs,
   findPipelineRunWithPlan,
@@ -63,6 +63,7 @@ import {
 export interface PipelineServiceConfig {
   runTimeoutSeconds: number
   workflowMaxBytes: number
+  codeChangeTimeoutSeconds?: number
 }
 
 /** code 模块公开用例的最小端口；使用结构类型避免 pipeline 依赖 HTTP 层。 */
@@ -111,6 +112,44 @@ export interface PipelineServiceDeps {
   credentials: PipelineCredentialProvider
 }
 
+/** 受控代码修改运行输入；由 `tools` 校验补丁与能力后构造。 */
+export interface ToolCodeChangeRunInput {
+  teamId: string
+  codeChangeId: string
+  repositoryId: string
+  baseRef: string
+  baseSha: string
+  branchName: string
+  commitMessage: string
+  authorName: string
+  authorEmail: string
+  patch: string
+  patchSha256: string
+  validationWorkflowPath: string
+  secretEnvironment: 'development' | 'test' | 'production'
+  idempotencyKey: string
+}
+
+/** 平台内部运行输入；由 `tools` 在完成补丁与能力校验后构造。 */
+export interface InternalPipelineRunInput {
+  teamId: string
+  projectId: string
+  repositoryId: string
+  workflowPath: string
+  workflowName: string
+  gitRef: string
+  commitSha: string
+  inputs: Record<string, PipelineInputValue>
+  runPlan: RunPlanTemplate
+  workflowSnapshot: string
+  workflowHash: string
+  initiatorUserId: string
+  idempotencyKey: string
+  timeoutSeconds?: number
+  runKind: 'code_change'
+  secretEnvironment: 'development' | 'test' | 'production'
+}
+
 /** 触发运行输入；仓库由服务端根据工作流路径解析。 */
 export interface TriggerPipelineRunInput {
   workflowPath: string
@@ -118,6 +157,8 @@ export interface TriggerPipelineRunInput {
   inputs: Record<string, PipelineInputValue>
   idempotencyKey: string
   initiatorChannel: 'web' | 'api'
+  /** 目标环境；变更计划部署时用于按环境解析 secret，普通手动触发缺省 production。 */
+  secretEnvironment?: 'development' | 'test' | 'production'
 }
 
 /**
@@ -257,6 +298,10 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       const values = await credentials.resolveSecrets({
         teamId: full.team_id,
         projectId: full.project_id,
+        environment:
+          full.secret_environment === 'development' || full.secret_environment === 'test'
+            ? full.secret_environment
+            : 'production',
         names: secretNames,
       })
       logSecretCache.set(runId, { values, expiresAt: Date.now() + 60_000 })
@@ -618,6 +663,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
           triggeredByUserId: actor.id,
           idempotencyKey,
           timeoutSeconds: template.timeoutSeconds,
+          secretEnvironment: input.secretEnvironment ?? 'production',
         })
         await insertPipelineRunSteps(tx, stepRows)
         await appendPipelineActivity(tx, {
@@ -768,6 +814,239 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     }
   }
 
+  /**
+   * 创建受控代码修改运行：读取仓库内校验工作流并生成平台固定计划。
+   * @param actor 发起人；调用方必须已校验项目写能力。
+   * @param projectId 项目标识。
+   * @param input 基线、工作分支、补丁与校验工作流。
+   * @returns 运行标识。
+   * @throws 仓库/工作流不可用、补丁校验失败或运行写入失败时抛出业务错误。
+   */
+  async function createCodeChangeRun(
+    actor: SessionUser,
+    projectId: string,
+    input: ToolCodeChangeRunInput,
+  ): Promise<{ runId: string }> {
+    const repositories = await code.listProjectRepositories(actor, projectId)
+    const repository = repositories.find((item) => item.id === input.repositoryId)
+    if (!repository) throw new ApiError(ERROR_CODES.NOT_FOUND, '仓库不存在或未关联到项目')
+    if (!isPipelineWorkflowPath(input.validationWorkflowPath)) {
+      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '校验工作流必须位于 .devops/workflows/')
+    }
+    let file: Awaited<ReturnType<PipelineCodePort['getRepositoryFileAtRef']>>
+    try {
+      file = await code.getRepositoryFileAtRef(
+        actor,
+        projectId,
+        input.repositoryId,
+        input.baseRef,
+        input.validationWorkflowPath,
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '校验工作流读取失败'
+      throw new ApiError(ERROR_CODES.PIPELINE_REPOSITORY_UNAVAILABLE, message)
+    }
+    if (file.truncated) throw new ApiError(ERROR_CODES.PIPELINE_WORKFLOW_SCHEMA_ERROR, '校验工作流文件过大')
+    const parsed = parseWorkflowFile({ path: input.validationWorkflowPath, content: file.content })
+    if (!parsed.ok) {
+      const issue = parsed.issues[0]
+      throw new ApiError(ERROR_CODES.PIPELINE_WORKFLOW_SCHEMA_ERROR, issue?.message ?? '校验工作流解析失败')
+    }
+    const runId = randomUUID()
+    let template: RunPlanTemplate
+    try {
+      template = buildCodeChangeRunPlan({
+        runId,
+        baseRef: input.baseRef,
+        baseSha: input.baseSha,
+        repositoryFullName: `${repository.namespace}/${repository.name}`,
+        branchName: input.branchName,
+        commitMessage: input.commitMessage,
+        authorName: input.authorName,
+        authorEmail: input.authorEmail,
+        patch: input.patch,
+        patchSha256: input.patchSha256,
+        workflow: parsed.workflow,
+        timeoutSeconds: config.codeChangeTimeoutSeconds ?? 900,
+      })
+    } catch (error) {
+      if (error instanceof PipelinePlanError) {
+        throw new ApiError(mapWorkflowIssueCode(error.code), error.message)
+      }
+      throw error
+    }
+    const stepRows = template.jobs.flatMap((job) =>
+      job.steps.map((step) => ({
+        id: randomUUID(),
+        teamId: input.teamId,
+        projectId,
+        runId,
+        stepIndex: step.index,
+        name: step.name,
+        kind: step.kind,
+        status: 'pending',
+      })),
+    )
+    await db.transaction(async (tx) => {
+      await insertPipelineRun(tx, {
+        id: runId,
+        teamId: input.teamId,
+        projectId,
+        repositoryId: input.repositoryId,
+        workflowPath: 'platform/code-change',
+        workflowName: '受控代码修改',
+        gitRef: input.baseRef,
+        commitSha: input.baseSha,
+        inputs: { codeChangeId: input.codeChangeId },
+        runPlan: template,
+        workflowSnapshot: parsed.workflow.snapshot,
+        workflowHash: parsed.workflow.hash,
+        status: 'queued',
+        triggerSource: 'manual',
+        initiatorChannel: 'api',
+        triggeredByUserId: actor.id,
+        idempotencyKey: input.idempotencyKey,
+        timeoutSeconds: template.timeoutSeconds,
+        runKind: 'code_change',
+        secretEnvironment: input.secretEnvironment,
+      })
+      await insertPipelineRunSteps(tx, stepRows)
+    })
+    return { runId }
+  }
+
+  /**
+   * 内部读取运行产物（不做用户权限校验），供 Worker/服务回填业务元数据使用。
+   * @param runId 运行标识。
+   * @param name 产物名。
+   * @returns 内容、摘要、大小与存储键；不存在时返回 null。
+   */
+  async function readRunArtifactInternal(
+    runId: string,
+    name: string,
+  ): Promise<{ content: string; sha256: string; sizeBytes: number; storageKey: string } | null> {
+    const artifacts = await findPipelineArtifacts(db, runId)
+    const row = artifacts.find((artifact) => artifact.name === name)
+    if (!row || row.status !== 'available') return null
+    try {
+      const buffer = await storage.readArtifact(row.storage_key)
+      return {
+        content: buffer.toString('utf8'),
+        sha256: row.sha256,
+        sizeBytes: Number(row.size_bytes),
+        storageKey: row.storage_key,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * 读取运行产物文本，供验证与展示使用。
+   * @param actor 当前用户；须对运行所属项目有读取权限。
+   * @param runId 运行标识。
+   * @param name 产物名；同名产物只允许一份。
+   * @param maxBytes 允许读取的最大字节数，默认 512 KiB。
+   * @returns 产物内容与元数据；不存在时返回 null。
+   * @throws 内容超过上限时抛出 PIPELINE_ARTIFACT_NOT_FOUND，避免大文件进入内存。
+   */
+  async function readRunArtifact(
+    actor: SessionUser,
+    runId: string,
+    name: string,
+    maxBytes = 524_288,
+  ): Promise<{ name: string; content: string; sha256: string; sizeBytes: number } | null> {
+    await requireRunAccess(actor, runId, false)
+    const artifacts = await findPipelineArtifacts(db, runId)
+    const row = artifacts.find((artifact) => artifact.name === name)
+    if (!row || row.status !== 'available') return null
+    const sizeBytes = Number(row.size_bytes)
+    if (sizeBytes > maxBytes) {
+      throw new ApiError(ERROR_CODES.PIPELINE_ARTIFACT_NOT_FOUND, '产物超过可读取上限')
+    }
+    try {
+      const buffer = await storage.readArtifact(row.storage_key)
+      return { name: row.name, content: buffer.toString('utf8'), sha256: row.sha256, sizeBytes }
+    } catch {
+      throw new ApiError(ERROR_CODES.PIPELINE_STORAGE_ERROR, '产物文件读取失败')
+    }
+  }
+
+  /**
+   * 创建平台内部运行（受控代码修改）；调用方必须已完成项目、能力与补丁校验。
+   * @param input 已固定的运行计划、仓库、基线、幂等键与目标环境。
+   * @returns 运行标识与是否新建；相同幂等键返回既有运行。
+   * @remarks 不读取仓库 YAML、不追加手动触发活动；该运行只由平台内部用例创建。
+   */
+  async function createInternalRun(input: InternalPipelineRunInput): Promise<{ runId: string; created: boolean }> {
+    const existing = await findPipelineRunByIdempotency(db, input.projectId, input.idempotencyKey)
+    if (existing) return { runId: existing.id, created: false }
+    const runId = randomUUID()
+    const runPlan: RunPlanTemplate = { ...input.runPlan, runId }
+    const stepRows = runPlan.jobs.flatMap((job) =>
+      job.steps.map((step) => ({
+        id: randomUUID(),
+        teamId: input.teamId,
+        projectId: input.projectId,
+        runId,
+        stepIndex: step.index,
+        name: step.name,
+        kind: step.kind,
+        status: 'pending',
+      })),
+    )
+    try {
+      await db.transaction(async (tx) => {
+        await insertPipelineRun(tx, {
+          id: runId,
+          teamId: input.teamId,
+          projectId: input.projectId,
+          repositoryId: input.repositoryId,
+          workflowPath: input.workflowPath,
+          workflowName: input.workflowName,
+          gitRef: input.gitRef,
+          commitSha: input.commitSha,
+          inputs: input.inputs,
+          runPlan,
+          workflowSnapshot: input.workflowSnapshot,
+          workflowHash: input.workflowHash,
+          status: 'queued',
+          triggerSource: 'manual',
+          initiatorChannel: 'api',
+          triggeredByUserId: input.initiatorUserId,
+          idempotencyKey: input.idempotencyKey,
+          timeoutSeconds: input.timeoutSeconds ?? runPlan.timeoutSeconds,
+          runKind: input.runKind,
+          secretEnvironment: input.secretEnvironment,
+        })
+        await insertPipelineRunSteps(tx, stepRows)
+      })
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error
+      const duplicated = await findPipelineRunByIdempotency(db, input.projectId, input.idempotencyKey)
+      if (!duplicated) throw error
+      return { runId: duplicated.id, created: false }
+    }
+    return { runId, created: true }
+  }
+
+  /**
+   * 读取内部运行的收口状态，供写能力模块回填结果。
+   * @param runId 运行标识。
+   * @returns 运行状态与结束时间；不存在时返回 null。
+   */
+  async function getInternalRunStatus(
+    runId: string,
+  ): Promise<{ status: string; finishedAt: string | null; errorCode: string | null } | null> {
+    const row = await findPipelineRunById(db, runId)
+    if (!row) return null
+    return {
+      status: row.status,
+      finishedAt: row.finished_at === null ? null : row.finished_at.toISOString(),
+      errorCode: row.error_code,
+    }
+  }
+
   return {
     listWorkflows,
     getWorkflowDetail,
@@ -778,6 +1057,11 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     readLogs,
     listArtifacts,
     openArtifactDownload,
+    createInternalRun,
+    getInternalRunStatus,
+    readRunArtifact,
+    readRunArtifactInternal,
+    createCodeChangeRun,
   }
 }
 

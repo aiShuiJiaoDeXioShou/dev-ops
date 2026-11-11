@@ -72,6 +72,8 @@ export interface PipelineAgentServiceDeps {
   config: PipelineAgentServiceConfig
   storage: PipelineStorage
   credentials: PipelineCredentialProvider
+  /** 运行进入终态后的回调；用于回填代码变更与变更执行。 */
+  onRunFinalized?: (runId: string) => Promise<void>
 }
 
 /** 已认证节点标识；Agent 路由用令牌认证后注入。 */
@@ -145,6 +147,11 @@ export function logSeqConflictData(
  * @remarks 租约明文令牌只在领取响应下发，因此租约在 Agent 领取时创建；
  * Worker 只负责把运行分配给节点，保证数据库只保存租约哈希。
  */
+/** 校验运行目标环境；历史运行缺省按 production 处理。 */
+function toSecretEnvironment(value: string): 'development' | 'test' | 'production' {
+  return value === 'development' || value === 'test' ? value : 'production'
+}
+
 export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
   const { db, config, storage, credentials } = deps
   // 租约作用域内已解析的运行时密钥短时缓存；明文只在内存，不写日志/数据库/响应。
@@ -153,7 +160,7 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
   /** 读取租约相关运行引用的运行时密钥，用于日志/错误二次脱敏；解析失败时返回空集合。 */
   async function loadKnownSecrets(
     lease: { id: string; expires_at: Date },
-    run: { id: string; team_id: string; project_id: string },
+    run: { id: string; team_id: string; project_id: string; secret_environment: string },
   ): Promise<Record<string, string>> {
     const cached = knownSecretsCache.get(lease.id)
     if (cached && cached.expiresAt > Date.now()) return cached.values
@@ -174,6 +181,7 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
       const values = await credentials.resolveSecrets({
         teamId: run.team_id,
         projectId: run.project_id,
+        environment: toSecretEnvironment(run.secret_environment),
         names: secretNames,
       })
       knownSecretsCache.set(lease.id, {
@@ -243,6 +251,7 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
     })
     if (!updated) return
     await skipPendingPipelineRunSteps(db, run.id)
+    await deps.onRunFinalized?.(run.id).catch(() => undefined)
   }
 
   /**
@@ -317,6 +326,7 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
       secrets = await credentials.resolveSecrets({
         teamId: run.team_id,
         projectId: run.project_id,
+        environment: toSecretEnvironment(run.secret_environment),
         names: template.secretNames,
       })
     } catch (error) {
@@ -646,6 +656,7 @@ export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
       throw error
     }
     dropKnownSecrets(leaseId)
+    await deps.onRunFinalized?.(run.id).catch(() => undefined)
     return { runId: run.id, status: targetStatus }
   }
 

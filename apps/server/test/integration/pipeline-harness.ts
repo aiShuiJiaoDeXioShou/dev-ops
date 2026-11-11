@@ -228,6 +228,23 @@ export function createMutableFakeGit(): MutableFakeGit {
       if (failure) throw failure
       return commitDetail
     },
+    async createIssue(input) {
+      if (failure) throw failure
+      return { number: 11, url: `https://example.test/acme/app/issues/11?title=${encodeURIComponent(input.title)}` }
+    },
+    async addComment(input) {
+      if (failure) throw failure
+      return { id: '88', url: `https://example.test/acme/app/issues/${input.targetNumber}#issuecomment-88` }
+    },
+    async createPullRequest(input) {
+      if (failure) throw failure
+      return {
+        number: 12,
+        url: 'https://example.test/acme/app/pull/12',
+        sourceBranch: input.sourceBranch,
+        targetBranch: input.targetBranch,
+      }
+    },
   }
   return {
     adapter,

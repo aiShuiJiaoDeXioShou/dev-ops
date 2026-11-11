@@ -32,7 +32,7 @@ test('注册令牌与 Agent 令牌只存在内存，不写入磁盘也不出现�
       return okEnvelope({
         nodeId: 'node-secure',
         agentToken: AGENT_TOKEN,
-        protocolVersion: 1,
+        protocolVersion: 2,
         heartbeatIntervalSeconds: 15,
         leaseTtlSeconds: 90,
       })

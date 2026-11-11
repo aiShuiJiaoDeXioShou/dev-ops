@@ -27,7 +27,7 @@ import type { PipelineNodeView } from './pipeline.view.ts'
 export const PIPELINE_NODE_CAPABILITY_WHITELIST: readonly string[] = ['linux', 'docker', 'node24']
 
 /** Agent 协议版本；注册响应返回，供 Agent 校验兼容性。 */
-export const AGENT_PROTOCOL_VERSION = 1
+export const AGENT_PROTOCOL_VERSION = 2
 
 /** 心跳建议间隔（秒）；与 agent-protocol.md §3 一致。 */
 export const AGENT_HEARTBEAT_INTERVAL_SECONDS = 15

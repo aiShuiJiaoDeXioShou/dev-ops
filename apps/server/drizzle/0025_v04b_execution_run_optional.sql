@@ -1,0 +1,2 @@
+ALTER TABLE "app"."change_execution" DROP CONSTRAINT "ck_change_execution_run";--> statement-breakpoint
+ALTER TABLE "app"."change_execution" ADD CONSTRAINT "ck_change_execution_run" CHECK (("app"."change_execution"."execution_mode" = 'platform_pipeline' and ("app"."change_execution"."pipeline_run_id" is not null or "app"."change_execution"."status" in ('queued', 'failed'))) or "app"."change_execution"."execution_mode" = 'external_system');
