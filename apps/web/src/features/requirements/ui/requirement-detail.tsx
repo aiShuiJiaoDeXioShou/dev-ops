@@ -9,22 +9,68 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/t
 import { ActivityTimeline, CommentForm, CommentList } from '@/features/collaboration/public'
 import { CodeReferenceCard, CodeReferenceDialog } from '@/features/code/public'
 import { BugForm } from '@/features/bugs/public'
+import {
+  AttachmentList,
+  describeAttachmentError,
+  removeAttachment,
+  type AttachmentSummary,
+} from '@/features/attachments/public'
 import { useSession } from '@/features/identity/public'
+import { projectQueryOptions } from '@/features/projects/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { Markdown } from '@/shared/lib/markdown'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { eligibilityQueryOptions, requirementQueryOptions, submissionQueryOptions } from '../api/queries'
 import { canWriteRequirements, isEditable, requirementMutations } from '../api/mutations'
+import { avatarToneClassName } from '@/shared/lib/avatar-tone'
+import { cn } from '@/shared/lib/utils'
 import { REQUIREMENT_STATUS_LABELS, SELF_TEST_LABELS } from '../model/labels'
+import type { RequirementDetail } from '../model/types'
 import { RequirementActionDialog, type RequirementAction } from './requirement-action-dialog'
 import { RequirementForm } from './requirement-form'
+
+/** 需求协作人员展示标签；失效成员保留并标注，不从历史数据中静默丢弃。 */
+function CollaboratorTags({ members }: { members: RequirementDetail['collaborators'] }) {
+  if (members.length === 0) return <span>无</span>
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="协作人员">
+      {members.map((member) => (
+        <li
+          key={member.userId}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border py-0.5 pr-2 pl-0.5 text-xs',
+            member.available
+              ? 'border-border bg-secondary text-secondary-foreground'
+              : 'border-destructive/40 bg-destructive/10 text-destructive',
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              'grid size-5 shrink-0 place-items-center rounded-full text-xs font-medium',
+              avatarToneClassName(member.userId),
+            )}
+          >
+            {member.name.slice(0, 1)}
+          </span>
+          <span className="max-w-40 truncate">{member.name}</span>
+          {!member.available && <span className="shrink-0">已失效</span>}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 /** 需求详情：范围字段、关联、流程动作、评论与活动。 */
 export function RequirementDetailPane({ requirementId, onClose }: { requirementId: string; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const { role } = useSession()
+  const { user, role } = useSession()
   const query = useQuery(requirementQueryOptions(requirementId))
+  const project = useQuery({
+    ...projectQueryOptions(query.data?.data.projectId ?? ''),
+    enabled: Boolean(query.data?.data.projectId),
+  })
   const submissions = useQuery(submissionQueryOptions(requirementId))
   const eligibility = useQuery({
     ...eligibilityQueryOptions(requirementId),
@@ -33,6 +79,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   const [action, setAction] = useState<RequirementAction | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [error, setError] = useState('')
+  const [attachmentError, setAttachmentError] = useState('')
   const [codeOpen, setCodeOpen] = useState(false)
   const [bugOpen, setBugOpen] = useState(false)
   const canWrite = canWriteRequirements(role)
@@ -44,6 +91,14 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
     mutationFn: (codeReferenceId: string) => apiClient.refreshCodeReference(codeReferenceId),
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['requirements', 'detail', requirementId] }),
     onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '代码引用刷新失败。'),
+  })
+  const removeAttachmentMutation = useMutation({
+    mutationFn: (attachment: AttachmentSummary) => removeAttachment(attachment.id),
+    onSuccess: async () => {
+      setAttachmentError('')
+      await queryClient.invalidateQueries({ queryKey: ['requirements', 'detail', requirementId] })
+    },
+    onError: (cause: unknown) => setAttachmentError(describeAttachmentError(cause)),
   })
   const direct = useMutation({
     mutationFn: async (kind: 'start-development' | 'start-test') => {
@@ -74,6 +129,13 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   }
   const detail = query.data.data
   const editable = canWrite && isEditable(detail.status)
+  /**
+   * 附件删除权限：上传者本人、团队管理员或项目负责人；浏览者与无权限成员不展示删除入口。
+   * @param attachment 待删除附件。
+   * @returns 当前用户是否可删除该附件。
+   */
+  const canDeleteAttachment = (attachment: AttachmentSummary) =>
+    role === 'admin' || attachment.uploadedBy.userId === user.id || project.data?.data.owner.userId === user.id
   const blockers = eligibility.data?.data.blockers ?? []
   return (
     <aside className="details" aria-label="需求详情">
@@ -180,7 +242,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
             <div>
               <dt className="text-xs text-muted-foreground">协作人员</dt>
               <dd className="mt-1">
-                {detail.collaborators.length ? detail.collaborators.map((item) => item.name).join('、') : '无'}
+                <CollaboratorTags members={detail.collaborators} />
               </dd>
             </div>
             <div>
@@ -215,6 +277,16 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
                 <p className="mt-1 whitespace-pre-wrap">{detail.acceptanceCriteria}</p>
               </div>
             )}
+          </section>
+          <section className="space-y-2" aria-label="附件">
+            <h3 className="text-sm font-semibold">附件</h3>
+            <AttachmentList
+              attachments={detail.attachments ?? []}
+              canDelete={canDeleteAttachment}
+              onDelete={(attachment) => removeAttachmentMutation.mutate(attachment)}
+              deletingId={removeAttachmentMutation.isPending ? (removeAttachmentMutation.variables?.id ?? null) : null}
+              deleteError={attachmentError}
+            />
           </section>
           <section className="space-y-2">
             <div className="flex items-center justify-between">

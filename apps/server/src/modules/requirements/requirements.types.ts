@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from '../attachments/attachments.view.ts'
 import type { OwnerRef } from '../identity/identity.display.ts'
 import type { RequirementStatus } from './requirements.rules.ts'
 
@@ -81,6 +82,7 @@ export interface RequirementDetail extends RequirementListItem {
   externalSummary: string | null
   acceptanceCriteria: string | null
   collaborators: OwnerRef[]
+  attachments: AttachmentSummary[]
   latestTestSubmission: TestSubmissionView | null
   linkedBugs: LinkedBugView[]
   needsReview: boolean

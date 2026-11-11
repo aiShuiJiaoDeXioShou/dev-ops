@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
+import { storageHandlers } from './storage-handlers'
 
 /** 测试用当前用户会话。 */
 export const sessionFixture = {
@@ -25,6 +26,43 @@ export function success(data: unknown, requestId = 'test-request') {
   )
 }
 
+/** 附件策略默认值；与会话层测试共享，具体用例可覆盖更小的上限。 */
+export const attachmentPolicyFixture = {
+  maxFileBytes: 50 * 1024 * 1024,
+  maxFilesPerSubmit: 10,
+  maxFilesPerRecord: 50,
+  tempRetentionHours: 24,
+}
+
+/** 上传成功时返回的附件标识计数；测试用例通常覆盖 handler 以固定 ID。 */
+let uploadSequence = 0
+
+/**
+ * 附件相关默认 handler：策略、上传与删除；未覆盖时让表单相关测试可正常挂载附件区。
+ */
+export const attachmentHandlers = [
+  http.get('*/api/v1/attachments/policy', () => success(attachmentPolicyFixture)),
+  http.post('*/api/v1/projects/:projectId/attachments', async ({ request }) => {
+    uploadSequence += 1
+    const encodedName = request.headers.get('x-file-name') ?? ''
+    const body = await request.arrayBuffer()
+    return success({
+      attachment: {
+        id: `attachment-${uploadSequence}`,
+        fileName: decodeURIComponent(encodedName),
+        sizeBytes: body.byteLength,
+        contentType: request.headers.get('x-file-type'),
+        sha256: 'a'.repeat(64),
+        status: 'temp',
+        uploadedAt: '2026-11-11T00:00:00.000Z',
+      },
+    })
+  }),
+  http.post('*/api/v1/attachments/:attachmentId/remove', ({ params }) =>
+    success({ id: String(params.attachmentId), removed: true }),
+  ),
+]
+
 /** 仅在测试中拦截网络，未声明的请求由测试配置报告错误。 */
 export const server = setupServer(
   http.get('http://localhost/api/v1/ready', () =>
@@ -34,7 +72,7 @@ export const server = setupServer(
     ),
   ),
   http.get('*/api/v1/auth/get-session', () => HttpResponse.json(sessionFixture)),
-  http.get('*/api/v1/me/teams', () => success([teamFixture])),
+  http.get('*/api/v1/me/teams', () => success({ teams: [teamFixture], isPlatformAdmin: false })),
   http.get('*/api/v1/teams/:teamId/projects', () =>
     success({
       items: [
@@ -57,6 +95,8 @@ export const server = setupServer(
     }),
   ),
   http.get('*/api/v1/teams/:teamId/members', () => success([memberFixture])),
+  ...attachmentHandlers,
+  ...storageHandlers,
   http.get('*/api/v1/git-providers', () =>
     success([
       { providerKey: 'github', name: 'GitHub', authModes: ['github_cli'] },

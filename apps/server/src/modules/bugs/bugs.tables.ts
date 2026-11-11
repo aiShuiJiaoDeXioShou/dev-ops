@@ -97,3 +97,22 @@ export const bugRegression = appSchema.table(
     index('idx_bug_regression_bug').on(table.bug_id, table.created_at),
   ],
 )
+
+/** 缺陷协作人员；只记录与展示，不授予权限或触发通知。 */
+export const bugCollaborator = appSchema.table(
+  'bug_collaborator',
+  {
+    id: uuid('id').notNull(),
+    team_id: uuid('team_id').notNull(),
+    bug_id: uuid('bug_id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    created_by_user_id: uuid('created_by_user_id').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: 'pk_bug_collaborator_id', columns: [table.id] }),
+    unique('uk_bug_collaborator').on(table.bug_id, table.user_id),
+    index('idx_bug_collaborator_user').on(table.user_id),
+  ],
+)

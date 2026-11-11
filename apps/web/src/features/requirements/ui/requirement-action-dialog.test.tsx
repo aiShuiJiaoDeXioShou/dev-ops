@@ -23,6 +23,7 @@ const requirement: RequirementDetail = {
   externalSummary: null,
   acceptanceCriteria: null,
   collaborators: [],
+  attachments: [],
   latestTestSubmission: null,
   linkedBugs: [],
   needsReview: false,

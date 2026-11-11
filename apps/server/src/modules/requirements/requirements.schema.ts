@@ -54,6 +54,16 @@ const testSubmissionSchema = Type.Object({
   versionNote: Type.Union([Type.String(), Type.Null()]),
   createdAt: Type.String(),
 })
+const attachmentSummarySchema = Type.Object({
+  id: uuidSchema,
+  fileName: Type.String(),
+  sizeBytes: Type.Integer(),
+  contentType: Type.Union([Type.String(), Type.Null()]),
+  sha256: Type.String(),
+  uploadedBy: ownerSchema,
+  createdAt: Type.String(),
+  downloadUrl: Type.String(),
+})
 const requirementDetailSchema = Type.Object({
   ...requirementItemSchema.properties,
   teamId: uuidSchema,
@@ -63,6 +73,7 @@ const requirementDetailSchema = Type.Object({
   externalSummary: Type.Union([Type.String(), Type.Null()]),
   acceptanceCriteria: Type.Union([Type.String(), Type.Null()]),
   collaborators: Type.Array(ownerSchema),
+  attachments: Type.Array(attachmentSummarySchema),
   latestTestSubmission: Type.Union([testSubmissionSchema, Type.Null()]),
   linkedBugs: Type.Array(
     Type.Object({ id: uuidSchema, number: Type.Integer(), title: Type.String(), status: Type.String() }),
@@ -121,6 +132,7 @@ export const createRequirementBodySchema = Type.Object(
     devOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     testOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
+    attachmentIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 10 })),
   },
   { additionalProperties: false },
 )
@@ -136,6 +148,7 @@ export const updateRequirementBodySchema = Type.Object(
     devOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     testOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
+    attachmentIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 10 })),
   },
   { additionalProperties: false },
 )

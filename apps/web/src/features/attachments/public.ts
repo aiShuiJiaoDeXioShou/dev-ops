@@ -1,0 +1,8 @@
+export { AttachmentField, type AttachmentFieldProps } from './ui/attachment-field'
+export { AttachmentList, type AttachmentListProps } from './ui/attachment-list'
+export { attachmentKeys, attachmentPolicyQueryOptions, useAttachmentPolicy } from './api/queries'
+export { describeAttachmentError } from './lib/errors'
+export { removeAttachment } from './api/attachments-api'
+export { doneAttachmentIds, hasUnfinishedAttachments, toPendingAttachments } from './lib/pending'
+export { formatFileSize, truncateFileName } from './lib/display'
+export type { AttachmentPolicy, AttachmentSummary, PendingAttachment, UploadedAttachment } from './model/types'

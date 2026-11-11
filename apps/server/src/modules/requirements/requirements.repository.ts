@@ -199,6 +199,21 @@ export async function findCollaborators(db: Database, requirementId: string) {
     .orderBy(requirementCollaborator.created_at, requirementCollaborator.user_id)
 }
 
+/**
+ * 读取需求当前协作人 userId 集合，供事务内计算增删 diff。
+ * @param executor 数据库连接或事务。
+ * @param requirementId 需求标识。
+ * @returns 按加入顺序排列的协作人标识。
+ */
+export async function findCollaboratorUserIds(executor: RequirementExecutor, requirementId: string): Promise<string[]> {
+  const rows = await executor
+    .select({ userId: requirementCollaborator.user_id })
+    .from(requirementCollaborator)
+    .where(eq(requirementCollaborator.requirement_id, requirementId))
+    .orderBy(requirementCollaborator.created_at, requirementCollaborator.user_id)
+  return rows.map((row) => row.userId)
+}
+
 /** 替换需求协作人员集合。 */
 export async function replaceCollaborators(
   tx: TransactionDatabase,

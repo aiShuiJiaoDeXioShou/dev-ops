@@ -91,7 +91,9 @@ describe('pipeline-nodes-page', () => {
   it('非管理员只看到权限说明，不请求节点列表', async () => {
     let requested = false
     server.use(
-      http.get('*/api/v1/me/teams', () => success([{ ...teamFixture, role: 'viewer' }])),
+      http.get('*/api/v1/me/teams', () =>
+        success({ teams: [{ ...teamFixture, role: 'viewer' }], isPlatformAdmin: false }),
+      ),
       http.get('*/api/v1/teams/team-1/pipeline-nodes', () => {
         requested = true
         return success({ items: [] })

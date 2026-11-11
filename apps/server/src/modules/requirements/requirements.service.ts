@@ -17,9 +17,11 @@ import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
+import type { AttachmentBindingUseCases } from '../attachments/attachments.binding.ts'
 import { EDITABLE_STATUSES, normalizeTitle, validateContent, validateStatus } from './requirements.rules.ts'
 import {
   countOpenRequirementsByProjects,
+  findCollaboratorUserIds,
   findCollaborators,
   findRequirementById,
   findRequirements,
@@ -42,6 +44,8 @@ export interface RequirementsServiceDeps {
   db: Database
   bugs?: RequirementBugReader
   codeReferences?: RequirementCodeReferenceReader
+  /** 附件绑定/解绑/列表用例；由 bootstrap 注入数量与保留期策略。 */
+  attachmentBinding: AttachmentBindingUseCases
 }
 
 /** 创建需求服务。 */
@@ -58,7 +62,7 @@ function reasonTextInService(value: string, name: string): string {
 }
 
 export function createRequirementsService(deps: RequirementsServiceDeps) {
-  const { db } = deps
+  const { db, attachmentBinding } = deps
 
   async function requireProjectAccess(actor: SessionUser, projectId: string) {
     const project = await getProjectContext(db, projectId)
@@ -81,11 +85,12 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   }
 
   async function toDetail(row: RequirementRow): Promise<RequirementDetail> {
-    const [collaboratorRows, latestSubmission, linkedBugs, linkedCodeReferences] = await Promise.all([
+    const [collaboratorRows, latestSubmission, linkedBugs, linkedCodeReferences, attachments] = await Promise.all([
       findCollaborators(db, row.id),
       findLatestSubmission(db, row.id),
       deps.bugs ? deps.bugs(row.id) : Promise.resolve([]),
       deps.codeReferences ? deps.codeReferences('requirement', row.id) : Promise.resolve([]),
+      attachmentBinding.listAttachmentsForTarget(db, 'requirement', row.id),
     ])
     const ownerUserIds = [
       ...(row.dev_owner_user_id === null ? [] : [row.dev_owner_user_id]),
@@ -96,6 +101,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     return toRequirementDetail({
       row,
       collaborators: collaboratorRows,
+      attachments,
       latestSubmission: latestSubmission ?? null,
       linkedBugs,
       linkedCodeReferences,
@@ -184,6 +190,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       devOwnerUserId?: string | null
       testOwnerUserId?: string | null
       collaboratorUserIds?: string[]
+      attachmentIds?: string[]
     },
   ) {
     const project = await requireProjectWrite(actor, projectId)
@@ -199,6 +206,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     if (acceptance !== undefined && acceptance.length > 20_000) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '验收标准不能超过 20000 个字符')
     }
+    const attachmentIds = [...new Set(input.attachmentIds ?? [])]
     const requirementId = randomUUID()
     const row = await db.transaction(async (tx) => {
       await lockProjectForWrite(tx, projectId)
@@ -220,6 +228,25 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       })
       if (collaborators.length > 0) {
         await replaceCollaborators(tx, requirementId, project.teamId, collaborators, actor.id)
+        await appendActivity(tx, {
+          teamId: project.teamId,
+          projectId,
+          entityType: 'requirement',
+          entityId: requirementId,
+          action: 'requirement_collaborators_changed',
+          actorUserId: actor.id,
+          changes: { added: collaborators, removed: [] },
+        })
+      }
+      if (attachmentIds.length > 0) {
+        await attachmentBinding.bindAttachments(tx, {
+          teamId: project.teamId,
+          projectId,
+          targetType: 'requirement',
+          targetId: requirementId,
+          attachmentIds,
+          actor: { userId: actor.id },
+        })
       }
       await appendActivity(tx, {
         teamId: project.teamId,
@@ -253,6 +280,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       devOwnerUserId?: string | null
       testOwnerUserId?: string | null
       collaboratorUserIds?: string[]
+      attachmentIds?: string[]
     },
   ) {
     if (!Number.isSafeInteger(input.version) || input.version < 1) {
@@ -315,8 +343,46 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         testOwnerUserId: input.testOwnerUserId,
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '需求已被更新，请刷新后重试')
+      if (input.attachmentIds !== undefined) {
+        const finalAttachmentIds = [...new Set(input.attachmentIds)]
+        const currentAttachments = await attachmentBinding.listAttachmentsForTarget(tx, 'requirement', requirementId)
+        const currentIds = new Set(currentAttachments.map((item) => item.id))
+        const newlyBoundIds = finalAttachmentIds.filter((attachmentId) => !currentIds.has(attachmentId))
+        await attachmentBinding.unbindAttachments(tx, {
+          teamId: project.teamId,
+          projectId: project.id,
+          targetType: 'requirement',
+          targetId: requirementId,
+          keepAttachmentIds: finalAttachmentIds,
+          actor: { userId: actor.id },
+        })
+        if (newlyBoundIds.length > 0) {
+          await attachmentBinding.bindAttachments(tx, {
+            teamId: project.teamId,
+            projectId: project.id,
+            targetType: 'requirement',
+            targetId: requirementId,
+            attachmentIds: newlyBoundIds,
+            actor: { userId: actor.id },
+          })
+        }
+      }
       if (collaborators !== undefined) {
+        const previousCollaborators = await findCollaboratorUserIds(tx, requirementId)
+        const added = collaborators.filter((userId) => !previousCollaborators.includes(userId))
+        const removed = previousCollaborators.filter((userId) => !collaborators.includes(userId))
         await replaceCollaborators(tx, requirementId, project.teamId, collaborators, actor.id)
+        if (added.length > 0 || removed.length > 0) {
+          await appendActivity(tx, {
+            teamId: project.teamId,
+            projectId: project.id,
+            entityType: 'requirement',
+            entityId: requirementId,
+            action: 'requirement_collaborators_changed',
+            actorUserId: actor.id,
+            changes: { added, removed },
+          })
+        }
       }
       if (Object.keys(changes).length > 0) {
         await appendActivity(tx, {

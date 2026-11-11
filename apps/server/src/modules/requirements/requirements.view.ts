@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from '../attachments/attachments.view.ts'
 import type { OwnerRef } from '../identity/identity.display.ts'
 import { ownerRefOf } from '../identity/identity.display.ts'
 import { toContentMode, toRequirementStatus } from './requirements.rules.ts'
@@ -21,6 +22,7 @@ export interface RequirementListMapping {
 export interface RequirementDetailMapping {
   row: RequirementRow
   collaborators: Array<{ userId: string }>
+  attachments: AttachmentSummary[]
   latestSubmission: RequirementSubmissionRow | null
   linkedBugs: LinkedBugView[]
   linkedCodeReferences: LinkedCodeReferenceView[]
@@ -75,7 +77,7 @@ export function toTestSubmissionView(row: RequirementSubmissionRow): TestSubmiss
  * @returns 需求详情视图。
  */
 export function toRequirementDetail(input: RequirementDetailMapping): RequirementDetail {
-  const { row, collaborators, latestSubmission, linkedBugs, linkedCodeReferences, refs } = input
+  const { row, collaborators, attachments, latestSubmission, linkedBugs, linkedCodeReferences, refs } = input
   const needsReview =
     row.status === 'passed' && linkedBugs.some((bug) => bug.status !== 'resolved' && bug.status !== 'closed')
   return {
@@ -90,6 +92,7 @@ export function toRequirementDetail(input: RequirementDetailMapping): Requiremen
       (item) =>
         ownerRefOf(item.userId, refs) ?? { userId: item.userId, name: '未知用户', status: 'missing', available: false },
     ),
+    attachments,
     latestTestSubmission: latestSubmission === null ? null : toTestSubmissionView(latestSubmission),
     linkedBugs,
     needsReview,

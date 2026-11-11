@@ -59,7 +59,9 @@ describe('SkillList', () => {
   it('浏览者不显示发布入口', async () => {
     server.use(
       skillsHandler,
-      http.get('*/api/v1/me/teams', () => ok([{ id: 'team-1', name: '测试团队', role: 'viewer', status: 'active' }])),
+      http.get('*/api/v1/me/teams', () =>
+        ok({ teams: [{ id: 'team-1', name: '测试团队', role: 'viewer', status: 'active' }], isPlatformAdmin: false }),
+      ),
     )
     renderList()
     await screen.findByText('代码评审')

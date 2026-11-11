@@ -120,6 +120,11 @@ export function createAppRoutes(): RouteObject[] {
               HydrateFallback: DelayedPageSkeleton,
             },
             {
+              path: 'settings/storage-buckets',
+              lazy: () => import('@/pages/settings/storage-buckets-page'),
+              HydrateFallback: DelayedPageSkeleton,
+            },
+            {
               path: 'system/status',
               lazy: () => import('@/pages/system-status'),
               HydrateFallback: DelayedPageSkeleton,

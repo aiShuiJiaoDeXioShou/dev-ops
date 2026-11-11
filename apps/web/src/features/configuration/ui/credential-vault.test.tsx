@@ -253,7 +253,9 @@ describe('CredentialVault', () => {
 
   it('浏览者角色不展示查看凭据值入口', async () => {
     server.use(
-      http.get('*/api/v1/me/teams', () => success([{ ...teamFixture, role: 'viewer' }])),
+      http.get('*/api/v1/me/teams', () =>
+        success({ teams: [{ ...teamFixture, role: 'viewer' }], isPlatformAdmin: false }),
+      ),
       credentialList(),
       credentialUsage(),
     )

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, count, desc, eq, ilike, inArray, isNotNull, max, notExists, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
-import { bug, bugRegression, bugRequirementLink } from './bugs.tables.ts'
+import { bug, bugCollaborator, bugRegression, bugRequirementLink } from './bugs.tables.ts'
 import type { BugSummary, BugSummaryForRequirement } from './bugs.types.ts'
 import { teamMember } from '../identity/identity.tables.ts'
 
@@ -203,6 +203,44 @@ export async function updateBug(
     .where(and(eq(bug.id, bugId), eq(bug.version, expectedVersion)))
     .returning()
   return row
+}
+
+/**
+ * 读取 Bug 当前协作人 userId 集合。
+ * @param executor 数据库连接或事务。
+ * @param bugId Bug 标识。
+ * @returns 按加入顺序排列的协作人标识，用于计算增删 diff。
+ */
+export async function findBugCollaboratorUserIds(executor: BugExecutor, bugId: string): Promise<string[]> {
+  const rows = await executor
+    .select({ userId: bugCollaborator.user_id })
+    .from(bugCollaborator)
+    .where(eq(bugCollaborator.bug_id, bugId))
+    .orderBy(bugCollaborator.created_at, bugCollaborator.user_id)
+  return rows.map((row) => row.userId)
+}
+
+/**
+ * 用给定集合整体替换 Bug 协作人：先清空再按新集合插入。
+ * @param tx 事务连接，调用方负责在同一事务内写入活动记录。
+ * @param input Bug、团队、目标用户集合与操作者。
+ * @returns 无返回值；空集合时只执行删除。
+ */
+export async function replaceBugCollaborators(
+  tx: TransactionDatabase,
+  input: { bugId: string; teamId: string; userIds: string[]; createdByUserId: string },
+) {
+  await tx.delete(bugCollaborator).where(eq(bugCollaborator.bug_id, input.bugId))
+  if (input.userIds.length === 0) return
+  await tx.insert(bugCollaborator).values(
+    input.userIds.map((userId) => ({
+      id: randomUUID(),
+      team_id: input.teamId,
+      bug_id: input.bugId,
+      user_id: userId,
+      created_by_user_id: input.createdByUserId,
+    })),
+  )
 }
 
 /** 查询 Bug 关联的需求标识。 */

@@ -31,22 +31,26 @@ test('业务客户端构建路径、查询、POST 与幂等键', async () => {
       if (String(input).includes('/requirements?status=')) {
         return success({ items: [], page: 2, pageSize: 20, total: 0 })
       }
-      return success([
-        {
-          id: teamId,
-          name: '团队',
-          iconText: null,
-          description: null,
-          version: 1,
-          role: 'admin',
-          status: 'active',
-        },
-      ])
+      return success({
+        teams: [
+          {
+            id: teamId,
+            name: '团队',
+            iconText: null,
+            description: null,
+            version: 1,
+            role: 'admin',
+            status: 'active',
+          },
+        ],
+        isPlatformAdmin: false,
+      })
     },
   })
 
   const teams = await client.listMyTeams()
-  assert.equal(teams.data[0]?.id, teamId)
+  assert.equal(teams.data.teams[0]?.id, teamId)
+  assert.equal(teams.data.isPlatformAdmin, false)
   assert.equal(calls[0]?.url, 'https://example.test/api/v1/me/teams')
   assert.equal(calls[0]?.init.method, 'GET')
 

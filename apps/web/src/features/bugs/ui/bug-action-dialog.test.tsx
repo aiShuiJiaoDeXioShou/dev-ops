@@ -26,6 +26,8 @@ const bug: BugDetail = {
   createdByUserId: 'user-1',
   createdAt: '2026-11-10T00:00:00.000Z',
   linkedRequirements: [],
+  collaborators: [],
+  attachments: [],
   regressions: [],
   linkedCodeReferences: [],
 }

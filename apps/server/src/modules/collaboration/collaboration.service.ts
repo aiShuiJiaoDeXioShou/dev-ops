@@ -33,6 +33,7 @@ const ACTIVITY_ENTITY_TYPES: ReadonlySet<string> = new Set([
   'project_env_var',
   'skill',
   'agent_template',
+  'attachment',
 ])
 
 export interface CommentView {

@@ -15,6 +15,16 @@ const ownerSchema = Type.Object({
   status: Type.Union([Type.Literal('active'), Type.Literal('disabled'), Type.Literal('missing')]),
   available: Type.Boolean(),
 })
+const attachmentSummarySchema = Type.Object({
+  id: uuidSchema,
+  fileName: Type.String(),
+  sizeBytes: Type.Integer(),
+  contentType: Type.Union([Type.String(), Type.Null()]),
+  sha256: Type.String(),
+  uploadedBy: ownerSchema,
+  createdAt: Type.String(),
+  downloadUrl: Type.String(),
+})
 const bugItemSchema = Type.Object({
   id: uuidSchema,
   projectId: uuidSchema,
@@ -68,6 +78,8 @@ const bugDetailSchema = Type.Object({
   evidenceUrl: Type.Union([Type.String(), Type.Null()]),
   createdByUserId: uuidSchema,
   createdAt: Type.String(),
+  collaborators: Type.Array(ownerSchema),
+  attachments: Type.Array(attachmentSummarySchema),
   linkedRequirements: Type.Array(linkedRequirementSchema),
   regressions: Type.Array(regressionSchema),
   linkedCodeReferences: Type.Array(codeReferenceSchema),
@@ -119,6 +131,8 @@ export const createBugBodySchema = Type.Object(
     evidenceText: Type.Optional(Type.Union([Type.String({ maxLength: 20000 }), Type.Null()])),
     evidenceUrl: Type.Optional(Type.Union([Type.String({ maxLength: 2048 }), Type.Null()])),
     fixOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
+    collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
+    attachmentIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 10 })),
     requirementIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
   },
   { additionalProperties: false },
@@ -134,6 +148,8 @@ export const updateBugBodySchema = Type.Object(
     evidenceText: Type.Optional(Type.Union([Type.String({ maxLength: 20000 }), Type.Null()])),
     evidenceUrl: Type.Optional(Type.Union([Type.String({ maxLength: 2048 }), Type.Null()])),
     fixOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
+    collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
+    attachmentIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 10 })),
   },
   { additionalProperties: false },
 )

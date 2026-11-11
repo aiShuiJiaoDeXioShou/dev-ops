@@ -676,6 +676,12 @@
 [data-slot='dialog-content'] form label > :not(:first-child) {
   margin-top: 0;
 }
+/* 复选框等行内标签：需要横向排列，覆盖上面的纵向字段标签规则。 */
+[data-slot='dialog-content'] form label.form-inline-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
 
 /* Toast 语义图标：与提示文字一起做 flex 中线对齐，不用无意义圆点。 */
 #toast {
@@ -1643,4 +1649,10 @@ a.skill-title:hover {
   .pr-diff-pane {
     padding: 14px 16px;
   }
+}
+
+/* 表单弹窗尺寸：桌面固定 720，窄屏保留 16px 视口边距；高度为视口预留 64px。 */
+.form-dialog-content {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
 }

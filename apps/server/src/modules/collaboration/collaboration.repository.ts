@@ -25,6 +25,7 @@ export type ActivityEntityType =
   | 'project_env_var'
   | 'skill'
   | 'agent_template'
+  | 'attachment'
 
 export interface NewComment {
   id: string

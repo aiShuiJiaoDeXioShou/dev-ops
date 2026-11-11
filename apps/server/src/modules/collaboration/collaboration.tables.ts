@@ -45,7 +45,7 @@ export const activity = appSchema.table(
     primaryKey({ name: 'pk_activity_id', columns: [table.id] }),
     check(
       'ck_activity_entity_type',
-      sql`${table.entity_type} in ('project', 'requirement', 'bug', 'code_reference', 'team_member', 'team', 'project_service', 'build_record', 'build_artifact', 'service_run_version', 'pipeline_run', 'pipeline_node', 'external_review', 'release_result', 'credential', 'credential_grant', 'project_env_var', 'skill', 'agent_template')`,
+      sql`${table.entity_type} in ('project', 'requirement', 'bug', 'code_reference', 'team_member', 'team', 'project_service', 'build_record', 'build_artifact', 'service_run_version', 'pipeline_run', 'pipeline_node', 'external_review', 'release_result', 'credential', 'credential_grant', 'project_env_var', 'skill', 'agent_template', 'attachment')`,
     ),
     index('idx_activity_entity').on(table.entity_type, table.entity_id, table.created_at, table.id),
     index('idx_activity_team').on(table.team_id, table.created_at),

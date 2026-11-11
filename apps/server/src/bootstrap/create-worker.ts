@@ -1,11 +1,17 @@
 import { createDatabase } from '../platform/database/client.ts'
 import type { AppConfig } from '../platform/config/env.ts'
 import { createPipelineScheduler, type PipelineSchedulerLogger } from '../modules/pipeline/pipeline.scheduler.ts'
+import { createStorageService } from '../modules/storage/storage.service.ts'
+import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
+import { createAttachmentCleanup } from '../modules/attachments/attachments.cleanup.ts'
 
 export type { PipelineSchedulerLogger } from '../modules/pipeline/pipeline.scheduler.ts'
 
 /** 调度周期间隔（毫秒）；小团队规模下 2 秒足够，避免空转压力。 */
 const SCHEDULE_INTERVAL_MS = 2_000
+
+/** 附件清理周期间隔（毫秒）；临时附件 24 小时保留期下 10 分钟粒度足够。 */
+const ATTACHMENT_CLEANUP_INTERVAL_MS = 10 * 60 * 1000
 
 /**
  * 组装流水线调度 Worker 的进程依赖。
@@ -29,8 +35,23 @@ export function createWorker(
     },
     log,
   })
+  const secretCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY
+    ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY)
+    : null
+  const attachmentCleanup = createAttachmentCleanup({
+    db: database.db,
+    storage: createStorageService({
+      db: database.db,
+      cipher: secretCipher,
+      config: { localDir: config.ATTACHMENT_STORAGE_DIR, probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS },
+    }),
+    policy: { tempRetentionHours: config.ATTACHMENT_TEMP_TTL_HOURS },
+    log: (message, context) => log('warn', message, context),
+  })
   let timer: NodeJS.Timeout | null = null
+  let cleanupTimer: NodeJS.Timeout | null = null
   let cycleRunning = false
+  let cleanupRunning = false
   let closing = false
 
   async function runCycleOnce(): Promise<void> {
@@ -47,6 +68,21 @@ export function createWorker(
     }
   }
 
+  async function runAttachmentCleanupOnce(): Promise<void> {
+    if (cleanupRunning || closing) return
+    cleanupRunning = true
+    try {
+      const result = await attachmentCleanup.runOnce()
+      log('info', '附件清理周期完成', { ...result })
+    } catch (error) {
+      log('error', '附件清理周期失败', {
+        error: error instanceof Error ? error.message : '未知错误',
+      })
+    } finally {
+      cleanupRunning = false
+    }
+  }
+
   return {
     /**
      * 启动 Worker：验证数据库后开始周期调度。
@@ -55,13 +91,22 @@ export function createWorker(
     async start(): Promise<void> {
       await database.check()
       await runCycleOnce()
+      await runAttachmentCleanupOnce()
       timer = setInterval(() => {
         void runCycleOnce()
       }, SCHEDULE_INTERVAL_MS)
-      log('info', 'pipeline worker 已启动', { intervalMs: SCHEDULE_INTERVAL_MS })
+      cleanupTimer = setInterval(() => {
+        void runAttachmentCleanupOnce()
+      }, ATTACHMENT_CLEANUP_INTERVAL_MS)
+      log('info', 'pipeline worker 已启动', {
+        intervalMs: SCHEDULE_INTERVAL_MS,
+        attachmentCleanupIntervalMs: ATTACHMENT_CLEANUP_INTERVAL_MS,
+      })
     },
     /** 主动执行一次调度周期；测试与运维排查使用。 */
     runCycleOnce,
+    /** 主动执行一次附件清理；测试与运维排查使用。 */
+    runAttachmentCleanupOnce,
     /**
      * 关闭 Worker：停止调度并关闭数据库连接。
      * @returns 连接关闭后完成。
@@ -71,6 +116,10 @@ export function createWorker(
       if (timer) {
         clearInterval(timer)
         timer = null
+      }
+      if (cleanupTimer) {
+        clearInterval(cleanupTimer)
+        cleanupTimer = null
       }
       await database.close()
     },

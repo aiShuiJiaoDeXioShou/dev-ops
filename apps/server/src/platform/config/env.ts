@@ -46,6 +46,18 @@ const environmentSchema = Type.Object({
   PIPELINE_LOG_CHUNK_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 262_144 }),
   PIPELINE_ARTIFACT_MAX_BYTES: Type.Integer({ minimum: 1_048_576, maximum: 2_147_483_648, default: 524_288_000 }),
   PIPELINE_WORKFLOW_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 131_072 }),
+  ATTACHMENT_STORAGE_DIR: Type.String({ minLength: 1, default: './attachment-data' }),
+  ATTACHMENT_MAX_BYTES: Type.Integer({ minimum: 1_048_576, maximum: 2_147_483_648, default: 52_428_800 }),
+  ATTACHMENT_MAX_PER_SUBMIT: Type.Integer({ minimum: 1, maximum: 50, default: 10 }),
+  ATTACHMENT_MAX_PER_RECORD: Type.Integer({ minimum: 1, maximum: 200, default: 50 }),
+  ATTACHMENT_TEMP_TTL_HOURS: Type.Integer({ minimum: 1, maximum: 168, default: 24 }),
+  STORAGE_PROBE_TIMEOUT_MS: Type.Integer({ minimum: 1_000, maximum: 60_000, default: 10_000 }),
+  // V0.4b 项目写能力与发布：补丁、差异响应与部署验证上限；均为字节或秒。
+  CODE_CHANGE_PATCH_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 1_048_576 }),
+  CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES: Type.Integer({ minimum: 4_096, maximum: 1_048_576, default: 262_144 }),
+  CODE_CHANGE_TIMEOUT_SECONDS: Type.Integer({ minimum: 60, maximum: 3_600, default: 900 }),
+  DEPLOY_VERIFY_TIMEOUT_SECONDS: Type.Integer({ minimum: 5, maximum: 120, default: 30 }),
+  CHANGE_PLAN_LIST_MAX_PAGE_SIZE: Type.Integer({ minimum: 1, maximum: 100, default: 100 }),
 })
 
 function validateHttpOrigin(value: string, name: string): string {

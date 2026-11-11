@@ -11,16 +11,18 @@ import {
   type CommentView,
   type PageResult,
 } from '../collaboration/collaboration.service.ts'
-import { isActiveTeamMember } from '../identity/identity.repository.ts'
+import { findActiveTeamMemberIds, isActiveTeamMember } from '../identity/identity.repository.ts'
 import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
+import type { AttachmentBindingUseCases } from '../attachments/attachments.binding.ts'
 import { findRequirementSummaries, findRequirementSummaryById } from '../requirements/requirements.repository.ts'
 import {
   countOpenBugsByProjects,
   deleteBugLink,
   findBugById,
+  findBugCollaboratorUserIds,
   findBugLink,
   findBugSummariesForRequirement,
   findBugRequirementIds,
@@ -33,6 +35,7 @@ import {
   lockBug,
   nextBugNumber,
   nextRegressionAttempt,
+  replaceBugCollaborators,
   updateBug,
   updateRegression,
   type BugRow,
@@ -55,6 +58,8 @@ import { toBugDetail, toBugListItem, toRegressionView } from './bugs.view.ts'
 export interface BugsServiceDeps {
   db: Database
   codeReferences?: BugCodeReferenceReader
+  /** 附件绑定/解绑/列表用例；由 bootstrap 注入数量与保留期策略。 */
+  attachmentBinding: AttachmentBindingUseCases
 }
 
 /**
@@ -63,7 +68,7 @@ export interface BugsServiceDeps {
  * @returns Bug 列表、详情、状态动作、关联、评论与活动用例。
  */
 export function createBugsService(deps: BugsServiceDeps) {
-  const { db } = deps
+  const { db, attachmentBinding } = deps
 
   async function requireProjectAccess(actor: SessionUser, projectId: string) {
     const project = await getProjectContext(db, projectId)
@@ -85,16 +90,30 @@ export function createBugsService(deps: BugsServiceDeps) {
     return { row, project }
   }
 
+  async function validateCollaborators(teamId: string, collaboratorUserIds?: string[]) {
+    const uniqueCollaborators = [...new Set(collaboratorUserIds ?? [])]
+    const activeMemberIds = await findActiveTeamMemberIds(db, teamId, uniqueCollaborators)
+    for (const userId of uniqueCollaborators) {
+      if (!activeMemberIds.has(userId)) {
+        throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '协作人员不是正常团队成员')
+      }
+    }
+    return uniqueCollaborators
+  }
+
   async function detail(row: BugRow): Promise<BugDetail> {
-    const [requirementIds, regressions, linkedCodeReferences] = await Promise.all([
+    const [requirementIds, regressions, linkedCodeReferences, collaboratorUserIds, attachments] = await Promise.all([
       findBugRequirementIds(db, row.id),
       listRegressions(db, row.id),
       deps.codeReferences ? deps.codeReferences('bug', row.id) : Promise.resolve([]),
+      findBugCollaboratorUserIds(db, row.id),
+      attachmentBinding.listAttachmentsForTarget(db, 'bug', row.id),
     ])
     const ownerUserIds = [
       ...(row.fix_owner_user_id === null ? [] : [row.fix_owner_user_id]),
       ...(row.regression_owner_user_id === null ? [] : [row.regression_owner_user_id]),
       ...regressions.flatMap((item) => [item.fixer_user_id, item.verifier_user_id]),
+      ...collaboratorUserIds,
     ]
     const [linkedRequirements, refs] = await Promise.all([
       findRequirementSummaries(
@@ -103,7 +122,15 @@ export function createBugsService(deps: BugsServiceDeps) {
       ),
       loadOwnerRefs(db, row.team_id, ownerUserIds),
     ])
-    return toBugDetail({ row, linkedRequirements, regressions, linkedCodeReferences, refs })
+    return toBugDetail({
+      row,
+      collaborators: collaboratorUserIds.map((userId) => ({ userId })),
+      attachments,
+      linkedRequirements,
+      regressions,
+      linkedCodeReferences,
+      refs,
+    })
   }
 
   async function listBugs(
@@ -151,6 +178,8 @@ export function createBugsService(deps: BugsServiceDeps) {
       evidenceText?: string | null
       evidenceUrl?: string | null
       fixOwnerUserId?: string | null
+      collaboratorUserIds?: string[]
+      attachmentIds?: string[]
       requirementIds?: string[]
     },
   ) {
@@ -164,6 +193,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     if (input.fixOwnerUserId && !(await isActiveTeamMember(db, project.teamId, input.fixOwnerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '修复负责人不是正常团队成员')
     }
+    const collaborators = await validateCollaborators(project.teamId, input.collaboratorUserIds)
     const requirementIds = [...new Set(input.requirementIds ?? [])]
     const requirementSummaries = await findRequirementSummaries(db, requirementIds)
     if (
@@ -172,6 +202,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     ) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '只能关联同项目需求')
     }
+    const attachmentIds = [...new Set(input.attachmentIds ?? [])]
     const bugId = randomUUID()
     const row = await db.transaction(async (tx) => {
       await lockProjectForWrite(tx, projectId)
@@ -194,6 +225,33 @@ export function createBugsService(deps: BugsServiceDeps) {
       })
       for (const requirementId of requirementIds) {
         await insertBugLink(tx, { teamId: project.teamId, bugId, requirementId, createdByUserId: actor.id })
+      }
+      if (collaborators.length > 0) {
+        await replaceBugCollaborators(tx, {
+          bugId,
+          teamId: project.teamId,
+          userIds: collaborators,
+          createdByUserId: actor.id,
+        })
+        await appendActivity(tx, {
+          teamId: project.teamId,
+          projectId,
+          entityType: 'bug',
+          entityId: bugId,
+          action: 'bug_collaborators_changed',
+          actorUserId: actor.id,
+          changes: { added: collaborators, removed: [] },
+        })
+      }
+      if (attachmentIds.length > 0) {
+        await attachmentBinding.bindAttachments(tx, {
+          teamId: project.teamId,
+          projectId,
+          targetType: 'bug',
+          targetId: bugId,
+          attachmentIds,
+          actor: { userId: actor.id },
+        })
       }
       await appendActivity(tx, {
         teamId: project.teamId,
@@ -226,6 +284,8 @@ export function createBugsService(deps: BugsServiceDeps) {
       evidenceText?: string | null
       evidenceUrl?: string | null
       fixOwnerUserId?: string | null
+      collaboratorUserIds?: string[]
+      attachmentIds?: string[]
     },
   ) {
     if (!Number.isSafeInteger(input.version) || input.version < 1) {
@@ -252,6 +312,10 @@ export function createBugsService(deps: BugsServiceDeps) {
     if (input.fixOwnerUserId && !(await isActiveTeamMember(db, project.teamId, input.fixOwnerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '修复负责人不是正常团队成员')
     }
+    const collaborators =
+      input.collaboratorUserIds === undefined
+        ? undefined
+        : await validateCollaborators(project.teamId, input.collaboratorUserIds)
     const changes: Record<string, unknown> = {}
     if (title !== undefined && title !== current.title) changes.title = [current.title, title]
     if (phenomenon !== undefined && phenomenon !== current.phenomenon)
@@ -280,6 +344,52 @@ export function createBugsService(deps: BugsServiceDeps) {
         fixOwnerUserId: input.fixOwnerUserId,
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
+      if (input.attachmentIds !== undefined) {
+        const finalAttachmentIds = [...new Set(input.attachmentIds)]
+        const currentAttachments = await attachmentBinding.listAttachmentsForTarget(tx, 'bug', bugId)
+        const currentIds = new Set(currentAttachments.map((item) => item.id))
+        const newlyBoundIds = finalAttachmentIds.filter((attachmentId) => !currentIds.has(attachmentId))
+        await attachmentBinding.unbindAttachments(tx, {
+          teamId: project.teamId,
+          projectId: project.id,
+          targetType: 'bug',
+          targetId: bugId,
+          keepAttachmentIds: finalAttachmentIds,
+          actor: { userId: actor.id },
+        })
+        if (newlyBoundIds.length > 0) {
+          await attachmentBinding.bindAttachments(tx, {
+            teamId: project.teamId,
+            projectId: project.id,
+            targetType: 'bug',
+            targetId: bugId,
+            attachmentIds: newlyBoundIds,
+            actor: { userId: actor.id },
+          })
+        }
+      }
+      if (collaborators !== undefined) {
+        const previousCollaborators = await findBugCollaboratorUserIds(tx, bugId)
+        const added = collaborators.filter((userId) => !previousCollaborators.includes(userId))
+        const removed = previousCollaborators.filter((userId) => !collaborators.includes(userId))
+        await replaceBugCollaborators(tx, {
+          bugId,
+          teamId: project.teamId,
+          userIds: collaborators,
+          createdByUserId: actor.id,
+        })
+        if (added.length > 0 || removed.length > 0) {
+          await appendActivity(tx, {
+            teamId: project.teamId,
+            projectId: project.id,
+            entityType: 'bug',
+            entityId: bugId,
+            action: 'bug_collaborators_changed',
+            actorUserId: actor.id,
+            changes: { added, removed },
+          })
+        }
+      }
       if (Object.keys(changes).length > 0) {
         await appendActivity(tx, {
           teamId: project.teamId,

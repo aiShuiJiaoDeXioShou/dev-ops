@@ -12,13 +12,15 @@ export {
   personalAccessToken,
 } from '../modules/identity/identity.tables.ts'
 export { comment, activity } from '../modules/collaboration/collaboration.tables.ts'
+export { storageBucket, storageBucketEvent } from '../modules/storage/storage.tables.ts'
+export { attachment } from '../modules/attachments/attachments.tables.ts'
 export { project, projectService, projectServiceRepository } from '../modules/projects/projects.tables.ts'
 export {
   requirement,
   requirementCollaborator,
   requirementTestSubmission,
 } from '../modules/requirements/requirements.tables.ts'
-export { bug, bugRequirementLink, bugRegression } from '../modules/bugs/bugs.tables.ts'
+export { bug, bugRequirementLink, bugRegression, bugCollaborator } from '../modules/bugs/bugs.tables.ts'
 export { idempotencyRecord } from '../platform/database/idempotency.tables.ts'
 export {
   secret,

@@ -15,19 +15,66 @@ import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { bugMutations, canWriteBugs, isEditableBug } from '../api/mutations'
 import { bugQueryOptions } from '../api/queries'
 import { BUG_STATUS_LABELS, REGRESSION_RESULT_LABELS } from '../model/labels'
+import {
+  AttachmentList,
+  describeAttachmentError,
+  removeAttachment,
+  type AttachmentSummary,
+} from '@/features/attachments/public'
+import { projectQueryOptions } from '@/features/projects/public'
+import { avatarToneClassName } from '@/shared/lib/avatar-tone'
+import { cn } from '@/shared/lib/utils'
+import type { BugDetail } from '../model/types'
 import { BugActionDialog, type BugAction } from './bug-action-dialog'
 import { BugForm } from './bug-form'
 import { Select } from '@/shared/ui/controls/select'
 
+/** 缺陷协作人员展示标签；失效成员保留并标注。 */
+function CollaboratorTags({ members }: { members: BugDetail['collaborators'] }) {
+  if (members.length === 0) return <span>无</span>
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="协作人员">
+      {members.map((member) => (
+        <li
+          key={member.userId}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border py-0.5 pr-2 pl-0.5 text-xs',
+            member.available
+              ? 'border-border bg-secondary text-secondary-foreground'
+              : 'border-destructive/40 bg-destructive/10 text-destructive',
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              'grid size-5 shrink-0 place-items-center rounded-full text-xs font-medium',
+              avatarToneClassName(member.userId),
+            )}
+          >
+            {member.name.slice(0, 1)}
+          </span>
+          <span className="max-w-40 truncate">{member.name}</span>
+          {!member.available && <span className="shrink-0">已失效</span>}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** Bug 详情：基本信息、回归历史、动作、评论与活动。 */
 export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const { role } = useSession()
+  const { user, role } = useSession()
   const query = useQuery(bugQueryOptions(bugId))
+  const project = useQuery({
+    ...projectQueryOptions(query.data?.data.projectId ?? ''),
+    enabled: Boolean(query.data?.data.projectId),
+  })
   const [action, setAction] = useState<BugAction | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [linkRequirementId, setLinkRequirementId] = useState('')
   const [error, setError] = useState('')
+  const [attachmentError, setAttachmentError] = useState('')
   const [codeOpen, setCodeOpen] = useState(false)
   const canWrite = canWriteBugs(role)
   const invalidate = async () => {
@@ -56,6 +103,14 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
     },
     onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '关联需求失败。'),
   })
+  const removeAttachmentMutation = useMutation({
+    mutationFn: (attachment: AttachmentSummary) => removeAttachment(attachment.id),
+    onSuccess: async () => {
+      setAttachmentError('')
+      await queryClient.invalidateQueries({ queryKey: ['bugs', 'detail', bugId] })
+    },
+    onError: (cause: unknown) => setAttachmentError(describeAttachmentError(cause)),
+  })
   const startFix = useMutation({
     mutationFn: () => bugMutations.startFix(bugId, { version: query.data?.data.version ?? 0 }),
     onSuccess: invalidate,
@@ -79,6 +134,13 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
     )
   }
   const bug = query.data.data
+  /**
+   * 附件删除权限：上传者本人、团队管理员或项目负责人；浏览者不展示删除入口。
+   * @param attachment 待删除附件。
+   * @returns 当前用户是否可删除该附件。
+   */
+  const canDeleteAttachment = (attachment: AttachmentSummary) =>
+    role === 'admin' || attachment.uploadedBy.userId === user.id || project.data?.data.owner.userId === user.id
   return (
     <aside className="details" aria-label="Bug 详情">
       <div className="detail-scroll">
@@ -148,6 +210,12 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
               <dd className="mt-1">{bug.regressionOwner?.name ?? '未指定'}</dd>
             </div>
             <div>
+              <dt className="text-xs text-muted-foreground">协作人员</dt>
+              <dd className="mt-1">
+                <CollaboratorTags members={bug.collaborators ?? []} />
+              </dd>
+            </div>
+            <div>
               <dt className="text-xs text-muted-foreground">关联需求</dt>
               <dd className="mt-1">
                 {bug.linkedRequirements.length
@@ -210,6 +278,16 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
             <p className="text-xs text-muted-foreground">预期：{bug.expectedBehavior}</p>
             {bug.reproduction && <p className="whitespace-pre-wrap text-muted-foreground">复现：{bug.reproduction}</p>}
             {bug.reproductionUnknown && <p className="text-muted-foreground">复现：明确无法稳定复现</p>}
+          </section>
+          <section className="space-y-2" aria-label="附件">
+            <h3 className="text-sm font-semibold">附件</h3>
+            <AttachmentList
+              attachments={bug.attachments ?? []}
+              canDelete={canDeleteAttachment}
+              onDelete={(attachment) => removeAttachmentMutation.mutate(attachment)}
+              deletingId={removeAttachmentMutation.isPending ? (removeAttachmentMutation.variables?.id ?? null) : null}
+              deleteError={attachmentError}
+            />
           </section>
           <section className="space-y-2">
             <h3 className="text-sm font-semibold">回归历史</h3>

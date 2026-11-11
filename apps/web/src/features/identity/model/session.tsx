@@ -21,6 +21,8 @@ interface SessionContextValue {
   setCurrentTeam: (teamId: string) => void
   /** 团队列表是否已解析，页面应等就绪后再渲染，避免空状态闪现。 */
   isReady: boolean
+  /** 当前用户是否为平台管理员；用于隐藏平台级入口，服务端仍独立校验。 */
+  isPlatformAdmin: boolean
 }
 const SessionContext = createContext<SessionContextValue | null>(null)
 
@@ -33,7 +35,9 @@ export function SessionProvider({ initialUser, children }: { initialUser: AuthUs
   const session = useQuery(sessionQueryOptions)
   const teamsQuery = useQuery(myTeamsQueryOptions)
   const user = session.data?.user ?? initialUser
-  const teams = useMemo<TeamSummary[]>(() => (teamsQuery.data?.data ?? []) as TeamSummary[], [teamsQuery.data])
+  const teamsPayload = teamsQuery.data?.data
+  const teams = useMemo<TeamSummary[]>(() => (teamsPayload?.teams ?? []) as TeamSummary[], [teamsPayload])
+  const isPlatformAdmin = teamsPayload?.isPlatformAdmin ?? false
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(() =>
     localStorage.getItem('dev-ops.current-team'),
   )
@@ -58,6 +62,7 @@ export function SessionProvider({ initialUser, children }: { initialUser: AuthUs
         teams,
         currentTeam,
         role: currentTeam?.role ?? 'viewer',
+        isPlatformAdmin,
         setCurrentTeam,
         isReady: !teamsQuery.isPending,
       }}

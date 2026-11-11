@@ -21,7 +21,7 @@ const ROLE_LABELS = { admin: '管理员', developer: '开发者', viewer: '浏�
 export function AppLayout() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user, teams, currentTeam, role, setCurrentTeam, isReady } = useSession()
+  const { user, teams, currentTeam, role, setCurrentTeam, isReady, isPlatformAdmin } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -72,6 +72,16 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="side-bottom">
+          {isPlatformAdmin && (
+            <NavLink
+              to="/settings/storage-buckets"
+              onClick={() => setMenuOpen(false)}
+              className={({ isActive }) => cn('nav-btn', isActive && 'active')}
+            >
+              <PrototypeIcon name="box" />
+              储存桶
+            </NavLink>
+          )}
           {(!currentTeam || role === 'admin') && (
             <NavLink
               to="/settings/team"

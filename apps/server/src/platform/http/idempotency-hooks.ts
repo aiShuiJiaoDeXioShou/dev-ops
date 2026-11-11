@@ -45,6 +45,8 @@ export function createIdempotencyHooks(options: IdempotencyHookOptions) {
 
   async function preHandler(request: FastifyRequest) {
     if (request.method !== 'POST' || request.url.startsWith(AUTH_PREFIX)) return
+    // 原始流上传路由显式关闭：流式请求体无法稳定哈希，冲突时也不会 drain 请求体。
+    if (request.routeOptions.config?.idempotency === false) return
     const header = request.headers['idempotency-key']
     const key = Array.isArray(header) ? header[0] : header
     if (!key) return

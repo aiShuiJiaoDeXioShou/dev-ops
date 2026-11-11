@@ -2095,5 +2095,67 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 读取平台储存桶列表；服务端已按内置桶、默认桶、创建时间倒序稳定排序。 */
+    async listStorageBuckets(options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/platform/storage-buckets', 'get'>>(
+        '/api/v1/platform/storage-buckets',
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 创建 S3 兼容储存桶；setAsDefault=true 时由服务端先完成可读写探测。 */
+    async createStorageBucket(body: ApiBody<'/api/v1/platform/storage-buckets', 'post'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/platform/storage-buckets', 'post'>>(
+        '/api/v1/platform/storage-buckets',
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 更新储存桶配置；version 用于乐观锁，Secret 省略表示保持原值。 */
+    async updateStorageBucket(
+      bucketId: string,
+      body: ApiBody<'/api/v1/platform/storage-buckets/{bucketId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/platform/storage-buckets/{bucketId}/update', 'post'>>(
+        `/api/v1/platform/storage-buckets/${segment(bucketId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 测试储存桶连接；服务端返回写探针、读回与删除探针的归因结论。 */
+    async testStorageBucket(bucketId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/platform/storage-buckets/{bucketId}/test', 'post'>>(
+        `/api/v1/platform/storage-buckets/${segment(bucketId)}/test`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 设为默认储存桶；服务端要求桶已启用且最近探测为 read_write。 */
+    async setStorageBucketDefault(
+      bucketId: string,
+      body: ApiBody<'/api/v1/platform/storage-buckets/{bucketId}/set-default', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/platform/storage-buckets/{bucketId}/set-default', 'post'>>(
+        `/api/v1/platform/storage-buckets/${segment(bucketId)}/set-default`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 删除储存桶；内置桶、默认桶与仍被附件引用的桶由服务端拒绝。 */
+    async removeStorageBucket(bucketId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/platform/storage-buckets/{bucketId}/remove', 'post'>>(
+        `/api/v1/platform/storage-buckets/${segment(bucketId)}/remove`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
   }
 }

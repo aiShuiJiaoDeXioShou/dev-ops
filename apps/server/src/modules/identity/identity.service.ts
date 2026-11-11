@@ -17,6 +17,7 @@ import {
   insertInvitation,
   insertTeam,
   insertTeamMember,
+  isPlatformAdminUser,
   listInvitations,
   listTeamMembers,
   listTeamsForUser,
@@ -443,6 +444,11 @@ export function createIdentityService(deps: IdentityServiceDeps) {
     return rows.map((row) => ({ ...row, role: toTeamRole(row.role) }))
   }
 
+  async function getMyTeams(user: SessionUser) {
+    const [teams, isPlatformAdmin] = await Promise.all([listMyTeams(user), isPlatformAdminUser(db, user.id)])
+    return { teams, isPlatformAdmin }
+  }
+
   return {
     createTeamAsRoot,
     inviteMember,
@@ -454,6 +460,7 @@ export function createIdentityService(deps: IdentityServiceDeps) {
     getInvitationByToken,
     acceptInvitation,
     listMyTeams,
+    getMyTeams,
     updateTeam,
   }
 }

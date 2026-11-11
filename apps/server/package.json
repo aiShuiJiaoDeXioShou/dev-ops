@@ -29,6 +29,7 @@
     "start:worker": "node --env-file-if-exists=.env dist/entrypoints/worker.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1164.0",
     "@better-auth/drizzle-adapter": "1.7.18",
     "@dev-ops/pipeline-protocol": "workspace:*",
     "@fastify/swagger": "^9.9.3",

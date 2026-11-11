@@ -19,7 +19,7 @@ import {
   memberResponseSchema,
   memberUpdateBodySchema,
   teamParamsSchema,
-  teamSummaryListResponseSchema,
+  myTeamsResponseSchema,
   updateTeamBodySchema,
   updateTeamResponseSchema,
   tokenParamsSchema,
@@ -38,11 +38,11 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/me/teams',
     {
-      schema: { response: { 200: teamSummaryListResponseSchema } },
+      schema: { response: { 200: myTeamsResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
-      return success(await options.service.listMyTeams(user), request.id)
+      return success(await options.service.getMyTeams(user), request.id)
     },
   )
 

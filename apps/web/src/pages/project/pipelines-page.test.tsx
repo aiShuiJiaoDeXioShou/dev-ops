@@ -164,7 +164,11 @@ describe('pipelines-page', () => {
   })
 
   it('浏览者只读：显示说明且没有触发入口', async () => {
-    server.use(http.get('*/api/v1/me/teams', () => success([{ ...teamFixture, role: 'viewer' }])))
+    server.use(
+      http.get('*/api/v1/me/teams', () =>
+        success({ teams: [{ ...teamFixture, role: 'viewer' }], isPlatformAdmin: false }),
+      ),
+    )
     mockWorkflows()
     mockRuns()
     renderPage()

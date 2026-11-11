@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, inArray } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
-import { authUser, invitation, team, teamMember } from './identity.tables.ts'
+import { authUser, invitation, platformAdmin, team, teamMember } from './identity.tables.ts'
 import type { UserSummary } from './identity.types.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
@@ -19,6 +19,21 @@ export async function findUserByEmail(db: Database, email: string) {
     .where(eq(authUser.email, email))
     .limit(1)
   return row
+}
+
+/**
+ * 判断用户是否拥有平台管理员身份。
+ * @param db 数据库连接。
+ * @param userId 用户标识。
+ * @returns 在 platform_admin 表中存在记录时为 true。
+ */
+export async function isPlatformAdminUser(db: Database, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ userId: platformAdmin.user_id })
+    .from(platformAdmin)
+    .where(eq(platformAdmin.user_id, userId))
+    .limit(1)
+  return row !== undefined
 }
 
 /**

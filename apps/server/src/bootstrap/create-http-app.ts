@@ -15,6 +15,8 @@ import { projectRoutes } from '../modules/projects/projects.routes.ts'
 import { projectDashboardRoutes } from '../modules/projects/projects.dashboard.routes.ts'
 import { requirementRoutes } from '../modules/requirements/requirements.routes.ts'
 import { bugRoutes } from '../modules/bugs/bugs.routes.ts'
+import { attachmentRoutes } from '../modules/attachments/attachments.routes.ts'
+import { storageRoutes } from '../modules/storage/storage.routes.ts'
 import type { MailSender } from '../adapters/mail/mail.types.ts'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
 import { codeRoutes } from '../modules/code/code.routes.ts'
@@ -72,7 +74,10 @@ export function createHttpApp(
     (code) => {
       app.log.error({ code }, '数据库空闲连接异常')
     },
-    options,
+    {
+      ...options,
+      log: (message, context) => app.log.warn(context ?? {}, message),
+    },
   )
   app.decorate('db', services.database.db)
   app.decorate('auth', services.auth)
@@ -119,6 +124,17 @@ export function createHttpApp(
   app.register(projectDashboardRoutes, { prefix: '/api/v1', service: services.projectDashboard })
   app.register(requirementRoutes, { prefix: '/api/v1', auth: services.auth, service: services.requirements })
   app.register(bugRoutes, { prefix: '/api/v1', auth: services.auth, service: services.bugs })
+  app.register(attachmentRoutes, {
+    prefix: '/api/v1',
+    auth: services.auth,
+    service: services.attachments,
+    maxFileBytes: config.ATTACHMENT_MAX_BYTES,
+  })
+  app.register(storageRoutes, {
+    prefix: '/api/v1',
+    auth: services.auth,
+    service: services.storageManagement,
+  })
   app.register(codeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.code })
   app.register(deliveryRoutes, { prefix: '/api/v1', service: services.delivery })
   app.register(pipelineRoutes, {
@@ -142,6 +158,19 @@ export function createHttpApp(
     auth: services.auth,
     service: services.integrations,
     webOrigin: config.APP_ORIGIN,
+  })
+
+  // 启动时校验内置本地储存桶存在且满足不变量；缺失补建，被误改则阻止启动。
+  app.addHook('onReady', async () => {
+    try {
+      const outcome = await services.storage.ensureBuiltinBucket()
+      if (outcome === 'created') app.log.warn('已补建内置本地储存桶，请确认 ATTACHMENT_STORAGE_DIR 与备份策略')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      // 内置桶存在但被误改属于部署错误，必须阻止启动；表不存在说明迁移未执行，交由就绪检查暴露。
+      if (message.includes('内置本地储存桶')) throw error
+      app.log.warn({ err: error }, '数据库尚未迁移，跳过内置储存桶校验')
+    }
   })
 
   return app

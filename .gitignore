@@ -21,4 +21,5 @@ specs
 .pnpm-store/
 .tmp/
 pipeline-data/
+attachment-data/
 .secrets/

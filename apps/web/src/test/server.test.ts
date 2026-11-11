@@ -6,7 +6,7 @@ describe('MSW 共享夹具', () => {
     const session = await fetch('http://localhost/api/v1/auth/get-session').then((response) => response.json())
     expect(session.user).toEqual(sessionFixture.user)
     const teams = await fetch('http://localhost/api/v1/me/teams').then((response) => response.json())
-    expect(teams.data).toEqual([teamFixture])
+    expect(teams.data).toEqual({ teams: [teamFixture], isPlatformAdmin: false })
     const members = await fetch('http://localhost/api/v1/teams/team-1/members').then((response) => response.json())
     expect(members.data).toEqual([memberFixture])
     const providers = await fetch('http://localhost/api/v1/git-providers').then((response) => response.json())

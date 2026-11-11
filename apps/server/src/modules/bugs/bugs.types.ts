@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from '../attachments/attachments.view.ts'
 import type { OwnerRef } from '../identity/identity.display.ts'
 
 /** Bug 摘要读模型：列表与跨模块关联展示所需的最小字段，不包含现象与复现正文。 */
@@ -82,6 +83,8 @@ export interface BugDetail extends BugListItem {
   evidenceUrl: string | null
   createdByUserId: string
   createdAt: string
+  collaborators: OwnerView[]
+  attachments: AttachmentSummary[]
   linkedRequirements: LinkedRequirementView[]
   regressions: RegressionView[]
   linkedCodeReferences: LinkedCodeReferenceView[]

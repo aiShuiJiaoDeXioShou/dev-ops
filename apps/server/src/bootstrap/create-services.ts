@@ -27,6 +27,10 @@ import {
 } from '../modules/pipeline/pipeline.credentials.ts'
 import { createPipelineStorage } from '../modules/pipeline/pipeline.storage.ts'
 import { createProjectDashboardService } from '../modules/projects/projects.dashboard.service.ts'
+import { createStorageService } from '../modules/storage/storage.service.ts'
+import { createStorageManagementService } from '../modules/storage/storage.management.service.ts'
+import { createAttachmentsService } from '../modules/attachments/attachments.service.ts'
+import { createAttachmentBinding } from '../modules/attachments/attachments.binding.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createIntegrationsService, type GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createSmtpMailer } from '../adapters/mail/smtp-mailer.ts'
@@ -48,6 +52,8 @@ export function createServices(
     gitAdapterFactory?: (connection: Parameters<GitAdapterFactory>[0]) => Promise<GitAdapter>
     /** 测试或部署可替换 Git 凭据来源；默认由 integrations/configuration 与 CLI/App 凭据签发。 */
     pipelineCredentials?: PipelineCredentialProvider
+    /** 结构化告警日志；附件对象清理失败等无法转化为业务结果的问题写入此处。 */
+    log?: (message: string, context?: Record<string, unknown>) => void
   } = {},
 ) {
   const database = createDatabase(config, onDatabaseIdleError)
@@ -111,13 +117,43 @@ export function createServices(
     db: database.db,
     git: { listCommits: code.listRepositoryCommits, listPullRequests: code.listRepositoryPullRequests },
   })
-  const bugs = createBugsService({ db: database.db, codeReferences: code.listReferencesForTarget })
+  // 附件数量与保留期策略先于业务服务装配，供需求与缺陷在各自事务内绑定/解绑。
+  const attachmentPolicy = {
+    maxFileBytes: config.ATTACHMENT_MAX_BYTES,
+    maxFilesPerSubmit: config.ATTACHMENT_MAX_PER_SUBMIT,
+    maxFilesPerRecord: config.ATTACHMENT_MAX_PER_RECORD,
+    tempRetentionHours: config.ATTACHMENT_TEMP_TTL_HOURS,
+  }
+  const attachmentBinding = createAttachmentBinding({ policy: attachmentPolicy })
+  const bugs = createBugsService({
+    db: database.db,
+    codeReferences: code.listReferencesForTarget,
+    attachmentBinding,
+  })
   const requirements = createRequirementsService({
     db: database.db,
     bugs: bugs.listLinkedBugs,
     codeReferences: code.listReferencesForTarget,
+    attachmentBinding,
   })
   const delivery = createDeliveryService({ db: database.db })
+  const storage = createStorageService({
+    db: database.db,
+    cipher: secretCipher,
+    config: { localDir: config.ATTACHMENT_STORAGE_DIR, probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS },
+  })
+  const storageManagement = createStorageManagementService({
+    db: database.db,
+    cipher: secretCipher,
+    storage,
+    probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS,
+  })
+  const attachments = createAttachmentsService({
+    db: database.db,
+    storage,
+    policy: attachmentPolicy,
+    ...(options.log ? { log: options.log } : {}),
+  })
   const pipelineStorage = createPipelineStorage({
     rootDir: config.PIPELINE_STORAGE_DIR,
     maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
@@ -189,6 +225,10 @@ export function createServices(
     delivery,
     pipeline,
     pipelineNodes,
+    storage,
+    storageManagement,
+    attachments,
+    attachmentBinding,
     pipelineAgent,
     projectDashboard,
     projects,

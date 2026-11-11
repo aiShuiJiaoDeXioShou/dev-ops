@@ -25,7 +25,9 @@ function renderSelector() {
 describe('ProjectSelector', () => {
   it('浏览者只读展示当前选用状态', async () => {
     server.use(
-      http.get('*/api/v1/me/teams', () => ok([{ id: 'team-1', name: '测试团队', role: 'viewer', status: 'active' }])),
+      http.get('*/api/v1/me/teams', () =>
+        ok({ teams: [{ id: 'team-1', name: '测试团队', role: 'viewer', status: 'active' }], isPlatformAdmin: false }),
+      ),
       http.get('*/api/v1/projects/project-1/agent-template', () =>
         ok({
           selection: {

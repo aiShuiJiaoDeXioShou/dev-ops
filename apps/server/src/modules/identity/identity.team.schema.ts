@@ -88,7 +88,12 @@ export const memberUpdateBodySchema = Type.Object(
   },
   { additionalProperties: false },
 )
-export const teamSummaryListResponseSchema = apiResponseSchema(Type.Array(teamSummarySchema))
+export const myTeamsResponseSchema = apiResponseSchema(
+  Type.Object({
+    teams: Type.Array(teamSummarySchema),
+    isPlatformAdmin: Type.Boolean(),
+  }),
+)
 export const invitationPublicResponseSchema = apiResponseSchema(invitationPublicSchema)
 export const acceptInvitationBodySchema = Type.Object(
   {

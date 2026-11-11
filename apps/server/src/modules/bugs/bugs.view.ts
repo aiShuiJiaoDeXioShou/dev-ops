@@ -1,3 +1,4 @@
+import type { AttachmentSummary } from '../attachments/attachments.view.ts'
 import type { OwnerRef } from '../identity/identity.display.ts'
 import { ownerRefOf } from '../identity/identity.display.ts'
 import type { RequirementSummary } from '../requirements/requirements.types.ts'
@@ -58,6 +59,8 @@ export function toRegressionView(row: RegressionRow, refs: Map<string, OwnerRef>
 /** Bug 详情映射输入；关联数据由 service 批量加载后传入。 */
 export interface BugDetailMapping {
   row: BugRow
+  collaborators: Array<{ userId: string }>
+  attachments: AttachmentSummary[]
   linkedRequirements: RequirementSummary[]
   regressions: RegressionRow[]
   linkedCodeReferences: LinkedCodeReferenceView[]
@@ -70,7 +73,7 @@ export interface BugDetailMapping {
  * @returns Bug 详情视图。
  */
 export function toBugDetail(input: BugDetailMapping): BugDetail {
-  const { row, linkedRequirements, regressions, linkedCodeReferences, refs } = input
+  const { row, collaborators, attachments, linkedRequirements, regressions, linkedCodeReferences, refs } = input
   return {
     ...toBugListItem(row, refs),
     teamId: row.team_id,
@@ -82,6 +85,11 @@ export function toBugDetail(input: BugDetailMapping): BugDetail {
     evidenceUrl: row.evidence_url,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at.toISOString(),
+    collaborators: collaborators.map(
+      (item) =>
+        ownerRefOf(item.userId, refs) ?? { userId: item.userId, name: '未知用户', status: 'missing', available: false },
+    ),
+    attachments,
     linkedRequirements: linkedRequirements.map((item) => ({
       id: item.id,
       number: item.number,

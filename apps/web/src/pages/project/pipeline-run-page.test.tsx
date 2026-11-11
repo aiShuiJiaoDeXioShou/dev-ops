@@ -195,7 +195,11 @@ describe('pipeline-run-page', () => {
   })
 
   it('浏览者看不到取消入口', async () => {
-    server.use(http.get('*/api/v1/me/teams', () => success([{ ...teamFixture, role: 'viewer' }])))
+    server.use(
+      http.get('*/api/v1/me/teams', () =>
+        success({ teams: [{ ...teamFixture, role: 'viewer' }], isPlatformAdmin: false }),
+      ),
+    )
     mockRun(runDetail({ status: 'running', steps: [{ ...stepInstall, status: 'running', exitCode: null }] }))
     renderPage()
     await screen.findByRole('heading', { name: 'web-build' })
