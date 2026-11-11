@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { EmptyState } from '@/shared/ui/page-state'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
@@ -11,7 +12,7 @@ import { parseListState, toSearchParams, updateListState } from '@/shared/lib/li
 import { projectQueryOptions } from '@/features/projects/public'
 import { canWriteRequirements } from '../api/mutations'
 import { requirementListQueryOptions } from '../api/queries'
-import { REQUIREMENT_STATUS_LABELS } from '../model/labels'
+import { REQUIREMENT_STATUS_LABELS, requirementStatusTone } from '../model/labels'
 import { RequirementDetailPane } from './requirement-detail'
 import { RequirementForm } from './requirement-form'
 
@@ -122,14 +123,18 @@ export function RequirementList({ projectId }: { projectId: string }) {
                           <span className="item-id">#{item.number}</span>
                           {item.title}
                         </button>
-                        <span className="badge mobile-status">
-                          {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
+                        <span className="mobile-status">
+                          <StatusBadge tone={requirementStatusTone(item.status)}>
+                            {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
+                          </StatusBadge>
                         </span>
                       </div>
                     </td>
                     <td>{item.devOwner?.name ?? '未指定'}</td>
                     <td>
-                      <span className="badge">{REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}</span>
+                      <StatusBadge tone={requirementStatusTone(item.status)}>
+                        {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
+                      </StatusBadge>
                     </td>
                     <td className="quiet">{formatDateTime(item.updatedAt)}</td>
                   </tr>

@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { ShieldAlert } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { TeamGitConnections } from '@/features/code/public'
+import { pipelineNodesQueryOptions } from '@/features/pipeline/public'
 import {
   CreateTeamDialog,
   EditTeamDialog,
@@ -98,20 +100,54 @@ export function Component() {
         </TabsContent>
         <TabsContent value="connections" className="space-y-8">
           <TeamGitConnections teamId={currentTeam.id} canManage={canManage} />
-          <section aria-label="执行节点" className="settings-section">
-            <h2 className="settings-section-title">执行节点</h2>
-            <p className="muted">
-              内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
-            </p>
-            <Link className="btn" to="/settings/pipeline-nodes">
-              管理执行节点
-            </Link>
-          </section>
+          <NodeManagementEntry teamId={currentTeam.id} canManage={canManage} />
         </TabsContent>
       </Tabs>
       <InviteMemberDialog teamId={currentTeam.id} open={inviteOpen} onOpenChange={setInviteOpen} />
       <EditTeamDialog open={editOpen} onOpenChange={setEditOpen} />
     </div>
+  )
+}
+
+/**
+ * 执行节点入口卡片：展示在线与注册数量，写操作进入独立节点管理页。
+ * @param props.teamId 团队标识；canManage 当前用户是否管理员。
+ * @returns 与 Git 连接卡片同层级的设置区块。
+ */
+function NodeManagementEntry({ teamId, canManage }: { teamId: string; canManage: boolean }) {
+  const nodes = useQuery(pipelineNodesQueryOptions(teamId))
+  const items = nodes.data?.items ?? []
+  const online = items.filter((node) => node.status === 'online').length
+  const pending = items.filter((node) => node.status !== 'online' && node.status !== 'disabled').length
+  return (
+    <section aria-label="执行节点" className="card">
+      <div className="section-heading">
+        <h3>执行节点</h3>
+        <span className="spacer" />
+        {canManage ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/settings/pipeline-nodes">管理执行节点</Link>
+          </Button>
+        ) : null}
+      </div>
+      <p className="section-note">
+        内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
+      </p>
+      <div className="node-summary" aria-label="执行节点概览">
+        <span>
+          <strong>{online}</strong>
+          在线
+        </span>
+        <span>
+          <strong>{items.length}</strong>
+          已注册
+        </span>
+        <span>
+          <strong>{pending}</strong>
+          待连接
+        </span>
+      </div>
+    </section>
   )
 }
 

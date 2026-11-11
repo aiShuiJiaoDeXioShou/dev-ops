@@ -6,6 +6,7 @@ import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline, CommentForm, CommentList } from '@/features/collaboration/public'
 import { CodeReferenceDialog } from '@/features/code/public'
 import { RemoteBugActions } from '@/features/tools/public'
@@ -15,7 +16,7 @@ import { formatDateTime } from '@/shared/lib/format'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { bugMutations, canWriteBugs, isEditableBug } from '../api/mutations'
 import { bugQueryOptions } from '../api/queries'
-import { BUG_STATUS_LABELS, REGRESSION_RESULT_LABELS } from '../model/labels'
+import { BUG_STATUS_LABELS, REGRESSION_RESULT_LABELS, bugStatusTone } from '../model/labels'
 import {
   AttachmentList,
   describeAttachmentError,
@@ -166,7 +167,9 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
               <p className="text-xs text-muted-foreground">Bug #{bug.number}</p>
               <h2 className="mt-1 text-lg font-semibold leading-6">{bug.title}</h2>
               <div className="mt-2 flex flex-wrap gap-2">
-                <Tag>{BUG_STATUS_LABELS[bug.status]}</Tag>
+                <StatusBadge tone={bugStatusTone(bug.status)}>
+                  {BUG_STATUS_LABELS[bug.status] ?? bug.status}
+                </StatusBadge>
                 <span className="text-xs text-muted-foreground">更新 {formatDateTime(bug.updatedAt)}</span>
               </div>
             </div>

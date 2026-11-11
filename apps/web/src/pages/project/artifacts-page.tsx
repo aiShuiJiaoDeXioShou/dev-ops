@@ -17,6 +17,8 @@ import {
   runVersionsQueryOptions,
 } from '@/features/delivery/public'
 import { describeRequestError } from '@/shared/api/errors'
+import { formatDateTime } from '@/shared/lib/format'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { EmptyState, PageLoading } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 
@@ -169,50 +171,78 @@ export function Component() {
               </div>
 
               {firstServiceId ? (
-                <section aria-label="运行版本" className="project-summary-section">
-                  <h3>运行版本</h3>
+                <section aria-label="运行版本" className="run-versions">
+                  <div className="run-versions-head">
+                    <h3>运行版本</h3>
+                    <p className="muted">最新构建不等于线上版本；未确认的记录显示为待核对。</p>
+                  </div>
                   {runVersions.isPending ? (
                     <DelayedLoading pending>
                       <PageLoading />
                     </DelayedLoading>
                   ) : runVersions.isError ? (
-                    <p className="muted">运行版本加载失败，请重试。</p>
+                    <div className="run-versions-error" role="alert">
+                      <span>运行版本加载失败：{describeRequestError(runVersions.error).description}</span>
+                      <Button type="button" size="sm" variant="outline" onClick={() => void runVersions.refetch()}>
+                        重新加载
+                      </Button>
+                    </div>
                   ) : (
-                    <ul className="plain-list">
-                      {runVersions.data.data.items.map((item) => (
-                        <li key={item.environment}>
-                          <span className="muted">
-                            {ENVIRONMENTS.find((env) => env.value === item.environment)?.label}
-                          </span>
-                          <span>{item.versionLabel ?? '未知版本'}</span>
-                          <span className="tag">
-                            {STATUS_LABELS[item.verificationStatus] ?? item.verificationStatus}
-                          </span>
-                          <span className="muted">{item.confirmedAt ?? '尚未确认'}</span>
-                          {item.source === 'deployment_receipt' && item.evidenceUrl ? (
-                            <a className="text-btn" href={item.evidenceUrl} target="_blank" rel="noreferrer">
-                              来源：变更计划
-                            </a>
-                          ) : null}
-                          {canManage ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() =>
-                                setConfirmTarget({
-                                  environment: item.environment,
-                                  version: item.version,
-                                  versionLabel: item.versionLabel,
-                                })
-                              }
-                            >
-                              确认/更正
-                            </Button>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="run-version-list">
+                      {runVersions.data.data.items.map((item) => {
+                        const environmentLabel =
+                          ENVIRONMENTS.find((env) => env.value === item.environment)?.label ?? item.environment
+                        const tone =
+                          item.verificationStatus === 'confirmed'
+                            ? 'success'
+                            : item.verificationStatus === 'pending'
+                              ? 'warning'
+                              : 'neutral'
+                        return (
+                          <div className="run-version-row" key={item.environment}>
+                            <div className="run-version-env">
+                              <span className={`dot ${item.verificationStatus === 'confirmed' ? 'green' : 'amber'}`} />
+                              {environmentLabel}
+                            </div>
+                            <div className="run-version-value">
+                              <strong>{item.versionLabel ?? '未知版本'}</strong>
+                              <span>版本号 {item.version}</span>
+                            </div>
+                            <div className="run-version-status">
+                              <StatusBadge tone={tone}>
+                                {STATUS_LABELS[item.verificationStatus] ?? item.verificationStatus}
+                              </StatusBadge>
+                              <span>
+                                {item.confirmedAt ? `确认于 ${formatDateTime(item.confirmedAt)}` : '尚未确认'}
+                              </span>
+                            </div>
+                            <div className="run-version-actions">
+                              {item.source === 'deployment_receipt' && item.evidenceUrl ? (
+                                <a className="text-btn" href={item.evidenceUrl} target="_blank" rel="noreferrer">
+                                  变更计划
+                                </a>
+                              ) : null}
+                              {canManage ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() =>
+                                    setConfirmTarget({
+                                      environment: item.environment,
+                                      version: item.version,
+                                      versionLabel: item.versionLabel,
+                                    })
+                                  }
+                                >
+                                  确认/更正
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
                   )}
                 </section>
               ) : null}
@@ -229,13 +259,6 @@ export function Component() {
                     mascot="project"
                     title="还没有构建产物"
                     description="上报构建后，安装包、二维码或测试地址会出现在这里。"
-                    action={
-                      canManage ? (
-                        <Button type="button" onClick={() => setReportOpen(true)}>
-                          上报构建
-                        </Button>
-                      ) : undefined
-                    }
                   />
                 ) : (
                   <ul className="artifact-list">

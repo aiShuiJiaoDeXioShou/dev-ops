@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { EmptyState } from '@/shared/ui/page-state'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
@@ -12,7 +13,7 @@ import { projectQueryOptions } from '@/features/projects/public'
 import type { BugListStatus } from '../api/queries'
 import { canWriteBugs } from '../api/mutations'
 import { bugListQueryOptions } from '../api/queries'
-import { BUG_STATUS_LABELS } from '../model/labels'
+import { BUG_STATUS_LABELS, bugStatusTone } from '../model/labels'
 import { BugDetailPane } from './bug-detail'
 import { BugForm } from './bug-form'
 
@@ -123,12 +124,18 @@ export function BugList({ projectId }: { projectId: string }) {
                           <span className="item-id">BUG-{item.number}</span>
                           {item.title}
                         </button>
-                        <span className="badge mobile-status">{BUG_STATUS_LABELS[item.status] ?? item.status}</span>
+                        <span className="mobile-status">
+                          <StatusBadge tone={bugStatusTone(item.status)}>
+                            {BUG_STATUS_LABELS[item.status] ?? item.status}
+                          </StatusBadge>
+                        </span>
                       </div>
                     </td>
                     <td>{item.fixOwner?.name ?? '未指定'}</td>
                     <td>
-                      <span className="badge">{BUG_STATUS_LABELS[item.status] ?? item.status}</span>
+                      <StatusBadge tone={bugStatusTone(item.status)}>
+                        {BUG_STATUS_LABELS[item.status] ?? item.status}
+                      </StatusBadge>
                     </td>
                     <td className="quiet">{formatDateTime(item.updatedAt)}</td>
                   </tr>

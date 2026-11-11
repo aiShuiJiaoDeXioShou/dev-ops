@@ -14,6 +14,10 @@
   --popover-foreground: var(--foreground);
   --primary: #4176e6;
   --primary-foreground: #ffffff;
+  --success: #269650;
+  --warning: #c98719;
+  --danger: #ce5252;
+  --info: #4176e6;
   --secondary: #f9fafb;
   --secondary-foreground: var(--foreground);
   --muted: #f5f6f7;
@@ -2019,4 +2023,191 @@ a.skill-title:hover {
 .auth-error-slot .field-error {
   margin: 0;
   line-height: 1.45;
+}
+
+/* 状态徽标：颜色只作辅助，文本始终可读；同一业务状态在列表、详情一致。 */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.status-pill-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.status-pill-neutral {
+  color: var(--muted-foreground);
+  background: var(--secondary);
+  border-color: var(--border);
+}
+.status-pill-info {
+  color: var(--info);
+  background: color-mix(in oklab, var(--info) 8%, var(--background));
+  border-color: color-mix(in oklab, var(--info) 18%, transparent);
+}
+.status-pill-success {
+  color: var(--success);
+  background: color-mix(in oklab, var(--success) 8%, var(--background));
+  border-color: color-mix(in oklab, var(--success) 18%, transparent);
+}
+.status-pill-warning {
+  color: var(--warning);
+  background: color-mix(in oklab, var(--warning) 9%, var(--background));
+  border-color: color-mix(in oklab, var(--warning) 20%, transparent);
+}
+.status-pill-danger {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 8%, var(--background));
+  border-color: color-mix(in oklab, var(--danger) 18%, transparent);
+}
+
+/* 运行版本：独立于最新产物，按环境成行展示版本、核对状态与操作。 */
+.run-versions {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.run-versions-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.run-versions-head h3 {
+  font-size: 13px;
+  font-weight: 600;
+}
+.run-versions-head p {
+  font-size: 11.5px;
+}
+.run-versions-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+.run-version-list {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--background);
+}
+.run-version-row {
+  display: grid;
+  grid-template-columns: 90px minmax(150px, 1fr) minmax(150px, 1.1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--border);
+}
+.run-version-row:first-child {
+  border-top: 0;
+}
+.run-version-env {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--foreground);
+}
+.run-version-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.run-version-value strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.run-version-value span {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.run-version-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.run-version-status > span:last-child {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.run-version-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: flex-end;
+}
+@media (max-width: 700px) {
+  .run-version-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+  .run-version-value {
+    grid-column: 1;
+  }
+  .run-version-status {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .run-version-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+}
+
+/* 执行节点概览：与 Git 连接卡片同一层级，数字展开而非挤在链接文字里。 */
+.node-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 28px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+.node-summary strong {
+  margin-right: 5px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 列表分页：计数在左、翻页按钮在右，和表格底边共用发丝线。 */
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.pagination .quiet {
+  margin-right: auto;
+  font-size: 12px;
+}
+.pagination .btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
 }

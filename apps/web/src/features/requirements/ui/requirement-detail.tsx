@@ -6,6 +6,7 @@ import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline, CommentForm, CommentList } from '@/features/collaboration/public'
 import { CodeReferenceCard, CodeReferenceDialog } from '@/features/code/public'
 import { BugForm } from '@/features/bugs/public'
@@ -25,7 +26,7 @@ import { eligibilityQueryOptions, requirementQueryOptions, submissionQueryOption
 import { canWriteRequirements, isEditable, requirementMutations } from '../api/mutations'
 import { avatarToneClassName } from '@/shared/lib/avatar-tone'
 import { cn } from '@/shared/lib/utils'
-import { REQUIREMENT_STATUS_LABELS, SELF_TEST_LABELS } from '../model/labels'
+import { REQUIREMENT_STATUS_LABELS, SELF_TEST_LABELS, requirementStatusTone } from '../model/labels'
 import type { RequirementDetail } from '../model/types'
 import { RequirementActionDialog, type RequirementAction } from './requirement-action-dialog'
 import { RequirementForm } from './requirement-form'
@@ -161,7 +162,9 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               <p className="text-xs text-muted-foreground">需求 #{detail.number}</p>
               <h2 className="mt-1 text-lg font-semibold leading-6">{detail.title}</h2>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Tag>{REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}</Tag>
+                <StatusBadge tone={requirementStatusTone(detail.status)}>
+                  {REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}
+                </StatusBadge>
                 <span>更新 {formatDateTime(detail.updatedAt)}</span>
                 {detail.needsReview && <Tag variant="red">存在未解决 Bug，需复核</Tag>}
               </div>
