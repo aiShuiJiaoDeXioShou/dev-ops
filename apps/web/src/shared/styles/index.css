@@ -1970,3 +1970,13 @@ a.skill-title:hover {
     box-shadow: -10px 0 50px color-mix(in oklab, var(--foreground) 12%, transparent);
   }
 }
+
+/* 凭据分类保持单行，可横向滚动，避免窄栏里换行挤压搜索区。 */
+.vault-keychain .keychain-categories {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.vault-keychain .keychain-categories::-webkit-scrollbar {
+  height: 0;
+}
