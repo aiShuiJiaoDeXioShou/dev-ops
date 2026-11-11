@@ -216,6 +216,45 @@ test('附件上传、绑定、下载、删除、清理与权限矩阵', { timeou
     tempRetentionHours: TEMP_TTL_HOURS,
   })
 
+  // 未绑定临时附件仅上传者本人可见可删；其他成员即使知道附件 ID 也按不存在处理。
+  const restrictedTemp = await uploadSucceeded(developer.cookie, '临时限制.txt')
+  for (const cookie of [otherDeveloper.cookie, viewer.cookie, teamAdmin.cookie]) {
+    const tempDownload = await app.inject({
+      method: 'GET',
+      url: `/api/v1/attachments/${restrictedTemp.attachment.id}/download`,
+      headers: { cookie },
+    })
+    assert.equal(tempDownload.statusCode, 200)
+    assert.equal(tempDownload.json().code, 'ATTACHMENT_NOT_FOUND')
+    const tempRemove = await app.inject({
+      method: 'POST',
+      url: `/api/v1/attachments/${restrictedTemp.attachment.id}/remove`,
+      headers: { cookie },
+    })
+    assert.equal(tempRemove.statusCode, 200)
+    assert.equal(tempRemove.json().code, 'ATTACHMENT_NOT_FOUND')
+  }
+  const uploaderTempDownload = await app.inject({
+    method: 'GET',
+    url: `/api/v1/attachments/${restrictedTemp.attachment.id}/download`,
+    headers: { cookie: developer.cookie },
+  })
+  assert.equal(uploaderTempDownload.statusCode, 200)
+  assert.equal(uploaderTempDownload.headers['content-type'], 'application/octet-stream')
+  assert.deepEqual(uploaderTempDownload.rawPayload, restrictedTemp.bytes)
+  const uploaderTempRemove = await app.inject({
+    method: 'POST',
+    url: `/api/v1/attachments/${restrictedTemp.attachment.id}/remove`,
+    headers: { cookie: developer.cookie },
+  })
+  assert.equal(uploaderTempRemove.json().success, true)
+  const afterTempRemove = await app.inject({
+    method: 'GET',
+    url: `/api/v1/attachments/${restrictedTemp.attachment.id}/download`,
+    headers: { cookie: developer.cookie },
+  })
+  assert.equal(afterTempRemove.json().code, 'ATTACHMENT_NOT_FOUND')
+
   // 绑定必须是上传者本人；绑定后在详情列表可见。
   await assert.rejects(
     app.db.transaction((tx) =>
@@ -399,8 +438,19 @@ test('附件上传、绑定、下载、删除、清理与权限矩阵', { timeou
     /单次最多提交 1 个附件/,
   )
 
-  // 删除权限矩阵：浏览者、非上传者开发者拒绝；项目负责人与团队管理员可删除。
+  // 删除权限矩阵（已绑定附件）：浏览者、非上传者开发者拒绝；项目负责人与团队管理员可删除。
   const removable = await uploadSucceeded(developer.cookie, '待删除.txt')
+  await app.db.transaction((tx) =>
+    bindAttachments(tx, {
+      teamId,
+      projectId,
+      targetType: 'requirement',
+      targetId: requirementId,
+      attachmentIds: [removable.attachment.id],
+      actor: { userId: developer.userId },
+      policy: bindingPolicy,
+    }),
+  )
   async function removeAttachmentRequest(attachmentId: string, cookie: string) {
     return app
       .inject({

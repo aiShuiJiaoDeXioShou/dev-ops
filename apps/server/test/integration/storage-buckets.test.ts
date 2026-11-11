@@ -3,13 +3,20 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { Client } from 'pg'
 import { and, eq } from 'drizzle-orm'
-import { CreateBucketCommand, DeleteBucketCommand, ListBucketsCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  CreateBucketCommand,
+  DeleteBucketCommand,
+  HeadObjectCommand,
+  ListBucketsCommand,
+  S3Client,
+} from '@aws-sdk/client-s3'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
 import { migrateDatabase } from '../../src/platform/database/migrate.ts'
 import { BUILTIN_LOCAL_BUCKET_ID, storageBucket, storageBucketEvent } from '../../src/modules/storage/storage.tables.ts'
 import { attachment } from '../../src/modules/attachments/attachments.tables.ts'
-import { platformAdmin } from '../../src/modules/identity/identity.tables.ts'
+import { platformAdmin, team, teamMember } from '../../src/modules/identity/identity.tables.ts'
+import { project } from '../../src/modules/projects/projects.tables.ts'
 import { createAttachmentStorageFixture } from '../support/attachment-storage.ts'
 import { createAuthenticatedUser } from '../support/auth.ts'
 import { FakeMailer } from '../support/fake-mailer.ts'
@@ -489,6 +496,81 @@ test('储存桶管理：权限、唯一性、默认桶、引用保护与审计',
     // 探测结论已持久化，再次读取可见。
     const minioListed = (await listBuckets()).find((bucket) => bucket.id === minioBucket.id)
     assert.equal(minioListed?.lastProbe?.result, 'read_write')
+    // 端到端：切默认到 S3 后上传附件应写入新桶，下载内容一致；切回本地后历史附件仍可下载。
+    const minioTeamId = randomUUID()
+    const minioProjectId = randomUUID()
+    await app.db.insert(team).values({
+      id: minioTeamId,
+      name: `minio-team-${randomBytes(3).toString('hex')}`,
+      created_by_user_id: normalUser.userId,
+    })
+    await app.db.insert(teamMember).values({
+      id: randomUUID(),
+      team_id: minioTeamId,
+      user_id: normalUser.userId,
+      role: 'admin',
+      status: 'active',
+    })
+    await app.db.insert(project).values({
+      id: minioProjectId,
+      team_id: minioTeamId,
+      name: 'MinIO 附件项目',
+      owner_user_id: normalUser.userId,
+      created_by_user_id: normalUser.userId,
+    })
+    const minioVersion = (await listBuckets()).find((bucket) => bucket.id === minioBucket.id)?.version
+    assert.ok(minioVersion)
+    const minioDefault = await adminPost(`/api/v1/platform/storage-buckets/${minioBucket.id}/set-default`, {
+      version: minioVersion,
+    })
+    assert.equal(minioDefault.success, true, JSON.stringify(minioDefault))
+    const minioBytes = Buffer.from('minio attachment body', 'utf8')
+    const minioUpload = await app.inject({
+      method: 'POST',
+      url: `/api/v1/projects/${minioProjectId}/attachments`,
+      headers: {
+        cookie: normalUser.cookie,
+        'content-type': 'application/octet-stream',
+        'x-file-name': encodeURIComponent('minio-附件.txt'),
+        'content-length': String(minioBytes.length),
+      },
+      payload: minioBytes,
+    })
+    assert.equal(minioUpload.statusCode, 200, minioUpload.body)
+    const minioUploadBody = minioUpload.json()
+    assert.equal(minioUploadBody.success, true, minioUpload.body)
+    const minioAttachmentId = minioUploadBody.data.attachment.id as string
+    const [minioAttachmentRow] = await app.db.select().from(attachment).where(eq(attachment.id, minioAttachmentId))
+    assert.ok(minioAttachmentRow)
+    assert.equal(minioAttachmentRow.bucket_id, minioBucket.id)
+    await minioClient.send(new HeadObjectCommand({ Bucket: minioBucketName, Key: minioAttachmentRow.storage_key }))
+    const minioDownload = await app.inject({
+      method: 'GET',
+      url: `/api/v1/attachments/${minioAttachmentId}/download`,
+      headers: { cookie: normalUser.cookie },
+    })
+    assert.equal(minioDownload.statusCode, 200, minioDownload.body)
+    assert.deepEqual(minioDownload.rawPayload, minioBytes)
+    const builtinVersion = (await listBuckets()).find((bucket) => bucket.id === BUILTIN_LOCAL_BUCKET_ID)?.version
+    assert.ok(builtinVersion)
+    const backToBuiltin = await adminPost(`/api/v1/platform/storage-buckets/${BUILTIN_LOCAL_BUCKET_ID}/set-default`, {
+      version: builtinVersion,
+    })
+    assert.equal(backToBuiltin.success, true, JSON.stringify(backToBuiltin))
+    const historicalDownload = await app.inject({
+      method: 'GET',
+      url: `/api/v1/attachments/${minioAttachmentId}/download`,
+      headers: { cookie: normalUser.cookie },
+    })
+    assert.equal(historicalDownload.statusCode, 200, historicalDownload.body)
+    assert.deepEqual(historicalDownload.rawPayload, minioBytes)
+    const minioRemoveAttachment = await app.inject({
+      method: 'POST',
+      url: `/api/v1/attachments/${minioAttachmentId}/remove`,
+      headers: { cookie: normalUser.cookie },
+    })
+    assert.equal(minioRemoveAttachment.json().success, true, minioRemoveAttachment.body)
+    t.diagnostic('MinIO 端到端通过：设默认→上传写入 S3→下载一致→切回本地后历史可下载')
     const minioRemoved = await adminPost(`/api/v1/platform/storage-buckets/${minioBucket.id}/remove`)
     assert.equal(minioRemoved.success, true, JSON.stringify(minioRemoved))
     t.diagnostic(`MinIO 真实验证通过：${minioEndpoint} 写入、读回、删除均成功`)

@@ -101,6 +101,8 @@ interface RequestErrorOptions {
   requestId?: string | null
   responseValid?: boolean
   serverCode?: string
+  /** 业务失败信封中的可选 data；仅在调用方明确需要展示结构化原因时使用。 */
+  data?: unknown
 }
 
 /** 只携带可展示的说明和排障标识，不保存原始响应或凭据。 */
@@ -110,6 +112,8 @@ export class RequestError extends Error {
   readonly requestId: string | null
   readonly responseValid: boolean | null
   readonly serverCode: string | null
+  /** 业务失败信封中的可选 data；调用方必须先校验再使用，不能直接信任结构。 */
+  readonly data: unknown
 
   /**
    * 创建统一请求错误。
@@ -125,6 +129,7 @@ export class RequestError extends Error {
     this.requestId = options.requestId ?? null
     this.responseValid = options.responseValid ?? null
     this.serverCode = options.serverCode ?? null
+    this.data = options.data
   }
 }
 
@@ -168,6 +173,7 @@ function createBusinessError(body: ApiFailureEnvelope, requestId: string): Reque
     requestId,
     responseValid: true,
     serverCode: body.code,
+    data: body.data,
   })
 }
 

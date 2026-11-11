@@ -38,8 +38,14 @@ function renderPanel() {
 }
 
 /** 业务失败信封：平台统一 HTTP 200 + success=false。 */
-function businessFailure(code: string, message: string) {
-  return HttpResponse.json({ success: false, code, message, requestId: 'trace-storage' })
+function businessFailure(code: string, message: string, data?: unknown) {
+  return HttpResponse.json({
+    success: false,
+    code,
+    message,
+    requestId: 'trace-storage',
+    ...(data === undefined ? {} : { data }),
+  })
 }
 
 describe('StorageBucketManagement', () => {
@@ -131,7 +137,9 @@ describe('StorageBucketManagement', () => {
     server.use(
       storageBucketListHandler([localBucketFixture, s3BucketFixture]),
       http.post('*/api/v1/platform/storage-buckets/:bucketId/remove', () =>
-        businessFailure('STORAGE_BUCKET_IN_USE', '该储存桶仍被 2 个附件引用，不能删除'),
+        businessFailure('STORAGE_BUCKET_IN_USE', '该储存桶仍被 2 个附件引用，不能删除', {
+          attachmentCount: 2,
+        }),
       ),
     )
     renderPanel()
@@ -140,7 +148,7 @@ describe('StorageBucketManagement', () => {
     const confirm = await screen.findByRole('alertdialog')
     expect(confirm).toHaveTextContent('删除后不可恢复')
     await userEvent.click(within(confirm).getByRole('button', { name: '删除储存桶' }))
-    expect(await within(confirm).findByText(/该储存桶仍被附件引用/)).toBeInTheDocument()
+    expect(await within(confirm).findByText(/该储存桶仍被 2 个附件引用/)).toBeInTheDocument()
     expect(screen.getByRole('alertdialog')).toBeInTheDocument()
   })
 

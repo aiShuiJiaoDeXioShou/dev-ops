@@ -77,7 +77,7 @@ test('业务失败信封转换为带业务码的 RequestError', async () => {
         code: 'PRECONDITION_FAILED',
         message: '内部原因',
         requestId: 'trace-2',
-        data: { blockers: [] },
+        data: { blockers: [], attachmentCount: 2 },
       }),
   })
   await assert.rejects(client.getProject('project-1'), (error: unknown) => {
@@ -85,7 +85,8 @@ test('业务失败信封转换为带业务码的 RequestError', async () => {
       error instanceof RequestError &&
       error.code === 'BUSINESS_ERROR' &&
       error.serverCode === 'PRECONDITION_FAILED' &&
-      error.requestId === 'trace-2'
+      error.requestId === 'trace-2' &&
+      (error.data as { attachmentCount?: number }).attachmentCount === 2
     )
   })
 })

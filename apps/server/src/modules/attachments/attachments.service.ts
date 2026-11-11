@@ -264,6 +264,10 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
     if (!isAttachmentStatus(row.status) || row.status === 'removed') {
       throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     }
+    // 未绑定的临时附件只有上传者本人可见，其他成员按不存在处理，避免泄露文件名与内容。
+    if (row.status === 'temp' && row.uploaded_by_user_id !== actor.id) {
+      throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
+    }
 
     let stream: Readable
     try {
@@ -288,6 +292,10 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
     if (!row) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     const project = await getProjectContext(db, row.project_id)
     if (!project) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
+    // 临时附件只有上传者本人可删除；管理员与项目负责人也不能删除他人未提交的附件。
+    if (row.status === 'temp' && row.uploaded_by_user_id !== actor.id) {
+      throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
+    }
     const authority = await resolveAttachmentDeleteAuthority(db, {
       teamId: project.teamId,
       projectId: project.id,
