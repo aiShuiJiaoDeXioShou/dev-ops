@@ -189,7 +189,6 @@ export function Component() {
                 <section aria-label="运行版本" className="run-versions">
                   <div className="run-versions-head">
                     <h3>运行版本</h3>
-                    <p className="muted">最新构建不等于线上版本；未确认的记录显示为待核对。</p>
                   </div>
                   {runVersions.isPending ? (
                     <DelayedLoading pending>

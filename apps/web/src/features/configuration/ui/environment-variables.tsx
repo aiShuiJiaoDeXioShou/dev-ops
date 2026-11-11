@@ -203,35 +203,35 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
                 <StatusBadge tone={item.status === 'active' ? 'success' : 'danger'}>
                   {item.status === 'active' ? '可用' : `失效（${item.invalidReason ?? '待核对'}）`}
                 </StatusBadge>
-                {canManage ? (
-                  <>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        openEdit({
-                          id: item.id,
-                          name: item.name,
-                          version: item.version,
-                          kind: item.kind,
-                          credentialId: item.credential?.id,
-                        })
-                      }
-                    >
-                      编辑
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => setRemoveTarget({ id: item.id, name: item.name })}
-                    >
-                      删除
-                    </Button>
-                  </>
-                ) : null}
               </div>
+              {canManage ? (
+                <div className="env-actions">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      openEdit({
+                        id: item.id,
+                        name: item.name,
+                        version: item.version,
+                        kind: item.kind,
+                        credentialId: item.credential?.id,
+                      })
+                    }
+                  >
+                    编辑
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setRemoveTarget({ id: item.id, name: item.name })}
+                  >
+                    删除
+                  </Button>
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

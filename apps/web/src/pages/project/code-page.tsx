@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { PrototypeIcon } from '@/prototype/icons/icon'
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  FileDiff,
+  FileText,
+  Folder,
+  FolderGit2,
+  GitBranch,
+  History,
+} from 'lucide-react'
 import { projectQueryOptions } from '@/features/projects/public'
-import { CodeChangeSection } from '@/features/tools/public'
+import { CodeChangeSection, CodeInvocationLogSheet } from '@/features/tools/public'
 import {
   CommitHistoryDialog,
   pickDefaultPreviewPath,
@@ -16,6 +27,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { PageError } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/controls/sheet'
 import { useToast } from '@/shared/ui/toast'
 import {
   DropdownMenu,
@@ -112,11 +124,15 @@ function FileTree({
             >
               {isDirectory ? (
                 <>
-                  <PrototypeIcon name="down" className="tree-caret" />
-                  <PrototypeIcon name="folder" />
+                  {isExpanded ? (
+                    <ChevronDown className="tree-caret size-3.5" aria-hidden="true" />
+                  ) : (
+                    <ChevronRight className="tree-caret size-3.5" aria-hidden="true" />
+                  )}
+                  <Folder className="size-4" aria-hidden="true" />
                 </>
               ) : (
-                <PrototypeIcon name="file" />
+                <FileText className="size-4" aria-hidden="true" />
               )}
               {node.name}
             </button>
@@ -170,6 +186,8 @@ export function Component() {
   const [selectedBranch, setSelectedBranch] = useState('')
   const [selectedPath, setSelectedPath] = useState('')
   const [commitsOpen, setCommitsOpen] = useState(false)
+  const [changesOpen, setChangesOpen] = useState(false)
+  const [invocationsOpen, setInvocationsOpen] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'preview' | 'code'>('preview')
   const linkedRepositories = repositories.data?.data ?? []
@@ -267,9 +285,9 @@ export function Component() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button type="button" className="git-branch-button" aria-label="切换代码分支">
-              <PrototypeIcon name="branch" />
+              <GitBranch className="size-4" aria-hidden="true" />
               <span>{currentBranch || '默认分支'}</span>
-              <PrototypeIcon name="down" />
+              <ChevronDown className="size-3.5" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="git-branch-menu" align="start">
@@ -282,7 +300,11 @@ export function Component() {
                   setSelectedPath('')
                 }}
               >
-                <PrototypeIcon name={item === currentBranch ? 'check' : 'branch'} />
+                {item === currentBranch ? (
+                  <Check className="size-4" aria-hidden="true" />
+                ) : (
+                  <GitBranch className="size-4" aria-hidden="true" />
+                )}
                 {item}
               </DropdownMenuItem>
             ))}
@@ -299,7 +321,7 @@ export function Component() {
           </DropdownMenuContent>
         </DropdownMenu>
         <span className="divider" />
-        <PrototypeIcon name="repo" />
+        <FolderGit2 className="size-4" aria-hidden="true" />
         {linkedRepositories.length > 1 ? (
           <select
             aria-label="选择仓库"
@@ -322,11 +344,25 @@ export function Component() {
           </span>
         )}
         <span className="spacer" />
+        <Button type="button" variant="outline" size="sm" onClick={() => setChangesOpen(true)}>
+          <FileDiff className="size-4" aria-hidden="true" />
+          代码变更
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="查看写能力调用记录"
+          title="写能力调用记录"
+          onClick={() => setInvocationsOpen(true)}
+        >
+          <History className="size-4" aria-hidden="true" />
+        </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => setCommitsOpen(true)}>
           提交记录
         </Button>
         <a className="btn" href={repository.webUrl} target="_blank" rel="noreferrer">
-          <PrototypeIcon name="external" />在 {providerLabel} 打开
+          <ExternalLink className="size-4" aria-hidden="true" />在 {providerLabel} 打开
         </a>
       </div>
       <CommitHistoryDialog
@@ -437,7 +473,18 @@ export function Component() {
           </section>
         </div>
       )}
-      <CodeChangeSection projectId={projectId} repositoryId={repository.id} />
+      <Sheet open={changesOpen} onOpenChange={setChangesOpen}>
+        <SheetContent className="code-changes-sheet">
+          <SheetHeader>
+            <SheetTitle>代码变更</SheetTitle>
+            <SheetDescription>受控修改、校验与 PR；记录不再铺在代码浏览器下方。</SheetDescription>
+          </SheetHeader>
+          <div className="code-changes-sheet-body">
+            <CodeChangeSection projectId={projectId} repositoryId={repository.id} embedded />
+          </div>
+        </SheetContent>
+      </Sheet>
+      <CodeInvocationLogSheet projectId={projectId} open={invocationsOpen} onOpenChange={setInvocationsOpen} />
     </div>
   )
 }

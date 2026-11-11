@@ -25,7 +25,6 @@
       - tab "生产"
     - region "运行版本":
       - heading "运行版本" [level=3]
-      - paragraph: 最新构建不等于线上版本；未确认的记录显示为待核对。
       - text: 开发
       - strong: 未知版本
       - text: 版本号 0 未知 尚未确认

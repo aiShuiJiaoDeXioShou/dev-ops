@@ -2774,15 +2774,14 @@ button:disabled,
 .env-list {
   display: grid;
   gap: 8px;
-  margin: 0;
+  margin: 16px 0 0;
   padding: 0;
   list-style: none;
 }
 .env-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   padding: 11px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -2794,6 +2793,7 @@ button:disabled,
   flex-wrap: wrap;
   gap: 6px 12px;
   min-width: 0;
+  flex: 0 1 auto;
 }
 .env-main strong {
   font-size: 13px;
@@ -2813,4 +2813,43 @@ button:disabled,
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
+}
+.env-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* 代码变更不再占用代码浏览器下方空间：工具栏入口打开右侧抽屉。 */
+.code-changes-sheet {
+  width: min(620px, 100vw);
+  max-width: 100vw;
+  gap: 0;
+  background: var(--background);
+}
+.code-changes-sheet [data-slot='sheet-header'] {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.code-changes-sheet [data-slot='sheet-close'] {
+  top: 14px;
+  right: 14px;
+}
+.code-changes-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px 24px;
+}
+.code-change-section-embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.code-change-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
 }

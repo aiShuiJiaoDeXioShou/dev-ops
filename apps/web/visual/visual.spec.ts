@@ -34,6 +34,13 @@ async function prepare(page: Page, path: string): Promise<void> {
  * @param name 快照名称。
  * @returns 可快照的布局对象。
  */
+/** 将相对时间替换为占位符，避免快照随当前时间漂移。 */
+function normalizeRelativeTime(value: string): string {
+  return value
+    .replace(/\d+\s*(秒|分钟|小时|天|周|个月|年)前/g, '<relative-time>')
+    .replace(/刚刚|今天|昨天|前天/g, '<relative-time>')
+}
+
 async function captureLayout(page: Page, testInfo: TestInfo, name: string): Promise<LayoutSnapshot> {
   await page.waitForTimeout(500)
   const layout = await page.evaluate(() => {
@@ -86,7 +93,7 @@ async function captureLayout(page: Page, testInfo: TestInfo, name: string): Prom
 async function expectPageSnapshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   const layout = await captureLayout(page, testInfo, name)
   expect(JSON.stringify(layout, null, 2)).toMatchSnapshot(`${name}.json`)
-  expect(await page.locator('main').ariaSnapshot()).toMatchSnapshot(`${name}.aria.txt`)
+  expect(normalizeRelativeTime(await page.locator('main').ariaSnapshot())).toMatchSnapshot(`${name}.aria.txt`)
 }
 
 test.describe('[desktop] 核心页面', () => {
@@ -129,8 +136,10 @@ test.describe('[desktop] 核心页面', () => {
         await expect(page.getByRole('tab', { name: /测试/ }).first()).toBeVisible()
       }
       if (name === 'code') {
-        // 代码变更卡片必须结构化；写能力调用收进日志抽屉，不再直接铺在页面底部。
+        // 代码变更收进工具栏抽屉；写能力调用由日志图标打开，均不再铺在代码浏览器下方。
+        await page.getByRole('button', { name: '代码变更' }).first().click()
         await expect(page.locator('.code-change-card').first()).toBeVisible()
+        await page.keyboard.press('Escape')
         await page.getByRole('button', { name: '查看写能力调用记录' }).first().click()
         await expect(page.locator('.invocation-row').first()).toBeVisible()
         await expect(page.locator('.invocation-row .status-pill').first()).toBeVisible()
@@ -183,6 +192,10 @@ test.describe('[desktop] 关键弹窗', () => {
     await page.keyboard.press('Escape')
 
     await prepare(page, `/projects/${VISUAL_IDS.projectId}/code`)
+    await page.getByRole('button', { name: '代码变更' }).first().click()
+    await expect(page.locator('.code-change-card').first()).toBeVisible()
+    await expectPageSnapshot(page, testInfo, 'sheet-code-changes')
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: '查看写能力调用记录' }).first().click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await expect(page.getByRole('heading', { name: '写能力调用记录' })).toBeVisible()

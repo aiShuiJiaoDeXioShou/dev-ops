@@ -4,7 +4,6 @@
   "violations": {
     "apps/web/src/pages/project/code-page.tsx": {
       "raw-control": 8,
-      "prototype-import": 1,
       "inline-style": 6
     }
   }

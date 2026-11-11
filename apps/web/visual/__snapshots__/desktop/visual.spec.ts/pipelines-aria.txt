@@ -38,6 +38,6 @@
               - text: 成功
               - link "查看最近一次运行 成功":
                 - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines/4f8812e5-40bc-588b-bc7e-2726a8902e21
-                - text: 4 小时前
+                - text: <relative-time>
             - cell "触发运行":
               - button "触发运行"

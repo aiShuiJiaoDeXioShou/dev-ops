@@ -13,87 +13,34 @@
     - tab "流水线"
     - tab "产物与版本"
     - tab "环境变量"
-  - button "切换代码分支":
-    - img
-    - text: main
-    - img
-  - img
+  - button "切换代码分支": main
   - text: aiShuiJiaoDeXioShou/dev-ops
+  - button "代码变更"
+  - button "查看写能力调用记录"
   - button "提交记录"
   - link "在 GitHub 打开":
     - /url: https://github.com/example/dev-ops
-    - img
-    - text: 在 GitHub 打开
   - navigation "文件目录":
-    - button ".devops":
-      - img
-      - img
-      - text: .devops
-    - button "apps":
-      - img
-      - img
-      - text: apps
-    - button "deploy":
-      - img
-      - img
-      - text: deploy
-    - button "design":
-      - img
-      - img
-      - text: design
-    - button "docs":
-      - img
-      - img
-      - text: docs
-    - button "packages":
-      - img
-      - img
-      - text: packages
-    - button "specs":
-      - img
-      - img
-      - text: specs
-    - button "tests":
-      - img
-      - img
-      - text: tests
-    - button "tooling":
-      - img
-      - img
-      - text: tooling
-    - button ".editorconfig":
-      - img
-      - text: .editorconfig
-    - button ".gitignore":
-      - img
-      - text: .gitignore
-    - button ".nvmrc":
-      - img
-      - text: .nvmrc
-    - button ".prettierignore":
-      - img
-      - text: .prettierignore
-    - button ".prettierrc.json":
-      - img
-      - text: .prettierrc.json
-    - button "AGENTS.md":
-      - img
-      - text: AGENTS.md
-    - button "eslint.config.mjs":
-      - img
-      - text: eslint.config.mjs
-    - button "package.json":
-      - img
-      - text: package.json
-    - button "pnpm-lock.yaml":
-      - img
-      - text: pnpm-lock.yaml
-    - button "pnpm-workspace.yaml":
-      - img
-      - text: pnpm-workspace.yaml
-    - button "README.md":
-      - img
-      - text: README.md
+    - button ".devops"
+    - button "apps"
+    - button "deploy"
+    - button "design"
+    - button "docs"
+    - button "packages"
+    - button "specs"
+    - button "tests"
+    - button "tooling"
+    - button ".editorconfig"
+    - button ".gitignore"
+    - button ".nvmrc"
+    - button ".prettierignore"
+    - button ".prettierrc.json"
+    - button "AGENTS.md"
+    - button "eslint.config.mjs"
+    - button "package.json"
+    - button "pnpm-lock.yaml"
+    - button "pnpm-workspace.yaml"
+    - button "README.md"
   - text: README.md
   - button "预览"
   - button "代码"
@@ -292,14 +239,3 @@
     - link "工程工具":
       - /url: ""
     - text: 。
-  - heading "代码变更" [level=2]
-  - button "查看写能力调用记录"
-  - text: 未获得代码修改授权，请联系管理员
-  - list:
-    - listitem:
-      - strong: cli-audit/cli-test-1
-      - text: ← main 失败
-      - paragraph: "chore: cli audit test change"
-      - text: 补丁 1 KB
-      - alert: 创建代码修改运行失败
-      - button "查看差异"

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { History } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
@@ -12,10 +11,8 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
-import { LogSheet } from '@/shared/ui/log-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { formatDateTime } from '@/shared/lib/format'
-import { codeChangesQueryOptions, toolCapabilitiesQueryOptions, toolInvocationsQueryOptions } from '../api/queries'
+import { codeChangesQueryOptions, toolCapabilitiesQueryOptions } from '../api/queries'
 
 const CODE_CHANGE_STATUS_LABELS: Record<string, string> = {
   queued: '排队中',
@@ -27,23 +24,6 @@ const CODE_CHANGE_STATUS_LABELS: Record<string, string> = {
 
 /** 代码变更状态到统一状态色。 */
 const CODE_CHANGE_STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
-  queued: 'warning',
-  running: 'info',
-  succeeded: 'success',
-  failed: 'danger',
-  cancelled: 'neutral',
-}
-
-/** 写能力调用名称到可读业务名。 */
-const CAPABILITY_LABELS: Record<string, string> = {
-  code_change: '代码变更',
-  create_pull_request: '创建 PR',
-  create_issue: '创建 Issue',
-  add_comment: '添加评论',
-}
-
-/** 写能力调用状态到统一状态色。 */
-const INVOCATION_STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
   queued: 'warning',
   running: 'info',
   succeeded: 'success',
@@ -80,17 +60,24 @@ const INITIAL_FORM: CodeChangeForm = {
  * @param props 项目标识与当前仓库标识。
  * @returns 代码变更区块；未授权时说明原因，不渲染假入口。
  */
-export function CodeChangeSection({ projectId, repositoryId }: { projectId: string; repositoryId: string }) {
+export function CodeChangeSection({
+  projectId,
+  repositoryId,
+  embedded = false,
+}: {
+  projectId: string
+  repositoryId: string
+  /** 嵌入侧边抽屉时隐藏页面级标题，改由抽屉头部承载。 */
+  embedded?: boolean
+}) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const capabilities = useQuery(toolCapabilitiesQueryOptions(projectId))
   const changes = useQuery(codeChangesQueryOptions(projectId))
-  const invocations = useQuery(toolInvocationsQueryOptions(projectId))
   const repositories = useQuery(projectRepositoriesQueryOptions(projectId))
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState<CodeChangeForm>({ ...INITIAL_FORM, repositoryId })
   const [diff, setDiff] = useState<{ id: string; content: string; truncated: boolean } | null>(null)
-  const [invocationsOpen, setInvocationsOpen] = useState(false)
 
   const granted = new Set(
     (capabilities.data?.data.capabilities ?? []).filter((item) => item.granted).map((item) => item.capability),
@@ -144,28 +131,32 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
   const items = changes.data?.data.items ?? []
 
   return (
-    <section className="space-y-3">
-      <div className="section-heading">
-        <h2>代码变更</h2>
-        <span className="spacer" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="查看写能力调用记录"
-          title="写能力调用记录"
-          onClick={() => setInvocationsOpen(true)}
-        >
-          <History className="size-4" aria-hidden="true" />
-        </Button>
-        {canChange ? (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            发起代码变更
-          </Button>
-        ) : (
-          <span className="small quiet">未获得代码修改授权，请联系管理员</span>
-        )}
-      </div>
+    <section className={embedded ? 'code-change-section-embedded' : 'space-y-3'}>
+      {embedded ? (
+        <div className="code-change-toolbar">
+          <span className="small quiet">
+            {canChange ? '受控修改会先校验再推送工作分支，不会直接改默认分支。' : '未获得代码修改授权，请联系管理员'}
+          </span>
+          <span className="spacer" />
+          {canChange ? (
+            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+              发起代码变更
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <div className="section-heading">
+          <h2>代码变更</h2>
+          <span className="spacer" />
+          {canChange ? (
+            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+              发起代码变更
+            </Button>
+          ) : (
+            <span className="small quiet">未获得代码修改授权，请联系管理员</span>
+          )}
+        </div>
+      )}
       {changes.isPending ? (
         <p className="small quiet">代码变更加载中…</p>
       ) : changes.isError ? (
@@ -242,50 +233,6 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
           ))}
         </ul>
       )}
-
-      <LogSheet
-        open={invocationsOpen}
-        onOpenChange={setInvocationsOpen}
-        title="写能力调用记录"
-        description="CLI 与 Bot 对当前项目发起的写操作，最近 5 条"
-        footer={<p className="small muted">调用记录只保留摘要；敏感参数不会出现在这里。</p>}
-      >
-        {invocations.isPending ? (
-          <p className="small quiet">调用记录加载中…</p>
-        ) : invocations.isError ? (
-          <div className="inline-error" role="alert">
-            <span>调用记录读取失败：{describeRequestError(invocations.error).description}</span>
-            <Button type="button" variant="outline" size="sm" onClick={() => void invocations.refetch()}>
-              重新加载
-            </Button>
-          </div>
-        ) : (invocations.data?.data.items ?? []).length === 0 ? (
-          <p className="small quiet">还没有写能力调用记录。</p>
-        ) : (
-          <ul className="invocation-list invocation-list-panel">
-            {(invocations.data?.data.items ?? []).slice(0, 5).map((item) => (
-              <li key={item.id} className="invocation-row">
-                <div className="invocation-main">
-                  <StatusBadge tone={INVOCATION_STATUS_TONES[item.status] ?? 'neutral'}>
-                    {CODE_CHANGE_STATUS_LABELS[item.status] ?? item.status}
-                  </StatusBadge>
-                  <strong>{CAPABILITY_LABELS[item.capability] ?? item.capability}</strong>
-                  <span className="quiet">· {item.channel === 'cli' ? 'CLI' : item.channel}</span>
-                </div>
-                <time className="invocation-time" dateTime={item.createdAt}>
-                  {formatDateTime(item.createdAt)}
-                </time>
-                {item.errorMessage ? (
-                  <p className="invocation-error">
-                    {item.errorCode ? `${item.errorCode}：` : ''}
-                    {item.errorMessage}
-                  </p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </LogSheet>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

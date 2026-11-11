@@ -28,7 +28,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm dev -- --port 5174 --strictPort',
+    command: 'pnpm dev --port 5174 --strictPort',
     url: 'http://localhost:5174',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
