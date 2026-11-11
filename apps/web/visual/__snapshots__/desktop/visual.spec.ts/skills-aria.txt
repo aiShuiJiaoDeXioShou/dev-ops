@@ -1,0 +1,21 @@
+- main:
+  - navigation "能力内容":
+    - tab "技能库" [selected]
+    - tab "AGENTS.md 模板"
+  - button "发布 Skill"
+  - heading "Skills" [level=1]
+  - group "技能分类":
+    - button "全部" [pressed]
+    - button "产品"
+    - button "研发"
+    - button "交付"
+  - textbox "搜索团队技能"
+  - list:
+    - listitem:
+      - text: 已停用
+      - link "[audit] UI 审计技能":
+        - /url: /capabilities/skills?skill=dc114230-72bc-5566-9f37-dae40a5573de
+      - paragraph: "[audit] 用于 UI 审计的技能包"
+      - text: 交付 v1.0.0 团队维护
+      - code: "@skill/ui-audit-skill"
+      - button "查看技能 [audit] UI 审计技能"

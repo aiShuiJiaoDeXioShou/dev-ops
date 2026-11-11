@@ -8,6 +8,8 @@ export default defineConfig({
     },
   },
   test: {
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['visual/**'],
     environment: 'jsdom',
     environmentOptions: { jsdom: { url: 'http://localhost/' } },
     setupFiles: ['./src/test/setup.ts'],

@@ -1,0 +1,54 @@
+- main:
+  - heading "凭据库" [level=1]
+  - complementary "凭据目录":
+    - textbox "搜索凭据"
+    - button "添加凭据"
+    - group "按分类筛选凭据":
+      - button "全部" [pressed]
+      - button "API 密钥"
+      - button "账号密码"
+      - button "SSH 密钥"
+      - button "已撤销"
+    - list:
+      - listitem:
+        - button "[audit] 测试凭据 账号密码 · v2 已撤销":
+          - strong: "[audit] 测试凭据"
+          - text: 账号密码 · v2 已撤销
+      - listitem:
+        - button "[audit] 未授权凭据 API 密钥 · v1":
+          - strong: "[audit] 未授权凭据"
+          - text: API 密钥 · v1
+      - listitem:
+        - button "[audit] 凭据 API 密钥 · v1":
+          - strong: "[audit] 凭据"
+          - text: API 密钥 · v1
+  - region "凭据详情":
+    - heading "[audit] 测试凭据" [level=2]
+    - paragraph: 账号密码 · v2
+    - text: 已撤销
+    - term: 说明
+    - definition: "[audit] 仅供 UI 审计的凭据"
+    - term: 密钥
+    - definition:
+      - text: 掩码 ••••••••
+      - button "查看凭据值"
+    - term: 授权期限
+    - definition: 长期有效
+    - term: 项目
+    - definition: "[audit] 权限测试项目"
+    - term: 版本
+    - definition: v2
+    - term: 最近更新
+    - definition: 2026/11/11 12:03
+    - button "轮换"
+    - button "授权项目"
+    - button "撤销"
+    - heading "使用记录" [level=3]
+    - list:
+      - listitem: 2026/11/11 12:03 撤销 成功 v2
+      - listitem: 2026/11/11 12:03 授权 成功 v2
+      - listitem: 2026/11/11 12:03 轮换 成功 v2
+      - listitem: 2026/11/11 12:03 查看明文 成功 v1
+      - listitem: 2026/11/11 12:03 查看明文 被拒绝 v1
+      - listitem: 2026/11/11 12:03 创建 成功 v1
+    - paragraph: 查看明文需要再次输入当前登录密码，明文只在详情中短暂展示。

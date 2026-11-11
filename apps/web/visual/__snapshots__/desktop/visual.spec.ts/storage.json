@@ -1,0 +1,17 @@
+{
+  "path": "/settings/storage-buckets",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "储存桶"
+  ],
+  "tabs": [],
+  "rows": 2,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 18,
+  "nonPointerControls": [],
+  "smallTargets": []
+}

@@ -1,0 +1,31 @@
+{
+  "path": "/projects/53d557da-d55b-5985-b44a-db55b313d0f2/environment",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "这个环境还没有配置"
+  ],
+  "tabs": [
+    "需求",
+    "Bug",
+    "代码",
+    "PR",
+    "流水线",
+    "产物与版本",
+    "环境变量",
+    "开发",
+    "测试",
+    "生产"
+  ],
+  "rows": 0,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 26,
+  "nonPointerControls": [],
+  "smallTargets": [
+    "项目",
+    "PR"
+  ]
+}

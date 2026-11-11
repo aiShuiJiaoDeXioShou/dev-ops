@@ -1,0 +1,40 @@
+- main:
+  - heading "储存桶" [level=1]
+  - paragraph: 附件默认写入默认储存桶。内置本地桶始终存在且不可删除；自定义桶需通过连接测试后才能设为默认。
+  - button "新建储存桶"
+  - region "储存桶列表":
+    - table:
+      - rowgroup:
+        - row "名称 类型 状态 最近探测 操作":
+          - cell "名称"
+          - cell "类型"
+          - cell "状态"
+          - cell "最近探测"
+          - cell "操作"
+      - rowgroup:
+        - row "本地储存 默认 内置 部署服务器本地目录 本地储存 启用 尚未测试 测试连接 编辑":
+          - cell "本地储存 默认 内置 部署服务器本地目录":
+            - text: 本地储存 默认 内置
+            - paragraph: 部署服务器本地目录
+          - cell "本地储存"
+          - cell "启用"
+          - cell "尚未测试"
+          - cell "测试连接 编辑":
+            - button "测试连接"
+            - button "编辑"
+        - row "[audit] S3 储存桶 https://s3.audit.example.test / audit-bucket S3 兼容 启用 无法连接 无法连接储存桶，请检查接入地址、网络与证书 2026/11/11 12:04 测试连接 设为默认 编辑 删除 请先完成连接测试并确认可读写":
+          - cell "[audit] S3 储存桶 https://s3.audit.example.test / audit-bucket":
+            - text: "[audit] S3 储存桶"
+            - paragraph: https://s3.audit.example.test / audit-bucket
+          - cell "S3 兼容"
+          - cell "启用"
+          - cell "无法连接 无法连接储存桶，请检查接入地址、网络与证书 2026/11/11 12:04":
+            - text: 无法连接
+            - paragraph: 无法连接储存桶，请检查接入地址、网络与证书
+            - paragraph: 2026/11/11 12:04
+          - cell "测试连接 设为默认 编辑 删除 请先完成连接测试并确认可读写":
+            - button "测试连接"
+            - button "设为默认" [disabled]
+            - button "编辑"
+            - button "删除"
+            - paragraph: 请先完成连接测试并确认可读写

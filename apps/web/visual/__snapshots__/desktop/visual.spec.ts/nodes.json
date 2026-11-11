@@ -1,0 +1,18 @@
+{
+  "path": "/settings/pipeline-nodes",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "执行节点",
+    "节点列表"
+  ],
+  "tabs": [],
+  "rows": 6,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 30,
+  "nonPointerControls": [],
+  "smallTargets": []
+}

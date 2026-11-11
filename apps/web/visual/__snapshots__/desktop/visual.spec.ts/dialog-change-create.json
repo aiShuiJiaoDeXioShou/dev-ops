@@ -1,0 +1,28 @@
+{
+  "path": "/operations/changes",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "变更",
+    "新建变更计划"
+  ],
+  "tabs": [],
+  "rows": 4,
+  "statusTexts": [
+    "已取消",
+    "已批准",
+    "已取消",
+    "待确认"
+  ],
+  "documentOverflow": false,
+  "interactiveCount": 19,
+  "nonPointerControls": [],
+  "smallTargets": [
+    "[audit] ui-target · v-ui",
+    "[audit] plan2 changed · ",
+    "[CLI审计] cleanup2 · v-cli",
+    "[audit] cleanup · v-audi"
+  ]
+}

@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "check": "pnpm lint && pnpm typecheck && pnpm test",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test:visual": "playwright test --config visual/playwright.config.ts"
   },
   "dependencies": {
     "@dev-ops/api-client": "workspace:*",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
+    "@playwright/test": "1.55.0",
     "@rolldown/plugin-babel": "^0.3.0",
     "@tailwindcss/vite": "^4.3.4",
     "@testing-library/dom": "^10.4.2",

@@ -1,0 +1,42 @@
+- main:
+  - button "项目"
+  - text: / 产物与版本 dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求"
+    - tab "Bug"
+    - tab "代码"
+    - tab "PR"
+    - tab "流水线"
+    - tab "产物与版本" [selected]
+    - tab "环境变量"
+  - tablist "产物视图":
+    - tab "构建产物" [selected]
+    - tab "审核与发布"
+  - button "上报构建"
+  - tabpanel "构建产物":
+    - tablist "环境":
+      - tab "开发"
+      - tab "测试" [selected]
+      - tab "生产"
+    - region "运行版本":
+      - heading "运行版本" [level=3]
+      - paragraph: 最新构建不等于线上版本；未确认的记录显示为待核对。
+      - text: 开发
+      - strong: 未知版本
+      - text: 版本号 0 未知 尚未确认
+      - button "确认/更正"
+      - text: 测试
+      - strong: 未知版本
+      - text: 版本号 0 未知 尚未确认
+      - button "确认/更正"
+      - text: 生产
+      - strong: 未知版本
+      - text: 版本号 0 未知 尚未确认
+      - button "确认/更正"
+    - region "产物":
+      - heading "还没有构建产物" [level=3]
+      - paragraph: 上报构建后，安装包、二维码或测试地址会出现在这里。

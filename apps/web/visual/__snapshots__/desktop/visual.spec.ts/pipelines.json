@@ -1,0 +1,31 @@
+{
+  "path": "/projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "流水线"
+  ],
+  "tabs": [
+    "需求",
+    "Bug",
+    "代码",
+    "PR",
+    "流水线",
+    "产物与版本",
+    "环境变量",
+    "工作流 1",
+    "运行历史 2"
+  ],
+  "rows": 1,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 26,
+  "nonPointerControls": [],
+  "smallTargets": [
+    "项目",
+    "PR",
+    "3 小时前"
+  ]
+}

@@ -1,0 +1,306 @@
+- main:
+  - button "项目"
+  - text: / 代码 dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求"
+    - tab "Bug"
+    - tab "代码" [selected]
+    - tab "PR"
+    - tab "流水线"
+    - tab "产物与版本"
+    - tab "环境变量"
+  - button "切换代码分支":
+    - img
+    - text: main
+    - img
+  - img
+  - text: aiShuiJiaoDeXioShou/dev-ops
+  - button "提交记录"
+  - link "在 GitHub 打开":
+    - /url: https://github.com/example/dev-ops
+    - img
+    - text: 在 GitHub 打开
+  - navigation "文件目录":
+    - button ".devops":
+      - img
+      - img
+      - text: .devops
+    - button "apps":
+      - img
+      - img
+      - text: apps
+    - button "deploy":
+      - img
+      - img
+      - text: deploy
+    - button "design":
+      - img
+      - img
+      - text: design
+    - button "docs":
+      - img
+      - img
+      - text: docs
+    - button "packages":
+      - img
+      - img
+      - text: packages
+    - button "specs":
+      - img
+      - img
+      - text: specs
+    - button "tests":
+      - img
+      - img
+      - text: tests
+    - button "tooling":
+      - img
+      - img
+      - text: tooling
+    - button ".editorconfig":
+      - img
+      - text: .editorconfig
+    - button ".gitignore":
+      - img
+      - text: .gitignore
+    - button ".nvmrc":
+      - img
+      - text: .nvmrc
+    - button ".prettierignore":
+      - img
+      - text: .prettierignore
+    - button ".prettierrc.json":
+      - img
+      - text: .prettierrc.json
+    - button "AGENTS.md":
+      - img
+      - text: AGENTS.md
+    - button "eslint.config.mjs":
+      - img
+      - text: eslint.config.mjs
+    - button "package.json":
+      - img
+      - text: package.json
+    - button "pnpm-lock.yaml":
+      - img
+      - text: pnpm-lock.yaml
+    - button "pnpm-workspace.yaml":
+      - img
+      - text: pnpm-workspace.yaml
+    - button "README.md":
+      - img
+      - text: README.md
+  - text: README.md
+  - button "预览"
+  - button "代码"
+  - button "复制内容"
+  - button "复制文件链接"
+  - button "下载文件"
+  - heading "项目开发平台" [level=1]
+  - paragraph:
+    - text: 产品定位、已确认需求及待定事项见
+    - link "项目管理与运维平台需求":
+      - /url: ""
+    - text: 。
+  - paragraph:
+    - text: 模块划分、功能优先级和版本验收见
+    - link "需求版本规划":
+      - /url: ""
+    - text: ，当前为规划草案。
+  - paragraph:
+    - text: 全项目的模块图、功能图和逻辑区域架构图见
+    - link "项目结构图":
+      - /url: ""
+    - text: ，可直接编辑 Mermaid 源图。
+  - paragraph:
+    - text: 首版功能清单、业务流程、验收标准和待确认问题见
+    - link "V0.1 需求细化":
+      - /url: ""
+    - text: 。
+  - paragraph:
+    - text: 平台内置流水线的整体方案、执行节点架构、版本安排与待确认决策见
+    - link "流水线功能规划草案":
+      - /url: ""
+    - text: ，当前为规划草案。
+  - paragraph:
+    - text: 全新的工作区结构、Web 与 Server 模块边界及搭建范围见
+    - link "目标架构方案":
+      - /url: ""
+    - text: ，目标方案已确认，工作区和基础工程已搭建，业务模块按实际需求加入。
+  - paragraph:
+    - text: GitHub App 授权、成员与 Bot 的权限和凭据、统一 Git 接口及执行流程见
+    - link "外部仓库集成架构":
+      - /url: ""
+    - text: 。首批适配范围为 GitHub、Gitea，GitLab、Gitee、Codeup 预留扩展；当前为待实施验证的架构设计。
+  - paragraph:
+    - text: Git 连接、仓库/PR 读取与自研流水线的分层结构见
+    - link "Git、PR 与流水线架构":
+      - /url: ""
+    - text: ，含 Mermaid 组件图与时序图。
+  - paragraph:
+    - text: 独立 Bot、会话、任务、Agent 执行与平台 API 隔离的建议见
+    - link "Bots 独立子系统架构草案":
+      - /url: ""
+    - text: ，包含开源参考、权限边界、恢复机制与实施顺序。
+  - paragraph:
+    - text: 运行时内部端口、原生协议映射、双向事件及控制顺序见
+    - link "Bots 运行时适配契约与示例":
+      - /url: ""
+    - text: 。
+  - paragraph:
+    - text: 轻量个人 Bot 首版已初始化在
+    - link "apps/bot":
+      - /url: ""
+    - text: ，使用 pi、DeepSeek 与 SQLite；运行
+    - code: pnpm --dir apps/bot dev chat
+    - text: 开始对话。
+  - paragraph:
+    - text: 前后端推荐组件、集成方式、测试方案和待补齐内容见
+    - link "技术选型与集成方案":
+      - /url: ""
+    - text: 。截至 2026-11-10，V0.1、V0.2、V0.3 阶段 A 与 V0.4a 已交付；下一版本为 V0.4b（流水线部署与产品发布），Bot 与运维后移，版本状态见
+    - link "需求版本规划":
+      - /url: ""
+    - text: 。
+  - paragraph:
+    - text: 界面与主要操作可查看
+    - link "HTML 交互原型":
+      - /url: ""
+    - text: ，打开方式和演示边界见
+    - link "原型说明":
+      - /url: ""
+    - text: 。
+  - paragraph:
+    - text: Web UI 的 token、组件选择、页面模式、交互规范和 AI 实现约束见
+    - link "设计规范":
+      - /url: ""
+    - text: ；修改 UI 后运行
+    - code: pnpm ui:check
+    - text: 。
+  - paragraph:
+    - text: 安装依赖后，在仓库根目录运行
+    - code: pnpm dev:prototype
+    - text: ，然后访问 http://127.0.0.1:4178/；按
+    - code: Ctrl+C
+    - text: 停止服务。
+  - paragraph:
+    - text: 前端位于
+    - link "apps/web":
+      - /url: ""
+    - text: ，后端位于
+    - link "apps/server":
+      - /url: ""
+    - text: ，命令行工具位于
+    - link "apps/cli":
+      - /url: ""
+    - text: 。应用各自声明依赖，共用根目录工作区与锁文件，协作规则见
+    - link "AGENTS.md":
+      - /url: ""
+    - text: 。
+  - paragraph: 在仓库根目录初始化依赖和本地数据库：
+  - code: nvm use pnpm install --frozen-lockfile pnpm db:setup pnpm db:up pnpm db:migrate pnpm dev
+  - paragraph:
+    - code: pnpm dev
+    - text: 先生成并构建 API 客户端，再同时启动 Web 和 Server。默认 Web 地址为
+    - code: http://localhost:5173
+    - text: ，API 为
+    - code: http://127.0.0.1:3001
+    - text: 。也可以分别运行
+    - code: pnpm dev:web
+    - text: 、
+    - code: pnpm dev:server
+    - text: 。开发代理地址可用启动进程环境变量
+    - code: DEV_OPS_API_TARGET
+    - text: 指定。
+  - paragraph: V0.4a 内置流水线还需要两个独立进程：调度 Worker 与自托管执行节点 Agent。Worker 用 PostgreSQL 行锁和租约调度运行、监控超时并收口节点离线，需在 Server 之外单独启动：
+  - code: pnpm --dir apps/server dev:worker
+  - paragraph:
+    - text: 执行节点需要一台可用的 Docker 主机（P1 为本地开发机），在团队设置 → 连接与节点中创建节点并复制一次性注册令牌，然后以环境变量启动 Agent（也可写入 agent 本地
+    - code: .env
+    - text: ）。平台地址、节点令牌与工作目录等配置见
+    - link "apps/pipeline-agent/README.md":
+      - /url: ""
+    - text: ，日志与产物保存在
+    - code: PIPELINE_STORAGE_DIR
+    - text: 指向的受控目录：
+  - code: PLATFORM_URL=http://127.0.0.1:3001 \ AGENT_REGISTRATION_TOKEN=<一次性令牌> \ AGENT_WORK_DIR=/tmp/devops-agent \ AGENT_LABELS=linux,docker,node24 \ pnpm dev:agent
+  - paragraph:
+    - text: 仓库内
+    - code: .devops/workflows/
+    - text: 中的 YAML 工作流按
+    - link "平台支持的子集":
+      - /url: ""
+    - text: 解析；语法不支持、节点离线、步骤超时与取消都会显式失败或中断，不会显示为成功。完整步骤见
+    - link "内置流水线验收指南":
+      - /url: ""
+    - text: 。
+  - paragraph:
+    - text: CLI 首次使用前执行
+    - code: pnpm prepare:clients
+    - text: ，之后查看帮助或检查运行中的服务：
+  - code: pnpm cli --help pnpm cli health --json
+  - paragraph: V0.1 本地初始化和验证：
+  - code: "pnpm db:setup pnpm db:up pnpm db:migrate pnpm --dir apps/server seed:root # 使用 apps/server/.env 的 ROOT_EMAIL / ROOT_INITIAL_PASSWORD pnpm test:db pnpm test:e2e"
+  - paragraph:
+    - text: 本地邮件默认使用 Mailpit 地址
+    - code: smtp://127.0.0.1:1025
+    - text: （需自行启动 Mailpit）；stg 使用 Resend 时在
+    - code: apps/server/.env
+    - text: 配置
+    - code: SMTP_URL
+    - text: 与
+    - code: MAIL_FROM
+    - text: 。root 种子命令只在首次创建账号时使用密码，不写入业务表。
+  - paragraph: 完整验证与构建命令：
+  - code: pnpm check pnpm test:db
+  - paragraph:
+    - code: pnpm check
+    - text: 从后端 TypeBox 路由导出契约，生成 API 类型及独立校验器，构建所有应用，检查模块依赖，再运行工程、应用和跨应用联通测试。除
+    - code: test:db
+    - text: 外，无需预先启动数据库或后端。
+    - code: pnpm test:db
+    - text: 使用本机 PostgreSQL，在隔离测试库中验证迁移、权限与事务，结束后删除测试库。
+  - paragraph:
+    - code: pnpm build
+    - text: 只执行契约生成和全部构建。单独检查某个应用前先执行
+    - code: pnpm prepare:clients
+    - text: ；运行端到端测试
+    - code: pnpm test:e2e
+    - text: 前先完成
+    - code: pnpm build
+    - text: 。
+  - paragraph:
+    - text: 后端配置和接口见
+    - link "后端说明":
+      - /url: ""
+    - text: 。PostgreSQL 默认监听
+    - code: 127.0.0.1:5433
+    - text: ，部署配置位于
+    - link "deploy":
+      - /url: ""
+    - text: ，数据和迁移操作见
+    - link "数据库说明":
+      - /url: ""
+    - text: 。共享客户端与工程工具分别见
+    - link "API 客户端":
+      - /url: ""
+    - text: 和
+    - link "工程工具":
+      - /url: ""
+    - text: 。
+  - heading "代码变更" [level=2]
+  - text: 未获得代码修改授权，请联系管理员
+  - list:
+    - listitem:
+      - strong: cli-audit/cli-test-1
+      - text: "← main · chore: cli audit test change 失败 补丁 1 KB"
+      - button "查看差异"
+      - paragraph: 创建代码修改运行失败
+  - heading "最近写能力调用" [level=3]
+  - list:
+    - listitem: 2026/11/11 11:55:08 · add_comment · succeeded
+    - listitem: 2026/11/11 11:54:52 · code_change · queued

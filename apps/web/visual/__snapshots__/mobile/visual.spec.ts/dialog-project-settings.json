@@ -1,0 +1,27 @@
+{
+  "path": "/projects",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "headings": [
+    "项目",
+    "项目设置"
+  ],
+  "tabs": [
+    "基本资料",
+    "代码仓库",
+    "项目服务"
+  ],
+  "rows": 0,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 32,
+  "nonPointerControls": [],
+  "smallTargets": [
+    "[audit] 权限测试项目",
+    "[audit] 项目-UI-审计",
+    "[audit] dev project",
+    "dev-ops 平台"
+  ]
+}

@@ -1,0 +1,23 @@
+- main:
+  - button "项目"
+  - text: / 环境变量 dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求"
+    - tab "Bug"
+    - tab "代码"
+    - tab "PR"
+    - tab "流水线"
+    - tab "产物与版本"
+    - tab "环境变量" [selected]
+  - tablist "环境":
+    - tab "开发" [selected]
+    - tab "测试"
+    - tab "生产"
+  - button "新增配置"
+  - heading "这个环境还没有配置" [level=3]
+  - paragraph: 当前环境还没有配置。
+  - button "新增配置"

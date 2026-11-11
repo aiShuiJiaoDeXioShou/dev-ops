@@ -1,0 +1,163 @@
+- main:
+  - button "打开导航"
+  - button "项目"
+  - text: / 需求 dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求" [selected]
+    - tab "Bug"
+    - tab "代码"
+    - tab "PR"
+    - tab "流水线"
+    - tab "产物与版本"
+    - tab "环境变量"
+  - combobox "需求状态":
+    - option "全部状态" [selected]
+    - option "待处理"
+    - option "开发中"
+    - option "待测试"
+    - option "测试中"
+    - option "已通过"
+    - option "已取消"
+  - textbox "搜索需求"
+  - button "新建需求"
+  - table:
+    - rowgroup:
+      - row "事项":
+        - cell "事项"
+    - rowgroup:
+      - row "#1 平台体验迭代 2026-11：核心交互修复与流水线自举验收 已通过":
+        - cell "#1 平台体验迭代 2026-11：核心交互修复与流水线自举验收 已通过":
+          - button "#1 平台体验迭代 2026-11：核心交互修复与流水线自举验收"
+          - text: 已通过
+      - row "#12 [audit] 开发者写入验证 待处理":
+        - cell "#12 [audit] 开发者写入验证 待处理":
+          - button "#12 [audit] 开发者写入验证"
+          - text: 待处理
+      - row "#11 [audit] 重复提交测试（已编辑） 待处理":
+        - cell "#11 [audit] 重复提交测试（已编辑） 待处理":
+          - button "#11 [audit] 重复提交测试（已编辑）"
+          - text: 待处理
+      - row "#10 [CLI审计] 外链需求 已取消":
+        - cell "#10 [CLI审计] 外链需求 已取消":
+          - button "#10 [CLI审计] 外链需求"
+          - text: 已取消
+      - row "#2 [CLI审计] 已更新标题 已通过":
+        - cell "#2 [CLI审计] 已更新标题 已通过":
+          - button "#2 [CLI审计] 已更新标题"
+          - text: 已通过
+      - row "#9 [audit] token write ok 待处理":
+        - cell "#9 [audit] token write ok 待处理":
+          - button "#9 [audit] token write ok"
+          - text: 待处理
+      - row "#5 [audit] 工作区需求字段验收 已通过":
+        - cell "#5 [audit] 工作区需求字段验收 已通过":
+          - button "#5 [audit] 工作区需求字段验收"
+          - text: 已通过
+      - row "#8 [audit] idem team1 待处理":
+        - cell "#8 [audit] idem team1 待处理":
+          - button "#8 [audit] idem team1"
+          - text: 待处理
+      - row "#7 [audit] 生命周期需求 已通过":
+        - cell "#7 [audit] 生命周期需求 已通过":
+          - button "#7 [audit] 生命周期需求"
+          - text: 已通过
+      - row "#6 [audit] 幂等测试 待处理":
+        - cell "#6 [audit] 幂等测试 待处理":
+          - button "#6 [audit] 幂等测试"
+          - text: 待处理
+      - row "#4 [audit] dev req 待处理":
+        - cell "#4 [audit] dev req 待处理":
+          - button "#4 [audit] dev req"
+          - text: 待处理
+      - row "#3 [audit] 需求权限测试 待处理":
+        - cell "#3 [audit] 需求权限测试 待处理":
+          - button "#3 [audit] 需求权限测试"
+          - text: 待处理
+  - text: 共 12 条
+  - button "上一页" [disabled]
+  - button "下一页" [disabled]
+  - complementary "需求详情":
+    - text: 需求详情
+    - button "返回列表"
+    - paragraph: "需求 #1"
+    - heading "平台体验迭代 2026-11：核心交互修复与流水线自举验收" [level=2]
+    - text: 已通过 更新 2026/11/11 12:31
+    - button "重新开发"
+    - button "取消"
+    - button "创建 Bug"
+    - term: 研发负责人
+    - definition: 开发同学
+    - term: 测试负责人
+    - definition: 管理员
+    - term: 协作人员
+    - definition:
+      - list "协作人员":
+        - listitem: 浏览同学
+    - term: 关联 Bug
+    - definition: "#9 变更计划部署版本缺少服务选择，创建必然失败"
+    - heading "内容" [level=3]
+    - heading "背景" [level=2]
+    - paragraph: 平台已完成 V0.1～V0.4b，具备项目、需求、Bug、代码、PR、流水线、产物与环境变量、变更发布、能力与凭据等能力。本次以 dev-ops 仓库自身作为自举项目，跑通一次真实的需求→开发→提测→Bug→回归→验收闭环，并修复全量体验审计中发现的 P0/P1 问题。
+    - heading "范围" [level=2]
+    - list:
+      - listitem: 项目工作区：需求、Bug、代码、PR、产物与版本、环境变量页面的交互、缺值、视觉与逻辑问题修复。
+      - listitem: 平台级页面：导航与布局、项目列表与晴雨表、能力（Skills/模板）、凭据库、团队与节点、储存桶、个人资料。
+      - listitem:
+        - text: 内置流水线自举：在仓库内新增
+        - code: .devops/workflows/
+        - text: 工作流，注册本机执行节点，完成一次真实运行并产出日志与产物。
+      - listitem: CLI：覆盖全部命令组的端到端验收，修复退出码、JSON 输出与参数语义问题。
+    - heading "验收标准" [level=2]
+    - list:
+      - listitem: 审计清单中的 P0/P1 问题全部修复，关键交互有回归测试或截图证据。
+      - listitem: 流水线在注册执行节点上成功运行，日志、状态与产物可追溯；不支持的语法或节点离线时显式失败。
+      - listitem:
+        - text: CLI 关键命令（project/requirement/bug/git/code/delivery/change/tool）可执行，
+        - code: "--json"
+        - text: 输出可解析，退出码符合 0/1/2 约定。
+      - listitem: 需求按 开发→提测→测试→回归→完成 流转，Bug 与真实提交/PR 关联，刷新后记录与活动仍存在。
+    - paragraph: 验收标准
+    - paragraph: 见正文；P0/P1 问题修复、流水线真实运行、CLI 全命令验收、需求状态完整流转。
+    - region "附件":
+      - heading "附件" [level=3]
+      - list "附件列表":
+        - listitem:
+          - paragraph: attachment.txt
+          - paragraph: 73 B · 管理员 · 2026/11/11 11:50
+          - link "下载":
+            - /url: /api/v1/attachments/f6d24a39-a4e6-53e7-bbc9-682c4da5ec3e/download
+          - button "删除附件 attachment.txt": 删除
+    - heading "代码引用" [level=3]
+    - button "添加引用"
+    - list:
+      - listitem:
+        - 'link "feat: 平台体验审计与自举迭代（2026-11）"':
+          - /url: https://github.com/example/dev-ops/pull/1
+        - text: ok
+        - button "刷新"
+      - listitem:
+        - 'link "docs: 记录体验审计与自举迭代验收"':
+          - /url: https://github.com/example/dev-ops/commit/a85f1b79b231098798dc42c8b23867d4daf4f463
+        - text: ok
+        - button "刷新"
+    - tablist:
+      - tab "评论" [selected]
+      - tab "活动"
+      - tab "提测历史"
+    - tabpanel "评论":
+      - list:
+        - listitem:
+          - paragraph: 2026/11/11 12:31
+          - paragraph: "## 本轮实现摘要（2026-11-11） - 修复忘记密码链路：启用 better-auth 重置邮件，前端改用 request-password-reset；本机已用真实 SMTP 收信、重置并重新登录验证。 - 修复变更计划部署版本缺少服务选择：新增服务下拉与必填校验，弹窗改为固定标题/底栏；外部执行类型不可放行。 - 服务端：重复邀请 500 修复、幂等作用域按实际路径、错误日志脱敏、413 语义。 - CLI：team list 修复；新增 code / project repository commits|commit|pull-requests|pull-request|pull-request-diff；--json 参数错误、配置退出码、--all、日期校验。 - Web：页签与晴雨表标签可见性、详情错误态、页头布局、弹窗焦点归还、移动抽屉、搜索防抖、移动端代码页与登录、个人资料修改密码/名称等 20+ 项。 - 流水线：新增 platform-smoke 工作流并在本机节点成功运行，产物 build-info 可下载；Agent 透传代理环境变量。 - 验证：server 117/117、test:db 121/121、web 258/258、CLI 108/108、Agent 61/61、ui:check 0 新增；未完成项见 specs/008-platform-ux-iteration/evidence.md。"
+        - listitem:
+          - paragraph: 2026/11/11 12:38
+          - paragraph: "## 验收结论（2026-11-11） - `pnpm check` 全链路通过（含契约生成、全部构建、依赖边界、应用测试与 e2e）；`test:db` 121/121、Web 258/258、CLI 108/108、Agent 61/61。 - 需求状态已流转至 `passed`；Bug #9 经修复→回归通过→`resolved`。 - PR #1 已创建：https://github.com/example/dev-ops/pull/1 ；真实提交与 PR 已在“代码引用”中可查。 - 流水线 `platform-smoke` 真实运行成功，产物 `build-info` 可下载。 - 仍待后续处理：头像上传（需存储方案确认）、PR 筛选入 URL、凭据配置请求日志弹窗、变更详情项目 UUID 展示、全站页面标题等 P2；真实 GitHub 写权限、非本机节点与生产部署未验证。详见 specs/008-platform-ux-iteration/evidence.md。"
+        - listitem:
+          - paragraph: 2026/11/11 12:56
+          - paragraph: "## 视觉与交互修订（2026-11，追加） 依据 DSH 风格探索稿 v3 与官方 Web UI style reference，重新收敛页面层级与控件密度： - 侧栏分组标签、38px 导航行、弱化底部边界；选中态使用中性底 + 蓝色文字。 - 项目工作区页头/页签压缩；需求/Bug 列表去掉重复标题，筛选、搜索与主操作合并为一条工具条；表格改发丝线、48px 行高、中性选中底。 - 需求/Bug 详情增加固定工具条与“返回列表”，正文取消内层卡片，页签改下划线式；详情独立滚动，窄屏整屏覆盖。 - 代码页把代码浏览器上移为主内容，写能力区块下沉；变更详情改为主内容 + 属性侧栏；项目首页晴雨表与项目卡片收紧，移除未开放的 Bots 指标。 - 全局筛选/搜索轻量化，按路由设置标题；移动端列表保留标题 + 状态，隐藏次要列。 说明与截图：docs/design/web-refresh-2026-11/README.md；对应提交见 PR #1。"
+      - textbox "追加评论"
+      - button "发表评论"

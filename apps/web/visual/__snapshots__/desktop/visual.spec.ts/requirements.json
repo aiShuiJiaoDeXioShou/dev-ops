@@ -1,0 +1,45 @@
+{
+  "path": "/projects/53d557da-d55b-5985-b44a-db55b313d0f2/requirements",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [],
+  "tabs": [
+    "需求",
+    "Bug",
+    "代码",
+    "PR",
+    "流水线",
+    "产物与版本",
+    "环境变量"
+  ],
+  "rows": 12,
+  "statusTexts": [
+    "已通过",
+    "待处理",
+    "待处理",
+    "已取消",
+    "已通过",
+    "待处理",
+    "已通过",
+    "待处理",
+    "已通过",
+    "待处理",
+    "待处理",
+    "待处理"
+  ],
+  "documentOverflow": false,
+  "interactiveCount": 36,
+  "nonPointerControls": [],
+  "smallTargets": [
+    "项目",
+    "PR",
+    "#1平台体验迭代 2026-11：核心交互修复与",
+    "#12[audit] 开发者写入验证",
+    "#11[audit] 重复提交测试（已编辑）",
+    "#10[CLI审计] 外链需求",
+    "#2[CLI审计] 已更新标题",
+    "#9[audit] token write ok"
+  ]
+}

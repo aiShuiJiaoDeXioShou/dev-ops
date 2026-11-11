@@ -1,0 +1,31 @@
+{
+  "path": "/capabilities/templates",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "Skills",
+    "[audit] UI 审计模板 副本",
+    "[audit] UI 审计模板"
+  ],
+  "tabs": [
+    "技能库",
+    "AGENTS.md 模板"
+  ],
+  "rows": 0,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 24,
+  "nonPointerControls": [],
+  "smallTargets": [
+    "复制内容",
+    "复制链接",
+    "下载",
+    "管理文件 →",
+    "复制内容",
+    "复制链接",
+    "下载",
+    "管理文件 →"
+  ]
+}

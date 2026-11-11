@@ -1,0 +1,20 @@
+{
+  "path": "/capabilities/skills",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "Skills"
+  ],
+  "tabs": [
+    "技能库",
+    "AGENTS.md 模板"
+  ],
+  "rows": 0,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 20,
+  "nonPointerControls": [],
+  "smallTargets": []
+}

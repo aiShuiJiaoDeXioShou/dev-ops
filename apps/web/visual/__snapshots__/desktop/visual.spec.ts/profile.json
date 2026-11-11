@@ -1,0 +1,22 @@
+{
+  "path": "/settings/profile",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "个人页面",
+    "账号",
+    "资料维护",
+    "修改密码",
+    "API Token",
+    "还没有 API Token"
+  ],
+  "tabs": [],
+  "rows": 0,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 15,
+  "nonPointerControls": [],
+  "smallTargets": []
+}

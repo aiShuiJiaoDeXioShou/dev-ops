@@ -1,0 +1,96 @@
+- main:
+  - heading "执行节点" [level=1]
+  - paragraph: 管理团队自托管的流水线执行节点；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
+  - button "新建执行节点"
+  - region "执行节点":
+    - heading "节点列表" [level=2]
+    - text: "6"
+    - table "执行节点列表":
+      - rowgroup:
+        - row "节点 状态 能力标签 心跳 并发 Agent 版本 操作":
+          - cell "节点"
+          - cell "状态"
+          - cell "能力标签"
+          - cell "心跳"
+          - cell "并发"
+          - cell "Agent 版本"
+          - cell "操作"
+      - rowgroup:
+        - row "[audit] ui-node-2 unknown / unknown 待注册 linux docker 从未心跳 1 — 排空 停用 轮换令牌":
+          - cell "[audit] ui-node-2 unknown / unknown":
+            - strong: "[audit] ui-node-2"
+            - text: unknown / unknown
+          - cell "待注册"
+          - cell "linux docker"
+          - cell "从未心跳"
+          - cell "1"
+          - cell "—"
+          - cell "排空 停用 轮换令牌":
+            - button "排空" [disabled]
+            - button "停用"
+            - button "轮换令牌" [disabled]
+        - row "local-audit-node-3 darwin / arm64 在线 linux docker node24 1 小时前 1 0.1.0 排空 停用 轮换令牌":
+          - cell "local-audit-node-3 darwin / arm64":
+            - strong: local-audit-node-3
+            - text: darwin / arm64
+          - cell "在线"
+          - cell "linux docker node24"
+          - cell "1 小时前"
+          - cell "1"
+          - cell "0.1.0"
+          - cell "排空 停用 轮换令牌":
+            - button "排空"
+            - button "停用"
+            - button "轮换令牌"
+        - row "[audit] ui-node unknown / unknown 待注册 linux docker 从未心跳 1 — 排空 停用 轮换令牌":
+          - cell "[audit] ui-node unknown / unknown":
+            - strong: "[audit] ui-node"
+            - text: unknown / unknown
+          - cell "待注册"
+          - cell "linux docker"
+          - cell "从未心跳"
+          - cell "1"
+          - cell "—"
+          - cell "排空 停用 轮换令牌":
+            - button "排空" [disabled]
+            - button "停用"
+            - button "轮换令牌" [disabled]
+        - row "local-audit-node-2 darwin / arm64 离线 linux docker node24 3 小时前 1 0.1.0 排空 停用 轮换令牌":
+          - cell "local-audit-node-2 darwin / arm64":
+            - strong: local-audit-node-2
+            - text: darwin / arm64
+          - cell "离线"
+          - cell "linux docker node24"
+          - cell "3 小时前"
+          - cell "1"
+          - cell "0.1.0"
+          - cell "排空 停用 轮换令牌":
+            - button "排空" [disabled]
+            - button "停用"
+            - button "轮换令牌"
+        - row "[audit] node unknown / unknown 待注册 linux docker 从未心跳 1 — 排空 停用 轮换令牌":
+          - cell "[audit] node unknown / unknown":
+            - strong: "[audit] node"
+            - text: unknown / unknown
+          - cell "待注册"
+          - cell "linux docker"
+          - cell "从未心跳"
+          - cell "1"
+          - cell "—"
+          - cell "排空 停用 轮换令牌":
+            - button "排空" [disabled]
+            - button "停用"
+            - button "轮换令牌" [disabled]
+        - row "local-audit-node darwin / arm64 离线 linux docker 3 小时前 1 0.1.0 排空 停用 轮换令牌":
+          - cell "local-audit-node darwin / arm64":
+            - strong: local-audit-node
+            - text: darwin / arm64
+          - cell "离线"
+          - cell "linux docker"
+          - cell "3 小时前"
+          - cell "1"
+          - cell "0.1.0"
+          - cell "排空 停用 轮换令牌":
+            - button "排空" [disabled]
+            - button "停用"
+            - button "轮换令牌"

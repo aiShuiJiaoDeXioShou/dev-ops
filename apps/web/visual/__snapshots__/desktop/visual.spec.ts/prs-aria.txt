@@ -1,0 +1,36 @@
+- main:
+  - button "项目"
+  - text: / PR dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求"
+    - tab "Bug"
+    - tab "代码"
+    - tab "PR" [selected]
+    - tab "流水线"
+    - tab "产物与版本"
+    - tab "环境变量"
+  - textbox "搜索 PR"
+  - link "在 GitHub 打开":
+    - /url: https://github.com/example/dev-ops/pulls
+  - group "PR 状态筛选":
+    - button "全部 1" [pressed]
+    - button "打开 0"
+    - button "已关闭 1"
+  - combobox "作者筛选":
+    - option "全部作者" [selected]
+    - option "aiShuiJiaoDeXioShou"
+  - combobox "评审状态筛选":
+    - option "全部评审状态" [selected]
+    - option "待评审"
+    - option "已通过"
+    - option "需修改"
+    - option "未知"
+  - list:
+    - listitem:
+      - img "已合并"
+      - 'button "feat: 平台体验审计与自举迭代（2026-11）"'
+      - paragraph: "#1 · aiShuiJiaoDeXioShou · feat/platform-polish-2026-11 → main · 更新于 2026/11/11 13:41"

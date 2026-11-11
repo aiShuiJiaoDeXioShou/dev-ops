@@ -1,0 +1,23 @@
+{
+  "path": "/settings/team",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "headings": [
+    "团队管理",
+    "DevOps 研发团队",
+    "Git 连接",
+    "执行节点"
+  ],
+  "tabs": [
+    "成员与权限",
+    "连接与节点"
+  ],
+  "rows": 0,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 11,
+  "nonPointerControls": [],
+  "smallTargets": []
+}

@@ -1,0 +1,32 @@
+- main:
+  - navigation "能力内容":
+    - tab "技能库"
+    - tab "AGENTS.md 模板" [selected]
+  - button "新建模板"
+  - heading "Skills" [level=1]
+  - textbox "搜索模板名称或分类"
+  - list:
+    - listitem:
+      - text: 团队
+      - heading "[audit] UI 审计模板 副本" [level=3]:
+        - link "[audit] UI 审计模板 副本":
+          - /url: /capabilities/templates?template=cde109eb-dbfb-50fb-85ce-8f73092436c6
+      - paragraph: "[audit] 用于 UI 审计的 AGENTS.md 模板"
+      - text: "# AGENTS.md ## 协作约定 - [audit] 仅用于测试"
+      - button "复制内容"
+      - button "复制链接"
+      - button "下载"
+      - text: v1
+      - button "管理文件 →"
+    - listitem:
+      - text: 团队
+      - heading "[audit] UI 审计模板" [level=3]:
+        - link "[audit] UI 审计模板":
+          - /url: /capabilities/templates?template=38e8c32c-09f1-5fcb-81d8-594f132b2ef1
+      - paragraph: "[audit] 用于 UI 审计的 AGENTS.md 模板"
+      - text: "# AGENTS.md ## 协作约定 - [audit] 仅用于测试"
+      - button "复制内容"
+      - button "复制链接"
+      - button "下载"
+      - text: v1
+      - button "管理文件 →"

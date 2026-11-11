@@ -1,0 +1,32 @@
+- main:
+  - heading "团队管理" [level=1]
+  - text: D
+  - heading "DevOps 研发团队" [level=2]
+  - button "邀请成员"
+  - button "编辑团队"
+  - tablist "团队设置分组":
+    - tab "成员与权限"
+    - tab "连接与节点" [selected]
+  - tabpanel "连接与节点":
+    - heading "Git 连接" [level=3]
+    - button "添加 GitHub 连接"
+    - paragraph: GitHub App 安装授权是团队级共享授权，成员无需各自绑定 GitHub 账号。连接、检查和同步仓库仅管理员可操作。
+    - strong: GitHub App 180579996
+    - text: 正常
+    - paragraph: GitHub · GitHub App 安装 · https://github.com
+    - paragraph: 最近检查 2026/11/11 11:57
+    - button "检查"
+    - button "同步仓库"
+    - button "撤销"
+    - group: 添加 Gitea 连接
+    - region "执行节点":
+      - heading "执行节点" [level=3]
+      - link "管理执行节点":
+        - /url: /settings/pipeline-nodes
+      - paragraph: 内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
+      - strong: "1"
+      - text: 在线
+      - strong: "6"
+      - text: 已注册
+      - strong: "5"
+      - text: 待连接

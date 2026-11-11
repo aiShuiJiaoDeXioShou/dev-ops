@@ -1,0 +1,82 @@
+- main:
+  - heading "变更" [level=1]
+  - paragraph: 创建具体变更计划，人工放行后执行并验证运行版本。
+  - button "新建变更计划"
+  - combobox "按项目筛选":
+    - option "全部项目" [selected]
+    - option "[audit] 权限测试项目"
+    - option "[audit] 项目-UI-审计"
+    - option "[audit] dev project"
+    - option "dev-ops 平台"
+  - combobox "按环境筛选":
+    - option "全部环境" [selected]
+    - option "开发"
+    - option "测试"
+    - option "生产"
+  - combobox "按状态筛选":
+    - option "全部状态" [selected]
+    - option "待确认"
+    - option "已批准"
+    - option "执行中"
+    - option "待验证"
+    - option "已完成"
+    - option "失败"
+    - option "已取消"
+  - combobox "按操作类型筛选":
+    - option "全部类型" [selected]
+    - option "部署版本"
+    - option "数据库变更"
+    - option "服务器清理"
+    - option "云资源调整"
+  - text: 共 4 条
+  - table:
+    - rowgroup:
+      - row "目标 / 版本 项目 环境 类型 状态 发起人 更新时间":
+        - cell "目标 / 版本"
+        - cell "项目"
+        - cell "环境"
+        - cell "类型"
+        - cell "状态"
+        - cell "发起人"
+        - cell "更新时间"
+    - rowgroup:
+      - row "[audit] ui-target · v-ui-audit-2 [audit] 权限测试项目 测试 服务器清理 已取消 管理员 2026/11/11 12:00:04":
+        - cell "[audit] ui-target · v-ui-audit-2":
+          - link "[audit] ui-target · v-ui-audit-2":
+            - /url: /operations/changes/82e21940-ec1c-5e98-8a7a-1c160cb8937a
+        - cell "[audit] 权限测试项目"
+        - cell "测试"
+        - cell "服务器清理"
+        - cell "已取消"
+        - cell "管理员"
+        - cell "2026/11/11 12:00:04"
+      - row "[audit] plan2 changed · v2 dev-ops 平台 测试 服务器清理 已批准 开发同学 2026/11/11 12:00:09":
+        - cell "[audit] plan2 changed · v2":
+          - link "[audit] plan2 changed · v2":
+            - /url: /operations/changes/7d0dca09-19ea-5009-b907-3fd68fcaca63
+        - cell "dev-ops 平台"
+        - cell "测试"
+        - cell "服务器清理"
+        - cell "已批准"
+        - cell "开发同学"
+        - cell "2026/11/11 12:00:09"
+      - row "[CLI审计] cleanup2 · v-cli-audit-2 dev-ops 平台 测试 服务器清理 已取消 管理员 2026/11/11 11:54:11":
+        - cell "[CLI审计] cleanup2 · v-cli-audit-2":
+          - link "[CLI审计] cleanup2 · v-cli-audit-2":
+            - /url: /operations/changes/db2fae0b-def0-5a8d-b61d-3489d5bbd175
+        - cell "dev-ops 平台"
+        - cell "测试"
+        - cell "服务器清理"
+        - cell "已取消"
+        - cell "管理员"
+        - cell "2026/11/11 11:54:11"
+      - row "[audit] cleanup · v-audit-1 dev-ops 平台 测试 服务器清理 待确认 管理员 2026/11/11 11:52:27":
+        - cell "[audit] cleanup · v-audit-1":
+          - link "[audit] cleanup · v-audit-1":
+            - /url: /operations/changes/4e120159-7ee9-5c77-b61f-db152b95a899
+        - cell "dev-ops 平台"
+        - cell "测试"
+        - cell "服务器清理"
+        - cell "待确认"
+        - cell "管理员"
+        - cell "2026/11/11 11:52:27"

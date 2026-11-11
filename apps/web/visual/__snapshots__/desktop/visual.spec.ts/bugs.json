@@ -1,0 +1,42 @@
+{
+  "path": "/projects/53d557da-d55b-5985-b44a-db55b313d0f2/bugs",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [],
+  "tabs": [
+    "需求",
+    "Bug",
+    "代码",
+    "PR",
+    "流水线",
+    "产物与版本",
+    "环境变量"
+  ],
+  "rows": 9,
+  "statusTexts": [
+    "已解决",
+    "修复中",
+    "修复中",
+    "已解决",
+    "已解决",
+    "待处理",
+    "待处理",
+    "待处理",
+    "待处理"
+  ],
+  "documentOverflow": false,
+  "interactiveCount": 33,
+  "nonPointerControls": [],
+  "smallTargets": [
+    "项目",
+    "PR",
+    "BUG-9变更计划部署版本缺少服务选择，创建必然",
+    "BUG-8[audit] Bug 全流程验收（已",
+    "BUG-7[audit] Bug 全流程验收",
+    "BUG-1t",
+    "BUG-6[CLI审计] 回归撤回Bug2",
+    "BUG-5[CLI审计] 回归撤回Bug"
+  ]
+}

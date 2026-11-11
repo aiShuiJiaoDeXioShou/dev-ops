@@ -32,7 +32,8 @@
     "ui:check": "node tooling/scripts/check-ui.mjs",
     "ui:baseline": "node tooling/scripts/check-ui.mjs --update-baseline",
     "dev:worker": "pnpm --filter @dev-ops/server dev:worker",
-    "dev:agent": "pnpm --filter @dev-ops/pipeline-agent dev"
+    "dev:agent": "pnpm --filter @dev-ops/pipeline-agent dev",
+    "test:visual": "pnpm --dir apps/web test:visual"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

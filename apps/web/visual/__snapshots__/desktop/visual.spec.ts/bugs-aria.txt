@@ -1,0 +1,89 @@
+- main:
+  - button "项目"
+  - text: / Bug dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求"
+    - tab "Bug" [selected]
+    - tab "代码"
+    - tab "PR"
+    - tab "流水线"
+    - tab "产物与版本"
+    - tab "环境变量"
+  - combobox "Bug 状态":
+    - option "全部状态" [selected]
+    - option "待处理"
+    - option "修复中"
+    - option "待回归"
+    - option "已解决"
+    - option "已关闭"
+  - textbox "搜索 Bug"
+  - button "新建 Bug"
+  - table:
+    - rowgroup:
+      - row "事项 负责人 业务进度 更新时间":
+        - cell "事项"
+        - cell "负责人"
+        - cell "业务进度"
+        - cell "更新时间"
+    - rowgroup:
+      - row "BUG-9 变更计划部署版本缺少服务选择，创建必然失败 管理员 已解决 2026/11/11 12:30":
+        - cell "BUG-9 变更计划部署版本缺少服务选择，创建必然失败":
+          - button "BUG-9 变更计划部署版本缺少服务选择，创建必然失败"
+        - cell "管理员"
+        - cell "已解决"
+        - cell "2026/11/11 12:30"
+      - row "BUG-8 [audit] Bug 全流程验收（已编辑） 开发同学 修复中 2026/11/11 12:14":
+        - cell "BUG-8 [audit] Bug 全流程验收（已编辑）":
+          - button "BUG-8 [audit] Bug 全流程验收（已编辑）"
+        - cell "开发同学"
+        - cell "修复中"
+        - cell "2026/11/11 12:14"
+      - row "BUG-7 [audit] Bug 全流程验收 开发同学 修复中 2026/11/11 12:00":
+        - cell "BUG-7 [audit] Bug 全流程验收":
+          - button "BUG-7 [audit] Bug 全流程验收"
+        - cell "开发同学"
+        - cell "修复中"
+        - cell "2026/11/11 12:00"
+      - row "BUG-1 t 开发同学 已解决 2026/11/11 11:59":
+        - cell "BUG-1 t":
+          - button "BUG-1 t"
+        - cell "开发同学"
+        - cell "已解决"
+        - cell "2026/11/11 11:59"
+      - row "BUG-6 [CLI审计] 回归撤回Bug2 开发同学 已解决 2026/11/11 11:59":
+        - cell "BUG-6 [CLI审计] 回归撤回Bug2":
+          - button "BUG-6 [CLI审计] 回归撤回Bug2"
+        - cell "开发同学"
+        - cell "已解决"
+        - cell "2026/11/11 11:59"
+      - row "BUG-5 [CLI审计] 回归撤回Bug 未指定 待处理 2026/11/11 11:58":
+        - cell "BUG-5 [CLI审计] 回归撤回Bug":
+          - button "BUG-5 [CLI审计] 回归撤回Bug"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 11:58"
+      - row "BUG-4 [CLI审计] 待关闭Bug 未指定 待处理 2026/11/11 11:58":
+        - cell "BUG-4 [CLI审计] 待关闭Bug":
+          - button "BUG-4 [CLI审计] 待关闭Bug"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 11:58"
+      - row "BUG-3 [audit] dev bug 未指定 待处理 2026/11/11 11:53":
+        - cell "BUG-3 [audit] dev bug":
+          - button "BUG-3 [audit] dev bug"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 11:53"
+      - row "BUG-2 [audit] Bug 权限测试 开发同学 待处理 2026/11/11 11:52":
+        - cell "BUG-2 [audit] Bug 权限测试":
+          - button "BUG-2 [audit] Bug 权限测试"
+        - cell "开发同学"
+        - cell "待处理"
+        - cell "2026/11/11 11:52"
+  - text: 共 9 条
+  - button "上一页" [disabled]
+  - button "下一页" [disabled]

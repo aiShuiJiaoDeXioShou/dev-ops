@@ -72,6 +72,7 @@
 - [ ] `pnpm ui:check` 通过，且没有扩大 baseline。
 - [ ] `pnpm --dir apps/web check` 通过。
 - [ ] 1440×1000 与 390×844 截图已对比参考设计。
+- [ ] `pnpm test:visual` 通过；布局或结构变化时同步更新视觉快照。
 - [ ] 变更说明中列出视觉与交互差异。
 
 ## 6. 相关文档
@@ -81,6 +82,7 @@
 - [页面模式](patterns.md)
 - [交互规范](interactions.md)
 - [UI 债务 baseline](baseline.md)
+- [视觉与布局回归](../../apps/web/visual/README.md)
 
 ## 7. 2026-11 视觉修订
 

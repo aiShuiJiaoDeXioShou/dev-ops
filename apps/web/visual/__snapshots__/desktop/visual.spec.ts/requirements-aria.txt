@@ -1,0 +1,108 @@
+- main:
+  - button "项目"
+  - text: / 需求 dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求" [selected]
+    - tab "Bug"
+    - tab "代码"
+    - tab "PR"
+    - tab "流水线"
+    - tab "产物与版本"
+    - tab "环境变量"
+  - combobox "需求状态":
+    - option "全部状态" [selected]
+    - option "待处理"
+    - option "开发中"
+    - option "待测试"
+    - option "测试中"
+    - option "已通过"
+    - option "已取消"
+  - textbox "搜索需求"
+  - button "新建需求"
+  - table:
+    - rowgroup:
+      - row "事项 负责人 业务进度 更新时间":
+        - cell "事项"
+        - cell "负责人"
+        - cell "业务进度"
+        - cell "更新时间"
+    - rowgroup:
+      - row "#1 平台体验迭代 2026-11：核心交互修复与流水线自举验收 开发同学 已通过 2026/11/11 12:31":
+        - cell "#1 平台体验迭代 2026-11：核心交互修复与流水线自举验收":
+          - button "#1 平台体验迭代 2026-11：核心交互修复与流水线自举验收"
+        - cell "开发同学"
+        - cell "已通过"
+        - cell "2026/11/11 12:31"
+      - row "#12 [audit] 开发者写入验证 未指定 待处理 2026/11/11 12:20":
+        - cell "#12 [audit] 开发者写入验证":
+          - button "#12 [audit] 开发者写入验证"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 12:20"
+      - row "#11 [audit] 重复提交测试（已编辑） 未指定 待处理 2026/11/11 12:18":
+        - cell "#11 [audit] 重复提交测试（已编辑）":
+          - button "#11 [audit] 重复提交测试（已编辑）"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 12:18"
+      - row "#10 [CLI审计] 外链需求 未指定 已取消 2026/11/11 12:00":
+        - cell "#10 [CLI审计] 外链需求":
+          - button "#10 [CLI审计] 外链需求"
+        - cell "未指定"
+        - cell "已取消"
+        - cell "2026/11/11 12:00"
+      - row "#2 [CLI审计] 已更新标题 开发同学 已通过 2026/11/11 11:59":
+        - cell "#2 [CLI审计] 已更新标题":
+          - button "#2 [CLI审计] 已更新标题"
+        - cell "开发同学"
+        - cell "已通过"
+        - cell "2026/11/11 11:59"
+      - row "#9 [audit] token write ok 未指定 待处理 2026/11/11 11:58":
+        - cell "#9 [audit] token write ok":
+          - button "#9 [audit] token write ok"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 11:58"
+      - row "#5 [audit] 工作区需求字段验收 开发同学 已通过 2026/11/11 11:57":
+        - cell "#5 [audit] 工作区需求字段验收":
+          - button "#5 [audit] 工作区需求字段验收"
+        - cell "开发同学"
+        - cell "已通过"
+        - cell "2026/11/11 11:57"
+      - row "#8 [audit] idem team1 未指定 待处理 2026/11/11 11:56":
+        - cell "#8 [audit] idem team1":
+          - button "#8 [audit] idem team1"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 11:56"
+      - row "#7 [audit] 生命周期需求 开发同学 已通过 2026/11/11 11:55":
+        - cell "#7 [audit] 生命周期需求":
+          - button "#7 [audit] 生命周期需求"
+        - cell "开发同学"
+        - cell "已通过"
+        - cell "2026/11/11 11:55"
+      - row "#6 [audit] 幂等测试 未指定 待处理 2026/11/11 11:54":
+        - cell "#6 [audit] 幂等测试":
+          - button "#6 [audit] 幂等测试"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 11:54"
+      - row "#4 [audit] dev req 未指定 待处理 2026/11/11 11:53":
+        - cell "#4 [audit] dev req":
+          - button "#4 [audit] dev req"
+        - cell "未指定"
+        - cell "待处理"
+        - cell "2026/11/11 11:53"
+      - row "#3 [audit] 需求权限测试 开发同学 待处理 2026/11/11 11:52":
+        - cell "#3 [audit] 需求权限测试":
+          - button "#3 [audit] 需求权限测试"
+        - cell "开发同学"
+        - cell "待处理"
+        - cell "2026/11/11 11:52"
+  - text: 共 12 条
+  - button "上一页" [disabled]
+  - button "下一页" [disabled]

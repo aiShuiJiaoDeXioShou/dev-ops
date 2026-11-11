@@ -1,0 +1,43 @@
+- main:
+  - button "项目"
+  - text: / 流水线 dev-ops 平台 进行中
+  - link "查看项目的协作约定模板":
+    - /url: /capabilities/templates
+    - text: 协作约定 未选用
+  - button "项目设置"
+  - tablist "项目功能":
+    - tab "需求"
+    - tab "Bug"
+    - tab "代码"
+    - tab "PR"
+    - tab "流水线" [selected]
+    - tab "产物与版本"
+    - tab "环境变量"
+  - heading "流水线" [level=1]
+  - tablist "流水线视图":
+    - tab "工作流 1" [selected]
+    - tab "运行历史 2"
+  - text: main · 7918a5f4
+  - button "重新检查"
+  - tabpanel "工作流 1":
+    - region "工作流":
+      - table "流水线工作流":
+        - rowgroup:
+          - row "工作流 解析状态 最近运行 操作":
+            - cell "工作流"
+            - cell "解析状态"
+            - cell "最近运行"
+            - cell "操作"
+        - rowgroup:
+          - row "platform-smoke .devops/workflows/platform-smoke.yml 可运行 成功 查看最近一次运行 成功 触发运行":
+            - cell "platform-smoke .devops/workflows/platform-smoke.yml":
+              - strong: platform-smoke
+              - text: .devops/workflows/platform-smoke.yml
+            - cell "可运行"
+            - cell "成功 查看最近一次运行 成功":
+              - text: 成功
+              - link "查看最近一次运行 成功":
+                - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines/4f8812e5-40bc-588b-bc7e-2726a8902e21
+                - text: 3 小时前
+            - cell "触发运行":
+              - button "触发运行"

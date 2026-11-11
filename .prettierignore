@@ -18,3 +18,6 @@ specs
 .env
 .env.*
 *.env
+apps/web/visual/__snapshots__
+apps/web/test-results
+apps/web/playwright-report

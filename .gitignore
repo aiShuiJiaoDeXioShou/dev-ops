@@ -24,3 +24,5 @@ pipeline-data/
 attachment-data/
 .secrets/
 canvas/
+test-results/
+playwright-report/
