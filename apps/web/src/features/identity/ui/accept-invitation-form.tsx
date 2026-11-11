@@ -108,11 +108,13 @@ export function AcceptInvitationForm() {
           autoComplete="new-password"
         />
       </label>
-      {error && (
-        <p className="field-error" role="alert">
-          {error}
-        </p>
-      )}
+      <div className="auth-error-slot" aria-live="polite">
+        {error ? (
+          <p className="field-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
       <button type="submit" className="login-submit" disabled={mutation.isPending}>
         {mutation.isPending ? '加入中…' : '加入团队'}
       </button>

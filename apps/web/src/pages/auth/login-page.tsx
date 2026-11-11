@@ -175,11 +175,13 @@ export function Component() {
             <div className="auth-row auth-row-end">
               <Link to="/forgot-password">忘记密码？</Link>
             </div>
-            {error && (
-              <p className="field-error" role="alert">
-                {error}
-              </p>
-            )}
+            <div className="auth-error-slot" aria-live="polite">
+              {error ? (
+                <p className="field-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </div>
             <button type="submit" className="login-submit" disabled={mutation.isPending}>
               {mutation.isPending ? '登录中…' : '登录'}
             </button>

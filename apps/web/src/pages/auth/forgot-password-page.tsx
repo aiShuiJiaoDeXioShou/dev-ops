@@ -40,11 +40,13 @@ export function Component() {
               {message}
             </p>
           )}
-          {error && (
-            <p className="field-error" role="alert">
-              {error}
-            </p>
-          )}
+          <div className="auth-error-slot" aria-live="polite">
+            {error ? (
+              <p className="field-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+          </div>
           <button type="submit" className="login-submit" disabled={pending}>
             {pending ? '发送中…' : '发送重置邮件'}
           </button>

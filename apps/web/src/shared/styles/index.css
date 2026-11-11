@@ -2007,3 +2007,16 @@ a.skill-title:hover {
   flex: 1 1 auto;
   min-width: 240px;
 }
+
+/* 认证表单预留错误位，避免错误出现/消失时整张卡片跳动。 */
+.auth-error-slot {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  margin: 2px 0 6px;
+  text-align: left;
+}
+.auth-error-slot .field-error {
+  margin: 0;
+  line-height: 1.45;
+}

@@ -1,3 +1,21 @@
+/** 将认证库常见错误归一为可操作的中文提示；未知英文错误不直接透出。 */
+function toFriendlyAuthMessage(serverMessage: string, fallback: string): string {
+  const message = serverMessage.trim()
+  const lower = message.toLowerCase()
+  if (/invalid origin|origin.*(not allowed|invalid)/.test(lower)) {
+    return '当前访问地址未获授权，请使用平台配置的访问地址。'
+  }
+  if (/invalid password|invalid credentials|incorrect password|user not found/.test(lower)) {
+    return '邮箱或密码不正确。'
+  }
+  if (/too many|rate limit/.test(lower)) return '尝试次数过多，请稍后再试。'
+  if (/email.*not verified|verify.*email/.test(lower)) return '邮箱尚未验证，请先完成邮箱验证。'
+  if (/reset password.*(disabled|not enabled)/.test(lower)) return '密码重置暂不可用，请联系平台管理员。'
+  if (/invalid token|token.*(expired|invalid)/.test(lower)) return '链接无效或已过期，请重新申请。'
+  if (/[\u4e00-\u9fa5]/.test(message)) return message
+  return fallback
+}
+
 /** 认证请求失败；message 可直接展示，不包含服务端内部细节。 */
 export class AuthRequestError extends Error {
   readonly code: string
@@ -55,8 +73,9 @@ async function authRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
         : response.status === 429
           ? '请求过于频繁，请稍后再试。'
           : '认证请求失败，请稍后重试。'
-    // 401 固定使用安全文案；其余状态优先显示认证库的具体原因（如重置功能不可用）。
-    throw new AuthRequestError(response.status === 401 ? fallback : serverMessage || fallback, code, response.status)
+    // 401 固定使用安全文案；其余状态把认证库原因翻译为中文，未知英文错误回退到安全文案。
+    const description = response.status === 401 ? fallback : toFriendlyAuthMessage(serverMessage, fallback)
+    throw new AuthRequestError(description, code, response.status)
   }
   if (response.status === 204) return undefined as T
   try {
