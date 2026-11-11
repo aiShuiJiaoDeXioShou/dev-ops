@@ -1,0 +1,28 @@
+name: platform-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 本次触发的备注
+        type: string
+        default: manual
+
+jobs:
+  verify:
+    name: 平台自举验证
+    runs-on: linux
+    timeout-minutes: 15
+    steps:
+      - uses: builtin:checkout
+      - name: 检查运行环境
+        run: node --version && npm --version
+      - name: 生成构建信息
+        run: node -e "const fs=require('fs');fs.writeFileSync('build-info.json', JSON.stringify({ commit: '${{ github.sha }}', ref: '${{ github.ref }}', note: '${{ inputs.note }}' }, null, 2))"
+      - name: 校验构建信息
+        run: node -e "const v=JSON.parse(require('fs').readFileSync('build-info.json','utf8')); if(!/^[0-9a-f]{40}$/.test(v.commit)) process.exit(1); console.log('build-info ok', v)"
+      - name: 上传构建信息
+        uses: builtin:upload-artifact
+        with:
+          name: build-info
+          path: build-info.json
