@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { eq } from 'drizzle-orm'
-import { pipelineRun } from '../../src/modules/pipeline/pipeline.tables.ts'
+import { pipelineRun, pipelineRunStep } from '../../src/modules/pipeline/pipeline.tables.ts'
 import { codeChange } from '../../src/modules/tools/tools.tables.ts'
 import { reconcileCodeChangeFromRun } from '../../src/modules/tools/tools.code-change.service.ts'
 import { setupPipelineContext } from '../helpers/operations.ts'
@@ -56,9 +56,23 @@ test('T033 运行收口后回填代码变更状态', { timeout: 60_000 }, async 
     created_by_user_id: context.developer.userId,
   })
 
+  await db.insert(pipelineRunStep).values({
+    id: randomUUID(),
+    team_id: context.teamId,
+    project_id: context.projectId,
+    run_id: runId,
+    step_index: 0,
+    name: '校验',
+    kind: 'run',
+    status: 'succeeded',
+  })
+
   assert.equal(await reconcileCodeChangeFromRun(db, runId), true)
   const [row] = await db.select().from(codeChange).where(eq(codeChange.id, codeChangeId))
   assert.equal(row?.status, 'succeeded')
   assert.equal(row?.error_code, null)
+  const validation = row?.validation_result as { steps?: unknown[]; failedStepIndex?: number | null }
+  assert.equal(validation.steps?.length, 1)
+  assert.equal(validation.failedStepIndex, null)
   assert.equal(await reconcileCodeChangeFromRun(db, runId), false)
 })

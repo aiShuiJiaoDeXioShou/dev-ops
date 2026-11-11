@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, lt, lte, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import type { RunPlanTemplate } from './pipeline.planner.ts'
 import { pipelineArtifact, pipelineRun, pipelineRunLog, pipelineRunStep } from './pipeline.tables.ts'
@@ -179,6 +179,27 @@ function buildRunFilters(projectId: string, filters: PipelineRunListFilters) {
   if (filters.from) conditions.push(gte(pipelineRun.created_at, filters.from))
   if (filters.to) conditions.push(lte(pipelineRun.created_at, filters.to))
   return and(...conditions)
+}
+
+/** 查询超过保留期的可用产物，供清理任务使用；按创建时间升序避免积压。 */
+export async function findExpiredPipelineArtifacts(db: Database, cutoff: Date, limit = 200) {
+  return db
+    .select()
+    .from(pipelineArtifact)
+    .where(and(eq(pipelineArtifact.status, 'available'), lt(pipelineArtifact.created_at, cutoff)))
+    .orderBy(pipelineArtifact.created_at)
+    .limit(limit)
+}
+
+/** 将产物标记为缺失；文件删除失败时也标记，调用方可在下轮重试。 */
+export async function markPipelineArtifactsMissing(db: Database, artifactIds: string[]): Promise<number> {
+  if (artifactIds.length === 0) return 0
+  const rows = await db
+    .update(pipelineArtifact)
+    .set({ status: 'missing', updated_at: new Date() })
+    .where(inArray(pipelineArtifact.id, artifactIds))
+    .returning({ id: pipelineArtifact.id })
+  return rows.length
 }
 
 /** 判断错误是否由唯一约束冲突引起；用于幂等触发与产物重名竞争。 */

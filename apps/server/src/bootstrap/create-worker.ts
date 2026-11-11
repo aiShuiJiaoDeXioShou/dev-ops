@@ -2,6 +2,8 @@ import { createDatabase } from '../platform/database/client.ts'
 import type { AppConfig } from '../platform/config/env.ts'
 import { createPipelineScheduler, type PipelineSchedulerLogger } from '../modules/pipeline/pipeline.scheduler.ts'
 import { createStorageService } from '../modules/storage/storage.service.ts'
+import { createPipelineStorage } from '../modules/pipeline/pipeline.storage.ts'
+import { cleanupExpiredPipelineArtifacts } from '../modules/pipeline/pipeline.retention.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createAttachmentCleanup } from '../modules/attachments/attachments.cleanup.ts'
 import { reconcileCodeChangeFromRun } from '../modules/tools/tools.code-change.service.ts'
@@ -46,6 +48,11 @@ export function createWorker(
   const secretCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY
     ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY)
     : null
+  const pipelineStorage = createPipelineStorage({
+    rootDir: config.PIPELINE_STORAGE_DIR,
+    maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
+    maxArtifactBytes: config.PIPELINE_ARTIFACT_MAX_BYTES,
+  })
   const attachmentCleanup = createAttachmentCleanup({
     db: database.db,
     storage: createStorageService({
@@ -82,6 +89,12 @@ export function createWorker(
     try {
       const result = await attachmentCleanup.runOnce()
       log('info', '附件清理周期完成', { ...result })
+      await cleanupExpiredPipelineArtifacts({
+        db: database.db,
+        storage: pipelineStorage,
+        retentionDays: config.PIPELINE_ARTIFACT_RETENTION_DAYS,
+        log: (message, context) => log('info', message, context),
+      })
     } catch (error) {
       log('error', '附件清理周期失败', {
         error: error instanceof Error ? error.message : '未知错误',

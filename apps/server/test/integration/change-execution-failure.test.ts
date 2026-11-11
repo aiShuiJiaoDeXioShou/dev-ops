@@ -263,3 +263,70 @@ test('T071 核对后重试：失败计划创建新执行尝试', { timeout: 90_0
   const [runAfterCancel] = await context.app.db.select().from(pipelineRun).where(eq(pipelineRun.id, runId))
   assert.equal(runAfterCancel?.status, 'cancelled')
 })
+
+test('T094 运行超时映射为执行 timed_out', { timeout: 60_000 }, async (t) => {
+  const context = await setupPipelineContext(t)
+  const planId = randomUUID()
+  const executionId = randomUUID()
+  const runId = randomUUID()
+  await context.app.db.insert(changePlan).values({
+    id: planId,
+    team_id: context.teamId,
+    project_id: context.projectId,
+    service_id: null,
+    target_resource: 'web',
+    environment: 'test',
+    operation_kind: 'database_change',
+    status: 'executing',
+    version_label: 'v9.9.9',
+    scope_summary: '超时映射测试',
+    evidence: '测试',
+    rollback_plan: '回滚',
+    execution_mode: 'platform_pipeline',
+    workflow_path: '.devops/workflows/deploy-test.yml',
+    pipeline_inputs: {},
+    created_by_user_id: context.admin.userId,
+  })
+  await context.app.db.insert(changeExecution).values({
+    id: executionId,
+    team_id: context.teamId,
+    project_id: context.projectId,
+    plan_id: planId,
+    plan_revision: 1,
+    attempt: 1,
+    execution_mode: 'platform_pipeline',
+    status: 'running',
+    pipeline_run_id: runId,
+    expected_version_label: 'v9.9.9',
+    created_by_user_id: context.admin.userId,
+  })
+  await context.app.db.insert(pipelineRun).values({
+    id: runId,
+    team_id: context.teamId,
+    project_id: context.projectId,
+    repository_id: context.repositoryId,
+    workflow_path: '.devops/workflows/deploy-test.yml',
+    workflow_name: 'deploy',
+    git_ref: 'main',
+    commit_sha: 'b'.repeat(40),
+    inputs: {},
+    run_plan: { runId, jobs: [], secretNames: [] },
+    workflow_snapshot: 'name: deploy',
+    workflow_hash: 'c'.repeat(64),
+    status: 'failed',
+    error_code: 'RUN_TIMEOUT',
+    trigger_source: 'manual',
+    initiator_channel: 'web',
+    triggered_by_user_id: context.admin.userId,
+    idempotency_key: `timeout-${runId}`,
+    timeout_seconds: 600,
+    finished_at: new Date(),
+  })
+
+  assert.equal(await reconcileChangeExecutionFromRun(context.app.db, runId), true)
+  const [execution] = await context.app.db.select().from(changeExecution).where(eq(changeExecution.id, executionId))
+  const [plan] = await context.app.db.select().from(changePlan).where(eq(changePlan.id, planId))
+  assert.equal(execution?.status, 'timed_out')
+  assert.equal(plan?.status, 'failed')
+  assert.equal(plan?.error_code, 'RUN_TIMEOUT')
+})

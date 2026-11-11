@@ -46,6 +46,8 @@ const environmentSchema = Type.Object({
   PIPELINE_LOG_CHUNK_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 262_144 }),
   PIPELINE_ARTIFACT_MAX_BYTES: Type.Integer({ minimum: 1_048_576, maximum: 2_147_483_648, default: 524_288_000 }),
   PIPELINE_WORKFLOW_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 131_072 }),
+  // 流水线产物保留天数；到期清理文件并把元数据标记为 missing。
+  PIPELINE_ARTIFACT_RETENTION_DAYS: Type.Integer({ minimum: 1, maximum: 365, default: 30 }),
   ATTACHMENT_STORAGE_DIR: Type.String({ minLength: 1, default: './attachment-data' }),
   ATTACHMENT_MAX_BYTES: Type.Integer({ minimum: 1_048_576, maximum: 2_147_483_648, default: 52_428_800 }),
   ATTACHMENT_MAX_PER_SUBMIT: Type.Integer({ minimum: 1, maximum: 50, default: 10 }),

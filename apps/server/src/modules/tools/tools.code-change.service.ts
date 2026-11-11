@@ -502,12 +502,26 @@ export async function reconcileCodeChangeFromRun(db: Database, runId: string): P
   const [change] = await db.select().from(codeChange).where(eq(codeChange.pipeline_run_id, runId)).limit(1)
   if (!change) return false
   if (change.status !== 'queued' && change.status !== 'running') return false
-  const { findPipelineRunById } = await import('../pipeline/pipeline.repository.ts')
+  const { findPipelineRunById, findPipelineRunSteps } = await import('../pipeline/pipeline.repository.ts')
   const run = await findPipelineRunById(db, runId)
   if (!run) return false
   const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
   if (!terminal.has(run.status)) return false
   const status = run.status === 'succeeded' ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : 'failed'
+  const steps = await findPipelineRunSteps(db, runId)
+  const validationResult = {
+    runStatus: run.status,
+    errorCode: run.error_code,
+    steps: steps.map((step) => ({
+      name: step.name,
+      kind: step.kind,
+      status: step.status,
+      errorCode: step.error_code,
+      startedAt: step.started_at?.toISOString() ?? null,
+      finishedAt: step.finished_at?.toISOString() ?? null,
+    })),
+    failedStepIndex: steps.find((step) => step.status === 'failed')?.step_index ?? null,
+  }
   const [updated] = await db
     .update(codeChange)
     .set({
@@ -515,7 +529,7 @@ export async function reconcileCodeChangeFromRun(db: Database, runId: string): P
       finished_at: run.finished_at ?? new Date(),
       error_code: status === 'succeeded' ? null : (run.error_code ?? 'CODE_CHANGE_FAILED'),
       error_message: status === 'succeeded' ? null : '代码修改运行未成功结束',
-      validation_result: { runStatus: run.status, errorCode: run.error_code },
+      validation_result: validationResult,
       updated_at: new Date(),
     })
     .where(and(eq(codeChange.id, change.id), inArray(codeChange.status, ['queued', 'running'])))

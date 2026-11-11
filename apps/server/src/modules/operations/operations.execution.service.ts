@@ -97,7 +97,10 @@ export interface VerifyChangePlanResult {
 
 const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
 
-function mapRunStatusToExecution(status: string): string {
+const TIMEOUT_ERROR_CODES = new Set(['RUN_TIMEOUT', 'NODE_WAIT_TIMEOUT', 'EXECUTION_TIMEOUT'])
+
+function mapRunStatusToExecution(status: string, errorCode?: string | null): string {
+  if (status !== 'succeeded' && errorCode && TIMEOUT_ERROR_CODES.has(errorCode)) return 'timed_out'
   switch (status) {
     case 'succeeded':
       return 'succeeded'
@@ -163,7 +166,7 @@ export function createOperationsExecutionUseCases(deps: {
     const run = await pipeline.getInternalRunStatus(execution.pipeline_run_id)
     if (!run || !TERMINAL_RUN_STATUSES.has(run.status)) return execution
     if (execution.status === 'succeeded' && run.status === 'succeeded') return execution
-    const mapped = mapRunStatusToExecution(run.status)
+    const mapped = mapRunStatusToExecution(run.status, run.errorCode)
     const now = new Date()
     const updated = await updateChangeExecution(db, execution.id, ['queued', 'running'], {
       status: mapped,
@@ -509,7 +512,12 @@ export async function reconcileChangeExecutionFromRun(db: Database, runId: strin
   if (!run) return false
   const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
   if (!terminal.has(run.status)) return false
-  const mapped = run.status === 'succeeded' ? 'succeeded' : run.status === 'interrupted' ? 'interrupted' : 'failed'
+  const mapped =
+    run.status === 'succeeded'
+      ? 'succeeded'
+      : run.status === 'interrupted'
+        ? 'interrupted'
+        : mapRunStatusToExecution(run.status, run.error_code)
   const updated = await updateChangeExecution(db, execution.id, ['queued', 'running'], {
     status: mapped,
     finished_at: run.finished_at ?? new Date(),
