@@ -19,6 +19,22 @@ const GIT_MAX_BUFFER_BYTES = 8 * 1_024 * 1_024
 /** 错误摘要保留的最大字符数，避免把整段 git 输出写进运行记录。 */
 const MAX_ERROR_DETAIL_CHARS = 2_000
 
+/**
+ * 需要透传给 git 子进程的代理环境变量。
+ * 企业网络与本地开发常通过 HTTP(S)_PROXY 访问代码平台；只传白名单变量，
+ * 避免把 Agent 进程中的其他环境变量（如密钥）带入 git 子进程。
+ */
+const GIT_PROXY_ENV_KEYS = [
+  'http_proxy',
+  'https_proxy',
+  'all_proxy',
+  'no_proxy',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'ALL_PROXY',
+  'NO_PROXY',
+] as const
+
 export interface RunWorkspaceOptions {
   /** Agent 工作根目录。 */
   workDir: string
@@ -109,6 +125,41 @@ function errorDetail(error: unknown, masker: SecretMasker): string {
 }
 
 /**
+ * 构造 git 子进程的最小环境变量集合。
+ * @param rootDir 运行工作区根目录，用于隔离 git HOME，避免读写用户级配置。
+ * @param username 平台签发的短期 Git 用户名。
+ * @param password 平台签发的短期 Git 密码；仅通过临时 http.extraHeader 注入。
+ * @param sourceEnv 环境变量来源，默认进程环境；测试可注入。
+ * @returns 仅包含 PATH、隔离 HOME、Git 安全配置、凭据头与代理变量的环境。
+ */
+export function buildGitProcessEnv(
+  rootDir: string,
+  username: string,
+  password: string,
+  sourceEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const basic = Buffer.from(`${username}:${password}`, 'utf8').toString('base64')
+  const env: NodeJS.ProcessEnv = {
+    PATH: sourceEnv.PATH ?? '',
+    HOME: join(rootDir, 'home'),
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_TERMINAL_PROMPT: '0',
+    GIT_ASKPASS: '',
+    // 通过 GIT_CONFIG_* 注入临时远程认证头：不出现在 argv（ps 可见）与 .git/config（落盘）。
+    GIT_CONFIG_COUNT: '2',
+    GIT_CONFIG_KEY_0: 'http.extraHeader',
+    GIT_CONFIG_VALUE_0: `Authorization: Basic ${basic}`,
+    GIT_CONFIG_KEY_1: 'credential.helper',
+    GIT_CONFIG_VALUE_1: '',
+  }
+  for (const key of GIT_PROXY_ENV_KEYS) {
+    const value = sourceEnv[key]
+    if (value !== undefined && value !== '') env[key] = value
+  }
+  return env
+}
+
+/**
  * 创建一次运行的临时工作区目录。
  * @param options 工作根目录、运行标识、日志器与脱敏器。
  * @returns 含仓库目录与临时目录的工作区句柄；目录已创建。
@@ -126,20 +177,7 @@ export async function createRunWorkspace(options: RunWorkspaceOptions): Promise<
 
   /** 构造最小 git 环境：凭据只经进程环境传入，不写入命令行与仓库配置。 */
   function gitEnv(username: string, password: string): NodeJS.ProcessEnv {
-    const basic = Buffer.from(`${username}:${password}`, 'utf8').toString('base64')
-    return {
-      PATH: process.env.PATH ?? '',
-      HOME: join(rootDir, 'home'),
-      GIT_CONFIG_NOSYSTEM: '1',
-      GIT_TERMINAL_PROMPT: '0',
-      GIT_ASKPASS: '',
-      // 通过 GIT_CONFIG_* 注入临时远程认证头：不出现在 argv（ps 可见）与 .git/config（落盘）。
-      GIT_CONFIG_COUNT: '2',
-      GIT_CONFIG_KEY_0: 'http.extraHeader',
-      GIT_CONFIG_VALUE_0: `Authorization: Basic ${basic}`,
-      GIT_CONFIG_KEY_1: 'credential.helper',
-      GIT_CONFIG_VALUE_1: '',
-    }
+    return buildGitProcessEnv(rootDir, username, password)
   }
 
   async function runGit(args: readonly string[], env: NodeJS.ProcessEnv, timeoutMs: number): Promise<string> {

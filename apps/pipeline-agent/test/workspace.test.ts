@@ -8,7 +8,7 @@ import type { RunPlanGit } from '@dev-ops/pipeline-protocol'
 
 import { createAgentLogger } from '../src/logger.ts'
 import { createSecretMasker } from '../src/masking.ts'
-import { cleanupStaleRunWorkspaces, createRunWorkspace } from '../src/workspace.ts'
+import { buildGitProcessEnv, cleanupStaleRunWorkspaces, createRunWorkspace } from '../src/workspace.ts'
 import { createTestGitRepo } from './helpers/git-repo.ts'
 
 const GIT_PASSWORD = 'super-secret-git-credential-value'
@@ -146,4 +146,25 @@ test('启动时清理遗留运行工作区', async () => {
   } finally {
     await rm(workDir, { recursive: true, force: true })
   }
+})
+
+test('git 子进程透传代理变量且不泄露其他环境变量', () => {
+  const env = buildGitProcessEnv('/tmp/agent-run', 'x-access-token', GIT_PASSWORD, {
+    PATH: '/usr/bin',
+    HOME: '/home/agent',
+    https_proxy: 'http://127.0.0.1:7890',
+    HTTPS_PROXY: 'http://127.0.0.1:7890',
+    no_proxy: 'localhost,127.0.0.1',
+    UNRELATED_SECRET: 'must-not-leak',
+  })
+  assert.equal(env.HOME, join('/tmp/agent-run', 'home'), 'git HOME 必须隔离到运行工作区')
+  assert.equal(env.https_proxy, 'http://127.0.0.1:7890')
+  assert.equal(env.HTTPS_PROXY, 'http://127.0.0.1:7890')
+  assert.equal(env.no_proxy, 'localhost,127.0.0.1')
+  assert.equal(env.UNRELATED_SECRET, undefined, '非白名单环境变量不得传入 git')
+  const header = Buffer.from(String(env.GIT_CONFIG_VALUE_0).replace('Authorization: Basic ', ''), 'base64').toString(
+    'utf8',
+  )
+  assert.ok(header.startsWith('x-access-token:'), '凭据头应包含短期用户名')
+  assert.ok(!JSON.stringify(env).includes(GIT_PASSWORD), '凭据只允许出现在 base64 头中，不得明文出现')
 })
