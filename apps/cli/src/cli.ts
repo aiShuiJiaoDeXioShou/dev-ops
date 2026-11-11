@@ -75,7 +75,7 @@ export async function runCli(args: string[], context: CliContext): Promise<numbe
           ? '未知命令或多余参数，请运行 devops --help'
           : error.message.replace(/^error:\s*/i, '').trim() || '参数无法识别，请运行 devops --help'
       return reportError(new CliError(message, 2, { code: 'INVALID_ARGUMENTS' }), {
-        json: false,
+        json: args.includes('--json'),
         stderr: context.stderr,
       })
     }

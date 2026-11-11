@@ -1,6 +1,6 @@
 import type { Command } from 'commander'
 import type { ApiBody, ApiQuery } from '@dev-ops/api-client'
-import { businessContext, printBusinessResult, readContent } from '../lib/command.ts'
+import { businessContext, collectAllPages, printBusinessResult, readContent } from '../lib/command.ts'
 import { resolvePagination } from '../lib/config.ts'
 import { CliError } from '../lib/errors.ts'
 import type { CliContext } from '../lib/context.ts'
@@ -96,7 +96,7 @@ export function registerDeliveryCommands(program: Command, context: CliContext):
     .option('--result-status <status>', '按结果筛选：succeeded|failed|cancelled|unknown')
     .action(async (options: Record<string, string | undefined>, command: Command) => {
       const business = await businessContext(command, context)
-      const { page, pageSize } = resolvePagination(business.globals)
+      const pagination = resolvePagination(business.globals)
       const environment = parseEnum(
         options.environment,
         ['development', 'test', 'production'] as const,
@@ -113,10 +113,12 @@ export function registerDeliveryCommands(program: Command, context: CliContext):
         ...(environment ? { environment } : {}),
         ...(source ? { source } : {}),
         ...(resultStatus ? { resultStatus } : {}),
-        page,
-        pageSize,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
       }
-      const result = await business.client.listBuilds(options.project ?? '', query)
+      const result = pagination.all
+        ? await collectAllPages((page) => business.client.listBuilds(options.project ?? '', { ...query, page }))
+        : await business.client.listBuilds(options.project ?? '', query)
       printBusinessResult(context, business.globals, result, true)
     })
 

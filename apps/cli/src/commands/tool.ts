@@ -265,6 +265,12 @@ export function registerToolCommands(program: Command, context: CliContext): voi
       ) => {
         const business = await businessContext(command, context)
         const bodyText = await readContent(options.bodyFile, context)
+        if (bodyText.trim() === '') {
+          throw new CliError('评论正文不能为空', 2, { code: 'EMPTY_COMMENT' })
+        }
+        if ((options.remoteIssue !== undefined || options.remotePr !== undefined) && !options.repository) {
+          throw new CliError('远端评论需要 --repository <repositoryId>', 2, { code: 'MISSING_REPOSITORY' })
+        }
         const targets = [options.requirement, options.bug, options.remoteIssue, options.remotePr].filter(
           (value) => value !== undefined,
         )

@@ -548,6 +548,11 @@ function registerRequirementActionCommands(requirement: Command, context: CliCon
       const testOwnerUserId = requireText(options.testOwner, '缺少 --test-owner 参数')
       const scopeNote = requireText(options.scopeNote, '缺少 --scope-note 参数')
       const selfTestResult = parseSelfTestResult(options.selfTestResult)
+      if (selfTestResult !== 'passed' && !options.selfTestNote?.trim()) {
+        throw new CliError('自测结论非 passed 时必须提供 --self-test-note 说明', 2, {
+          code: 'MISSING_SELF_TEST_NOTE',
+        })
+      }
       const action = await prepareAction(context, command, requirementId, options.expectedVersion)
       const result = await action.business.client.submitRequirementTest(
         requirementId,

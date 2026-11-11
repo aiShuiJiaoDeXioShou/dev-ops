@@ -25,6 +25,22 @@ interface FileOptions extends RepositoryOptions {
   branch?: string
 }
 
+interface CommitsOptions extends RepositoryOptions {
+  ref?: string
+}
+
+interface CommitOptions extends RepositoryOptions {
+  ref: string
+}
+
+interface PullRequestsOptions extends RepositoryOptions {
+  state?: string
+}
+
+interface PullRequestOptions extends RepositoryOptions {
+  number: string
+}
+
 interface AddCodeReferenceOptions {
   repository: string
   targetType: string
@@ -104,18 +120,45 @@ export function registerCodeCommands(program: Command, context: CliContext): voi
   const project = getOrCreateGroup(program, 'project', '管理项目')
   const repository = getOrCreateGroup(project, 'repository', '管理项目关联仓库')
 
+  /** 列出分支；`code` 与 `project repository` 两个入口共用同一实现。 */
+  const branchesAction = async (projectId: string, ...args: unknown[]) => {
+    const command = lastCommand(args)
+    const options = command.opts<RepositoryOptions>()
+    const business = await businessContext(command, context)
+    const result = await business.client.listRepositoryBranches(projectId, options.repository)
+    printBusinessResult(context, business.globals, result)
+  }
+
+  /** 读取文件树；`code` 与 `project repository` 两个入口共用同一实现。 */
+  const treeAction = async (projectId: string, ...args: unknown[]) => {
+    const command = lastCommand(args)
+    const options = command.opts<TreeOptions>()
+    const business = await businessContext(command, context)
+    const result = await business.client.listRepositoryTree(
+      projectId,
+      options.repository,
+      options.branch === undefined ? undefined : { branch: options.branch },
+    )
+    printBusinessResult(context, business.globals, result)
+  }
+
+  /** 读取单个文件；`code` 与 `project repository` 两个入口共用同一实现。 */
+  const fileAction = async (projectId: string, ...args: unknown[]) => {
+    const command = lastCommand(args)
+    const options = command.opts<FileOptions>()
+    const path = requireText(options.path, '--path', 'MISSING_PATH')
+    const branch = options.branch === undefined ? {} : { branch: options.branch }
+    const business = await businessContext(command, context)
+    const result = await business.client.getRepositoryFile(projectId, options.repository, { path, ...branch })
+    printBusinessResult(context, business.globals, result)
+  }
+
   repository
     .command('branches')
     .argument('<projectId>', '项目标识')
     .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
     .description('列出项目关联仓库的分支')
-    .action(async (projectId: string, ...args: unknown[]) => {
-      const command = lastCommand(args)
-      const options = command.opts<RepositoryOptions>()
-      const business = await businessContext(command, context)
-      const result = await business.client.listRepositoryBranches(projectId, options.repository)
-      printBusinessResult(context, business.globals, result)
-    })
+    .action(branchesAction)
 
   repository
     .command('tree')
@@ -123,17 +166,7 @@ export function registerCodeCommands(program: Command, context: CliContext): voi
     .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
     .option('--branch <branch>', '分支名，缺省使用仓库默认分支')
     .description('读取项目关联仓库的文件树')
-    .action(async (projectId: string, ...args: unknown[]) => {
-      const command = lastCommand(args)
-      const options = command.opts<TreeOptions>()
-      const business = await businessContext(command, context)
-      const result = await business.client.listRepositoryTree(
-        projectId,
-        options.repository,
-        options.branch === undefined ? undefined : { branch: options.branch },
-      )
-      printBusinessResult(context, business.globals, result)
-    })
+    .action(treeAction)
 
   repository
     .command('file')
@@ -142,13 +175,145 @@ export function registerCodeCommands(program: Command, context: CliContext): voi
     .requiredOption('--path <path>', '文件路径，相对仓库根目录')
     .option('--branch <branch>', '分支名，缺省使用仓库默认分支')
     .description('读取项目关联仓库的单个文件内容')
+    .action(fileAction)
+
+  repository
+    .command('commits')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .option('--ref <ref>', '提交引用，缺省使用仓库默认分支')
     .action(async (projectId: string, ...args: unknown[]) => {
       const command = lastCommand(args)
-      const options = command.opts<FileOptions>()
-      const path = requireText(options.path, '--path', 'MISSING_PATH')
-      const branch = options.branch === undefined ? {} : { branch: options.branch }
+      const options = command.opts<CommitsOptions>()
       const business = await businessContext(command, context)
-      const result = await business.client.getRepositoryFile(projectId, options.repository, { path, ...branch })
+      const pagination = business.globals
+      const result = await business.client.listCommits(projectId, options.repository, {
+        ...(options.ref ? { ref: options.ref } : {}),
+        ...(pagination.page ? { page: Number(pagination.page) } : {}),
+        ...(pagination.pageSize ? { pageSize: Number(pagination.pageSize) } : {}),
+      })
+      printBusinessResult(context, business.globals, result)
+    })
+
+  repository
+    .command('commit')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .requiredOption('--ref <ref>', '提交 SHA 或引用')
+    .description('读取单个提交详情与变更文件')
+    .action(async (projectId: string, ...args: unknown[]) => {
+      const command = lastCommand(args)
+      const options = command.opts<CommitOptions>()
+      const business = await businessContext(command, context)
+      const result = await business.client.getCommit(projectId, options.repository, options.ref)
+      printBusinessResult(context, business.globals, result)
+    })
+
+  repository
+    .command('pull-requests')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .option('--state <state>', 'PR 状态：open、closed 或 all')
+    .action(async (projectId: string, ...args: unknown[]) => {
+      const command = lastCommand(args)
+      const options = command.opts<PullRequestsOptions>()
+      const state = options.state === undefined ? undefined : requireText(options.state, '--state', 'INVALID_ARGUMENT')
+      const business = await businessContext(command, context)
+      const pagination = business.globals
+      const result = await business.client.listPullRequests(projectId, options.repository, {
+        ...(state ? { state: state as 'open' | 'closed' | 'all' } : {}),
+        ...(pagination.page ? { page: Number(pagination.page) } : {}),
+        ...(pagination.pageSize ? { pageSize: Number(pagination.pageSize) } : {}),
+      })
+      printBusinessResult(context, business.globals, result)
+    })
+
+  repository
+    .command('pull-request')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .requiredOption('--number <number>', 'PR 编号')
+    .description('读取 PR 详情与变更文件')
+    .action(async (projectId: string, ...args: unknown[]) => {
+      const command = lastCommand(args)
+      const options = command.opts<PullRequestOptions>()
+      const number = requireText(options.number, '--number', 'MISSING_PR_NUMBER')
+      const business = await businessContext(command, context)
+      const result = await business.client.getPullRequest(projectId, options.repository, number)
+      printBusinessResult(context, business.globals, result)
+    })
+
+  repository
+    .command('pull-request-diff')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .requiredOption('--number <number>', 'PR 编号')
+    .description('读取 PR 差异文本')
+    .action(async (projectId: string, ...args: unknown[]) => {
+      const command = lastCommand(args)
+      const options = command.opts<PullRequestOptions>()
+      const number = requireText(options.number, '--number', 'MISSING_PR_NUMBER')
+      const business = await businessContext(command, context)
+      const result = await business.client.getPullRequestDiff(projectId, options.repository, number)
+      printBusinessResult(context, business.globals, result)
+    })
+
+  // 顶层 `code` 是 `project repository` 的只读别名，README 与脚本可用更短入口。
+  const code = getOrCreateGroup(program, 'code', '浏览项目关联仓库的代码与 PR')
+  code
+    .command('branches')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .description('列出项目关联仓库的分支')
+    .action(branchesAction)
+  code
+    .command('tree')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .option('--branch <branch>', '分支名，缺省使用仓库默认分支')
+    .description('读取项目关联仓库的文件树')
+    .action(treeAction)
+  code
+    .command('file')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .requiredOption('--path <path>', '文件路径，相对仓库根目录')
+    .option('--branch <branch>', '分支名，缺省使用仓库默认分支')
+    .description('读取项目关联仓库的单个文件内容')
+    .action(fileAction)
+  code
+    .command('commits')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .option('--ref <ref>', '提交引用，缺省使用仓库默认分支')
+    .action(async (projectId: string, ...args: unknown[]) => {
+      const command = lastCommand(args)
+      const options = command.opts<CommitsOptions>()
+      const business = await businessContext(command, context)
+      const pagination = business.globals
+      const result = await business.client.listCommits(projectId, options.repository, {
+        ...(options.ref ? { ref: options.ref } : {}),
+        ...(pagination.page ? { page: Number(pagination.page) } : {}),
+        ...(pagination.pageSize ? { pageSize: Number(pagination.pageSize) } : {}),
+      })
+      printBusinessResult(context, business.globals, result)
+    })
+  code
+    .command('pull-requests')
+    .argument('<projectId>', '项目标识')
+    .requiredOption('--repository <repositoryId>', '项目关联仓库标识')
+    .option('--state <state>', 'PR 状态：open、closed 或 all')
+    .action(async (projectId: string, ...args: unknown[]) => {
+      const command = lastCommand(args)
+      const options = command.opts<PullRequestsOptions>()
+      const state = options.state === undefined ? undefined : requireText(options.state, '--state', 'INVALID_ARGUMENT')
+      const business = await businessContext(command, context)
+      const pagination = business.globals
+      const result = await business.client.listPullRequests(projectId, options.repository, {
+        ...(state ? { state: state as 'open' | 'closed' | 'all' } : {}),
+        ...(pagination.page ? { page: Number(pagination.page) } : {}),
+        ...(pagination.pageSize ? { pageSize: Number(pagination.pageSize) } : {}),
+      })
       printBusinessResult(context, business.globals, result)
     })
 

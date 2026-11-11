@@ -1,4 +1,5 @@
 import { RequestError } from '@dev-ops/api-client'
+import { ConfigFileError } from './config-file.ts'
 
 /** CLI 运行期错误；exitCode 固定为业务失败 1 或参数/本地配置错误 2。 */
 export class CliError extends Error {
@@ -35,6 +36,9 @@ export function toErrorOutput(error: unknown): ErrorOutput {
       ...(error.requestId ? { requestId: error.requestId } : {}),
       exitCode: error.exitCode,
     }
+  }
+  if (error instanceof ConfigFileError) {
+    return { code: 'CONFIG_INVALID', message: error.message, exitCode: 2 }
   }
   if (error instanceof RequestError) {
     const requestId = error.requestId ?? undefined

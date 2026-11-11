@@ -1,7 +1,7 @@
 import type { ApiBody, ApiQuery } from '@dev-ops/api-client'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { Command } from 'commander'
-import { businessContext, printBusinessResult, resolveTeamId } from '../lib/command.ts'
+import { businessContext, collectAllPages, printBusinessResult, resolveTeamId } from '../lib/command.ts'
 import { resolvePagination } from '../lib/config.ts'
 import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
@@ -64,6 +64,9 @@ function buildPlanFields(options: PlanFieldsOptions): CreatePlanBody {
   const operationKind = requireEnum(options.kind, OPERATION_KINDS, 'kind')
   const environment = requireEnum(options.environment, ENVIRONMENTS, 'environment')
   const executionMode = requireEnum(options.execution, EXECUTION_MODES, 'execution')
+  if (executionMode === 'platform_pipeline' && !options.workflow?.trim()) {
+    throw new CliError('platform_pipeline 执行方式需要 --workflow <path>', 2, { code: 'MISSING_WORKFLOW' })
+  }
   return {
     operationKind,
     environment,
@@ -99,6 +102,15 @@ function applyPlanOptions(command: Command): Command {
  * @param program 根命令。
  * @param context CLI 上下文。
  */
+/** 校验 ISO 8601 时间并在本地拒绝非法值，避免把坏参数发送到服务端。 */
+function requireIsoTimestamp(value: string, label: string): string {
+  const timestamp = Date.parse(value)
+  if (Number.isNaN(timestamp)) {
+    throw new CliError(`${label} 必须是 ISO 8601 时间，例如 2026-11-11T00:00:00Z`, 2, { code: 'INVALID_ARGUMENT' })
+  }
+  return new Date(timestamp).toISOString()
+}
+
 export function registerChangeCommands(program: Command, context: CliContext): void {
   const change = program.command('change').description('创建、放行、执行与验证变更计划')
 
@@ -124,18 +136,22 @@ export function registerChangeCommands(program: Command, context: CliContext): v
     .action(async (options: Record<string, string | undefined>, command: Command) => {
       const business = await businessContext(command, context)
       const teamId = await resolveTeamId(context, business)
-      const { page, pageSize } = resolvePagination(business.globals)
+      const pagination = resolvePagination(business.globals)
+      const from = options.from ? requireIsoTimestamp(options.from, '--from') : undefined
+      const to = options.to ? requireIsoTimestamp(options.to, '--to') : undefined
       const query: ListPlansQuery = {
-        page,
-        pageSize,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
         ...(options.project ? { projectId: options.project } : {}),
         ...(options.environment ? { environment: requireEnum(options.environment, ENVIRONMENTS, 'environment') } : {}),
         ...(options.status ? { status: requireEnum(options.status, PLAN_STATUSES, 'status') } : {}),
         ...(options.kind ? { operationKind: requireEnum(options.kind, OPERATION_KINDS, 'kind') } : {}),
-        ...(options.from ? { from: options.from } : {}),
-        ...(options.to ? { to: options.to } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
       }
-      const result = await business.client.listChangePlans(teamId, query)
+      const result = pagination.all
+        ? await collectAllPages((page) => business.client.listChangePlans(teamId, { ...query, page }))
+        : await business.client.listChangePlans(teamId, query)
       printBusinessResult(context, business.globals, result, true)
     })
 
@@ -294,8 +310,15 @@ export function registerChangeCommands(program: Command, context: CliContext): v
     .argument('<planId>', '变更计划标识')
     .action(async (planId: string, _options: unknown, command: Command) => {
       const business = await businessContext(command, context)
-      const { page, pageSize } = resolvePagination(business.globals)
-      const result = await business.client.listChangePlanEvents(planId, { page, pageSize })
+      const pagination = resolvePagination(business.globals)
+      const result = pagination.all
+        ? await collectAllPages((page) =>
+            business.client.listChangePlanEvents(planId, { page, pageSize: pagination.pageSize }),
+          )
+        : await business.client.listChangePlanEvents(planId, {
+            page: pagination.page,
+            pageSize: pagination.pageSize,
+          })
       printBusinessResult(context, business.globals, result, true)
     })
 

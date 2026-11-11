@@ -355,3 +355,137 @@ test('复用 project 命令组，不重复注册同名组', () => {
   assert.equal(subcommandNames.includes('repository'), true)
   assert.equal(subcommandNames.includes('code-reference'), true)
 })
+
+test('code 组、commit 与 PR 命令输出生成契约结构', async (t) => {
+  const commit = {
+    sha: 'a'.repeat(40),
+    title: 'feat: demo',
+    authorName: '测试用户',
+    committedAt: '2026-11-11T00:00:00.000Z',
+    url: 'https://github.com/example/repo/commit/' + 'a'.repeat(40),
+    lastCheckedAt: '2026-11-11T00:00:00.000Z',
+  }
+  const pullRequest = {
+    number: 12,
+    title: 'feat: demo PR',
+    authorName: '测试用户',
+    sourceBranch: 'feature/demo',
+    targetBranch: 'main',
+    state: 'open',
+    reviewStatus: 'pending',
+    createdAt: '2026-11-11T00:00:00.000Z',
+    updatedAt: '2026-11-11T00:00:00.000Z',
+    mergedAt: null,
+    url: 'https://github.com/example/repo/pull/12',
+    lastCheckedAt: '2026-11-11T00:00:00.000Z',
+    files: [],
+    truncated: false,
+  }
+  const { server, requests } = await startJsonStub(t, (request) => {
+    const url = new URL(request.path, 'http://127.0.0.1')
+    if (url.pathname.endsWith('/commits')) return successEnvelope({ items: [commit], page: 1, pageSize: 20, total: 1 })
+    if (url.pathname.endsWith('/commits/' + commit.sha))
+      return successEnvelope({ ...commit, files: [], filesTruncated: false, filesUnsupported: false })
+    if (url.pathname.endsWith('/pull-requests'))
+      return successEnvelope({ items: [pullRequest], page: 1, pageSize: 20, total: 1 })
+    if (url.pathname.endsWith('/pull-requests/12')) return successEnvelope(pullRequest)
+    if (url.pathname.endsWith('/pull-requests/12/diff'))
+      return successEnvelope({ patch: 'diff --git a/x b/x', truncated: false })
+    if (url.pathname.endsWith('/branches')) return successEnvelope({ branches: ['main'] })
+    return failureEnvelope('NOT_FOUND', '未预期的请求')
+  })
+
+  const commits = await execute([
+    'project',
+    'repository',
+    'commits',
+    PROJECT_ID,
+    '--repository',
+    REPOSITORY_ID,
+    '--ref',
+    'main',
+    '--server',
+    server,
+    '--json',
+  ])
+  assert.equal(commits.code, 0, commits.stderr)
+  assert.equal(JSON.parse(commits.stdout).data.items[0].sha, commit.sha)
+
+  const commitDetail = await execute([
+    'project',
+    'repository',
+    'commit',
+    PROJECT_ID,
+    '--repository',
+    REPOSITORY_ID,
+    '--ref',
+    commit.sha,
+    '--server',
+    server,
+    '--json',
+  ])
+  assert.equal(commitDetail.code, 0, commitDetail.stderr)
+  assert.equal(JSON.parse(commitDetail.stdout).data.title, 'feat: demo')
+
+  const prs = await execute([
+    'project',
+    'repository',
+    'pull-requests',
+    PROJECT_ID,
+    '--repository',
+    REPOSITORY_ID,
+    '--state',
+    'open',
+    '--server',
+    server,
+    '--json',
+  ])
+  assert.equal(prs.code, 0, prs.stderr)
+  assert.equal(JSON.parse(prs.stdout).data.items[0].number, 12)
+
+  const pr = await execute([
+    'project',
+    'repository',
+    'pull-request',
+    PROJECT_ID,
+    '--repository',
+    REPOSITORY_ID,
+    '--number',
+    '12',
+    '--server',
+    server,
+    '--json',
+  ])
+  assert.equal(pr.code, 0, pr.stderr)
+  assert.equal(JSON.parse(pr.stdout).data.number, 12)
+
+  const diff = await execute([
+    'project',
+    'repository',
+    'pull-request-diff',
+    PROJECT_ID,
+    '--repository',
+    REPOSITORY_ID,
+    '--number',
+    '12',
+    '--server',
+    server,
+    '--json',
+  ])
+  assert.equal(diff.code, 0, diff.stderr)
+  assert.equal(JSON.parse(diff.stdout).data.truncated, false)
+
+  const shortBranches = await execute([
+    'code',
+    'branches',
+    PROJECT_ID,
+    '--repository',
+    REPOSITORY_ID,
+    '--server',
+    server,
+    '--json',
+  ])
+  assert.equal(shortBranches.code, 0, shortBranches.stderr)
+  assert.deepEqual(JSON.parse(shortBranches.stdout).data.branches, ['main'])
+  assert.equal(requests.length, 6)
+})

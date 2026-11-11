@@ -48,6 +48,39 @@ export function printBusinessResult(
   printSuccess({ json: globals.json === true, stdout: context.stdout }, data, result.requestId)
 }
 
+/** 统一列表分页结构。 */
+export interface PageResult<T> {
+  items: T[]
+  page: number
+  pageSize: number
+  total: number
+}
+
+/**
+ * 逐页读取全部列表；用于全局 `--all`，避免只取第一页造成静默截断。
+ * @param fetchPage 按页码读取一页的函数。
+ * @returns 合并后的列表与首个请求标识；页内为空即停止，最多读取 1000 页防止异常远端无限翻页。
+ */
+export async function collectAllPages<T>(
+  fetchPage: (page: number) => Promise<{ data: PageResult<T>; requestId: string }>,
+): Promise<{ data: PageResult<T>; requestId: string }> {
+  const items: T[] = []
+  let page = 1
+  let requestId = ''
+  let total = 0
+  for (;;) {
+    const result = await fetchPage(page)
+    requestId ||= result.requestId
+    items.push(...result.data.items)
+    total = result.data.total
+    const pageSize = result.data.pageSize
+    if (result.data.items.length === 0 || items.length >= total || page >= 1_000) break
+    if (pageSize <= 0) break
+    page += 1
+  }
+  return { data: { items, page: 1, pageSize: items.length, total }, requestId }
+}
+
 /** 解析团队：参数/环境优先，否则通过 /me 自动选择唯一团队。 */
 export async function resolveTeamId(context: CliContext, business: BusinessCommandContext): Promise<string> {
   const explicit = business.globals.team ?? context.env.DEV_OPS_TEAM

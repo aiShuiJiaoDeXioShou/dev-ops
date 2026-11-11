@@ -1,6 +1,7 @@
 import { createIdempotencyKey, type ApiBody } from '@dev-ops/api-client'
 import type { Command } from 'commander'
 import { businessContext, globalsOf, printBusinessResult, resolveTeamId } from '../lib/command.ts'
+import { printSuccess } from '../lib/output.ts'
 import type { GlobalOptions } from '../lib/config.ts'
 import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
@@ -103,7 +104,19 @@ export function registerTeamCommands(program: Command, context: CliContext): voi
     .action(async (_options: unknown, command: Command) => {
       const business = await businessContext(command, context)
       const result = await business.client.listMyTeams()
-      printBusinessResult(context, business.globals, result, true)
+      // /me/teams 返回 { teams, isPlatformAdmin }，不能按通用列表归一化，否则团队会全部丢失。
+      const data = result.data as { teams: unknown[]; isPlatformAdmin: boolean }
+      printSuccess(
+        { json: business.globals.json === true, stdout: context.stdout },
+        {
+          items: data.teams,
+          page: 1,
+          pageSize: data.teams.length,
+          total: data.teams.length,
+          isPlatformAdmin: data.isPlatformAdmin,
+        },
+        result.requestId,
+      )
     })
 
   team

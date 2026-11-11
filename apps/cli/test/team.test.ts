@@ -147,13 +147,21 @@ function requestAt(requests: CapturedRequest[], index: number): CapturedRequest 
   return request
 }
 
-function teamRow(id = 'team-1') {
-  return { id, name: '测试团队', role: 'admin', status: 'active' }
+function teamRow(id = '11111111-1111-4111-8111-111111111111') {
+  return {
+    id,
+    name: '测试团队',
+    iconText: null,
+    description: null,
+    version: 1,
+    role: 'admin',
+    status: 'active',
+  }
 }
 
 function memberRow() {
   return {
-    userId: 'user-1',
+    userId: '22222222-2222-4222-8222-222222222222',
     name: '测试成员',
     email: 'member@example.test',
     role: 'developer',
@@ -164,13 +172,13 @@ function memberRow() {
 
 function invitationRow() {
   return {
-    id: 'inv-1',
-    teamId: 'team-1',
+    id: '33333333-3333-4333-8333-333333333333',
+    teamId: '11111111-1111-4111-8111-111111111111',
     email: 'invitee@example.test',
     role: 'developer',
     status: 'pending',
     expiresAt: '2026-11-17T00:00:00.000Z',
-    invitedByUserId: 'user-1',
+    invitedByUserId: '22222222-2222-4222-8222-222222222222',
     deliveryStatus: 'sent',
     createdAt: '2026-11-10T00:00:00.000Z',
   }
@@ -178,14 +186,20 @@ function invitationRow() {
 
 test('team list 归一化 JSON 列表并携带 Bearer', async (t) => {
   const row = teamRow()
-  const { url, requests } = await startRecordingServer(t, () => ({ data: [row] }))
+  const { url, requests } = await startRecordingServer(t, () => ({ data: { teams: [row], isPlatformAdmin: false } }))
   const result = await execute(['team', 'list', '--server', url, '--json'])
   assert.equal(result.code, 0, result.stderr)
   const request = requestAt(requests, 0)
   assert.equal(request.method, 'GET')
   assert.equal(new URL(request.url, url).pathname, '/api/v1/me/teams')
   assert.equal(request.headers.authorization, `Bearer ${TOKEN}`)
-  assert.deepEqual(successData(result.stdout), { items: [row], page: 1, pageSize: 1, total: 1 })
+  assert.deepEqual(successData(result.stdout), {
+    items: [row],
+    page: 1,
+    pageSize: 1,
+    total: 1,
+    isPlatformAdmin: false,
+  })
 })
 
 test('team create 发送名称与管理员邮箱', async (t) => {
@@ -229,7 +243,12 @@ test('team member list 归一化成员列表', async (t) => {
   const result = await execute(['team', 'member', 'list', '--team', 'team-1', '--server', url, '--json'])
   assert.equal(result.code, 0, result.stderr)
   assert.equal(new URL(requestAt(requests, 0).url, url).pathname, '/api/v1/teams/team-1/members')
-  assert.deepEqual(successData(result.stdout), { items: [row], page: 1, pageSize: 1, total: 1 })
+  assert.deepEqual(successData(result.stdout), {
+    items: [row],
+    page: 1,
+    pageSize: 1,
+    total: 1,
+  })
 })
 
 test('team member list 未指定团队时自动选择唯一团队', async (t) => {
@@ -353,7 +372,12 @@ test('team invitation list 按状态筛选并使用环境团队', async (t) => {
   const requestUrl = new URL(requestAt(requests, 0).url, url)
   assert.equal(requestUrl.pathname, '/api/v1/teams/team-env/invitations')
   assert.equal(requestUrl.searchParams.get('status'), 'pending')
-  assert.deepEqual(successData(result.stdout), { items: [row], page: 1, pageSize: 1, total: 1 })
+  assert.deepEqual(successData(result.stdout), {
+    items: [row],
+    page: 1,
+    pageSize: 1,
+    total: 1,
+  })
 })
 
 test('team invitation list 非法状态退出 2 且不发请求', async (t) => {
