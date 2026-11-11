@@ -57,6 +57,28 @@ test('业务失败返回 BUSINESS_ERROR，保留业务码且不透传服务端�
   })
 })
 
+test('参数校验类业务错误向调用方保留可读原因', async () => {
+  const client = createApiClient({
+    baseUrl: 'https://example.test',
+    fetch: async () =>
+      Response.json(
+        {
+          success: false,
+          code: 'VALIDATION_ERROR',
+          message: '环境变量名必须匹配 [A-Za-z_][A-Za-z0-9_]*',
+          requestId: 'trace',
+        },
+        { status: 200, headers: { 'x-request-id': 'trace' } },
+      ),
+  })
+  await assert.rejects(client.ready(), (error: unknown) => {
+    assert.ok(error instanceof RequestError)
+    assert.equal(error.serverCode, 'VALIDATION_ERROR')
+    assert.match(error.message, /环境变量名必须匹配/)
+    return true
+  })
+})
+
 test('契约外响应在 HTTP 200 时返回 INVALID_RESPONSE', async () => {
   const client = createApiClient({
     baseUrl: 'https://example.test',

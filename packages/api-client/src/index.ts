@@ -168,8 +168,23 @@ export function isBusinessError(error: unknown, code?: string): error is Request
   )
 }
 
+/** 可以安全展示给用户的业务错误码；数据库或内部错误不向调用方透传正文。 */
+const PUBLIC_BUSINESS_CODES = new Set([
+  'VALIDATION_ERROR',
+  'PRECONDITION_FAILED',
+  'DUPLICATE_RELATION',
+  'INVALID_TRANSITION',
+  'VERSION_CONFLICT',
+  'CHANGE_PLAN_TARGET_UNSUPPORTED',
+  'CHANGE_PLAN_APPROVAL_REQUIRED',
+  'CHANGE_VERIFICATION_MISMATCH',
+  'CODE_CHANGE_NOT_FOUND',
+  'PIPELINE_SECRET_UNAVAILABLE',
+])
+
 function createBusinessError(body: ApiFailureEnvelope, requestId: string): RequestError {
-  return new RequestError(body.message.trim() || '操作未完成，请稍后重试。', {
+  const safeMessage = PUBLIC_BUSINESS_CODES.has(body.code) ? body.message.trim() : ''
+  return new RequestError(safeMessage || '操作未完成，请稍后重试。', {
     code: 'BUSINESS_ERROR',
     status: 200,
     requestId,
