@@ -150,7 +150,8 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
    * @returns 当前用户是否可删除该附件。
    */
   const canDeleteAttachment = (attachment: AttachmentSummary) =>
-    role === 'admin' || attachment.uploadedBy.userId === user.id || project.data?.data.owner.userId === user.id
+    role !== 'viewer' &&
+    (role === 'admin' || attachment.uploadedBy.userId === user.id || project.data?.data.owner.userId === user.id)
   return (
     <aside className="details" aria-label="Bug 详情">
       <div className="detail-top">
