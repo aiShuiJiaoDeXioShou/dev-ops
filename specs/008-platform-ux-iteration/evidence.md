@@ -82,3 +82,12 @@
 - UI P1/P2 未完成：PR 筛选入 URL、移动端表格滚动提示、凭据配置请求日志弹窗、头像上传、变更详情项目 UUID 展示、全站 document.title。
 - 未验证：真实 GitHub 写权限、非本机 Linux 节点、生产部署、外部执行系统连接器。
 - 审计报告中其余未修复项保留在对应审计清单，不视为已通过。
+
+## 6. 自举验收记录（平台内）
+
+- 需求：`#1 平台体验迭代 2026-11：核心交互修复与流水线自举验收`，状态 `passed`；已关联真实提交与 PR。
+- Bug：`#9 变更计划部署版本缺少服务选择，创建必然失败`，经创建→修复→回归通过→`resolved`，并关联修复提交。
+- 代码关联：需求关联 PR `#1`（https://github.com/aiShuiJiaoDeXioShou/dev-ops/pull/1）与本轮实现提交；Bug 关联修复提交。
+- PR 页在真实 GitHub PR 创建后显示 1 条记录，可直接打开来源平台。
+- 流水线：运行 `platform-smoke`（ref `feat/platform-polish-2026-11`）状态 `succeeded`，步骤日志可读，产物 `build-info` 可下载且 SHA-256 已记录。
+- CLI 验收：`requirement start-development/submit-test/start-test/pass-test/comment`、`bug create/start-fix/submit-regression/record-regression`、`project code-reference add` 均为真实 API 调用；`team list`、`code branches`、`project repository commits` 已用真实服务验证。
