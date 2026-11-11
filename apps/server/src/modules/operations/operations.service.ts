@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -218,10 +219,12 @@ export function createOperationsService(deps: {
     const isManager = member.role === 'admin' || (await isProjectOwner(plan.project_id, actor.id))
     const isCreator = plan.created_by_user_id === actor.id
     const status = plan.status
+    // 外部执行系统连接器尚未接入，本版只为此类计划保留记录，不能放行或执行。
+    const isExecutable = plan.execution_mode === 'platform_pipeline'
     return {
       canUpdate: status === 'pending' && (isCreator || isManager),
-      canApprove: status === 'pending' && isManager && !isCreator,
-      canExecute: status === 'approved' && isManager,
+      canApprove: isExecutable && status === 'pending' && isManager && !isCreator,
+      canExecute: isExecutable && status === 'approved' && isManager,
       canVerify: status === 'verifying' && isManager,
       canCancel: ['pending', 'approved', 'executing'].includes(status) && (isCreator || isManager),
       canRetry: status === 'failed' && isManager,
@@ -430,6 +433,12 @@ export function createOperationsService(deps: {
     if (row.status !== 'pending') {
       throw new ApiError(ERROR_CODES.CHANGE_PLAN_APPROVAL_REQUIRED, '只有待确认的计划可以放行')
     }
+    if (row.execution_mode !== 'platform_pipeline') {
+      throw new ApiError(
+        ERROR_CODES.CHANGE_PLAN_TARGET_UNSUPPORTED,
+        '本版未接入外部执行系统，外部执行计划只能记录，不能放行或执行',
+      )
+    }
     if (row.revision !== input.expectedRevision) {
       throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '计划已被修改，请刷新后重试')
     }
@@ -558,14 +567,6 @@ export function createOperationsService(deps: {
     listEventsPage,
     ...execution,
   }
-}
-
-/** 判断唯一约束冲突；Drizzle 可能把数据库错误包在 cause 中。 */
-function isUniqueViolation(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  const code = Reflect.get(error, 'code')
-  if (code === '23505') return true
-  return 'cause' in error && isUniqueViolation(Reflect.get(error, 'cause'))
 }
 
 export type OperationsService = ReturnType<typeof createOperationsService>

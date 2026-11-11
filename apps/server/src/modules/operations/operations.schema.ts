@@ -3,6 +3,9 @@ import { apiResponseSchema } from '../../platform/http/response.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const timestampSchema = Type.String()
+const isoTimestampQuerySchema = Type.String({
+  pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,3})?(?:Z|[+-]\\d{2}:\\d{2})$',
+})
 const environmentSchema = Type.Union([Type.Literal('development'), Type.Literal('test'), Type.Literal('production')])
 const operationKindSchema = Type.Union([
   Type.Literal('deploy_version'),
@@ -167,8 +170,8 @@ export const changePlanListQuerySchema = Type.Object(
       ]),
     ),
     operationKind: Type.Optional(operationKindSchema),
-    from: Type.Optional(timestampSchema),
-    to: Type.Optional(timestampSchema),
+    from: Type.Optional(isoTimestampQuerySchema),
+    to: Type.Optional(isoTimestampQuerySchema),
     page: Type.Optional(Type.Integer({ minimum: 1, default: 1 })),
     pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100, default: 20 })),
   },

@@ -43,6 +43,8 @@ function mapHttpStatus(statusCode: number): ErrorCode {
       return ERROR_CODES.NOT_FOUND
     case 409:
       return ERROR_CODES.PRECONDITION_FAILED
+    case 413:
+      return ERROR_CODES.VALIDATION_ERROR
     default:
       return ERROR_CODES.INTERNAL_ERROR
   }
@@ -93,7 +95,17 @@ export function registerErrorHandlers(app: FastifyInstance) {
       return sendFailure(reply, 200, failure(mapHttpStatus(statusCode), '请求无法完成', request.id))
     }
 
-    request.log.error({ err: error }, 'Request failed')
+    // 不记录原始 error：Drizzle/Fastify 的错误消息可能包含完整 SQL、绑定参数与内部堆栈，
+    // 只保留可检索的错误类型与请求上下文，具体排查用 requestId 关联。
+    request.log.error(
+      {
+        errorName: error.name,
+        errorCode: typeof error.code === 'string' ? error.code : undefined,
+        method: request.method,
+        url: request.url,
+      },
+      'Request failed',
+    )
     return sendFailure(reply, 500, failure(ERROR_CODES.INTERNAL_ERROR, '服务内部错误', request.id))
   })
 }

@@ -9,6 +9,7 @@ import { ApiError } from './errors.ts'
 import { requestHash } from './idempotency.ts'
 
 const NIL_TEAM_ID = '00000000-0000-0000-0000-000000000000'
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_KEY_LENGTH = 128
 const AUTH_PREFIX = '/api/v1/auth/'
 
@@ -21,6 +22,27 @@ function isUniqueConstraintError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false
   if ('code' in error && error.code === '23505') return true
   return 'cause' in error && isUniqueConstraintError(error.cause)
+}
+
+/**
+ * 计算幂等作用域与团队标识。
+ * 使用实际请求路径而非路由模式：同一用户在不同团队/项目复用同一个 Idempotency-Key 时，
+ * 实际资源路径不同，不应被误判为重复请求；路径中的动态标识均为服务端校验过的 UUID。
+ * @param input 请求 URL 与已解析的路由参数。
+ * @returns 不含查询串的作用域与团队标识；无法从参数确定团队时使用 nil UUID。
+ */
+export function idempotencyScopeFor(input: { url: string; params: unknown }): { scope: string; teamId: string } {
+  const scope = input.url.split('?')[0] ?? input.url
+  const params = input.params
+  const teamId =
+    typeof params === 'object' &&
+    params !== null &&
+    'teamId' in params &&
+    typeof params.teamId === 'string' &&
+    UUID_PATTERN.test(params.teamId)
+      ? params.teamId
+      : NIL_TEAM_ID
+  return { scope, teamId }
 }
 
 function payloadIsFailure(payload: unknown): boolean {
@@ -55,12 +77,12 @@ export function createIdempotencyHooks(options: IdempotencyHookOptions) {
     }
     const userId = await options.getUserId(request.headers)
     if (!userId) return
-    const scope = request.routeOptions.url ?? request.url.split('?')[0] ?? request.url
+    const { scope, teamId } = idempotencyScopeFor({ url: request.url, params: request.params })
     const recordId = randomUUID()
     try {
       await options.db.insert(idempotencyRecord).values({
         id: recordId,
-        team_id: NIL_TEAM_ID,
+        team_id: teamId,
         actor_user_id: userId,
         scope,
         idempotency_key: key,

@@ -169,7 +169,7 @@ export function isBusinessError(error: unknown, code?: string): error is Request
 }
 
 function createBusinessError(body: ApiFailureEnvelope, requestId: string): RequestError {
-  return new RequestError('操作未完成，请稍后重试。', {
+  return new RequestError(body.message.trim() || '操作未完成，请稍后重试。', {
     code: 'BUSINESS_ERROR',
     status: 200,
     requestId,
