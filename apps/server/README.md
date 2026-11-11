@@ -73,6 +73,12 @@ pnpm --dir apps/server dev
 | `GITHUB_APP_ID`                  | 未设置                            | `app` 模式 GitHub App ID                                          |
 | `GITHUB_APP_PRIVATE_KEY_PATH`    | 未设置                            | `app` 模式 App 私钥文件路径                                       |
 | `GITHUB_APP_SLUG`                | 未设置                            | `app` 模式安装入口 slug                                           |
+| `ATTACHMENT_STORAGE_DIR`         | `./attachment-data`               | 本地储存桶根目录；需可写并纳入备份                                |
+| `ATTACHMENT_MAX_BYTES`           | `52428800`                        | 单附件上限（字节），范围 1 MB–2 GB                                |
+| `ATTACHMENT_MAX_PER_SUBMIT`      | `10`                              | 单次提交附件数量上限，范围 1–50                                   |
+| `ATTACHMENT_MAX_PER_RECORD`      | `50`                              | 单条记录累计附件上限，范围 1–200                                  |
+| `ATTACHMENT_TEMP_TTL_HOURS`      | `24`                              | 未绑定临时附件保留小时数，范围 1–168                              |
+| `STORAGE_PROBE_TIMEOUT_MS`       | `10000`                           | 储存桶连接测试超时，范围 1–60 秒                                  |
 
 `ROOT_EMAIL`、`ROOT_INITIAL_PASSWORD` 只由 `seed:root` 一次性使用，不进入常驻服务配置。
 
@@ -157,21 +163,25 @@ apps/server/
 
 ### 平台接口（均走 /api/v1、GET/POST、统一信封）
 
-| 方法与路径                                           | 权限          | 说明                                                         |
-| ---------------------------------------------------- | ------------- | ------------------------------------------------------------ |
-| `GET /projects/:projectId/pipeline-workflows`        | 项目可见      | 列出 `.devops/workflows/` 工作流与解析状态、最近运行         |
-| `GET /projects/:projectId/pipeline-workflows/detail` | 项目可见      | 工作流详情、YAML 内容、内容哈希与计划摘要                    |
-| `POST /projects/:projectId/pipeline-runs`            | 管理员/开发者 | 手动触发运行，幂等键重复返回同一运行                         |
-| `GET /projects/:projectId/pipeline-runs`             | 项目可见      | 运行列表，按 workflowPath/status/from/to 筛选并分页          |
-| `GET /pipeline-runs/:runId`                          | 项目可见      | 运行详情：输入摘要、发起人、节点摘要、步骤、产物与日志元数据 |
-| `POST /pipeline-runs/:runId/cancel`                  | 管理员/开发者 | 取消运行，返回最新详情                                       |
-| `GET /pipeline-runs/:runId/logs`                     | 项目可见      | 按 stepIndex/afterSeq/limit 读取日志分片                     |
-| `GET /pipeline-runs/:runId/artifacts`                | 项目可见      | 运行产物列表（含受鉴权 downloadUrl）                         |
-| `GET /pipeline-artifacts/:artifactId/download`       | 项目可见      | 产物二进制下载（文件传输显式例外，见下）                     |
-| `GET/POST /teams/:teamId/pipeline-nodes`             | 团队管理员    | 节点列表、创建节点并返回一次性注册令牌                       |
-| `POST /pipeline-nodes/:nodeId/drain`                 | 团队管理员    | 排空节点，不再分配新运行                                     |
-| `POST /pipeline-nodes/:nodeId/disable`               | 团队管理员    | 停用节点并撤销 Agent 令牌                                    |
-| `POST /pipeline-nodes/:nodeId/tokens/rotate`         | 团队管理员    | 轮换 Agent 令牌，旧令牌立即失效                              |
+| 方法与路径                                           | 权限                     | 说明                                                             |
+| ---------------------------------------------------- | ------------------------ | ---------------------------------------------------------------- |
+| `GET /projects/:projectId/pipeline-workflows`        | 项目可见                 | 列出 `.devops/workflows/` 工作流与解析状态、最近运行             |
+| `GET /projects/:projectId/pipeline-workflows/detail` | 项目可见                 | 工作流详情、YAML 内容、内容哈希与计划摘要                        |
+| `POST /projects/:projectId/pipeline-runs`            | 管理员/开发者            | 手动触发运行，幂等键重复返回同一运行                             |
+| `GET /projects/:projectId/pipeline-runs`             | 项目可见                 | 运行列表，按 workflowPath/status/from/to 筛选并分页              |
+| `GET /pipeline-runs/:runId`                          | 项目可见                 | 运行详情：输入摘要、发起人、节点摘要、步骤、产物与日志元数据     |
+| `POST /pipeline-runs/:runId/cancel`                  | 管理员/开发者            | 取消运行，返回最新详情                                           |
+| `GET /pipeline-runs/:runId/logs`                     | 项目可见                 | 按 stepIndex/afterSeq/limit 读取日志分片                         |
+| `GET /pipeline-runs/:runId/artifacts`                | 项目可见                 | 运行产物列表（含受鉴权 downloadUrl）                             |
+| `GET /pipeline-artifacts/:artifactId/download`       | 项目可见                 | 产物二进制下载（文件传输显式例外，见下）                         |
+| `GET/POST /teams/:teamId/pipeline-nodes`             | 团队管理员               | 节点列表、创建节点并返回一次性注册令牌                           |
+| `POST /pipeline-nodes/:nodeId/drain`                 | 团队管理员               | 排空节点，不再分配新运行                                         |
+| `POST /pipeline-nodes/:nodeId/disable`               | 团队管理员               | 停用节点并撤销 Agent 令牌                                        |
+| `POST /pipeline-nodes/:nodeId/tokens/rotate`         | 团队管理员               | 轮换 Agent 令牌，旧令牌立即失效                                  |
+| `POST /projects/:projectId/attachments`              | 管理员/开发者            | 原始流上传临时附件；按 Content-Length 自行计量并跳过全局幂等钩子 |
+| `GET /attachments/policy`                            | 登录用户                 | 附件大小、单次/单记录数量与临时保留期策略                        |
+| `GET /attachments/:attachmentId/download`            | 项目可见                 | 附件二进制下载（文件传输第二条例外，见下）                       |
+| `POST /attachments/:attachmentId/remove`             | 上传者/管理员/项目负责人 | 删除附件；事务内置 removed 或删除临时记录，对象在提交后删除      |
 
 角色口径：浏览者可查看工作流/运行/日志/产物，不可触发或取消；开发者可触发与取消；节点管理与令牌轮换仅团队管理员。所有接口逐层校验登录身份、团队成员、项目归属与角色。
 

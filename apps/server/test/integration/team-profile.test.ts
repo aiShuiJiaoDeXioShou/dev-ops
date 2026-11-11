@@ -110,6 +110,6 @@ test('团队资料：管理员更新、名称冲突、版本冲突、非管理�
     url: '/api/v1/me/teams',
     headers: { cookie: devUser.cookie },
   })
-  assert.equal(teams.json().data[0].iconText, '研')
-  assert.equal(teams.json().data[0].version, 2)
+  assert.equal(teams.json().data.teams[0].iconText, '研')
+  assert.equal(teams.json().data.teams[0].version, 2)
 })

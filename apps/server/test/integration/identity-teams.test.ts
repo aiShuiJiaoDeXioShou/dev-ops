@@ -133,7 +133,13 @@ test('团队邀请、开通、角色与最后管理员保护通过真实 HTTP �
 
   const myTeams = await app.inject({ method: 'GET', url: '/api/v1/me/teams', headers: { cookie: adminCookie } })
   assert.equal(myTeams.json().success, true)
-  assert.equal(myTeams.json().data[0].role, 'admin')
+  assert.equal(myTeams.json().data.teams[0].role, 'admin')
+  assert.equal(myTeams.json().data.isPlatformAdmin, false)
+
+  // 平台管理员身份由 /me/teams 透出；root 账号在 seed 时写入 platform_admin。
+  const rootTeams = await app.inject({ method: 'GET', url: '/api/v1/me/teams', headers: { cookie: rootCookie } })
+  assert.equal(rootTeams.json().success, true)
+  assert.equal(rootTeams.json().data.isPlatformAdmin, true)
 
   // 管理员邀请开发者；开发者接受后只读接口可用，管理接口被拒绝。
   const devEmail = `dev-${randomBytes(3).toString('hex')}@example.test`
