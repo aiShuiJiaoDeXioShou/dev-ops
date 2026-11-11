@@ -75,19 +75,21 @@ export function AppLayout() {
         className="sidebar"
         {...(menuOpen ? { role: 'dialog', 'aria-modal': true, 'aria-label': '工作区导航' } : {})}
       >
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="sidebar-close"
-          aria-label="关闭导航"
-          onClick={() => {
-            setMenuOpen(false)
-            menuButtonRef.current?.focus()
-          }}
-        >
-          <XIcon className="size-4" aria-hidden="true" />
-        </Button>
+        {menuOpen ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="sidebar-close"
+            aria-label="关闭导航"
+            onClick={() => {
+              setMenuOpen(false)
+              menuButtonRef.current?.focus()
+            }}
+          >
+            <XIcon className="size-4" aria-hidden="true" />
+          </Button>
+        ) : null}
         <Link className="brand" to="/projects" aria-label="项目列表">
           <img src="/prototype/brand.svg" width={29} height={29} alt="" />
           DevOps

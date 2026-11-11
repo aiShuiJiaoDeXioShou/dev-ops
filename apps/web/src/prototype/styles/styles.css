@@ -3352,13 +3352,3 @@ select.btn:hover:not(:disabled) {
   visibility: visible;
 }
 
-
-/* 桌面端不显示移动抽屉的关闭按钮；窄屏抽屉内显示。 */
-.sidebar-close {
-  display: none;
-}
-@media (max-width: 700px) {
-  .sidebar .sidebar-close {
-    display: grid;
-  }
-}
