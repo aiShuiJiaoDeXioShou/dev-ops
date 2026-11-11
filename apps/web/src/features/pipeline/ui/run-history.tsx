@@ -1,6 +1,7 @@
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Search } from 'lucide-react'
 import { formatDateTime } from '@/shared/lib/format'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
@@ -74,6 +75,7 @@ export function RunHistory({
   requestId,
   onRetry,
 }: RunHistoryProps) {
+  const navigate = useNavigate()
   const filtersActive = hasRunFilters(filters)
   /** 没有任何运行记录时不展示筛选栏，避免空页面堆一排无效控件；有记录或已选条件时保留。 */
   const showFilters = filtersActive || isPending || total > 0 || runs.length > 0
@@ -186,7 +188,14 @@ export function RunHistory({
               </TableHeader>
               <TableBody>
                 {runs.map((run) => (
-                  <TableRow key={run.runId}>
+                  <TableRow
+                    key={run.runId}
+                    className="clickable-row"
+                    onClick={(event) => {
+                      if (isNestedInteractiveTarget(event.target)) return
+                      navigate(`${projectBasePath}/pipelines/${run.runId}`)
+                    }}
+                  >
                     <TableCell>
                       <Link to={`${projectBasePath}/pipelines/${run.runId}`} className="item-title">
                         <strong className="whitespace-nowrap">{run.workflowName ?? run.workflowPath}</strong>

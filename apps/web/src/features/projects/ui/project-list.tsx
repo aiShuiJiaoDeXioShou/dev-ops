@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { useSession } from '@/features/identity/public'
 import { describeRequestError } from '@/shared/api/errors'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { EmptyState } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectActivityQueryOptions, projectListQueryOptions } from '../api/queries'
@@ -20,6 +21,7 @@ import { ActivityBarometer } from './activity-barometer'
 
 /** 项目列表：项目卡片、状态筛选、搜索与创建入口。 */
 export function ProjectList() {
+  const navigate = useNavigate()
   const { currentTeam, role } = useSession()
   const [params, setParams] = useSearchParams()
   const filters = parseProjectFilters(params)
@@ -167,7 +169,14 @@ export function ProjectList() {
         ) : (
           <div className="project-grid">
             {projects.map((project) => (
-              <article key={project.id} className="project-card">
+              <article
+                key={project.id}
+                className="project-card clickable-card"
+                onClick={(event) => {
+                  if (isNestedInteractiveTarget(event.target)) return
+                  navigate(`/projects/${project.id}/requirements`)
+                }}
+              >
                 <div className="project-card-head">
                   <span className="project-symbol">
                     <PrototypeIcon name="folder" />

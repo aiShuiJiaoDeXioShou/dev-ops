@@ -4,6 +4,7 @@ import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Select } from '@/shared/ui/controls/select'
@@ -185,7 +186,15 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
             </TableHeader>
             <TableBody>
               {members.data.data.map((member) => (
-                <TableRow key={member.userId}>
+                <TableRow
+                  key={member.userId}
+                  className={canManage ? 'clickable-row' : undefined}
+                  onClick={(event) => {
+                    if (!canManage || isNestedInteractiveTarget(event.target)) return
+                    setError('')
+                    setManageTarget(member)
+                  }}
+                >
                   <TableCell>
                     <span className="item-cell">
                       <span className="avatar">{member.name.slice(0, 1)}</span>

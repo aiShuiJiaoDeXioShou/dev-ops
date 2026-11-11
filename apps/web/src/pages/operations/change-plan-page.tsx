@@ -6,6 +6,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
 import { projectQueryOptions } from '@/features/projects/public'
 import { Badge } from '@/shared/ui/controls/badge'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { FormField } from '@/shared/ui/controls/form-field'
@@ -23,6 +24,16 @@ import {
   PLAN_STATUS_LABELS,
   VERIFICATION_STATUS_LABELS,
 } from '@/features/operations/public'
+
+const PLAN_STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+  pending: 'warning',
+  approved: 'info',
+  executing: 'info',
+  verifying: 'warning',
+  completed: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
+}
 
 type ConfirmAction = 'approve' | 'execute' | 'verify' | 'cancel' | 'retry'
 
@@ -134,9 +145,9 @@ export function Component() {
             {OPERATION_KIND_LABELS[plan.operationKind] ?? plan.operationKind} · 修订 {plan.revision}
           </p>
         </div>
-        <Badge variant={plan.status === 'failed' ? 'destructive' : 'secondary'}>
+        <StatusBadge tone={PLAN_STATUS_TONES[plan.status] ?? 'neutral'}>
           {PLAN_STATUS_LABELS[plan.status] ?? plan.status}
-        </Badge>
+        </StatusBadge>
       </div>
 
       <div className="change-actions">

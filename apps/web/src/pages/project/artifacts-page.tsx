@@ -18,6 +18,7 @@ import {
 } from '@/features/delivery/public'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { EmptyState, PageLoading } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
@@ -263,7 +264,14 @@ export function Component() {
                 ) : (
                   <ul className="artifact-list">
                     {artifacts.data.data.items.map((artifact) => (
-                      <li key={artifact.id} className="artifact-item">
+                      <li
+                        key={artifact.id}
+                        className="artifact-item clickable-list-item"
+                        onClick={(event) => {
+                          if (isNestedInteractiveTarget(event.target)) return
+                          setSelectedBuildId(artifact.buildId)
+                        }}
+                      >
                         <div>
                           <strong>{artifact.versionLabel}</strong>
                           <span className="muted"> {artifact.artifactType}</span>

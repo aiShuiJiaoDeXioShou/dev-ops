@@ -2211,3 +2211,96 @@ a.skill-title:hover {
   padding: 4px 10px;
   font-size: 12px;
 }
+
+/* 鼠标模式基础：可点击控件统一手型光标，禁用以禁止光标表达。 */
+button:not(:disabled),
+a[href],
+select:not(:disabled),
+summary,
+[role='button']:not([aria-disabled='true']),
+[role='tab']:not([aria-disabled='true']),
+[role='checkbox'],
+[role='switch'],
+[role='radio'],
+label[for],
+label:has([data-slot='checkbox']),
+label:has([data-slot='switch']) {
+  cursor: pointer;
+}
+button:disabled,
+[aria-disabled='true'],
+[role='button'][aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+/* 整行/整卡可点击区域：手型 + 明确 hover，嵌套控件保持自己的语义。 */
+.clickable-row,
+.clickable-card,
+.clickable-list-item {
+  cursor: pointer;
+}
+.clickable-card {
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+@media (hover: hover) {
+  .clickable-card:hover {
+    border-color: color-mix(in oklab, var(--primary) 30%, var(--border));
+    box-shadow: 0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent);
+  }
+  .clickable-list-item:hover {
+    background: var(--secondary);
+  }
+}
+/* 整行内不要出现意外文本选中，双击行时更像“条目”。 */
+.clickable-row,
+.clickable-card {
+  user-select: none;
+}
+/* 行内输入与正文仍允许选择。 */
+.clickable-row input,
+.clickable-row textarea,
+.clickable-card input,
+.clickable-card textarea {
+  user-select: text;
+}
+
+/* 项目设置弹窗：分组页签下只滚动内容区，避免保存按钮与后续设置区混在一起。 */
+.project-settings-tabs [data-slot='tabs-list'] {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 18px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+.project-settings-tabs [data-slot='tabs-trigger'] {
+  min-height: 34px;
+  padding: 8px 0;
+  border-radius: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.project-settings-tabs [data-slot='tabs-trigger'][data-state='active'] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--primary);
+  font-weight: 500;
+}
+.project-settings-tabs [data-slot='tabs-content'] {
+  padding-top: 4px;
+}
+
+/* 可交互的日期格子：手型 + hover 描边，强调可点开当天明细。 */
+.activity-day:not(.future) {
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .activity-day:not(.future):hover {
+    outline: 2px solid var(--primary);
+    outline-offset: 1px;
+  }
+}

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
@@ -49,7 +50,14 @@ export function CommitHistoryDialog({
           ) : (
             <ul className="plain-list stacked-list">
               {list.data.data.items.map((commit) => (
-                <li key={commit.sha}>
+                <li
+                  key={commit.sha}
+                  className="clickable-list-item"
+                  onClick={(event) => {
+                    if (isNestedInteractiveTarget(event.target)) return
+                    setSelectedRef(commit.sha)
+                  }}
+                >
                   <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedRef(commit.sha)}>
                     {commit.sha.slice(0, 8)} {commit.title}
                   </Button>

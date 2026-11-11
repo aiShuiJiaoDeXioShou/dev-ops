@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import { EmptyState } from '@/shared/ui/page-state'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/public'
@@ -115,7 +116,14 @@ export function RequirementList({ projectId }: { projectId: string }) {
               </thead>
               <tbody>
                 {items.map((item) => (
-                  <tr key={item.id} className={state.openId === item.id ? 'selected' : undefined}>
+                  <tr
+                    key={item.id}
+                    className={`clickable-row${state.openId === item.id ? ' selected' : ''}`}
+                    onClick={(event) => {
+                      if (isNestedInteractiveTarget(event.target)) return
+                      update({ openId: item.id })
+                    }}
+                  >
                     <td>
                       <div className="item-cell">
                         <PrototypeIcon name="file" />

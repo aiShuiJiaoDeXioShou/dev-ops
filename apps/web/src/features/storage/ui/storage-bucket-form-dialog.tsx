@@ -415,7 +415,7 @@ export function StorageBucketFormDialog({
                 </FormSection>
               )}
               {!isEditing && (
-                <label className="flex items-center gap-2 text-sm font-medium">
+                <label className="form-inline-label flex items-center gap-2 text-sm font-medium">
                   <Checkbox checked={setAsDefault} onCheckedChange={(checked) => setSetAsDefault(checked === true)} />
                   创建后设为默认储存桶（需先通过可读写测试）
                 </label>

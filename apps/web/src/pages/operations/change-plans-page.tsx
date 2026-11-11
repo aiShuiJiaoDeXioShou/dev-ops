@@ -6,7 +6,8 @@ import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
 import { projectListQueryOptions, projectServicesQueryOptions } from '@/features/projects/public'
 import { Button } from '@/shared/ui/controls/button'
-import { Badge } from '@/shared/ui/controls/badge'
+import { StatusBadge } from '@/shared/ui/status-badge'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,17 @@ import { ENVIRONMENT_LABELS, OPERATION_KIND_LABELS, PLAN_STATUS_LABELS } from '@
 const STATUS_OPTIONS = ['pending', 'approved', 'executing', 'verifying', 'completed', 'failed', 'cancelled'] as const
 const ENVIRONMENT_OPTIONS = ['development', 'test', 'production'] as const
 const KIND_OPTIONS = ['deploy_version', 'database_change', 'server_cleanup', 'cloud_resource_change'] as const
+
+/** 计划状态的位置色；文本仍来自业务标签。 */
+const PLAN_STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+  pending: 'warning',
+  approved: 'info',
+  executing: 'info',
+  verifying: 'warning',
+  completed: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
+}
 
 interface CreateFormState {
   projectId: string
@@ -247,7 +259,14 @@ export function Component() {
           </TableHeader>
           <TableBody>
             {items.map((plan) => (
-              <TableRow key={plan.id}>
+              <TableRow
+                key={plan.id}
+                className="clickable-row"
+                onClick={(event) => {
+                  if (isNestedInteractiveTarget(event.target)) return
+                  navigate(`/operations/changes/${plan.id}`)
+                }}
+              >
                 <TableCell>
                   <Link to={`/operations/changes/${plan.id}`}>
                     {plan.targetResource} · {plan.versionLabel}
@@ -257,9 +276,9 @@ export function Component() {
                 <TableCell>{ENVIRONMENT_LABELS[plan.environment] ?? plan.environment}</TableCell>
                 <TableCell>{OPERATION_KIND_LABELS[plan.operationKind] ?? plan.operationKind}</TableCell>
                 <TableCell>
-                  <Badge variant={plan.status === 'failed' ? 'destructive' : 'secondary'}>
+                  <StatusBadge tone={PLAN_STATUS_TONES[plan.status] ?? 'neutral'}>
                     {PLAN_STATUS_LABELS[plan.status] ?? plan.status}
-                  </Badge>
+                  </StatusBadge>
                 </TableCell>
                 <TableCell>{plan.createdBy?.name ?? '未知用户'}</TableCell>
                 <TableCell>{new Date(plan.updatedAt).toLocaleString()}</TableCell>

@@ -10,6 +10,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { cn } from '@/shared/lib/utils'
 import { Pagination } from '@/shared/ui/pagination'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { canWriteKnowledge } from '../api/mutations'
 import { skillListQueryOptions } from '../api/queries'
 import { SKILL_CATEGORY_LABELS, SKILL_CATEGORY_OPTIONS } from '../model/labels'
@@ -139,7 +140,14 @@ export function SkillList({ teamId }: { teamId: string }) {
             ) : (
               <ul className="skill-grid">
                 {query.data.data.items.map((item) => (
-                  <li key={item.id} className="skill-card">
+                  <li
+                    key={item.id}
+                    className="skill-card clickable-card"
+                    onClick={(event) => {
+                      if (isNestedInteractiveTarget(event.target)) return
+                      updateParam('skill', item.id)
+                    }}
+                  >
                     <div className="row spread">
                       <span className="skill-glyph">
                         <Layers className="size-5" aria-hidden="true" />

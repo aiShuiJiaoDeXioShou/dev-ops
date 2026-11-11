@@ -9,6 +9,7 @@ import {
   storageBucketsQueryOptions,
 } from '../api/queries'
 import { describeStorageError } from '../lib/errors'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import {
   BUCKET_KIND_LABELS,
   BUCKET_STATUS_LABELS,
@@ -157,7 +158,14 @@ export function StorageBucketManagement() {
                 const defaultReason = canSetBucketDefault(bucket) ? null : bucketDefaultBlockedReason(bucket)
                 const removeReason = canRemoveBucket(bucket) ? null : bucketRemoveBlockedReason(bucket)
                 return (
-                  <TableRow key={bucket.id}>
+                  <TableRow
+                    key={bucket.id}
+                    className="clickable-row"
+                    onClick={(event) => {
+                      if (isNestedInteractiveTarget(event.target)) return
+                      openForm(bucket, event.currentTarget)
+                    }}
+                  >
                     <TableCell>
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">

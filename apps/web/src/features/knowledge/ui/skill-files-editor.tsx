@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { FilePlus2, Pencil, Trash2, Download } from 'lucide-react'
 import { Button } from '@/shared/ui/controls/button'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Textarea } from '@/shared/ui/controls/textarea'
@@ -142,7 +143,14 @@ export function SkillFilesEditor({
       ) : (
         <ul className="space-y-2">
           {files.map((file, index) => (
-            <li key={file.path} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2">
+            <li
+              key={file.path}
+              className="clickable-row flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2"
+              onClick={(event) => {
+                if (isNestedInteractiveTarget(event.target)) return
+                openEdit(index)
+              }}
+            >
               <code className="min-w-0 flex-1 truncate text-xs">{file.path}</code>
               <Tag variant={file.encoding === 'utf8' ? 'neutral' : 'blue'}>
                 {file.encoding === 'utf8' ? '文本' : '二进制'}

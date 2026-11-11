@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { projectRepositoriesQueryOptions } from '@/features/code/public'
 import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
@@ -134,7 +135,14 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
       ) : (
         <ul className="space-y-2">
           {items.map((change) => (
-            <li key={change.id} className="event-card">
+            <li
+              key={change.id}
+              className="event-card clickable-card"
+              onClick={(event) => {
+                if (isNestedInteractiveTarget(event.target)) return
+                void showDiff(change.id)
+              }}
+            >
               <div className="row spread flex-wrap">
                 <span>
                   <strong>{change.branchName}</strong>

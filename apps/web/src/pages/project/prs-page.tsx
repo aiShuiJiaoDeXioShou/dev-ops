@@ -11,6 +11,7 @@ import {
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/utils'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
@@ -276,7 +277,13 @@ export function Component() {
           {filteredPullRequests.map((pullRequest) => (
             <li
               key={pullRequest.number}
-              className={`pr-row ${selectedNumber === String(pullRequest.number) ? 'selected' : ''}`}
+              className={`pr-row clickable-list-item ${selectedNumber === String(pullRequest.number) ? 'selected' : ''}`}
+              onClick={(event) => {
+                if (isNestedInteractiveTarget(event.target)) return
+                setSelectedNumber(String(pullRequest.number))
+                setSelectedFile('')
+                setShowFullDiff(false)
+              }}
             >
               <PullRequestStateIcon state={pullRequest.state} />
               <div className="pr-main">

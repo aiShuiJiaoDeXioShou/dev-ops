@@ -11,6 +11,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Tag } from '@/shared/ui/tag'
 import { Pagination } from '@/shared/ui/pagination'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { useToast } from '@/shared/ui/toast'
 import { canWriteKnowledge } from '../api/mutations'
 import { templateListQueryOptions } from '../api/queries'
@@ -141,7 +142,14 @@ export function TemplateList({ teamId }: { teamId: string }) {
             ) : (
               <ul className="template-grid">
                 {query.data.data.items.map((item) => (
-                  <li key={item.id} className="template-card">
+                  <li
+                    key={item.id}
+                    className="template-card clickable-card"
+                    onClick={(event) => {
+                      if (isNestedInteractiveTarget(event.target)) return
+                      updateParam('template', item.id)
+                    }}
+                  >
                     <div className="row spread">
                       <span className="skill-glyph">
                         <FileText className="size-5" aria-hidden="true" />

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/public'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
+import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -163,7 +164,20 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
       ) : (
         <ul className="plain-list stacked-list">
           {variables.data.data.items.map((item) => (
-            <li key={item.id}>
+            <li
+              key={item.id}
+              className={canManage ? 'clickable-row' : undefined}
+              onClick={(event) => {
+                if (!canManage || isNestedInteractiveTarget(event.target)) return
+                openEdit({
+                  id: item.id,
+                  name: item.name,
+                  version: item.version,
+                  kind: item.kind,
+                  credentialId: item.credential?.id,
+                })
+              }}
+            >
               <span>{item.name}</span>
               <span className="tag">{item.kind === 'plain' ? '普通变量' : '密钥引用'}</span>
               <span className="muted">{item.masked ? '••••••••' : (item.valuePreview ?? '')}</span>
