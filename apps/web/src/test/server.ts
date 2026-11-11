@@ -73,6 +73,28 @@ export const server = setupServer(
   ),
   http.get('*/api/v1/auth/get-session', () => HttpResponse.json(sessionFixture)),
   http.get('*/api/v1/me/teams', () => success({ teams: [teamFixture], isPlatformAdmin: false })),
+  http.get('*/api/v1/teams/:teamId/project-activity', () =>
+    success({
+      timezone: 'UTC',
+      from: '2025-11-05',
+      to: '2026-11-10',
+      source: 'all',
+      sourceStatus: { activity: 'ok', code: 'unknown', pullRequest: 'unknown' },
+      days: [],
+      projects: [
+        {
+          projectId: 'project-1',
+          status: 'active',
+          owner: { userId: 'user-1', name: '测试用户', available: true },
+          items: { total: 4, completed: 2 },
+          pendingRequirements: 1,
+          pendingBugs: 1,
+          pendingPullRequests: null,
+          bots: null,
+        },
+      ],
+    }),
+  ),
   http.get('*/api/v1/teams/:teamId/projects', () =>
     success({
       items: [
