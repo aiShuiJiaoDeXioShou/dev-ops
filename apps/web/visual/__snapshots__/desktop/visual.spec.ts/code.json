@@ -19,7 +19,11 @@
     "环境变量"
   ],
   "rows": 0,
-  "statusTexts": [],
+  "statusTexts": [
+    "失败",
+    "成功",
+    "排队中"
+  ],
   "documentOverflow": false,
   "interactiveCount": 78,
   "nonPointerControls": [],

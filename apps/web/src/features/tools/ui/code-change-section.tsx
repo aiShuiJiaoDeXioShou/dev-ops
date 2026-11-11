@@ -4,7 +4,6 @@ import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { projectRepositoriesQueryOptions } from '@/features/code/public'
-import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { FormField } from '@/shared/ui/controls/form-field'
@@ -12,6 +11,8 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
+import { StatusBadge } from '@/shared/ui/status-badge'
+import { formatDateTime } from '@/shared/lib/format'
 import { codeChangesQueryOptions, toolCapabilitiesQueryOptions, toolInvocationsQueryOptions } from '../api/queries'
 
 const CODE_CHANGE_STATUS_LABELS: Record<string, string> = {
@@ -20,6 +21,32 @@ const CODE_CHANGE_STATUS_LABELS: Record<string, string> = {
   succeeded: '成功',
   failed: '失败',
   cancelled: '已取消',
+}
+
+/** 代码变更状态到统一状态色。 */
+const CODE_CHANGE_STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+  queued: 'warning',
+  running: 'info',
+  succeeded: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
+}
+
+/** 写能力调用名称到可读业务名。 */
+const CAPABILITY_LABELS: Record<string, string> = {
+  code_change: '代码变更',
+  create_pull_request: '创建 PR',
+  create_issue: '创建 Issue',
+  add_comment: '添加评论',
+}
+
+/** 写能力调用状态到统一状态色。 */
+const INVOCATION_STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+  queued: 'warning',
+  running: 'info',
+  succeeded: 'success',
+  failed: 'danger',
+  cancelled: 'neutral',
 }
 
 interface CodeChangeForm {
@@ -129,38 +156,54 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
       {changes.isPending ? (
         <p className="small quiet">代码变更加载中…</p>
       ) : changes.isError ? (
-        <p className="small">代码变更读取失败：{describeRequestError(changes.error).description}</p>
+        <div className="inline-error" role="alert">
+          <span>代码变更读取失败：{describeRequestError(changes.error).description}</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => void changes.refetch()}>
+            重新加载
+          </Button>
+        </div>
       ) : items.length === 0 ? (
         <p className="small quiet">还没有代码变更。</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="code-change-list">
           {items.map((change) => (
             <li
               key={change.id}
-              className="event-card clickable-card"
+              className="code-change-card clickable-card"
               onClick={(event) => {
                 if (isNestedInteractiveTarget(event.target)) return
                 void showDiff(change.id)
               }}
             >
-              <div className="row spread flex-wrap">
-                <span>
+              <div className="code-change-head">
+                <div className="code-change-branch">
                   <strong>{change.branchName}</strong>
-                  <span className="small quiet">
-                    {' '}
-                    ← {change.baseRef} · {change.commitMessage}
-                  </span>
-                </span>
-                <Badge variant={change.status === 'failed' ? 'destructive' : 'secondary'}>
+                  <span className="quiet">← {change.baseRef}</span>
+                </div>
+                <StatusBadge tone={CODE_CHANGE_STATUS_TONES[change.status] ?? 'neutral'}>
                   {CODE_CHANGE_STATUS_LABELS[change.status] ?? change.status}
-                </Badge>
+                </StatusBadge>
               </div>
-              <div className="row flex-wrap gap-2">
-                <span className="small quiet">补丁 {Math.ceil(change.patchSizeBytes / 1024)} KB</span>
-                {change.pipelineRunId ? (
-                  <span className="small quiet">运行 {change.pipelineRunId.slice(0, 8)}</span>
-                ) : null}
-                <Button type="button" variant="ghost" size="sm" onClick={() => void showDiff(change.id)}>
+              <p className="code-change-message">{change.commitMessage}</p>
+              <div className="code-change-meta">
+                <span>补丁 {Math.ceil(change.patchSizeBytes / 1024)} KB</span>
+                {change.pipelineRunId ? <span>流水线运行 {change.pipelineRunId.slice(0, 8)}</span> : null}
+              </div>
+              {change.errorMessage ? (
+                <p className="code-change-error" role="alert">
+                  {change.errorMessage}
+                </p>
+              ) : null}
+              <div className="code-change-actions">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    void showDiff(change.id)
+                  }}
+                >
                   查看差异
                 </Button>
                 {change.pullRequest ? (
@@ -172,30 +215,58 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => createPullRequest.mutate(change.id)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      createPullRequest.mutate(change.id)
+                    }}
                     disabled={createPullRequest.isPending}
                   >
                     创建 PR
                   </Button>
                 ) : null}
               </div>
-              {change.errorMessage ? <p className="small">{change.errorMessage}</p> : null}
             </li>
           ))}
         </ul>
       )}
 
-      <section className="space-y-2">
-        <h3>最近写能力调用</h3>
-        {(invocations.data?.data.items ?? []).length === 0 ? (
+      <section className="write-invocations">
+        <div className="section-heading">
+          <h2>最近写能力调用</h2>
+          <span className="spacer" />
+          <span className="small quiet">最近 5 条</span>
+        </div>
+        {invocations.isPending ? (
+          <p className="small quiet">调用记录加载中…</p>
+        ) : invocations.isError ? (
+          <div className="inline-error" role="alert">
+            <span>调用记录读取失败：{describeRequestError(invocations.error).description}</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => void invocations.refetch()}>
+              重新加载
+            </Button>
+          </div>
+        ) : (invocations.data?.data.items ?? []).length === 0 ? (
           <p className="small quiet">还没有写能力调用记录。</p>
         ) : (
-          <ul className="space-y-1">
+          <ul className="invocation-list">
             {(invocations.data?.data.items ?? []).slice(0, 5).map((item) => (
-              <li key={item.id} className="small">
-                <span className="quiet">{new Date(item.createdAt).toLocaleString()}</span> · {item.capability} ·{' '}
-                {item.status}
-                {item.errorMessage ? ` · ${item.errorMessage}` : ''}
+              <li key={item.id} className="invocation-row">
+                <div className="invocation-main">
+                  <StatusBadge tone={INVOCATION_STATUS_TONES[item.status] ?? 'neutral'}>
+                    {CODE_CHANGE_STATUS_LABELS[item.status] ?? item.status}
+                  </StatusBadge>
+                  <strong>{CAPABILITY_LABELS[item.capability] ?? item.capability}</strong>
+                  <span className="quiet">· {item.channel === 'cli' ? 'CLI' : item.channel}</span>
+                </div>
+                <time className="invocation-time" dateTime={item.createdAt}>
+                  {formatDateTime(item.createdAt)}
+                </time>
+                {item.errorMessage ? (
+                  <p className="invocation-error">
+                    {item.errorCode ? `${item.errorCode}：` : ''}
+                    {item.errorMessage}
+                  </p>
+                ) : null}
               </li>
             ))}
           </ul>

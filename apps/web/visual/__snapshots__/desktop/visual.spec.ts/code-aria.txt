@@ -297,10 +297,21 @@
   - list:
     - listitem:
       - strong: cli-audit/cli-test-1
-      - text: "← main · chore: cli audit test change 失败 补丁 1 KB"
+      - text: ← main 失败
+      - paragraph: "chore: cli audit test change"
+      - text: 补丁 1 KB
+      - alert: 创建代码修改运行失败
       - button "查看差异"
-      - paragraph: 创建代码修改运行失败
-  - heading "最近写能力调用" [level=3]
+  - heading "最近写能力调用" [level=2]
+  - text: 最近 5 条
   - list:
-    - listitem: 2026/11/11 11:55:08 · add_comment · succeeded
-    - listitem: 2026/11/11 11:54:52 · code_change · queued
+    - listitem:
+      - text: 成功
+      - strong: 添加评论
+      - text: · CLI
+      - time: 2026/11/11 11:55
+    - listitem:
+      - text: 排队中
+      - strong: 代码变更
+      - text: · CLI
+      - time: 2026/11/11 11:54

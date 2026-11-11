@@ -100,6 +100,10 @@ test.describe('[desktop] 核心页面', () => {
     await prepare(page, `/projects/${VISUAL_IDS.projectId}/requirements`)
     await expect(page.getByRole('button', { name: '新建需求' })).toBeVisible()
     await expectPageSnapshot(page, testInfo, 'requirements')
+    // 筛选下拉应只有一个箭头，且宽度跟随内容，不能出现标签与箭头分散的“双箭头”。
+    await expect(page.locator('.filter-select svg')).toHaveCount(1)
+    const filterBox = await page.locator('.filter-select').first().boundingBox()
+    expect(filterBox?.width ?? 0).toBeLessThanOrEqual(140)
     await page.locator('.item-title').first().click()
     await expect(page.locator('aside[aria-label="需求详情"]')).toBeVisible()
     await expectPageSnapshot(page, testInfo, 'requirement-detail')
@@ -118,6 +122,12 @@ test.describe('[desktop] 核心页面', () => {
       await prepare(page, path)
       await expect(page.getByRole('tab', { name: tab })).toBeVisible()
       await expectPageSnapshot(page, testInfo, name)
+      if (name === 'code') {
+        // 代码变更卡片与写能力调用必须是结构化行，不能退回点号分隔的纯文本。
+        await expect(page.locator('.code-change-card').first()).toBeVisible()
+        await expect(page.locator('.invocation-row').first()).toBeVisible()
+        await expect(page.locator('.invocation-row .status-pill').first()).toBeVisible()
+      }
     }
   })
 
@@ -183,6 +193,10 @@ test.describe('[mobile] 关键页面', () => {
   test('[mobile] 需求列表与整屏详情', async ({ page }, testInfo) => {
     await prepare(page, `/projects/${VISUAL_IDS.projectId}/requirements`)
     await expectPageSnapshot(page, testInfo, 'requirements')
+    // 筛选下拉应只有一个箭头，且宽度跟随内容，不能出现标签与箭头分散的“双箭头”。
+    await expect(page.locator('.filter-select svg')).toHaveCount(1)
+    const filterBox = await page.locator('.filter-select').first().boundingBox()
+    expect(filterBox?.width ?? 0).toBeLessThanOrEqual(140)
     await page.locator('.item-title').first().click()
     await expect(page.locator('aside[aria-label="需求详情"]')).toBeVisible()
     const box = await page.locator('aside[aria-label="需求详情"]').boundingBox()

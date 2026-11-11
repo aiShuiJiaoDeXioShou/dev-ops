@@ -138,7 +138,7 @@ export function RequirementList({ projectId }: { projectId: string }) {
                         onClick={() => update({ openId: item.id })}
                       >
                         <span className="item-id">#{item.number}</span>
-                        {item.title}
+                        <span className="item-title-text">{item.title}</span>
                       </Button>
                       <span className="mobile-status">
                         <StatusBadge tone={requirementStatusTone(item.status)}>

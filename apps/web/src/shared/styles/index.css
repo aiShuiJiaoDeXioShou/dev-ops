@@ -1357,15 +1357,6 @@
   font: inherit;
 }
 
-/* 需求/Bug 筛选下拉统一自定义箭头，避免浏览器默认控件差异。 */
-.filter-select {
-  appearance: none;
-  padding-right: 26px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%2381858c' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 4px center;
-}
-
 /* 代码分支触发器和下拉菜单按 GitHub 风格收敛。 */
 .git-branch-button {
   display: inline-flex;
@@ -2311,18 +2302,32 @@ button:disabled,
   min-width: 0;
 }
 
-/* 共享 Select/Input 嵌入轻量筛选条时的视觉收口。 */
+/* 共享 Select/Input 嵌入轻量筛选条时的视觉收口；下拉宽度跟随当前选项，避免标签与箭头被拉开。 */
+.filter-select {
+  width: auto;
+  max-width: none;
+  flex: 0 0 auto;
+  padding: 0;
+  background: none;
+}
 .filter-select select {
+  width: auto;
   height: 30px;
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-  padding-left: 8px;
+  appearance: none;
+  padding: 0 22px 0 8px;
   font-size: 12.5px;
   color: var(--muted-foreground);
 }
 .filter-select select:hover {
   background: var(--secondary);
+}
+.filter-select svg {
+  right: 2px;
+  width: 14px;
+  height: 14px;
 }
 .search .search-input {
   height: auto;
@@ -2473,4 +2478,144 @@ button:disabled,
   border-radius: 8px;
   font-size: 13px;
   font-weight: 500;
+}
+
+/* 代码变更卡片：分支、提交信息、状态与操作分层，避免一行堆叠全部信息。 */
+.code-change-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.code-change-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+}
+.code-change-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.code-change-branch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+.code-change-branch strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.code-change-message {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.code-change-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--quiet);
+  font-size: 11.5px;
+}
+.code-change-error {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 9%, transparent);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.code-change-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 2px;
+}
+.inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in oklab, var(--danger) 24%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--danger) 6%, transparent);
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.inline-error > span {
+  min-width: 0;
+}
+
+/* 写能力调用：状态、能力、通道与时间形成稳定行，不再是一串点号分隔的纯文本。 */
+.write-invocations {
+  margin-top: 8px;
+}
+.invocation-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+.invocation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.invocation-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+.invocation-main strong {
+  font-weight: 500;
+}
+.invocation-time {
+  color: var(--quiet);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.invocation-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--danger);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* 列表标题允许占用首列更多宽度，并在窄屏安全截断。 */
+.item-title {
+  max-width: 560px;
+}
+.item-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .item-title {
+    max-width: 210px;
+  }
 }

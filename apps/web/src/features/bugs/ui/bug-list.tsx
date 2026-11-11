@@ -139,7 +139,7 @@ export function BugList({ projectId }: { projectId: string }) {
                         onClick={() => update({ openId: item.id })}
                       >
                         <span className="item-id">BUG-{item.number}</span>
-                        {item.title}
+                        <span className="item-title-text">{item.title}</span>
                       </Button>
                       <span className="mobile-status">
                         <StatusBadge tone={bugStatusTone(item.status)}>
