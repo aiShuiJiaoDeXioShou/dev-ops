@@ -336,15 +336,6 @@ export function Component() {
         open={commitsOpen}
         onOpenChange={setCommitsOpen}
       />
-      <CodeChangeSection projectId={projectId} repositoryId={repository.id} />
-      <div className="section-heading">
-        <h2>代码</h2>
-        <span className="badge">只读</span>
-        <span className="spacer" />
-        <span className="small quiet">
-          {providerLabel} · {tree.data?.data.branch ?? branch}
-        </span>
-      </div>
       {tree.isError ? (
         <PageError
           title="代码文件读取失败"
@@ -446,6 +437,7 @@ export function Component() {
           </section>
         </div>
       )}
+      <CodeChangeSection projectId={projectId} repositoryId={repository.id} />
     </div>
   )
 }

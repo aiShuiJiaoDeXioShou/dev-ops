@@ -152,6 +152,13 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
     role === 'admin' || attachment.uploadedBy.userId === user.id || project.data?.data.owner.userId === user.id
   return (
     <aside className="details" aria-label="Bug 详情">
+      <div className="detail-top">
+        <span className="detail-top-title">Bug 详情</span>
+        <span className="spacer" />
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          返回列表
+        </Button>
+      </div>
       <div className="detail-scroll">
         <div className="space-y-5">
           <header className="flex items-start justify-between gap-3">
@@ -163,9 +170,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
                 <span className="text-xs text-muted-foreground">更新 {formatDateTime(bug.updatedAt)}</span>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              返回列表
-            </Button>
           </header>
           <div className="flex flex-wrap gap-2">
             {canWrite && bug.status === 'pending' && (

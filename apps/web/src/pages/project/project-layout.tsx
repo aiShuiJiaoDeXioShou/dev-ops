@@ -50,7 +50,7 @@ export function Component() {
             项目
           </button>
           <span>/</span>
-          <span>{detail.name}</span>
+          <span>{tabs.find((tab) => tab.slug === activeTab)?.label ?? '需求'}</span>
         </div>
         <div className="row spread">
           <div className="project-title">

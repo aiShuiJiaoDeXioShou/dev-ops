@@ -81,3 +81,7 @@
 - [页面模式](patterns.md)
 - [交互规范](interactions.md)
 - [UI 债务 baseline](baseline.md)
+
+## 7. 2026-11 视觉修订
+
+按 DSH 风格探索稿 v3 与官方 Web UI style reference 收敛页面层级：连续白色工作区、浅灰侧栏、发丝线、克制的蓝色强调、紧凑标题与轻量筛选。本轮范围、截图与未完成项见 [Web 视觉修订](web-refresh-2026-11/README.md)。

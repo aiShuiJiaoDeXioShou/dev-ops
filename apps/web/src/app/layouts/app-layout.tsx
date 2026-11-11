@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { XIcon } from 'lucide-react'
 import { PrototypeIcon } from '@/prototype/icons/icon'
@@ -25,6 +25,26 @@ export function AppLayout() {
   const { user, teams, currentTeam, role, setCurrentTeam, isReady, isPlatformAdmin } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
+  const location = useLocation()
+  useEffect(() => {
+    // 页面标题用于浏览器多标签、历史记录与读屏识别；无法匹配时回退到产品名。
+    const titles: Array<[string, string]> = [
+      ['/projects/', '项目工作区'],
+      ['/projects', '项目'],
+      ['/operations/changes', '变更与发布'],
+      ['/capabilities/templates', 'AGENTS.md 模板'],
+      ['/capabilities/skills', '团队 Skills'],
+      ['/capabilities', '能力'],
+      ['/vault', '凭据库'],
+      ['/settings/pipeline-nodes', '执行节点'],
+      ['/settings/storage-buckets', '储存桶'],
+      ['/settings/team', '团队管理'],
+      ['/settings/profile', '个人页面'],
+      ['/system/status', '系统状态'],
+    ]
+    const matched = titles.find(([path]) => location.pathname === path || location.pathname.startsWith(path + '/'))
+    document.title = matched ? `${matched[1]} · DevOps` : 'DevOps 项目开发平台'
+  }, [location.pathname])
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -94,6 +114,7 @@ export function AppLayout() {
           <img src="/prototype/brand.svg" width={29} height={29} alt="" />
           DevOps
         </Link>
+        <div className="nav-label">工作台</div>
         <nav className="nav" aria-label="主导航">
           {primaryNavItems.map((item) => (
             <NavLink
@@ -108,6 +129,7 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="side-bottom">
+          <div className="nav-label">管理与设置</div>
           {isPlatformAdmin && (
             <NavLink
               to="/settings/storage-buckets"

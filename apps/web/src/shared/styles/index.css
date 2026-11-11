@@ -1679,3 +1679,294 @@ a.skill-title:hover {
 .table-scroll table {
   min-width: 640px;
 }
+
+/* 详情面板：内容与页签保持连续平面，操作行更克制。 */
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.detail-properties {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+@media (min-width: 480px) {
+  .detail-properties {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 20px;
+  }
+}
+.detail-properties dt {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+.detail-properties dd {
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+.detail-markdown {
+  color: var(--foreground);
+  line-height: 1.75;
+}
+.detail-markdown h1,
+.detail-markdown h2,
+.detail-markdown h3 {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 14px 0 6px;
+}
+.detail-markdown p {
+  margin: 6px 0;
+}
+.detail-markdown ul,
+.detail-markdown ol {
+  padding-left: 18px;
+  margin: 6px 0;
+}
+.details [data-slot='tabs-list'] {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 20px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+}
+.details [data-slot='tabs-trigger'] {
+  min-height: 34px;
+  padding: 8px 0;
+  border-radius: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.details [data-slot='tabs-trigger'][data-state='active'] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* 筛选控件保持轻量：默认无边框，hover/focus 才出现表面，减少工具条噪音。 */
+.filters [data-slot='select'],
+.list-toolbar [data-slot='select'] {
+  height: 30px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  padding-left: 8px;
+  padding-right: 28px;
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+.filters [data-slot='select']:hover,
+.list-toolbar [data-slot='select']:hover {
+  background: var(--secondary);
+}
+.filters [data-slot='select']:focus-visible,
+.list-toolbar [data-slot='select']:focus-visible {
+  border-color: var(--ring);
+  background: var(--background);
+}
+.filters .search,
+.list-toolbar .search {
+  height: 32px;
+  border-color: transparent;
+  background: var(--secondary);
+  padding: 5px 10px;
+}
+.filters .search:focus-within,
+.list-toolbar .search:focus-within {
+  border-color: var(--ring);
+  background: var(--background);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 18%, transparent);
+}
+.page-head p {
+  max-width: 720px;
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+.code-page > .section-heading,
+.code-page .section-heading h2 {
+  font-size: 13px;
+}
+.code-page .section-heading {
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+.code-page .git-strip {
+  background: var(--secondary);
+  border-color: transparent;
+  margin-bottom: 16px;
+}
+
+/* 变更详情：主内容与属性分栏，属性区贴右并保持发丝线，减少长页面的空面积。 */
+.change-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+.change-actions a {
+  margin-left: auto;
+  font-size: 12.5px;
+}
+.change-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 32px;
+  align-items: start;
+  padding-bottom: 40px;
+}
+.change-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  min-width: 0;
+}
+.change-detail-main h2 {
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  letter-spacing: 0.01em;
+}
+.change-detail-main p {
+  font-size: 13.5px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.change-detail-side {
+  position: sticky;
+  top: 0;
+  min-width: 0;
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
+}
+.change-detail-side .work-properties {
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 13px 10px;
+  margin: 0;
+  font-size: 12px;
+}
+.change-detail-side .work-properties dt {
+  font-size: 11.5px;
+}
+.event-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--background);
+}
+.event-card + .event-card {
+  margin-top: 8px;
+}
+.event-card strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.event-card p {
+  margin-top: 4px;
+}
+@media (max-width: 960px) {
+  .change-detail-body {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  .change-detail-side {
+    position: static;
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+}
+.change-detail-main {
+  max-width: 760px;
+}
+.change-detail-main h2:not(:first-child) {
+  margin-top: 18px;
+}
+.project-card-title {
+  color: var(--foreground);
+}
+.project-card-title:hover {
+  color: var(--primary);
+}
+@media (max-width: 1080px) {
+  .details {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100dvh;
+    width: min(390px, 100vw);
+    z-index: 10;
+    box-shadow: -10px 0 50px color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
+}
+
+/* 窄屏列表优先保留标题与状态，隐藏次要列避免横向裁切；详情仍可查看完整信息。 */
+.mobile-status {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .items-workspace .table {
+    min-width: 0;
+  }
+  .items-workspace .table th:nth-child(2),
+  .items-workspace .table td:nth-child(2),
+  .items-workspace .table th:nth-child(3),
+  .items-workspace .table td:nth-child(3),
+  .items-workspace .table th:nth-child(4),
+  .items-workspace .table td:nth-child(4) {
+    display: none;
+  }
+  .items-workspace .item-title {
+    max-width: 170px;
+  }
+  .mobile-status {
+    display: inline-flex;
+    margin-left: auto;
+  }
+  .items-workspace .table th,
+  .items-workspace .table td {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+/* 列表 + 详情保持同一视口：详情独立滚动，避免点击页签时整页被带动。 */
+.items-workspace {
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+.details {
+  position: sticky;
+  top: 0;
+  height: calc(100dvh - 172px);
+  min-height: 420px;
+}
+.details .detail-scroll {
+  min-height: 0;
+}
+
+/* 窄屏详情以整屏覆盖方式出现；放在基础规则之后，避免被 sticky 覆盖。 */
+@media (max-width: 1080px) {
+  .details {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    height: 100dvh;
+    width: min(390px, 100vw);
+    z-index: 10;
+    box-shadow: -10px 0 50px color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
+}

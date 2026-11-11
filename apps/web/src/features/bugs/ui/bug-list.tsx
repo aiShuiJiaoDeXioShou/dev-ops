@@ -51,20 +51,9 @@ export function BugList({ projectId }: { projectId: string }) {
   const isEmpty = items.length === 0
   const filtered = Boolean(state.search || state.status)
   return (
-    <div className="row items-workspace" style={{ alignItems: 'flex-start', minHeight: 0 }}>
+    <div className="row items-workspace">
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="section-heading">
-          <h2>项目 Bug</h2>
-          {query.data.data.total > 0 && <span className="counter">{query.data.data.total}</span>}
-          <span className="spacer" />
-          {canWrite && (
-            <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-              <PrototypeIcon name="plus" />
-              新建 Bug
-            </button>
-          )}
-        </div>
-        {(!isEmpty || filtered) && (
+        <div className="list-toolbar">
           <div className="filters">
             <select
               className="filter-select"
@@ -89,7 +78,13 @@ export function BugList({ projectId }: { projectId: string }) {
               />
             </label>
           </div>
-        )}
+          {canWrite && (
+            <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+              <PrototypeIcon name="plus" />
+              新建 Bug
+            </button>
+          )}
+        </div>
         {isEmpty ? (
           <EmptyState
             mascot="signal"
@@ -128,6 +123,7 @@ export function BugList({ projectId }: { projectId: string }) {
                           <span className="item-id">BUG-{item.number}</span>
                           {item.title}
                         </button>
+                        <span className="badge mobile-status">{BUG_STATUS_LABELS[item.status] ?? item.status}</span>
                       </div>
                     </td>
                     <td>{item.fixOwner?.name ?? '未指定'}</td>

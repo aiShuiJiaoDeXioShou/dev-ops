@@ -220,10 +220,6 @@ export function ProjectList() {
                           <strong>{pendingPr}</strong>
                           <span>待审 PR</span>
                         </Link>
-                        <span className="project-metric-muted">
-                          <strong>—</strong>
-                          <span>Bots</span>
-                        </span>
                       </div>
                       <div className="project-card-footer">
                         <div className="project-progress">

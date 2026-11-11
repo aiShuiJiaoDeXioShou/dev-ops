@@ -50,20 +50,9 @@ export function RequirementList({ projectId }: { projectId: string }) {
   const isEmpty = items.length === 0
   const filtered = Boolean(state.search || state.status)
   return (
-    <div className="row items-workspace" style={{ alignItems: 'flex-start', minHeight: 0 }}>
+    <div className="row items-workspace">
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="section-heading">
-          <h2>需求列表</h2>
-          {query.data.data.total > 0 && <span className="counter">{query.data.data.total}</span>}
-          <span className="spacer" />
-          {canWrite && (
-            <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
-              <PrototypeIcon name="plus" />
-              新建需求
-            </button>
-          )}
-        </div>
-        {(!isEmpty || filtered) && (
+        <div className="list-toolbar">
           <div className="filters">
             <select
               className="filter-select"
@@ -88,7 +77,13 @@ export function RequirementList({ projectId }: { projectId: string }) {
               />
             </label>
           </div>
-        )}
+          {canWrite && (
+            <button type="button" className="btn primary" onClick={() => setCreateOpen(true)}>
+              <PrototypeIcon name="plus" />
+              新建需求
+            </button>
+          )}
+        </div>
         {isEmpty ? (
           <EmptyState
             mascot="prism"
@@ -127,6 +122,9 @@ export function RequirementList({ projectId }: { projectId: string }) {
                           <span className="item-id">#{item.number}</span>
                           {item.title}
                         </button>
+                        <span className="badge mobile-status">
+                          {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}
+                        </span>
                       </div>
                     </td>
                     <td>{item.devOwner?.name ?? '未指定'}</td>

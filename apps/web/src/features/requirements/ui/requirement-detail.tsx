@@ -147,6 +147,13 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   const blockers = eligibility.data?.data.blockers ?? []
   return (
     <aside className="details" aria-label="需求详情">
+      <div className="detail-top">
+        <span className="detail-top-title">需求详情</span>
+        <span className="spacer" />
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          返回列表
+        </Button>
+      </div>
       <div className="detail-scroll">
         <div className="space-y-5">
           <header className="flex items-start justify-between gap-3">
@@ -159,9 +166,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
                 {detail.needsReview && <Tag variant="red">存在未解决 Bug，需复核</Tag>}
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              返回列表
-            </Button>
           </header>
           {detail.status === 'in_testing' && (
             <div
@@ -176,7 +180,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               )}
             </div>
           )}
-          <div className="flex flex-wrap gap-2">
+          <div className="detail-actions">
             {canWrite && detail.status === 'pending' && (
               <Button size="sm" onClick={() => direct.mutate('start-development')} disabled={direct.isPending}>
                 开始开发
@@ -238,7 +242,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               {error}
             </p>
           )}
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <dl className="detail-properties">
             <div>
               <dt className="text-xs text-muted-foreground">研发负责人</dt>
               <dd className="mt-1">{detail.devOwner?.name ?? '未指定'}</dd>
@@ -265,7 +269,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
           <section className="space-y-2">
             <h3 className="text-sm font-semibold">内容</h3>
             {detail.contentMode === 'markdown' ? (
-              <div className="rounded-lg border bg-background p-4 text-sm">
+              <div className="detail-markdown text-sm">
                 <Markdown>{detail.contentMarkdown ?? ''}</Markdown>
               </div>
             ) : (

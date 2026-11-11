@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/public'
+import { projectQueryOptions } from '@/features/projects/public'
 import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
@@ -44,6 +45,10 @@ export function Component() {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const detail = useQuery(changePlanQueryOptions(planId))
+  const project = useQuery({
+    ...projectQueryOptions(detail.data?.data.plan.projectId ?? ''),
+    enabled: Boolean(detail.data),
+  })
   const [action, setAction] = useState<ConfirmAction | null>(null)
   const [note, setNote] = useState('')
   const [reason, setReason] = useState('')
@@ -134,7 +139,7 @@ export function Component() {
         </Badge>
       </div>
 
-      <div className="row flex-wrap gap-2">
+      <div className="change-actions">
         {actions.canUpdate && plan.status === 'pending' ? (
           <span className="small quiet">待确认状态可在 CLI 修改计划内容</span>
         ) : null}
@@ -169,85 +174,90 @@ export function Component() {
         <Link to={`/projects/${plan.projectId}/artifacts`}>查看产物与版本</Link>
       </div>
 
-      <dl className="work-properties">
-        <dt>项目</dt>
-        <dd>{plan.projectId}</dd>
-        <dt>目标环境</dt>
-        <dd>{ENVIRONMENT_LABELS[plan.environment] ?? plan.environment}</dd>
-        <dt>执行方式</dt>
-        <dd>{plan.executionMode === 'platform_pipeline' ? '平台流水线' : '外部执行系统'}</dd>
-        <dt>部署工作流</dt>
-        <dd>
-          {plan.workflowPath ?? '不适用'}
-          {plan.workflowRef ? ` @ ${plan.workflowRef}` : ''}
-        </dd>
-        <dt>发起人</dt>
-        <dd>{plan.createdBy?.name ?? '未知用户'}</dd>
-        <dt>放行</dt>
-        <dd>
-          {approval
-            ? `${approval.approvedBy?.name ?? '未知用户'} · ${new Date(approval.approvedAt).toLocaleString()}`
-            : '未放行'}
-        </dd>
-        <dt>创建时间</dt>
-        <dd>{new Date(plan.createdAt).toLocaleString()}</dd>
-      </dl>
+      <div className="change-detail-body">
+        <div className="change-detail-main">
+          <section className="space-y-2">
+            <h2>变更范围</h2>
+            <p className="whitespace-pre-wrap">{plan.scopeSummary}</p>
+            <h2>核对依据</h2>
+            <p className="whitespace-pre-wrap">{plan.evidence}</p>
+            <h2>恢复方案</h2>
+            <p className="whitespace-pre-wrap">{plan.rollbackPlan}</p>
+          </section>
 
-      <section className="space-y-2">
-        <h2>变更范围</h2>
-        <p className="whitespace-pre-wrap">{plan.scopeSummary}</p>
-        <h2>核对依据</h2>
-        <p className="whitespace-pre-wrap">{plan.evidence}</p>
-        <h2>恢复方案</h2>
-        <p className="whitespace-pre-wrap">{plan.rollbackPlan}</p>
-      </section>
+          <section className="space-y-3">
+            <h2>执行记录</h2>
+            {executions.length === 0 ? (
+              <p className="small quiet">还没有执行尝试。</p>
+            ) : (
+              executions.map((execution) => (
+                <div key={execution.id} className="event-card">
+                  <div className="row spread flex-wrap">
+                    <strong>
+                      第 {execution.attempt} 次 · {EXECUTION_STATUS_LABELS[execution.status] ?? execution.status}
+                    </strong>
+                    <Badge variant={execution.verificationStatus === 'passed' ? 'secondary' : 'outline'}>
+                      {VERIFICATION_STATUS_LABELS[execution.verificationStatus] ?? execution.verificationStatus}
+                    </Badge>
+                  </div>
+                  <p className="small quiet">
+                    预期版本 {execution.expectedVersionLabel} · 实际版本 {execution.actualVersionLabel ?? '未知'} · 健康{' '}
+                    {execution.healthStatus ?? '未知'}
+                  </p>
+                  {execution.pipelineRunId ? (
+                    <Link to={`/projects/${plan.projectId}/pipelines/${execution.pipelineRunId}`}>查看流水线运行</Link>
+                  ) : null}
+                  {execution.status === 'interrupted' || execution.status === 'timed_out' ? (
+                    <p className="small">执行未确认结束，请核对实际状态后重试或验证。</p>
+                  ) : null}
+                  {execution.errorMessage ? <p className="small">{execution.errorMessage}</p> : null}
+                </div>
+              ))
+            )}
+          </section>
 
-      <section className="space-y-3">
-        <h2>执行记录</h2>
-        {executions.length === 0 ? (
-          <p className="small quiet">还没有执行尝试。</p>
-        ) : (
-          executions.map((execution) => (
-            <div key={execution.id} className="event-card">
-              <div className="row spread flex-wrap">
-                <strong>
-                  第 {execution.attempt} 次 · {EXECUTION_STATUS_LABELS[execution.status] ?? execution.status}
-                </strong>
-                <Badge variant={execution.verificationStatus === 'passed' ? 'secondary' : 'outline'}>
-                  {VERIFICATION_STATUS_LABELS[execution.verificationStatus] ?? execution.verificationStatus}
-                </Badge>
-              </div>
-              <p className="small quiet">
-                预期版本 {execution.expectedVersionLabel} · 实际版本 {execution.actualVersionLabel ?? '未知'} · 健康{' '}
-                {execution.healthStatus ?? '未知'}
-              </p>
-              {execution.pipelineRunId ? (
-                <Link to={`/projects/${plan.projectId}/pipelines/${execution.pipelineRunId}`}>查看流水线运行</Link>
-              ) : null}
-              {execution.status === 'interrupted' || execution.status === 'timed_out' ? (
-                <p className="small">执行未确认结束，请核对实际状态后重试或验证。</p>
-              ) : null}
-              {execution.errorMessage ? <p className="small">{execution.errorMessage}</p> : null}
-            </div>
-          ))
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2>事件</h2>
-        {events.length === 0 ? (
-          <p className="small quiet">还没有事件记录。</p>
-        ) : (
-          <ol className="space-y-2">
-            {events.map((event) => (
-              <li key={event.id} className="small">
-                <span className="quiet">{new Date(event.createdAt).toLocaleString()}</span> ·{' '}
-                {event.actor?.name ?? '未知用户'} · {event.summary}
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+          <section className="space-y-3">
+            <h2>事件</h2>
+            {events.length === 0 ? (
+              <p className="small quiet">还没有事件记录。</p>
+            ) : (
+              <ol className="space-y-2">
+                {events.map((event) => (
+                  <li key={event.id} className="small">
+                    <span className="quiet">{new Date(event.createdAt).toLocaleString()}</span> ·{' '}
+                    {event.actor?.name ?? '未知用户'} · {event.summary}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
+        <aside className="change-detail-side" aria-label="计划属性">
+          <dl className="work-properties">
+            <dt>项目</dt>
+            <dd>{project.data?.data.name ?? plan.projectId}</dd>
+            <dt>目标环境</dt>
+            <dd>{ENVIRONMENT_LABELS[plan.environment] ?? plan.environment}</dd>
+            <dt>执行方式</dt>
+            <dd>{plan.executionMode === 'platform_pipeline' ? '平台流水线' : '外部执行系统'}</dd>
+            <dt>部署工作流</dt>
+            <dd>
+              {plan.workflowPath ?? '不适用'}
+              {plan.workflowRef ? ` @ ${plan.workflowRef}` : ''}
+            </dd>
+            <dt>发起人</dt>
+            <dd>{plan.createdBy?.name ?? '未知用户'}</dd>
+            <dt>放行</dt>
+            <dd>
+              {approval
+                ? `${approval.approvedBy?.name ?? '未知用户'} · ${new Date(approval.approvedAt).toLocaleString()}`
+                : '未放行'}
+            </dd>
+            <dt>创建时间</dt>
+            <dd>{new Date(plan.createdAt).toLocaleString()}</dd>
+          </dl>
+        </aside>
+      </div>
 
       <Dialog open={action !== null} onOpenChange={(open) => (!open ? setAction(null) : undefined)}>
         <DialogContent>
