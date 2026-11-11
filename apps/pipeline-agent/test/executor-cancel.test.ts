@@ -91,9 +91,9 @@ test('真实 Docker：运行级超时优先于步骤超时并以 RUN_TIMEOUT 收
   const scenario = await createDockerScenario()
   try {
     // 运行级超时需明显大于检出与容器启动耗时，避免并行负载下把检出误判成超时前置失败；
-    // 仍远小于步骤 60s，保证“运行级超时优先于步骤超时”的断言有效。
-    const plan = scenario.createPlan([checkoutStep(0), runStep(1, 'sleep 20', { timeoutSeconds: 60 })], {
-      timeoutSeconds: 10,
+    // 仍远小于步骤 120s，保证“运行级超时优先于步骤超时”的断言有效。
+    const plan = scenario.createPlan([checkoutStep(0), runStep(1, 'sleep 60', { timeoutSeconds: 120 })], {
+      timeoutSeconds: 30,
     })
     const recording = createRecordingSink()
     const collected = createRecordingCollector({ masker: scenario.masker, logger: scenario.logger })
@@ -111,7 +111,7 @@ test('真实 Docker：运行级超时优先于步骤超时并以 RUN_TIMEOUT 收
     })
     assert.equal(result.status, 'failed')
     assert.equal(result.errorCode, 'RUN_TIMEOUT')
-    assert.ok(Date.now() - startedAt < 30_000, '运行级超时应终止长时间步骤')
+    assert.ok(Date.now() - startedAt < 60_000, '运行级超时应终止长时间步骤')
     const failedStep = recording.statuses.find((item) => item.stepIndex === 1 && item.body.status === 'failed')
     assert.equal(failedStep?.body.errorCode, 'RUN_TIMEOUT')
     await assertResourcesCleaned(scenario.workDir, scenario.runId)

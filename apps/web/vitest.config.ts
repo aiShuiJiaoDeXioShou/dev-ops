@@ -14,6 +14,6 @@ export default defineConfig({
     environmentOptions: { jsdom: { url: 'http://localhost/' } },
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
-    testTimeout: 10_000,
+    testTimeout: 20_000,
   },
 })

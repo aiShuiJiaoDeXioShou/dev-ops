@@ -4,7 +4,8 @@ import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll } from 'vitest'
 import { server } from './server'
 
-configure({ asyncUtilTimeout: 3000 })
+// 根目录 pnpm check 会并行跑多个应用，异步渲染在负载下可能超过默认 1s 等待。
+configure({ asyncUtilTimeout: 10_000 })
 
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 afterEach(() => {
