@@ -23,7 +23,7 @@
 
 ## 截图
 
-截图在 1440×1000 下采集：`projects.png`、`requirements-detail.png`、`change-detail.png`、`skills.png`；移动端 390×844：`mobile-list.png`。
+截图在 1440×1000 下采集：`projects.png`、`requirements-detail.png`、`change-detail.png`、`skills.png`、`status-and-pagination.png`、`run-versions.png`、`team-nodes.png`；移动端 390×844：`mobile-list.png`。
 完整前后对比截图保存在本地 `/tmp/browser/design-before/` 与 `/tmp/browser/design-final/`，不提交仓库。
 
 ## 未完成
