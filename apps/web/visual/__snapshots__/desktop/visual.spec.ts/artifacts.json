@@ -5,8 +5,7 @@
     "height": 1000
   },
   "headings": [
-    "运行版本",
-    "还没有构建产物"
+    "运行版本"
   ],
   "tabs": [
     "需求",
@@ -18,9 +17,9 @@
     "环境变量",
     "构建产物",
     "审核与发布",
+    "全部",
     "开发",
-    "测试",
-    "生产"
+    "测试"
   ],
   "rows": 0,
   "statusTexts": [
@@ -29,7 +28,7 @@
     "未知"
   ],
   "documentOverflow": false,
-  "interactiveCount": 30,
+  "interactiveCount": 33,
   "nonPointerControls": [],
   "smallTargets": [
     "项目",

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { History } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
@@ -11,6 +12,7 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
+import { LogSheet } from '@/shared/ui/log-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { formatDateTime } from '@/shared/lib/format'
 import { codeChangesQueryOptions, toolCapabilitiesQueryOptions, toolInvocationsQueryOptions } from '../api/queries'
@@ -88,6 +90,7 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState<CodeChangeForm>({ ...INITIAL_FORM, repositoryId })
   const [diff, setDiff] = useState<{ id: string; content: string; truncated: boolean } | null>(null)
+  const [invocationsOpen, setInvocationsOpen] = useState(false)
 
   const granted = new Set(
     (capabilities.data?.data.capabilities ?? []).filter((item) => item.granted).map((item) => item.capability),
@@ -145,6 +148,16 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
       <div className="section-heading">
         <h2>代码变更</h2>
         <span className="spacer" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="查看写能力调用记录"
+          title="写能力调用记录"
+          onClick={() => setInvocationsOpen(true)}
+        >
+          <History className="size-4" aria-hidden="true" />
+        </Button>
         {canChange ? (
           <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
             发起代码变更
@@ -230,12 +243,13 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
         </ul>
       )}
 
-      <section className="write-invocations">
-        <div className="section-heading">
-          <h2>最近写能力调用</h2>
-          <span className="spacer" />
-          <span className="small quiet">最近 5 条</span>
-        </div>
+      <LogSheet
+        open={invocationsOpen}
+        onOpenChange={setInvocationsOpen}
+        title="写能力调用记录"
+        description="CLI 与 Bot 对当前项目发起的写操作，最近 5 条"
+        footer={<p className="small muted">调用记录只保留摘要；敏感参数不会出现在这里。</p>}
+      >
         {invocations.isPending ? (
           <p className="small quiet">调用记录加载中…</p>
         ) : invocations.isError ? (
@@ -248,7 +262,7 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
         ) : (invocations.data?.data.items ?? []).length === 0 ? (
           <p className="small quiet">还没有写能力调用记录。</p>
         ) : (
-          <ul className="invocation-list">
+          <ul className="invocation-list invocation-list-panel">
             {(invocations.data?.data.items ?? []).slice(0, 5).map((item) => (
               <li key={item.id} className="invocation-row">
                 <div className="invocation-main">
@@ -271,7 +285,7 @@ export function CodeChangeSection({ projectId, repositoryId }: { projectId: stri
             ))}
           </ul>
         )}
-      </section>
+      </LogSheet>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

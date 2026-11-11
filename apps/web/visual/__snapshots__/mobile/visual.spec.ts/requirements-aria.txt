@@ -77,6 +77,4 @@
         - cell "#3 [audit] 需求权限测试 待处理":
           - button "#3 [audit] 需求权限测试"
           - text: 待处理
-  - text: 共 12 条
-  - button "上一页" [disabled]
-  - button "下一页" [disabled]
+  - paragraph: 共 12 条

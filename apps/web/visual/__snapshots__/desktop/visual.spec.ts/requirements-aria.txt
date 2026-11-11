@@ -103,6 +103,4 @@
         - cell "开发同学"
         - cell "待处理"
         - cell "2026/11/11 11:52"
-  - text: 共 12 条
-  - button "上一页" [disabled]
-  - button "下一页" [disabled]
+  - paragraph: 共 12 条

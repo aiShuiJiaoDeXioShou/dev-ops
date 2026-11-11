@@ -25,6 +25,7 @@
   - region "凭据详情":
     - heading "[audit] 测试凭据" [level=2]
     - paragraph: 账号密码 · v2
+    - button "查看使用记录"
     - text: 已撤销
     - term: 说明
     - definition: "[audit] 仅供 UI 审计的凭据"
@@ -43,12 +44,4 @@
     - button "轮换"
     - button "授权项目"
     - button "撤销"
-    - heading "使用记录" [level=3]
-    - list:
-      - listitem: 2026/11/11 12:03 撤销 成功 v2
-      - listitem: 2026/11/11 12:03 授权 成功 v2
-      - listitem: 2026/11/11 12:03 轮换 成功 v2
-      - listitem: 2026/11/11 12:03 查看明文 成功 v1
-      - listitem: 2026/11/11 12:03 查看明文 被拒绝 v1
-      - listitem: 2026/11/11 12:03 创建 成功 v1
     - paragraph: 查看明文需要再次输入当前登录密码，明文只在详情中短暂展示。

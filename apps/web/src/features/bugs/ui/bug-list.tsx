@@ -160,7 +160,7 @@ export function BugList({ projectId }: { projectId: string }) {
             </TableBody>
           </Table>
         )}
-        {!isEmpty && (
+        {!isEmpty && query.data.data.total > query.data.data.pageSize && (
           <div className="pagination">
             <span className="quiet">共 {query.data.data.total} 条</span>
             <Button
@@ -182,6 +182,9 @@ export function BugList({ projectId }: { projectId: string }) {
               下一页
             </Button>
           </div>
+        )}
+        {!isEmpty && query.data.data.total <= query.data.data.pageSize && (
+          <p className="list-count">共 {query.data.data.total} 条</p>
         )}
       </div>
       {state.openId && (

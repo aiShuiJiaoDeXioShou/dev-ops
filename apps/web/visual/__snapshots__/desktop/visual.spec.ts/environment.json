@@ -4,9 +4,7 @@
     "width": 1440,
     "height": 1000
   },
-  "headings": [
-    "这个环境还没有配置"
-  ],
+  "headings": [],
   "tabs": [
     "需求",
     "Bug",
@@ -15,14 +13,16 @@
     "流水线",
     "产物与版本",
     "环境变量",
-    "开发",
-    "测试",
-    "生产"
+    "开发1",
+    "测试0",
+    "生产0"
   ],
   "rows": 0,
-  "statusTexts": [],
+  "statusTexts": [
+    "可用"
+  ],
   "documentOverflow": false,
-  "interactiveCount": 26,
+  "interactiveCount": 27,
   "nonPointerControls": [],
   "smallTargets": [
     "项目",

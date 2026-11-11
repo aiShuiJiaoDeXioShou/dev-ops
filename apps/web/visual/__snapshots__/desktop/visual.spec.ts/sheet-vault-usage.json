@@ -1,0 +1,26 @@
+{
+  "path": "/vault",
+  "viewport": {
+    "width": 1440,
+    "height": 1000
+  },
+  "headings": [
+    "凭据库",
+    "[audit] 测试凭据",
+    "使用记录"
+  ],
+  "tabs": [],
+  "rows": 0,
+  "statusTexts": [
+    "成功",
+    "成功",
+    "成功",
+    "成功",
+    "被拒绝",
+    "成功"
+  ],
+  "documentOverflow": false,
+  "interactiveCount": 26,
+  "nonPointerControls": [],
+  "smallTargets": []
+}

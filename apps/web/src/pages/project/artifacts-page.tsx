@@ -28,6 +28,9 @@ const ENVIRONMENTS = [
   { value: 'test', label: '测试' },
   { value: 'production', label: '生产' },
 ] as const
+/** 产物筛选环境；「全部」用于展示未指定环境的构建产物。 */
+const ARTIFACT_ENVIRONMENTS = [{ value: 'all', label: '全部' }, ...ENVIRONMENTS] as const
+type ArtifactEnvironment = (typeof ARTIFACT_ENVIRONMENTS)[number]['value']
 /** 页面内视图页签；构建产物与外部审核发布是两条独立链路，不在同一屏纵向堆叠。 */
 type ArtifactsTab = 'builds' | 'review'
 
@@ -37,6 +40,12 @@ const ARTIFACTS_TABS: { value: ArtifactsTab; label: string }[] = [
   { value: 'builds', label: '构建产物' },
   { value: 'review', label: '审核与发布' },
 ]
+
+const ARTIFACT_TYPE_LABELS: Record<string, string> = {
+  mobile_package: '移动安装包',
+  mini_program_qr: '小程序二维码',
+  web_test_url: '测试地址',
+}
 
 const STATUS_LABELS: Record<string, string> = {
   available: '可用',
@@ -54,12 +63,17 @@ export function Component() {
   const { role } = useSession()
   const canManage = role === 'admin' || role === 'developer'
   const tab: ArtifactsTab = searchParams.get(TAB_PARAM) === 'review' ? 'review' : 'builds'
-  const [environment, setEnvironment] = useState<'development' | 'test' | 'production'>('test')
+  const [environment, setEnvironment] = useState<ArtifactEnvironment>('all')
   const [selectedBuildId, setSelectedBuildId] = useState('')
   const [reportOpen, setReportOpen] = useState(false)
   const services = useQuery(projectServicesQueryOptions(projectId))
   const artifacts = useQuery(
-    projectArtifactsQueryOptions(projectId, { environment, latest: 'true', page: 1, pageSize: 50 }),
+    projectArtifactsQueryOptions(projectId, {
+      ...(environment === 'all' ? {} : { environment }),
+      latest: 'true',
+      page: 1,
+      pageSize: 50,
+    }),
   )
   const firstServiceId = services.data?.data[0]?.id ?? ''
   const runVersions = useQuery(runVersionsQueryOptions(projectId, firstServiceId))
@@ -155,7 +169,7 @@ export function Component() {
           {tab === 'builds' ? (
             <>
               <div className="segments" role="tablist" aria-label="环境">
-                {ENVIRONMENTS.map((item) => (
+                {ARTIFACT_ENVIRONMENTS.map((item) => (
                   <Button
                     key={item.value}
                     type="button"
@@ -274,7 +288,13 @@ export function Component() {
                       >
                         <div>
                           <strong>{artifact.versionLabel}</strong>
-                          <span className="muted"> {artifact.artifactType}</span>
+                          <span className="muted">
+                            {' '}
+                            {ARTIFACT_TYPE_LABELS[artifact.artifactType] ?? artifact.artifactType}
+                          </span>
+                          <span className="tag artifact-environment">
+                            {ENVIRONMENTS.find((item) => item.value === artifact.environment)?.label ?? '未指定环境'}
+                          </span>
                         </div>
                         <div className="row">
                           {artifact.status === 'available' ? (

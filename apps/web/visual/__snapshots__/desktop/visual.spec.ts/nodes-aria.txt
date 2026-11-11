@@ -29,13 +29,13 @@
             - button "排空" [disabled]
             - button "停用"
             - button "轮换令牌" [disabled]
-        - row "local-audit-node-3 darwin / arm64 在线 linux docker node24 1 小时前 1 0.1.0 排空 停用 轮换令牌":
+        - row "local-audit-node-3 darwin / arm64 在线 linux docker node24 3 小时前 1 0.1.0 排空 停用 轮换令牌":
           - cell "local-audit-node-3 darwin / arm64":
             - strong: local-audit-node-3
             - text: darwin / arm64
           - cell "在线"
           - cell "linux docker node24"
-          - cell "1 小时前"
+          - cell "3 小时前"
           - cell "1"
           - cell "0.1.0"
           - cell "排空 停用 轮换令牌":
@@ -55,13 +55,13 @@
             - button "排空" [disabled]
             - button "停用"
             - button "轮换令牌" [disabled]
-        - row "local-audit-node-2 darwin / arm64 离线 linux docker node24 3 小时前 1 0.1.0 排空 停用 轮换令牌":
+        - row "local-audit-node-2 darwin / arm64 离线 linux docker node24 4 小时前 1 0.1.0 排空 停用 轮换令牌":
           - cell "local-audit-node-2 darwin / arm64":
             - strong: local-audit-node-2
             - text: darwin / arm64
           - cell "离线"
           - cell "linux docker node24"
-          - cell "3 小时前"
+          - cell "4 小时前"
           - cell "1"
           - cell "0.1.0"
           - cell "排空 停用 轮换令牌":
@@ -81,13 +81,13 @@
             - button "排空" [disabled]
             - button "停用"
             - button "轮换令牌" [disabled]
-        - row "local-audit-node darwin / arm64 离线 linux docker 3 小时前 1 0.1.0 排空 停用 轮换令牌":
+        - row "local-audit-node darwin / arm64 离线 linux docker 4 小时前 1 0.1.0 排空 停用 轮换令牌":
           - cell "local-audit-node darwin / arm64":
             - strong: local-audit-node
             - text: darwin / arm64
           - cell "离线"
           - cell "linux docker"
-          - cell "3 小时前"
+          - cell "4 小时前"
           - cell "1"
           - cell "0.1.0"
           - cell "排空 停用 轮换令牌":

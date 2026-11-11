@@ -6,8 +6,7 @@
   },
   "headings": [
     "项目开发平台",
-    "代码变更",
-    "最近写能力调用"
+    "代码变更"
   ],
   "tabs": [
     "需求",
@@ -20,12 +19,10 @@
   ],
   "rows": 0,
   "statusTexts": [
-    "失败",
-    "成功",
-    "排队中"
+    "失败"
   ],
   "documentOverflow": false,
-  "interactiveCount": 78,
+  "interactiveCount": 79,
   "nonPointerControls": [],
   "smallTargets": [
     "项目",

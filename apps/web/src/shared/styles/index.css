@@ -2619,3 +2619,198 @@ button:disabled,
     max-width: 210px;
   }
 }
+
+/* 使用/调用日志抽屉：页面不再直接铺审计长列表，由小日志图标按需打开。 */
+.log-sheet {
+  width: min(460px, 100vw);
+  max-width: 100vw;
+  gap: 0;
+  background: var(--background);
+}
+.log-sheet [data-slot='sheet-header'] {
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.log-sheet [data-slot='sheet-close'] {
+  top: 14px;
+  right: 14px;
+}
+.log-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 24px;
+}
+.vault-usage-panel {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vault-usage-row {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.vault-usage-time {
+  color: var(--quiet);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.vault-usage-action {
+  color: var(--foreground);
+}
+.vault-usage-result {
+  justify-self: start;
+}
+.vault-usage-version {
+  color: var(--quiet);
+  font-size: 11px;
+  justify-self: end;
+}
+.log-sheet-footnote {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  line-height: 1.6;
+}
+
+/* 知识详情弹窗：内容按自然高度排列，工具条可换行，避免 grid 拉伸产生大空白和横向滚动条。 */
+[data-slot='dialog-content'].knowledge-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(600px, calc(100vw - 32px));
+  padding: 22px 24px;
+  overflow-x: hidden;
+}
+.knowledge-dialog > * {
+  min-width: 0;
+}
+.knowledge-dialog .document-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.knowledge-dialog .row {
+  flex-wrap: wrap;
+}
+
+/* 单页列表不再展示禁用的上/下页按钮，只用一行轻量计数收尾。 */
+.list-count {
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  color: var(--quiet);
+  font-size: 11.5px;
+}
+
+/* 环境页签上的配置数量，帮助用户发现非当前环境已有数据。 */
+.segment-count {
+  display: inline-grid;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 5px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--quiet);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.segment.active .segment-count {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.artifact-environment {
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+/* 产物列表：每条产物是一行可点击卡片，版本、类型、环境与操作各自归位。 */
+.artifact-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.artifact-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+}
+.artifact-item > div:first-child {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.artifact-item > div:first-child strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.artifact-item .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.knowledge-dialog .skill-description,
+.knowledge-dialog .document-toolbar,
+.knowledge-dialog .skill-source {
+  margin: 0;
+}
+
+/* 环境变量：名称与值一行，类型/状态/操作独立成组，避免一行被拉成两段。 */
+.env-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.env-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--background);
+}
+.env-main {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+.env-main strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.env-value {
+  overflow: hidden;
+  max-width: 320px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+}
+.env-meta {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}

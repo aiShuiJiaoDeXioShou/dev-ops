@@ -47,7 +47,7 @@ function DialogContent({
   const layoutClassName =
     layout === 'form'
       ? `form-dialog-content flex flex-col gap-0 overflow-hidden rounded-xl border border-border bg-background p-0 ${DIALOG_SHADOW} outline-none`
-      : `grid max-h-[85svh] w-[min(520px,calc(100vw-32px))] gap-6 overflow-y-auto rounded-xl border border-border bg-background p-6 ${DIALOG_SHADOW} outline-none`
+      : `grid max-h-[85svh] w-[min(520px,calc(100vw-32px))] content-start gap-6 overflow-y-auto rounded-xl border border-border bg-background p-6 ${DIALOG_SHADOW} outline-none`
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[#101828]/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />

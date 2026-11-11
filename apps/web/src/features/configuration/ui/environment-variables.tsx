@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/public'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { useToast } from '@/shared/ui/toast'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { DelayedPageLoading, EmptyState } from '@/shared/ui/page-state'
 import { envVariablesQueryOptions, credentialsQueryOptions } from '../api/queries'
 
@@ -36,6 +37,16 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null)
   const [removeReason, setRemoveReason] = useState('')
   const variables = useQuery(envVariablesQueryOptions(projectId, environment))
+  // 三个环境各取一次，页签上显示配置数量，避免用户停在空环境里看不到其他环境已有数据。
+  const environmentQueries = useQueries({
+    queries: ENVIRONMENTS.map((item) => envVariablesQueryOptions(projectId, item.value)),
+  })
+  const environmentCounts = new Map(
+    ENVIRONMENTS.map((item, index) => [item.value, environmentQueries[index]?.data?.data.items.length ?? 0]),
+  )
+  const configuredElsewhere = ENVIRONMENTS.filter(
+    (item) => item.value !== environment && (environmentCounts.get(item.value) ?? 0) > 0,
+  )
   const credentials = useQuery({
     ...credentialsQueryOptions(teamId, { page: 1, pageSize: 100 }),
     enabled: Boolean(teamId),
@@ -139,6 +150,7 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
               onClick={() => setEnvironment(item.value)}
             >
               {item.label}
+              <span className="segment-count">{environmentCounts.get(item.value) ?? 0}</span>
             </Button>
           ))}
         </div>
@@ -152,7 +164,11 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
         <EmptyState
           mascot="prism"
           title="这个环境还没有配置"
-          description="当前环境还没有配置。"
+          description={
+            configuredElsewhere.length > 0
+              ? `当前环境没有配置；${configuredElsewhere.map((item) => item.label).join('、')}环境已有配置，可切换查看。`
+              : '当前环境还没有配置。'
+          }
           action={
             canManage ? (
               <Button type="button" onClick={openCreate}>
@@ -162,11 +178,11 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
           }
         />
       ) : (
-        <ul className="plain-list stacked-list">
+        <ul className="env-list">
           {variables.data.data.items.map((item) => (
             <li
               key={item.id}
-              className={canManage ? 'clickable-row' : undefined}
+              className={`env-row${canManage ? ' clickable-row' : ''}`}
               onClick={(event) => {
                 if (!canManage || isNestedInteractiveTarget(event.target)) return
                 openEdit({
@@ -178,40 +194,44 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
                 })
               }}
             >
-              <span>{item.name}</span>
-              <span className="tag">{item.kind === 'plain' ? '普通变量' : '密钥引用'}</span>
-              <span className="muted">{item.masked ? '••••••••' : (item.valuePreview ?? '')}</span>
-              <span className="tag">
-                {item.status === 'active' ? '可用' : `失效（${item.invalidReason ?? '待核对'}）`}
-              </span>
-              {canManage ? (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() =>
-                      openEdit({
-                        id: item.id,
-                        name: item.name,
-                        version: item.version,
-                        kind: item.kind,
-                        credentialId: item.credential?.id,
-                      })
-                    }
-                  >
-                    编辑
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setRemoveTarget({ id: item.id, name: item.name })}
-                  >
-                    删除
-                  </Button>
-                </>
-              ) : null}
+              <div className="env-main">
+                <strong>{item.name}</strong>
+                <span className="env-value">{item.masked ? '••••••••' : (item.valuePreview ?? '')}</span>
+              </div>
+              <div className="env-meta">
+                <span className="tag">{item.kind === 'plain' ? '普通变量' : '密钥引用'}</span>
+                <StatusBadge tone={item.status === 'active' ? 'success' : 'danger'}>
+                  {item.status === 'active' ? '可用' : `失效（${item.invalidReason ?? '待核对'}）`}
+                </StatusBadge>
+                {canManage ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        openEdit({
+                          id: item.id,
+                          name: item.name,
+                          version: item.version,
+                          kind: item.kind,
+                          credentialId: item.credential?.id,
+                        })
+                      }
+                    >
+                      编辑
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => setRemoveTarget({ id: item.id, name: item.name })}
+                    >
+                      删除
+                    </Button>
+                  </>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

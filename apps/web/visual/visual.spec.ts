@@ -122,11 +122,19 @@ test.describe('[desktop] 核心页面', () => {
       await prepare(page, path)
       await expect(page.getByRole('tab', { name: tab })).toBeVisible()
       await expectPageSnapshot(page, testInfo, name)
+      if (name === 'artifacts') {
+        await expect(page.getByRole('tab', { name: '全部' })).toBeVisible()
+      }
+      if (name === 'environment') {
+        await expect(page.getByRole('tab', { name: /测试/ }).first()).toBeVisible()
+      }
       if (name === 'code') {
-        // 代码变更卡片与写能力调用必须是结构化行，不能退回点号分隔的纯文本。
+        // 代码变更卡片必须结构化；写能力调用收进日志抽屉，不再直接铺在页面底部。
         await expect(page.locator('.code-change-card').first()).toBeVisible()
+        await page.getByRole('button', { name: '查看写能力调用记录' }).first().click()
         await expect(page.locator('.invocation-row').first()).toBeVisible()
         await expect(page.locator('.invocation-row .status-pill').first()).toBeVisible()
+        await page.keyboard.press('Escape')
       }
     }
   })
@@ -164,6 +172,21 @@ test.describe('[desktop] 关键弹窗', () => {
     await expectPageSnapshot(page, testInfo, 'dialog-project-settings')
     const footer = await dialog.locator('[data-slot="dialog-footer"], [data-slot="dialog-form-footer"]').count()
     expect(footer).toBeGreaterThanOrEqual(0)
+  })
+
+  test('[desktop] 使用记录进入侧边日志抽屉', async ({ page }, testInfo) => {
+    await prepare(page, '/vault')
+    await page.getByRole('button', { name: '查看使用记录' }).first().click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '使用记录' })).toBeVisible()
+    await expectPageSnapshot(page, testInfo, 'sheet-vault-usage')
+    await page.keyboard.press('Escape')
+
+    await prepare(page, `/projects/${VISUAL_IDS.projectId}/code`)
+    await page.getByRole('button', { name: '查看写能力调用记录' }).first().click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '写能力调用记录' })).toBeVisible()
+    await expectPageSnapshot(page, testInfo, 'sheet-code-invocations')
   })
 
   test('[desktop] 需求创建与变更计划创建弹窗固定底栏', async ({ page }, testInfo) => {

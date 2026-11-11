@@ -293,6 +293,7 @@
       - /url: ""
     - text: 。
   - heading "代码变更" [level=2]
+  - button "查看写能力调用记录"
   - text: 未获得代码修改授权，请联系管理员
   - list:
     - listitem:
@@ -302,16 +303,3 @@
       - text: 补丁 1 KB
       - alert: 创建代码修改运行失败
       - button "查看差异"
-  - heading "最近写能力调用" [level=2]
-  - text: 最近 5 条
-  - list:
-    - listitem:
-      - text: 成功
-      - strong: 添加评论
-      - text: · CLI
-      - time: 2026/11/11 11:55
-    - listitem:
-      - text: 排队中
-      - strong: 代码变更
-      - text: · CLI
-      - time: 2026/11/11 11:54

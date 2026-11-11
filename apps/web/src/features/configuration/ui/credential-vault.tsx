@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Lock, Plus, Search } from 'lucide-react'
+import { AlertCircle, History, Lock, Plus, Search } from 'lucide-react'
 import type { ApiBody } from '@dev-ops/api-client'
 import { useSession } from '@/features/identity/public'
 import { projectListQueryOptions } from '@/features/projects/public'
@@ -13,6 +13,8 @@ import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
+import { LogSheet } from '@/shared/ui/log-sheet'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
 import { EmptyState, PageLoading } from '@/shared/ui/page-state'
@@ -72,6 +74,7 @@ export function CredentialVault() {
   const [searchInput, setSearchInput] = useState('')
   const [category, setCategory] = useState<CredentialCategory>('')
   const [selectedId, setSelectedId] = useState('')
+  const [usageOpen, setUsageOpen] = useState(false)
   useEffect(() => {
     // 凭据搜索防抖：避免每次击键都查询一次。
     const timer = window.setTimeout(() => setSearch(searchInput), 350)
@@ -86,7 +89,11 @@ export function CredentialVault() {
   )
   const items = list.data?.data.items ?? []
   const selected = items.find((item) => item.id === selectedId) ?? items[0] ?? null
-  const usage = useQuery({ ...credentialUsageQueryOptions(selected?.id ?? ''), enabled: Boolean(selected?.id) })
+  // 使用记录按需加载：只有打开日志抽屉时才请求，避免浏览凭据时产生额外查询。
+  const usage = useQuery({
+    ...credentialUsageQueryOptions(selected?.id ?? ''),
+    enabled: Boolean(selected?.id) && usageOpen,
+  })
   const projects = useQuery({
     ...projectListQueryOptions(teamId, { page: 1, pageSize: 100 }),
     enabled: Boolean(teamId) && canManage,
@@ -234,7 +241,10 @@ export function CredentialVault() {
                       variant="ghost"
                       className={cn('keychain-item', active && 'selected')}
                       aria-current={active ? 'true' : undefined}
-                      onClick={() => setSelectedId(credential.id)}
+                      onClick={() => {
+                        setSelectedId(credential.id)
+                        setUsageOpen(false)
+                      }}
                     >
                       <span className="key-symbol">
                         <Lock className="size-4" aria-hidden="true" />
@@ -283,6 +293,16 @@ export function CredentialVault() {
                   </p>
                 </div>
                 <span className="spacer" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="查看使用记录"
+                  title="使用记录"
+                  onClick={() => setUsageOpen(true)}
+                >
+                  <History className="size-4" aria-hidden="true" />
+                </Button>
                 <span className="badge">{KIND_LABELS[selected.status] ?? selected.status}</span>
               </div>
 
@@ -347,31 +367,56 @@ export function CredentialVault() {
                 <p className="small muted">仅管理员可以轮换或撤销团队凭据；开发者可以查看被授权凭据的元数据。</p>
               )}
 
-              <h3 className="vault-usage-title">使用记录</h3>
-              {usage.isPending ? (
-                <DelayedLoading pending>
-                  <PageLoading />
-                </DelayedLoading>
-              ) : usage.isError || !usage.data ? (
-                <p className="muted small">使用记录不可用。</p>
-              ) : usage.data.data.items.length === 0 ? (
-                <p className="muted small">暂无使用记录。</p>
-              ) : (
-                <ul className="plain-list vault-usage">
-                  {usage.data.data.items.map((item) => (
-                    <li key={item.id} className="row spread">
-                      <span>{formatDateTime(item.createdAt)}</span>
-                      <span className="muted small">{USAGE_ACTION_LABELS[item.action] ?? item.action}</span>
-                      <span className="muted small">{USAGE_RESULT_LABELS[item.result] ?? item.result}</span>
-                      <span className="muted small">v{item.credentialVersion}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
               <p className="small muted vault-credential-note">
                 查看明文需要再次输入当前登录密码，明文只在详情中短暂展示。
               </p>
+
+              <LogSheet
+                open={usageOpen}
+                onOpenChange={setUsageOpen}
+                title="使用记录"
+                description={`${selected.name} · 最近使用与敏感操作`}
+                footer={<p className="small muted">查看明文需要再次输入当前登录密码，明文只在详情中短暂展示。</p>}
+              >
+                {usage.isPending ? (
+                  <DelayedLoading pending>
+                    <PageLoading />
+                  </DelayedLoading>
+                ) : usage.isError || !usage.data ? (
+                  <EmptyState
+                    title="使用记录不可用"
+                    description="暂时无法读取该凭据的使用记录，请稍后重试。"
+                    action={
+                      <Button type="button" variant="outline" onClick={() => void usage.refetch()}>
+                        重新加载
+                      </Button>
+                    }
+                  />
+                ) : usage.data.data.items.length === 0 ? (
+                  <p className="muted small">暂无使用记录。</p>
+                ) : (
+                  <ul className="vault-usage-panel">
+                    {usage.data.data.items.map((item) => (
+                      <li key={item.id} className="vault-usage-row">
+                        <time className="vault-usage-time" dateTime={item.createdAt}>
+                          {formatDateTime(item.createdAt)}
+                        </time>
+                        <span className="vault-usage-action">{USAGE_ACTION_LABELS[item.action] ?? item.action}</span>
+                        <span className="vault-usage-result">
+                          <StatusBadge
+                            tone={
+                              item.result === 'success' ? 'success' : item.result === 'failed' ? 'danger' : 'neutral'
+                            }
+                          >
+                            {USAGE_RESULT_LABELS[item.result] ?? item.result}
+                          </StatusBadge>
+                        </span>
+                        <span className="vault-usage-version">v{item.credentialVersion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </LogSheet>
             </>
           ) : list.isPending ? (
             <DelayedLoading pending>

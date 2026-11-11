@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { delay, http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -155,16 +155,19 @@ describe('CredentialVault', () => {
     expect(screen.getByLabelText('搜索凭据')).toHaveValue('')
   })
 
-  it('选中凭据后展示授权项目名称与使用记录，查看明文动作使用中文标签', async () => {
+  it('选中凭据后在日志抽屉中展示使用记录，查看明文动作使用中文标签', async () => {
     server.use(credentialList(), credentialUsage([USAGE_ITEM, REVEAL_USAGE_ITEM]))
+    const user = userEvent.setup()
     renderVault()
     expect(await screen.findByRole('heading', { name: '测试环境对象存储密钥' })).toBeInTheDocument()
     expect(screen.getByText('测试项目')).toBeInTheDocument()
     expect(screen.queryByText('project-1')).not.toBeInTheDocument()
-    expect(await screen.findByText('使用')).toBeInTheDocument()
-    expect(screen.getByText('成功')).toBeInTheDocument()
-    expect(screen.getByText('查看明文')).toBeInTheDocument()
-    expect(screen.getByText('被拒绝')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '查看使用记录' }))
+    const sheet = await screen.findByRole('dialog')
+    expect(within(sheet).getByText('使用')).toBeInTheDocument()
+    expect(within(sheet).getByText('成功')).toBeInTheDocument()
+    expect(within(sheet).getByText('查看明文')).toBeInTheDocument()
+    expect(within(sheet).getByText('被拒绝')).toBeInTheDocument()
   })
 
   it('管理员输入正确密码后展示明文、版本与查看时间，且敏感信息不写入存储', async () => {

@@ -6,14 +6,13 @@
   },
   "headings": [
     "凭据库",
-    "[audit] 测试凭据",
-    "使用记录"
+    "[audit] 测试凭据"
   ],
   "tabs": [],
   "rows": 0,
   "statusTexts": [],
   "documentOverflow": false,
-  "interactiveCount": 24,
+  "interactiveCount": 25,
   "nonPointerControls": [],
   "smallTargets": []
 }
