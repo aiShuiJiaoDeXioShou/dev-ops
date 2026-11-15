@@ -78,27 +78,36 @@ export function createServices(
     : null
   type ConnectionRow = Parameters<GitAdapterFactory>[0]
   async function buildGitAdapter(connection: ConnectionRow): Promise<GitAdapter> {
-    const input = {
-      provider: connection.provider_key as 'github' | 'gitea',
-      authKind: connection.auth_kind as 'github_cli' | 'github_app_installation' | 'gitea_token',
-      instanceUrl: connection.instance_url,
-    }
-    if (connection.auth_kind === 'github_cli') {
-      return createGitAdapter(config, input, { githubCli: (selected) => createGitHubCliAdapter(selected) })
-    }
-    if (connection.auth_kind === 'gitea_token') {
+    const { provider_key: provider, auth_kind: authKind, instance_url: instanceUrl } = connection
+    if (provider === 'gitea') {
+      if (authKind !== 'gitea_token') throw new Error('数据库中的 Gitea 连接授权方式不合法')
       if (!configuration || !connection.secret_id) throw new Error('Gitea 凭据未配置')
       const token = await configuration.decryptSecret(connection.team_id, connection.secret_id)
-      return createGitAdapter(config, input, { gitea: (selected) => createGiteaAdapter({ ...selected, token }) })
+      return createGitAdapter(
+        config,
+        { provider, authKind, instanceUrl },
+        {
+          gitea: (selected) => createGiteaAdapter({ ...selected, token }),
+        },
+      )
     }
-    if (!config.GITHUB_APP_ID || !config.GITHUB_APP_PRIVATE_KEY_PATH) throw new Error('GitHub App 凭据未配置')
+    if (provider !== 'github') throw new Error('数据库中的 Git 提供方不合法')
+    if (authKind === 'github_cli') {
+      return createGitAdapter(config, { provider, authKind, instanceUrl }, { githubCli: createGitHubCliAdapter })
+    }
+    if (authKind !== 'github_app_installation') throw new Error('数据库中的 GitHub 连接授权方式不合法')
+    const { GITHUB_APP_ID: appId, GITHUB_APP_PRIVATE_KEY_PATH: keyPath } = config
+    if (!appId || !keyPath) throw new Error('GitHub App 凭据未配置')
     const installationId = Number(connection.external_identity)
     if (!Number.isSafeInteger(installationId) || installationId <= 0) throw new Error('GitHub App 安装 ID 无效')
-    const privateKey = await readFile(config.GITHUB_APP_PRIVATE_KEY_PATH, 'utf8')
-    return createGitAdapter(config, input, {
-      githubApp: (selected) =>
-        createGitHubAppAdapter({ ...selected, appId: config.GITHUB_APP_ID ?? '', privateKey, installationId }),
-    })
+    const privateKey = await readFile(keyPath, 'utf8')
+    return createGitAdapter(
+      config,
+      { provider, authKind, instanceUrl },
+      {
+        githubApp: (selected) => createGitHubAppAdapter({ ...selected, appId, privateKey, installationId }),
+      },
+    )
   }
   const gitAdapterFactory = options.gitAdapterFactory ?? buildGitAdapter
   const integrations = createIntegrationsService({
