@@ -1,0 +1,52 @@
+# 页面设计与交互
+
+Web 页面、组件、样式和交互变更从 [DSH UI 技能](../.agents/skills/dsh-client-ui-ux/SKILL.md)与[设计规范总入口](design/DESIGN.md)开始。按改动选读以下章节。取值、组件选择和交互验收以本仓库 [设计规范](design/README.md)为准。
+
+<a name="dsh-reference"></a>
+
+## DSH 视觉基准
+
+用对应界面的实图和源码核对布局、密度、排版、控件和明暗主题。官方源码链接固定到本仓库[技术选型](technical-selection.md#5-deepseek-harness-的参考边界)采用的提交。官方演示和截图随产品更新，精确取值以本仓库 Token 为准。
+
+- **工作区**核对分栏、阅读边、标题与工具栏密度。[官网工作区演示](https://www.deepseek.com/harness/) · [布局样式源码](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-layout/src/client/AppFrame.module.css)
+- **控件与主题**用目录实图看控件和排版，用主题源码核对明暗配色与状态。[插件目录截图](https://www.deepseek.com/harness/images/feat-plugins-zh.webp) · [Web 样式规范](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/docs/web-styling.md) · [主题变量](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-theme/src/styles/design-platform.css) · [目录组件](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-plugin-manager/src/client/PluginManagerPage.tsx)
+- **会话与轨迹**核对输入区位置、滚动区、执行记录的密度与层级。[运行轨迹截图](https://www.deepseek.com/harness/images/feat-trace-zh.webp) · [输入区源码](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-conversation/src/client/input/editor/ComposerContentEditable.tsx) · [轨迹表格源码](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/ui-trajectory/src/client/TrajectoryTable.tsx)
+
+DevOps 验收时优先对照受影响页面的实拍，必要时补看原型与设计稿。浅色工作区采用连续白底、浅灰侧栏与细分隔线，蓝色强调主操作、链接和活动态。用本仓库的语义 Token 检查深色下的相同层级和可读性。[Web 视觉修订截图](design/web-refresh-2026-11/README.md) · [数据展示与抽屉截图](design/ux-fixes-2026-11/README.md) · [交互原型](desgin/interactive-prototype-v1/README.md) · [DSH 风格探索稿](desgin/web-dsh-style-v3/brief.md)
+
+<a name="layout"></a>
+
+## 页面布局与响应式
+
+先确定列表、详情、表单、认证或设置的页面模式，再检查标题、筛选、正文和操作区的阅读边与间距。窄屏优先重排、换行或改用详情覆盖层，保持关键内容和主操作可达。[页面模式](design/patterns.md) · [响应式技能](../.agents/skills/dsh-responsive-ui/SKILL.md)
+
+<a name="components"></a>
+
+## 主题与组件
+
+配色、排版、圆角和状态从项目 Token 与既有控件入手。页面结构沿用 `prototype` 层基础类，交互复用 shared UI。界面图标查看主技能的图标参考，项目品牌、Bot 头像和目录素材使用素材技能。[设计 Token](design/tokens.md) · [组件选择](design/components.md) · [图标参考](../.agents/skills/dsh-client-ui-ux/references/icons.md) · [素材技能](../.agents/skills/dsh-official-plugin-artwork/SKILL.md)
+
+<a name="controls"></a>
+
+## 控件、键盘与浮层
+
+核对键盘操作、焦点可见、Esc 关闭和焦点归还。在移动端检查菜单与抽屉的可视范围、触控目标和软键盘遮挡。破坏性操作按业务规则使用确认框。[交互规范](design/interactions.md) · [组件选择](design/components.md) · [响应式技能](../.agents/skills/dsh-responsive-ui/SKILL.md)
+
+<a name="feedback"></a>
+
+## 加载、空内容与操作反馈
+
+按状态矩阵同时设计加载、空数据、筛选无匹配、失败、只读、提交中与重试。请求失败时保留已加载内容，提交失败时保留草稿并就地提示，敏感字段遵循对应流程。提交成功时按用例关闭或刷新，再给出一条结果反馈。[交互规范](design/interactions.md) · [组件选择](design/components.md)
+
+<a name="conversation"></a>
+
+## 对话与流式输出
+
+全局协作和项目协作沿用本仓库的产品规则。全局协作默认发送普通消息，通过明确入口创建任务。项目协作只读，按工作标签归集当前用户可查看的会话。[MVP 协作需求](prd/mvp.md#101-独立-bots会话与项目入口)
+
+- 会话使用「对话 / 轨迹 / 上下文 / 编队」页签。消息和生成状态留在对话，工具调用和耗时可在轨迹中查看。项目只读入口保留查看能力，隐藏发送、附件添加与管理操作。
+- 输入区保留发送按钮。桌面键盘使用 Enter 发送、Shift+Enter 换行，中文输入法组字时保留 Enter 的确认行为。`@` 候选打开时优先处理候选的选择和 Esc 关闭。发送失败保留草稿与附件。
+- 生成时在原发送位置提供「停止生成」。完成、失败和中断分别展示。中断时保留已输出的内容和可用轨迹。仅在用户已靠近消息末尾时随增量内容滚动，查看历史时保持阅读位置。
+- 窄屏将会话列表收进抽屉。验证长消息、代码块和附件列表的局部滚动，保持输入区与停止按钮可达。
+
+原型用本地模拟验证上述交互。实现真实流式路径时，对照 Bots 架构的运行状态、事件与恢复约定。[协作原型说明](desgin/interactive-prototype-v1/README.md#ai-对话状态与上下文) · [流式与轨迹原型源码](desgin/interactive-prototype-v1/modules/ai-chat.js) · [React 协作原型](../apps/web/src/prototype/pages/collaboration-page.tsx) · [Bots 架构](architecture/bots-architecture.md#7-持久调度事件与恢复)

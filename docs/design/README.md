@@ -1,5 +1,6 @@
 # 设计规范索引
 
+- 按改动查对应规范、DSH 实图和源码及对话原型。[页面设计与交互](../ui-guidelines.md)
 - [设计总规范](DESIGN.md)：优先级、分层、强制规则、AI 工作协议、DoD
 - [设计 Token](tokens.md)：颜色、字体、间距、圆角、动效
 - [组件选择](components.md)：base 类与 shared UI 的职责划分

@@ -1,0 +1,43 @@
+---
+name: dsh-client-ui-ux
+description: DevOps 工作区 Web UI 的设计、实现和评审入口。新增或修改 apps/web 的页面、组件、样式、主题或交互前使用，覆盖布局、对齐、间距、图标、数据状态和浏览器验收。
+---
+
+# DevOps Web UI 设计与实现
+
+开始前读项目设计总规范、Token、组件选择、对应页面模式和交互规范。打开目标路由，查找同类页面与共享控件。用 DSH 视觉基准中的对应实图和源码核对布局、密度、排版、控件及明暗主题。本仓库规范决定具体取值、组件和业务行为。[设计总规范](../../../docs/design/DESIGN.md) · [Token](../../../docs/design/tokens.md) · [组件选择](../../../docs/design/components.md) · [页面模式](../../../docs/design/patterns.md) · [交互规范](../../../docs/design/interactions.md) · [DSH 视觉基准](../../../docs/ui-guidelines.md#dsh-reference)
+
+| 改动                                     | 选读                                                                                                                        |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 页面布局、信息层级、分栏或间距           | [页面布局与响应式](../../../docs/ui-guidelines.md#layout) · [对齐](references/alignment.md) · [间距](references/spacing.md) |
+| 窄屏、触控、截断、工具提示或断点下的焦点 | [响应式技能](../dsh-responsive-ui/SKILL.md)                                                                                 |
+| 样式、主题或组件                         | [主题与组件](../../../docs/ui-guidelines.md#components)                                                                     |
+| 操作图标、图标按钮或信息图标             | [图标](references/icons.md)                                                                                                 |
+| 项目品牌、Bot 头像或目录素材             | [素材技能](../dsh-official-plugin-artwork/SKILL.md)                                                                         |
+| 控件行为、键盘、菜单或弹窗               | [控件、键盘与浮层](../../../docs/ui-guidelines.md#controls)                                                                 |
+| 请求、表单或操作状态                     | [加载、空内容与操作反馈](../../../docs/ui-guidelines.md#feedback)                                                           |
+| 会话、输入区或流式输出                   | [对话与流式输出](../../../docs/ui-guidelines.md#conversation)                                                               |
+
+## 页面结构与视觉
+
+- 先确定页面模式、内容层级和适用状态。布局使用 `.page-head`、`.catalog`、`.filters`、`.table-wrap`、`.details` 等 `prototype` 层基础类，可交互控件优先复用 `apps/web/src/shared/ui/controls/`。缺少合适控件时按组件规范补共享实现、示例与状态测试。页面和 feature 禁止新增裸 `<button>`、`<input>`、`<select>`、`<textarea>`、`<table>` 及 `@/prototype/*` 依赖。
+- `design/tokens.json` 定义 Token，`apps/web/src/shared/styles/index.css` 提供运行时映射。颜色、圆角、状态色用项目 Token。禁止裸色值和任意 Tailwind 值。沿用本项目的字号、行高和间距，优先用位置、字号和文字色表达层级。浅色工作区采用浅灰侧栏、连续白色主区与细分隔线，蓝色用于主操作、链接和活动态。
+- 样式层顺序固定为 `theme, base, prototype, components, utilities`。`apps/web/src/main.tsx` 先导入 `@/prototype/styles/layered.css`，再导入 `./shared/styles/index.css`。
+- 从既有控件的角色和尺寸变体选圆角、内距与高度。并排控件以同类元素对齐，嵌套容器检查内外留白，相接表面由外层保持轮廓。检查 hover、选中、加载、禁用与焦点态，保持控件尺寸、可读性和焦点环。
+
+## 控件与状态
+
+- 用共享控件处理 Tab、Enter/Space、方向键及 Esc。弹窗设置初始焦点和焦点陷阱，关闭后归还触发入口。菜单和抽屉保持在视口内并避开滚动容器裁切。按业务处理点击外部关闭和草稿确认。危险操作复用 `AlertDialog`，确认文案交代对象与后果，初始焦点放在安全操作上。
+- 数据界面覆盖 loading、empty、no-match、error、read-only、提交中及重试。列表加载保持布局，复用 `DelayedLoading` 和页面状态组件。空数据提供下一步，筛选无匹配提供清除条件，加载失败提供重试，已有数据保留。只读操作按权限规则隐藏或禁用，禁用时说明原因。
+- 提交期间防止重复操作。失败时保留草稿，字段错误就地显示，敏感字段按对应流程处理。长列表或详情优先局部重试。成功按用例刷新或关闭，再用共享 Toast 给出一次结果反馈。列表筛选、分页和详情恢复遵循页面模式，整行可点击时保留可聚焦标题入口与行内独立操作。
+
+## 会话与流式输出
+
+全局协作默认发消息，创建任务使用显式入口。项目协作沿用只读模式。改输入区时检查中文输入法组字、`@` 候选、发送失败和草稿。流式生成途中保持「停止生成」可达，核对中断后的部分正文、轨迹和用户阅读位置。[对话与流式输出](../../../docs/ui-guidelines.md#conversation)
+
+## 验收
+
+1. 在实际页面检查变更、相邻元素和受影响状态。布局检查长文本和断点两侧。颜色、主题或控件状态变更核对明暗主题中的文字、边界、状态和焦点。共享控件或全局样式覆盖受影响的不同页面模式与尺寸。
+2. 在 1440×1000 与 390×844 截图，和对应原型或设计稿核对。按改动验证键盘路径、触控、异步反馈及只读状态。测试夹具仅提供其实际覆盖范围内的证据，实际页面或状态无法打开时记录原因和待验证项。
+3. 在仓库根目录运行 `pnpm prepare:clients` 后执行 `pnpm ui:check`、`pnpm --dir apps/web check`、`pnpm --dir apps/web build` 和 `pnpm test:visual`。按视觉回归说明维护有意改变的布局与结构快照。`tooling/design/ui-baseline.json` 只记录存量债务，禁止通过 `pnpm ui:baseline` 放行新增违规。[视觉与布局回归](../../../apps/web/visual/README.md) · [UI 债务基线](../../../docs/design/baseline.md)
+4. 交付说明写明使用的组件、覆盖的状态、检查结果、截图路径与未核对的视觉或交互项。纯规范文档变更核对内容、相对链接和命令。

@@ -61,15 +61,23 @@
 5. 注释解释为什么和约束，不复述代码；公开函数 JSDoc 写用途、参数、返回和异常，显而易见的内部函数不强制。
 6. 错误分层：用户输入或业务规则用 `ApiError` 和业务错误码；数据库读出的值不合法属于数据异常，用普通 `Error` 说明“数据库…不合法”，不要伪装成用户输入错误。
 
-## UI 实现规范（强制）
+## 页面设计与交互（强制）
 
-1. 所有 Web UI 变更开始前必须阅读 [设计规范总入口](docs/design/DESIGN.md)、[设计 Token](docs/design/tokens.md)、[组件选择](docs/design/components.md)与对应[页面模式](docs/design/patterns.md)；交互行为遵循[交互规范](docs/design/interactions.md)。
-2. 可交互控件优先复用 `apps/web/src/shared/ui/controls/`；布局结构使用 `prototype` 层基础类。新增代码禁止裸写 `<button>`、`<input>`、`<select>`、`<textarea>`、`<table>`，禁止新增 `@/prototype/*` 依赖。
-3. 颜色、圆角、状态色必须来自 `design/tokens.json` 和 `apps/web/src/shared/styles/index.css`；禁止裸色值和任意 Tailwind 值（`w-[...]`、`text-[...]` 等）。
-4. 任何数据界面必须覆盖 loading、empty、no-match、error、read-only、提交中与重试状态；交互必须支持键盘、焦点可见、Esc 关闭和关闭后焦点归还。
-5. UI 完成后必须运行 `pnpm ui:check`。`tooling/design/ui-baseline.json` 记录存量债务，只能减少；禁止无理由运行 `pnpm ui:baseline` 放行新增违规。
-6. 交付前在 1440×1000 与 390×844 下截图，对照参考原型或设计稿核对；未验证的视觉/交互差异必须在说明中列出。
-7. 样式分层顺序固定为 `theme, base, prototype, components, utilities`；`apps/web/src/main.tsx` 必须先导入 `@/prototype/styles/layered.css`，再导入 `shared/styles/index.css`。
+新增或修改 Web 页面、组件、样式或交互前，必须先读 [DSH UI 技能](.agents/skills/dsh-client-ui-ux/SKILL.md)、[设计规范总入口](docs/design/DESIGN.md)、[设计 Token](docs/design/tokens.md)、[组件选择](docs/design/components.md)和对应[页面模式](docs/design/patterns.md)。交互遵循[交互规范](docs/design/interactions.md)，按改动阅读[页面设计与交互规范](docs/ui-guidelines.md)中的相关章节。使用 [DSH 视觉基准](docs/ui-guidelines.md#dsh-reference)中的对应实图和源码对照布局、密度、排版、控件和明暗主题，取值与业务行为遵循本仓库规范。
+
+- 改页面布局、信息层级或窄屏表现时，读[页面布局与响应式](docs/ui-guidelines.md#layout)。
+- 改样式、主题或组件时，读[主题与组件](docs/ui-guidelines.md#components)。
+- 改控件行为、键盘、菜单或弹窗时，读[控件、键盘与浮层](docs/ui-guidelines.md#controls)。
+- 改请求、表单或操作状态时，读[加载、空内容与操作反馈](docs/ui-guidelines.md#feedback)。
+- 改对话、输入框或流式回复时，读[对话与流式输出](docs/ui-guidelines.md#conversation)。
+
+### 实现与验收
+
+1. 可交互控件优先复用 `apps/web/src/shared/ui/controls/`。布局结构使用 `prototype` 层基础类。新增代码禁止裸写 `<button>`、`<input>`、`<select>`、`<textarea>`、`<table>`，禁止新增 `@/prototype/*` 依赖。
+2. 颜色、圆角、状态色必须来自 `design/tokens.json` 和 `apps/web/src/shared/styles/index.css`。禁止裸色值和任意 Tailwind 值（`w-[...]`、`text-[...]` 等）。样式分层顺序固定为 `theme, base, prototype, components, utilities`。`apps/web/src/main.tsx` 必须先导入 `@/prototype/styles/layered.css`，再导入 `shared/styles/index.css`。
+3. 数据界面必须覆盖 loading、empty、no-match、error、read-only、提交中与重试状态。交互必须支持键盘、焦点可见、Esc 关闭和关闭后焦点归还。
+4. UI 完成后必须运行 `pnpm ui:check`。`tooling/design/ui-baseline.json` 记录存量债务，只能减少。禁止用 `pnpm ui:baseline` 放行新增违规。
+5. 交付前在 1440×1000 与 390×844 下截图，对照参考原型或设计稿核对。交付说明列出未验证的视觉与交互项。
 
 ## 后端遵循规范
 
