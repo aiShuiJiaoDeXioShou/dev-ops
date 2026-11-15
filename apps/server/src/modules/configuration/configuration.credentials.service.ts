@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingHttpHeaders } from 'node:http'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES, type ErrorCode } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -47,7 +48,6 @@ import {
   restoreEnvVarsForCredentialInProject,
 } from './configuration.environment-variables.repository.ts'
 import {
-  isUniqueConstraintError,
   optionalText,
   requireText,
   validateCredentialKind,
@@ -257,8 +257,7 @@ export function createCredentialsService(deps: CredentialsServiceDeps) {
         }
       })
     } catch (error) {
-      if (isUniqueConstraintError(error))
-        throw new ApiError(ERROR_CODES.CREDENTIAL_NAME_DUPLICATE, '同团队已存在同名凭据')
+      if (isUniqueViolation(error)) throw new ApiError(ERROR_CODES.CREDENTIAL_NAME_DUPLICATE, '同团队已存在同名凭据')
       throw error
     }
     return singleView(credentialId)

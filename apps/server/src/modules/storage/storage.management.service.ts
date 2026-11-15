@@ -1,3 +1,4 @@
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { randomUUID } from 'node:crypto'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
@@ -12,7 +13,6 @@ import {
   findBucketById,
   findStorageBuckets,
   insertStorageBucket,
-  isUniqueViolation,
   updateStorageBucketByVersion,
   updateStorageBucketProbe,
 } from './storage.repository.ts'

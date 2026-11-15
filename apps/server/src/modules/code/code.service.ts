@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -392,12 +393,6 @@ function pagedTotal(itemCount: number, page: number, pageSize: number): number {
   return itemCount === pageSize ? consumed + 1 : consumed
 }
 
-function isUniqueError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === '23505') return true
-  return 'cause' in error && isUniqueError(error.cause)
-}
-
 function gitErrorToCheckStatus(error: unknown): { status: string; errorCode: string } {
   if (
     typeof error === 'object' &&
@@ -443,6 +438,11 @@ function mapGitWriteError(error: unknown, action: string): never {
   throw new ApiError(ERROR_CODES.EXTERNAL_UNAVAILABLE, `${action}失败：来源暂时不可用`)
 }
 
+/**
+ * 创建项目仓库、提交和合并请求用例。
+ * @param deps 数据库、Git 适配器解析与有效连接查询依赖。
+ * @returns 负责项目鉴权、代码读取与仓库关联写入的用例。
+ */
 export function createCodeService(deps: CodeServiceDeps) {
   const { db } = deps
 
@@ -709,7 +709,7 @@ export function createCodeService(deps: CodeServiceDeps) {
         createdByUserId: actor.id,
       })
     } catch (error) {
-      if (isUniqueError(error)) {
+      if (isUniqueViolation(error)) {
         throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '该代码引用已存在')
       }
       throw error

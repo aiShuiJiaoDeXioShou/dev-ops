@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { AppConfig } from '../../platform/config/env.ts'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
@@ -31,7 +32,6 @@ import {
   createInvitationToken,
   hashInvitationToken,
   INVITATION_TTL_MS,
-  isUniqueViolation,
   normalizeEmail,
   normalizeRole,
   toTeamRole,

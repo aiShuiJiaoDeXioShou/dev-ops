@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { loadUserRefs, userRefOf, type UserRef } from '../identity/identity.display.ts'
@@ -223,7 +224,7 @@ export async function grantToolCapability(
     const refs = await loadUserRefs(db, [row.grantee_user_id, row.granted_by_user_id])
     return toCapabilityGrantView(row, refs)
   } catch (error) {
-    if (isUniqueConstraintError(error)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '该成员已获得此能力')
+    if (isUniqueViolation(error)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '该成员已获得此能力')
     throw error
   }
 }
@@ -305,10 +306,4 @@ function toCapabilityGrantView(row: GrantRow, refs: Awaited<ReturnType<typeof lo
     grantedAt: (row.granted_at ?? row.created_at).toISOString(),
     revokedAt: row.revoked_at === null ? null : row.revoked_at.toISOString(),
   }
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  const code = Reflect.get(error, 'code')
-  return code === '23505'
 }

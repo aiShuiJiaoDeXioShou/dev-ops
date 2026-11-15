@@ -257,14 +257,3 @@ export function validateFutureTimestamp(value: string | null | undefined, name: 
   }
   return parsed
 }
-
-/**
- * 判断错误是否为唯一约束冲突；并发写入同名记录时转换为业务错误码。
- * @param error 捕获的未知错误。
- * @returns 是唯一约束冲突时为 true，并检查 cause 链。
- */
-export function isUniqueConstraintError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === '23505') return true
-  return 'cause' in error && isUniqueConstraintError(error.cause)
-}

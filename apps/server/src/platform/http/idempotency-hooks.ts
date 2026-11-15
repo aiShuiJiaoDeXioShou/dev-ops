@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { IncomingHttpHeaders } from 'node:http'
 import type { Database } from '../database/client.ts'
+import { isUniqueViolation } from '../database/errors.ts'
 import { idempotencyRecord } from '../database/idempotency.tables.ts'
 import { ERROR_CODES } from './error-codes.ts'
 import { ApiError } from './errors.ts'
@@ -16,12 +17,6 @@ const AUTH_PREFIX = '/api/v1/auth/'
 interface IdempotencyHookOptions {
   db: Database
   getUserId: (headers: IncomingHttpHeaders) => Promise<string | null>
-}
-
-function isUniqueConstraintError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === '23505') return true
-  return 'cause' in error && isUniqueConstraintError(error.cause)
 }
 
 /**
@@ -92,7 +87,7 @@ export function createIdempotencyHooks(options: IdempotencyHookOptions) {
         status_code: 200,
       })
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
+      if (isUniqueViolation(error)) {
         throw new ApiError(ERROR_CODES.IDEMPOTENCY_CONFLICT, '请求已处理，请刷新后查看结果')
       }
       throw error

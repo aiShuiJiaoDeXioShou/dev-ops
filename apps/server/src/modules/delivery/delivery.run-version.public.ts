@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import { requireActiveProjectService } from './delivery.access.ts'
 import type { DeliveryExecutor } from './delivery.repository.ts'
-import { isUniqueConstraintError } from './delivery.errors.ts'
 import {
   findRunVersion,
   insertRunVersion,
@@ -118,7 +118,7 @@ export function createDeploymentRunVersionWriter(deps: { db: Database }) {
       if (executor) await write(executor)
       else await db.transaction(write)
     } catch (error) {
-      if (!existing && isUniqueConstraintError(error)) {
+      if (!existing && isUniqueViolation(error)) {
         throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '运行版本已被其他操作修改，请刷新后重试')
       }
       throw error

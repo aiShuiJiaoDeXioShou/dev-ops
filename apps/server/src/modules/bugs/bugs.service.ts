@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import {
@@ -642,7 +643,7 @@ export function createBugsService(deps: BugsServiceDeps) {
         })
       })
     } catch (error) {
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      if (isUniqueViolation(error)) {
         throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '需求已关联')
       }
       throw error

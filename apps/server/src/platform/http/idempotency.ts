@@ -1,17 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, isNull } from 'drizzle-orm'
 import type { Database } from '../database/client.ts'
+import { isUniqueViolation } from '../database/errors.ts'
 import { ApiError } from './errors.ts'
 import { ERROR_CODES } from './error-codes.ts'
 import { idempotencyRecord } from '../database/idempotency.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
-
-function isUniqueConstraintError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === '23505') return true
-  return 'cause' in error && isUniqueConstraintError(error.cause)
-}
 
 /** 计算请求体规范化哈希；调用方负责传入已校验输入。 */
 export function requestHash(input: unknown): string {
@@ -50,7 +45,7 @@ export async function recordIdempotency(
       status_code: 200,
     })
   } catch (error) {
-    if (isUniqueConstraintError(error)) {
+    if (isUniqueViolation(error)) {
       throw new ApiError(ERROR_CODES.IDEMPOTENCY_CONFLICT, '请求已处理，请刷新后查看结果')
     }
     throw error

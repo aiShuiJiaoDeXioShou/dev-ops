@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import type { ErrorCode } from '../../platform/http/error-codes.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
@@ -27,7 +28,6 @@ import {
 } from './configuration.environment-variables.view.ts'
 import {
   assertPlainValueNotSensitive,
-  isUniqueConstraintError,
   validateEnvVarKind,
   validateEnvironment,
   validatePlainValue,
@@ -270,8 +270,7 @@ export function createEnvironmentVariablesService(deps: EnvironmentVariablesServ
         })
       })
     } catch (error) {
-      if (isUniqueConstraintError(error))
-        throw new ApiError(ERROR_CODES.ENV_VAR_NAME_DUPLICATE, '同项目同环境已存在同名变量')
+      if (isUniqueViolation(error)) throw new ApiError(ERROR_CODES.ENV_VAR_NAME_DUPLICATE, '同项目同环境已存在同名变量')
       throw error
     }
     const record = await findEnvVarById(db, variableId)

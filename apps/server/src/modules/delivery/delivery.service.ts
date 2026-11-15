@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -10,7 +11,6 @@ import { findProjectServiceById } from '../projects/projects.repository.ts'
 import { findRequirementSummaryById } from '../requirements/requirements.repository.ts'
 import { createProjectAccess } from './delivery.access.ts'
 import { createArtifactUseCases } from './delivery.artifact.service.ts'
-import { isUniqueConstraintError } from './delivery.errors.ts'
 import {
   deleteTarget,
   findBuildByBusinessKey,
@@ -376,7 +376,7 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
         })
       })
     } catch (error) {
-      if (!isUniqueConstraintError(error)) throw error
+      if (!isUniqueViolation(error)) throw error
       const concurrent = await findBuildByBusinessKey(db, projectId, source, buildKey)
       if (concurrent) return singleBuildView(concurrent.id)
       throw error
@@ -525,7 +525,7 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
         })
       })
     } catch (error) {
-      if (isUniqueConstraintError(error)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '该事项已关联此构建')
+      if (isUniqueViolation(error)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '该事项已关联此构建')
       throw error
     }
     return singleBuildView(buildId)

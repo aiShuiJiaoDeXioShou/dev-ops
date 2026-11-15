@@ -202,9 +202,6 @@ export async function markPipelineArtifactsMissing(db: Database, artifactIds: st
   return rows.length
 }
 
-/** 判断错误是否由唯一约束冲突引起；统一从平台数据库工具导出，供流水线内部复用。 */
-export { isUniqueViolation } from '../../platform/database/errors.ts'
-
 /** 按标识查找运行摘要；不读取运行计划与工作流快照。 */
 export async function findPipelineRunById(db: PipelineExecutor, runId: string) {
   const [row] = await db.select(runListColumns).from(pipelineRun).where(eq(pipelineRun.id, runId)).limit(1)

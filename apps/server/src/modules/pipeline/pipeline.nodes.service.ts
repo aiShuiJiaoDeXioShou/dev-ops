@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingHttpHeaders } from 'node:http'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
@@ -20,7 +21,6 @@ import {
   updatePipelineNodeStatus,
   type PipelineNodeRow,
 } from './pipeline.nodes.repository.ts'
-import { isUniqueViolation } from './pipeline.repository.ts'
 import type { PipelineNodeView } from './pipeline.view.ts'
 
 /** P1 允许的能力标签白名单；未知标签不能进入调度匹配，避免 Agent 自报任意能力。 */

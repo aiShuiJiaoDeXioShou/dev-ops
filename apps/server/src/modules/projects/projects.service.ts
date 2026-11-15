@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
@@ -134,12 +135,6 @@ function toServiceStatus(value: string): 'active' | 'disabled' {
 }
 
 /** 判断唯一约束冲突；并发创建同名服务时映射为业务错误。 */
-function isUniqueConstraintError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === '23505') return true
-  return 'cause' in error && isUniqueConstraintError(error.cause)
-}
-
 function normalizeServiceName(name: string): string {
   const value = name.trim()
   if (value.length === 0 || value.length > 120) {
@@ -581,7 +576,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
         })
       })
     } catch (error) {
-      if (isUniqueConstraintError(error)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '仓库已关联该服务')
+      if (isUniqueViolation(error)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '仓库已关联该服务')
       throw error
     }
     return getService(actor, serviceId)

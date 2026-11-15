@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { PipelineInputValue } from '@dev-ops/pipeline-protocol'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -27,7 +28,6 @@ import {
   findPipelineRunSteps,
   insertPipelineRun,
   insertPipelineRunSteps,
-  isUniqueViolation,
   skipPendingPipelineRunSteps,
   updatePipelineRunStatus,
   type PipelineRunListFilters,

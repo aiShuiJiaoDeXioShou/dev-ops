@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
+import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import type { SessionUser } from '../identity/identity.session.ts'
 import { requireActiveProjectService, requireProjectService, type RequireProjectAccess } from './delivery.access.ts'
-import { isUniqueConstraintError } from './delivery.errors.ts'
 import {
   findRunVersion,
   findRunVersionChanges,
@@ -213,7 +213,7 @@ export function createRunVersionUseCases(deps: RunVersionUseCaseDeps) {
       })
     } catch (error) {
       // 并发首次确认可能同时通过存在性检查，唯一约束兜底并转换为业务冲突。
-      if (!existing && isUniqueConstraintError(error)) {
+      if (!existing && isUniqueViolation(error)) {
         throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '运行版本已被其他操作修改，请刷新后重试')
       }
       throw error

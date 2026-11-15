@@ -238,14 +238,3 @@ export async function appendStorageBucketEvent(
     changes: input.changes,
   })
 }
-
-/**
- * 判断数据库错误是否为唯一约束冲突。
- * @param error 未知异常。
- * @returns PostgreSQL 唯一冲突（23505）时返回 true。
- */
-export function isUniqueViolation(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false
-  if ('code' in error && error.code === '23505') return true
-  return 'cause' in error && isUniqueViolation(error.cause)
-}
