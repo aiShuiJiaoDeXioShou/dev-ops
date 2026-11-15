@@ -8,12 +8,13 @@ export interface ProjectListFilters {
   pageSize?: number
 }
 
-/** 团队项目列表查询。 */
+/** 团队项目列表查询；改筛选或翻页时沿用上一页数据，避免列表在请求期间卸载搜索框。 */
 export function projectListQueryOptions(teamId: string, filters: ProjectListFilters) {
   return queryOptions({
     queryKey: ['projects', 'list', teamId, filters],
     queryFn: ({ signal }) => apiClient.listProjects(teamId, filters, { signal }),
     enabled: Boolean(teamId),
+    placeholderData: keepPreviousData,
   })
 }
 

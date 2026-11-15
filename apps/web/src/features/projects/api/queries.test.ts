@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { projectActivityQueryOptions } from './queries'
+import { projectActivityQueryOptions, projectListQueryOptions } from './queries'
+
+describe('projectListQueryOptions', () => {
+  it('切换搜索词时沿用上一页数据，避免列表卸载导致搜索框丢失焦点', () => {
+    const options = projectListQueryOptions('team-1', { search: 'dev' })
+    expect(options.placeholderData).toBeDefined()
+  })
+})
 
 describe('projectActivityQueryOptions', () => {
   it('项目晴雨表在一个会话内缓存，不随重新挂载或窗口聚焦刷新', () => {

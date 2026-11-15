@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 import type { SkillListItem } from '../model/types'
 
@@ -18,12 +18,13 @@ export interface TemplateListFilters {
   pageSize?: number
 }
 
-/** 团队技能列表。 */
+/** 团队技能列表；改筛选或翻页时沿用上一页数据，避免列表在请求期间卸载搜索框。 */
 export function skillListQueryOptions(teamId: string, filters: SkillListFilters) {
   return queryOptions({
     queryKey: ['knowledge', 'skills', 'list', teamId, filters],
     queryFn: ({ signal }) => apiClient.listSkills(teamId, filters, { signal }),
     enabled: Boolean(teamId),
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -54,12 +55,13 @@ export function skillActivitiesQueryOptions(skillId: string, page = 1) {
   })
 }
 
-/** 团队模板列表。 */
+/** 团队模板列表；改筛选或翻页时沿用上一页数据，避免列表在请求期间卸载搜索框。 */
 export function templateListQueryOptions(teamId: string, filters: TemplateListFilters) {
   return queryOptions({
     queryKey: ['knowledge', 'templates', 'list', teamId, filters],
     queryFn: ({ signal }) => apiClient.listAgentTemplates(teamId, filters, { signal }),
     enabled: Boolean(teamId),
+    placeholderData: keepPreviousData,
   })
 }
 
