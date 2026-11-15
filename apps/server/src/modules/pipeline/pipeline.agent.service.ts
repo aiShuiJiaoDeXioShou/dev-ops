@@ -140,6 +140,11 @@ export function logSeqConflictData(
   return { acceptedThrough: { [String(stepIndex)]: acceptedSeq } }
 }
 
+/** 校验运行目标环境；历史运行缺省按 production 处理。 */
+function toSecretEnvironment(value: string): 'development' | 'test' | 'production' {
+  return value === 'development' || value === 'test' ? value : 'production'
+}
+
 /**
  * 创建 Agent 执行服务：租约领取/续约、步骤状态、日志与产物上传、完成收口。
  * @param deps 数据库、存储、配置与 Git/密钥凭据提供者。
@@ -147,11 +152,6 @@ export function logSeqConflictData(
  * @remarks 租约明文令牌只在领取响应下发，因此租约在 Agent 领取时创建；
  * Worker 只负责把运行分配给节点，保证数据库只保存租约哈希。
  */
-/** 校验运行目标环境；历史运行缺省按 production 处理。 */
-function toSecretEnvironment(value: string): 'development' | 'test' | 'production' {
-  return value === 'development' || value === 'test' ? value : 'production'
-}
-
 export function createPipelineAgentService(deps: PipelineAgentServiceDeps) {
   const { db, config, storage, credentials } = deps
   // 租约作用域内已解析的运行时密钥短时缓存；明文只在内存，不写日志/数据库/响应。

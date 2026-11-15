@@ -14,6 +14,13 @@ export type PullRequestDetail = ApiSuccessData<
 >
 export type PullRequestQuery = ApiQuery<'/api/v1/projects/{projectId}/repositories/{repositoryId}/pull-requests', 'get'>
 
+/**
+ * 构建仓库合并请求列表查询。
+ * @param projectId 项目标识。
+ * @param repositoryId 仓库标识。
+ * @param query 列表筛选和分页条件。
+ * @returns 按仓库和条件区分缓存的查询配置。
+ */
 export function pullRequestsQueryOptions(projectId: string, repositoryId: string, query: PullRequestQuery) {
   return queryOptions({
     queryKey: ['code', 'pull-requests', projectId, repositoryId, query],
@@ -22,6 +29,13 @@ export function pullRequestsQueryOptions(projectId: string, repositoryId: string
   })
 }
 
+/**
+ * 构建指定合并请求的详情查询。
+ * @param projectId 项目标识。
+ * @param repositoryId 仓库标识。
+ * @param number 合并请求编号。
+ * @returns 详情查询配置，缺少任一标识时禁用请求。
+ */
 export function pullRequestQueryOptions(projectId: string, repositoryId: string, number: string) {
   return queryOptions({
     queryKey: ['code', 'pull-request', projectId, repositoryId, number],
@@ -30,6 +44,13 @@ export function pullRequestQueryOptions(projectId: string, repositoryId: string,
   })
 }
 
+/**
+ * 构建指定合并请求的文件差异查询。
+ * @param projectId 项目标识。
+ * @param repositoryId 仓库标识。
+ * @param number 合并请求编号。
+ * @returns 差异查询配置，缺少任一标识时禁用请求。
+ */
 export function pullRequestDiffQueryOptions(projectId: string, repositoryId: string, number: string) {
   return queryOptions({
     queryKey: ['code', 'pull-request-diff', projectId, repositoryId, number],

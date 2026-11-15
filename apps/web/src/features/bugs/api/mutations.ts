@@ -1,9 +1,19 @@
 import { apiClient } from '@/shared/api/client'
 import type { TeamRole } from '@/features/identity/model/session'
 
+/**
+ * 判断当前角色是否能使用缺陷写入操作。
+ * @param role 当前团队角色。
+ * @returns 管理员和开发者可写时返回 true。
+ */
 export function canWriteBugs(role: TeamRole): boolean {
   return role === 'admin' || role === 'developer'
 }
+/**
+ * 判断缺陷是否允许编辑。
+ * @param status 当前缺陷状态。
+ * @returns 待处理或修复中时返回 true。
+ */
 export function isEditableBug(status: string): boolean {
   return status === 'pending' || status === 'in_fix'
 }

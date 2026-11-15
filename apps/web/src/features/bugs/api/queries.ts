@@ -18,6 +18,11 @@ export function bugListQueryOptions(projectId: string, filters: BugListFilters) 
     placeholderData: keepPreviousData,
   })
 }
+/**
+ * 构建缺陷详情查询。
+ * @param bugId 缺陷标识。
+ * @returns 包含缓存键的详情查询配置，标识为空时禁用请求。
+ */
 export function bugQueryOptions(bugId: string) {
   return queryOptions({
     queryKey: ['bugs', 'detail', bugId],

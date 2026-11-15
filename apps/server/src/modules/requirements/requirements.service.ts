@@ -61,6 +61,11 @@ function reasonTextInService(value: string, name: string): string {
   return requiredTextInService(value, name, 2000)
 }
 
+/**
+ * 创建需求读写、提测与流转用例。
+ * @param deps 数据库连接及附件绑定依赖。
+ * @returns 负责项目权限检查和需求业务规则的用例。
+ */
 export function createRequirementsService(deps: RequirementsServiceDeps) {
   const { db, attachmentBinding } = deps
 

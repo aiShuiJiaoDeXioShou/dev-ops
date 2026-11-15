@@ -17,6 +17,14 @@ export interface AuthMailer {
   send(message: { to: string; subject: string; text: string }): Promise<void>
 }
 
+/**
+ * 创建由应用数据库持久化的认证实例。
+ * @param db 数据库连接。
+ * @param config 已校验的认证、应用地址及密码配置。
+ * @param mailer 发送密码重置邮件的可选依赖。
+ * @returns 认证路由和服务端会话查询使用的实例。
+ * @throws 缺少认证密钥时拒绝初始化。
+ */
 export function createIdentityAuth(db: Database, config: AppConfig, mailer?: AuthMailer | null) {
   if (!config.AUTH_SECRET) {
     throw new Error('AUTH_SECRET 必须配置后才能启用认证')
