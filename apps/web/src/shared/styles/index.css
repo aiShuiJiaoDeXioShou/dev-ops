@@ -2329,11 +2329,12 @@ button:disabled,
   width: 14px;
   height: 14px;
 }
-/* 输入框撑满筛选框内容区（外框 32px − 上下边框 2px − 上下内边距 10px = 20px）：
-   5px 内边距下 `height: auto` 只会取 text-sm 行高比例算出的 17.14px 行盒，光标比外框短一截；
-   行高同步为 20px 后光标与内容区等高，不会被输入框自身裁掉上下端。 */
+/* 筛选框外框固定 32px（2px 边框 + 10px 内边距，内容区 20px），输入框无边框背景，视觉上与外框合一。
+   输入框自身高度必须给到 24px：Chromium 按输入框盒子高度裁切光标，盒子不足 24px 时
+   12px 文字的光标只有「高度 − 10px」，20px 盒子只画出 10px 高，明显比文字短；
+   24px 起才按字体行盒完整绘制 14px 光标。多出的 4px 在内容区内垂直居中，不改变外框高度与文字位置。 */
 .search .search-input {
-  height: 20px;
+  height: 24px;
   line-height: 20px;
   border: 0;
   background: transparent;
@@ -2343,6 +2344,16 @@ button:disabled,
 }
 .search .search-input:focus-visible {
   box-shadow: none;
+}
+
+/* 凭据库与能力目录的搜索框外框高度不固定，输入框增高后会连带把外框撑大；
+   固定 32px 并把上下内边距收到 3px，内容区正好容纳 24px 输入框，光标与外框比例一致。 */
+.catalog > .search,
+.skill-toolbar .search,
+.vault-toolbar .search {
+  height: 32px;
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 
 /* 列表标题按钮：共享 Button 的默认内边距/高度会打断表格行高，这里统一回原型尺寸。 */

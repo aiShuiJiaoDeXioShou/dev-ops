@@ -106,7 +106,7 @@ export function SkillList({ teamId }: { teamId: string }) {
                   placeholder="搜索团队技能"
                   value={searchInput}
                   maxLength={200}
-                  className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+                  className="search-input"
                   onChange={(event) => setSearchInput(event.target.value)}
                 />
               </label>
