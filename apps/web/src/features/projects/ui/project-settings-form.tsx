@@ -7,7 +7,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
-import { teamMembersQueryOptions } from '@/features/identity/public'
+import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import type { ApiSuccessData } from '@dev-ops/api-client'
 
 type Project = ApiSuccessData<'/api/v1/projects/{projectId}', 'get'>

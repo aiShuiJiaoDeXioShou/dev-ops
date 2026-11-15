@@ -1,5 +1,5 @@
 import { useParams } from 'react-router'
-import { RequirementList } from '@/features/requirements/public'
+import { RequirementList } from '@/features/requirements/ui/requirement-list'
 
 /** 项目需求页。 */
 export function Component() {

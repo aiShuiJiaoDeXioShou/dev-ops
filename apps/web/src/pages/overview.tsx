@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
-import { ConnectionStatus } from '@/features/system/public'
+import { default as ConnectionStatus } from '@/features/system/ui/connection-status'
 import { EmptyState } from '@/shared/ui/page-state'
 import { Button } from '@/shared/ui/controls/button'
 import { Card, CardContent } from '@/shared/ui/controls/card'

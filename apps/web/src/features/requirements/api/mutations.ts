@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/api/client'
-import type { TeamRole } from '@/features/identity/public'
+import type { TeamRole } from '@/features/identity/model/session'
 
 /** 需求可写角色。 */
 export function canWriteRequirements(role: TeamRole): boolean {

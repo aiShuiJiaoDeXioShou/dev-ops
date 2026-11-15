@@ -2,20 +2,17 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useSearchParams } from 'react-router'
 import { apiClient } from '@/shared/api/client'
-import { useSession } from '@/features/identity/public'
+import { useSession } from '@/features/identity/model/session'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { useToast } from '@/shared/ui/toast'
-import { projectServicesQueryOptions } from '@/features/projects/public'
-import {
-  BuildDetailPanel,
-  BuildReportDialog,
-  projectArtifactsQueryOptions,
-  ReviewReleaseSection,
-  runVersionsQueryOptions,
-} from '@/features/delivery/public'
+import { projectServicesQueryOptions } from '@/features/projects/api/queries'
+import { BuildDetailPanel } from '@/features/delivery/ui/build-detail-panel'
+import { BuildReportDialog } from '@/features/delivery/ui/build-report-dialog'
+import { projectArtifactsQueryOptions, runVersionsQueryOptions } from '@/features/delivery/api/artifact-queries'
+import { ReviewReleaseSection } from '@/features/delivery/ui/review-release-section'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'

@@ -5,7 +5,7 @@ import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
-import { SessionProvider } from '@/features/identity/public'
+import { SessionProvider } from '@/features/identity/model/session'
 import { server } from '@/test/server'
 import { SkillList } from './skill-list'
 

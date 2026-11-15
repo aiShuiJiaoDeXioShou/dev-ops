@@ -1,5 +1,5 @@
 import { apiClient } from '@/shared/api/client'
-import type { TeamRole } from '@/features/identity/public'
+import type { TeamRole } from '@/features/identity/model/session'
 
 /** 知识资产可写角色。 */
 export function canWriteKnowledge(role: TeamRole): boolean {

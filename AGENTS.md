@@ -25,7 +25,7 @@
 
 ## 模块依赖
 
-1. Web 按 app → pages → features → shared 依赖；跨功能使用所属 feature 的 `public.ts`，禁止页面层之外反向引用页面或应用组装。
+1. Web 按 app → pages → features → shared 单向依赖，允许上层直接引用下层的具体文件。跨 feature 直接引用所属功能中定义组件、查询或类型的文件。禁止反向引用上层代码及循环依赖。
 2. 后端按业务模块组织代码，模块用于组织代码而不是强制封装：跨模块可以直接导入对方 service、read、repository、表定义，也可以跨模块 SQL join。同一张表的写入逻辑优先集中在数据所属模块，避免散落；该约定靠代码评审维持，不做静态依赖限制。bootstrap 可访问路由与构造入口完成组装，platform 不反向依赖业务模块。
 3. Web、CLI 只通过 API 操作 Server；共享包不导入应用源码，Server 不依赖生成的 api-client。
 4. 生成的接口类型与校验器不手工修改、不提交。修改 TypeBox 契约后运行根目录 `pnpm api:generate`，完整检查使用 `pnpm check`。

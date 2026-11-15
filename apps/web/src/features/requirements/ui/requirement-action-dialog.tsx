@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
-import { teamMembersQueryOptions } from '@/features/identity/public'
+import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import type { RequirementDetail } from '../model/types'
 import { SELF_TEST_LABELS } from '../model/labels'
 

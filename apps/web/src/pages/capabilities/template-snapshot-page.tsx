@@ -7,7 +7,8 @@ import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { Button } from '@/shared/ui/controls/button'
 import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
-import { copyText, downloadTextFile, templateSnapshotQueryOptions } from '@/features/knowledge/public'
+import { copyText, downloadTextFile } from '@/features/knowledge/lib/files'
+import { templateSnapshotQueryOptions } from '@/features/knowledge/api/queries'
 
 /** 模板快照只读预览页；不进入能力页签，链接仍要求登录与团队权限。 */
 export function Component() {

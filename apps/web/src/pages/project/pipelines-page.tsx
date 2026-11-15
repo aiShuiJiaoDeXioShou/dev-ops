@@ -3,23 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useSearchParams } from 'react-router'
 import { RefreshCw } from 'lucide-react'
 import { describeRequestError } from '@/shared/api/errors'
-import { useSession } from '@/features/identity/public'
-import {
-  RunHistory,
-  TriggerRunDialog,
-  WorkflowList,
-  parseRunFilters,
-  parseRunPage,
-  pipelineRunsQueryOptions,
-  pipelineWorkflowsQueryOptions,
-  serializeRunFilters,
-  shortCommitSha,
-  triggerPipelineRun,
-  useFocusReturn,
-  type PipelineRunListQuery,
-  type PipelineWorkflowSummary,
-  type TriggerRunInput,
-} from '@/features/pipeline/public'
+import { useSession } from '@/features/identity/model/session'
+import { RunHistory } from '@/features/pipeline/ui/run-history'
+import { TriggerRunDialog } from '@/features/pipeline/ui/trigger-run-dialog'
+import { WorkflowList } from '@/features/pipeline/ui/workflow-list'
+import { parseRunFilters, parseRunPage, serializeRunFilters, shortCommitSha } from '@/features/pipeline/lib/format'
+import { pipelineRunsQueryOptions, triggerPipelineRun, type PipelineRunListQuery } from '@/features/pipeline/api/runs'
+import { pipelineWorkflowsQueryOptions } from '@/features/pipeline/api/workflows'
+import { useFocusReturn } from '@/features/pipeline/hooks/use-focus-return'
+import type { PipelineWorkflowSummary, TriggerRunInput } from '@/features/pipeline/model/types'
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageError, PageLoading } from '@/shared/ui/page-state'

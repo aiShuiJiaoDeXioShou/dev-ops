@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
-import { teamMembersQueryOptions } from '@/features/identity/public'
+import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import type { BugDetail } from '../model/types'
 
 export type BugAction = 'submit-regression' | 'withdraw-regression' | 'record-regression' | 'close' | 'reopen'

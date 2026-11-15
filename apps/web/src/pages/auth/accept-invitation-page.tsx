@@ -1,4 +1,4 @@
-import { AcceptInvitationForm } from '@/features/identity/public'
+import { AcceptInvitationForm } from '@/features/identity/ui/accept-invitation-form'
 
 /** 接受团队邀请页；沿用认证卡片布局。 */
 export function Component() {

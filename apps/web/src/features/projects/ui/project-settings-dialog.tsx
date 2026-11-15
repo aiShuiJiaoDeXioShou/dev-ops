@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useSession } from '@/features/identity/public'
-import { LinkRepositoryDialog, RepositoryPicker } from '@/features/code/public'
+import { useSession } from '@/features/identity/model/session'
+import { LinkRepositoryDialog } from '@/features/code/ui/link-repository-dialog'
+import { RepositoryPicker } from '@/features/code/ui/repository-picker'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import {
   Dialog,

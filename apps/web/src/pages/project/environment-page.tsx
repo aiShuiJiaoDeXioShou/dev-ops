@@ -1,5 +1,5 @@
 import { useParams } from 'react-router'
-import { EnvironmentVariables } from '@/features/configuration/public'
+import { EnvironmentVariables } from '@/features/configuration/ui/environment-variables'
 
 /** 项目环境变量页。 */
 export function Component() {

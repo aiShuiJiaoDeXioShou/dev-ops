@@ -46,7 +46,7 @@ pnpm dev:web
 目录：
 
 - `features/identity`：认证请求、会话上下文、登录/邀请/成员管理。
-- `features/projects`、`requirements`、`bugs`、`code`：按功能组织 `api/`、`model/`、`ui/` 与 `public.ts`。
+- `features/projects`、`requirements`、`bugs`、`code`：按功能组织 `api/`、`model/`、`ui/`，调用方直接导入定义所在文件。
 - `features/collaboration`：通用评论与活动时间线。
 - `shared/api`：页面使用的 API 单例、QueryClient 与业务错误文案。
 - `shared/lib`：Markdown 安全渲染、日期/编号格式化、列表 URL 状态。

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { StorageBucket, StorageProbeResult } from '@/features/storage/public'
+import type { StorageBucket, StorageProbeResult } from '@/features/storage/model/types'
 
 /** 测试用统一成功信封；与 test/server.ts 的 success 保持一致，避免反向引用造成循环依赖。 */
 function ok(data: unknown, requestId = 'test-request') {

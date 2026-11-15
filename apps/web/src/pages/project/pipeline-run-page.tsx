@@ -2,19 +2,16 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { describeRequestError } from '@/shared/api/errors'
-import { useSession } from '@/features/identity/public'
-import {
-  ArtifactList,
-  CancelRunDialog,
-  LogViewer,
-  RunSummary,
-  StepTimeline,
-  cancelPipelineRun,
-  isRunActive,
-  pipelineRunQueryOptions,
-  useFocusReturn,
-  usePipelineLogs,
-} from '@/features/pipeline/public'
+import { useSession } from '@/features/identity/model/session'
+import { ArtifactList } from '@/features/pipeline/ui/artifact-list'
+import { CancelRunDialog } from '@/features/pipeline/ui/cancel-run-dialog'
+import { LogViewer } from '@/features/pipeline/ui/log-viewer'
+import { RunSummary } from '@/features/pipeline/ui/run-summary'
+import { StepTimeline } from '@/features/pipeline/ui/step-timeline'
+import { cancelPipelineRun, pipelineRunQueryOptions } from '@/features/pipeline/api/runs'
+import { isRunActive } from '@/features/pipeline/lib/status'
+import { useFocusReturn } from '@/features/pipeline/hooks/use-focus-return'
+import { usePipelineLogs } from '@/features/pipeline/hooks/use-pipeline-logs'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'

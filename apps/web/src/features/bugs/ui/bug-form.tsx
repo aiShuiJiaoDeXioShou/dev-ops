@@ -23,15 +23,11 @@ import {
 } from '@/shared/ui/controls/member-multiselect'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
-import { teamMembersQueryOptions } from '@/features/identity/public'
-import {
-  AttachmentField,
-  describeAttachmentError,
-  doneAttachmentIds,
-  hasUnfinishedAttachments,
-  toPendingAttachments,
-  type PendingAttachment,
-} from '@/features/attachments/public'
+import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
+import { AttachmentField } from '@/features/attachments/ui/attachment-field'
+import { describeAttachmentError } from '@/features/attachments/lib/errors'
+import { doneAttachmentIds, hasUnfinishedAttachments, toPendingAttachments } from '@/features/attachments/lib/pending'
+import type { PendingAttachment } from '@/features/attachments/model/types'
 import type { BugDetail } from '../model/types'
 
 type CreateBody = ApiBody<'/api/v1/projects/{projectId}/bugs', 'post'>

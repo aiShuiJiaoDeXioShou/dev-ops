@@ -151,7 +151,6 @@ app 组装应用所需的 Provider 和路由。pages 读取路由参数、组合
 
 ```text
 features/requirements/
-├── public.ts                     # 页面和其他功能可以使用的公开导出
 ├── api/
 │   ├── queries.ts                # 查询键、查询函数和读取缓存
 │   └── mutations.ts              # 写入动作及对应缓存更新
@@ -163,12 +162,12 @@ features/requirements/
 │   ├── requirement-detail.tsx
 │   ├── requirement-form.tsx
 │   └── submit-for-testing-dialog.tsx
-└── README.md                     # 职责、公开入口及依赖
+└── README.md                     # 职责及依赖
 ```
 
 组件测试放在被测组件附近，查询与交互测试使用可控的 API 模拟。接口请求与响应类型来自 api-client；前端另建的模型只表达筛选、编辑等客户端语义。
 
-业务模块的公开导出采用显式列表。跨功能组合优先放在页面层；确有复用需要时，通过对方 public.ts 单向引用，并加入依赖检查。功能模块不能导入 pages、app 或其他模块的内部文件。
+组件、查询和类型在定义处按需导出。页面和其他 feature 直接导入定义所在的文件，例如 `@/features/requirements/ui/requirement-list`。跨功能组合优先放在页面层。依赖检查约束 `app → pages → features → shared` 的单向依赖，并拒绝循环依赖。
 
 ### 4.3 状态归属与依赖规则
 

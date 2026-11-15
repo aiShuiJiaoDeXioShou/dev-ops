@@ -1,6 +1,6 @@
 import { EmptyState } from '@/shared/ui/page-state'
-import { useSession } from '@/features/identity/public'
-import { SkillList } from '@/features/knowledge/public'
+import { useSession } from '@/features/identity/model/session'
+import { SkillList } from '@/features/knowledge/ui/skill-list'
 
 /** 能力—技能库页面。 */
 export function Component() {

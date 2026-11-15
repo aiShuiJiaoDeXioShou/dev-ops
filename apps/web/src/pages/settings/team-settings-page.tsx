@@ -2,15 +2,13 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { Plus, ShieldAlert } from 'lucide-react'
-import { TeamGitConnections } from '@/features/code/public'
-import { pipelineNodesQueryOptions } from '@/features/pipeline/public'
-import {
-  CreateTeamDialog,
-  EditTeamDialog,
-  InviteMemberDialog,
-  MemberManagement,
-  useSession,
-} from '@/features/identity/public'
+import { TeamGitConnections } from '@/features/code/ui/team-git-connections'
+import { pipelineNodesQueryOptions } from '@/features/pipeline/api/nodes'
+import { CreateTeamDialog } from '@/features/identity/ui/create-team-dialog'
+import { EditTeamDialog } from '@/features/identity/ui/edit-team-dialog'
+import { InviteMemberDialog } from '@/features/identity/ui/invite-member-dialog'
+import { MemberManagement } from '@/features/identity/ui/member-management'
+import { useSession } from '@/features/identity/model/session'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { EmptyState } from '@/shared/ui/page-state'

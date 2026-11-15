@@ -2,21 +2,20 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ShieldAlert } from 'lucide-react'
 import { describeRequestError } from '@/shared/api/errors'
-import { useSession } from '@/features/identity/public'
+import { useSession } from '@/features/identity/model/session'
+import { ConfirmActionDialog } from '@/features/pipeline/ui/confirm-action-dialog'
+import { CreateNodeDialog, type CreateNodeFormInput } from '@/features/pipeline/ui/create-node-dialog'
+import { NodeList } from '@/features/pipeline/ui/node-list'
+import { NodeTokenDialog } from '@/features/pipeline/ui/node-token-dialog'
 import {
-  ConfirmActionDialog,
-  CreateNodeDialog,
-  NodeList,
-  NodeTokenDialog,
   disablePipelineNode,
   drainPipelineNode,
   createPipelineNode,
   pipelineNodesQueryOptions,
   rotatePipelineNodeToken,
-  useFocusReturn,
-  type CreateNodeFormInput,
-  type PipelineNode,
-} from '@/features/pipeline/public'
+} from '@/features/pipeline/api/nodes'
+import { useFocusReturn } from '@/features/pipeline/hooks/use-focus-return'
+import type { PipelineNode } from '@/features/pipeline/model/types'
 import { Button } from '@/shared/ui/controls/button'
 import { EmptyState } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'

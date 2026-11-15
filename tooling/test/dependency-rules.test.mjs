@@ -9,14 +9,15 @@ import { test } from 'node:test'
 const executable = fileURLToPath(new URL('../../node_modules/.bin/depcruise', import.meta.url))
 const configuration = fileURLToPath(new URL('../dependency-rules.mjs', import.meta.url))
 
-test('真实依赖扫描允许 Web 公开接口和后端跨模块导入，并拒绝越界导入和循环依赖', async () => {
+test('真实依赖扫描允许 Web 与后端模块直接导入，并拒绝越界导入和循环依赖', async () => {
   const cases = [
     [
-      'Web 公开接口与后端跨模块直接导入',
+      'Web 页面和跨功能直接导入，以及后端跨模块直接导入',
       null,
       {
-        'apps/web/src/pages/detail.ts': "import { value } from '@/features/project/public'; export { value }",
-        'apps/web/src/features/project/public.ts': 'export const value = 1',
+        'apps/web/src/pages/detail.ts': "export const load = () => import('@/features/project/model/detail')",
+        'apps/web/src/features/project/model/detail.ts': "export { value } from '@/features/team/api/queries'",
+        'apps/web/src/features/team/api/queries.ts': 'export const value = 1',
         'apps/server/src/modules/requirement/service.ts': "export { value } from '../project/service.js'",
         'apps/server/src/modules/project/service.ts': 'export const value = 1',
       },
@@ -25,16 +26,24 @@ test('真实依赖扫描允许 Web 公开接口和后端跨模块导入，并拒
       '功能引用页面',
       'web-features-independent-of-pages',
       {
-        'apps/web/src/features/project/public.ts': "export { value } from '@/pages/detail'",
+        'apps/web/src/features/project/model/detail.ts': "export { value } from '@/pages/detail'",
         'apps/web/src/pages/detail.ts': 'export const value = 1',
       },
     ],
     [
-      '页面动态导入内部实现',
-      'web-feature-public-entry',
+      '页面引用应用组装',
+      'web-pages-independent-of-app',
       {
-        'apps/web/src/pages/detail.ts': "export const load = () => import('@/features/project/internal')",
-        'apps/web/src/features/project/internal.ts': 'export const value = 1',
+        'apps/web/src/pages/detail.ts': "export { value } from '@/app/routes'",
+        'apps/web/src/app/routes.ts': 'export const value = 1',
+      },
+    ],
+    [
+      'Web 共享基础依赖业务',
+      'web-shared-is-foundation',
+      {
+        'apps/web/src/shared/utility.ts': "export { value } from '@/features/project/model/detail'",
+        'apps/web/src/features/project/model/detail.ts': 'export const value = 1',
       },
     ],
     [

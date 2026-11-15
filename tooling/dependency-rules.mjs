@@ -34,18 +34,6 @@ const configuration = {
       to: { path: '^apps/web/src/app/' },
     },
     {
-      name: 'web-feature-public-entry',
-      severity: 'error',
-      from: { path: '^apps/web/src/(?!features/|test/)' },
-      to: { path: '^apps/web/src/features/[^/]+/', pathNot: '/public\\.ts$' },
-    },
-    {
-      name: 'web-cross-feature-public-entry',
-      severity: 'error',
-      from: { path: '^apps/web/src/features/([^/]+)/' },
-      to: { path: '^apps/web/src/features/', pathNot: ['^apps/web/src/features/$1/', '/public\\.ts$'] },
-    },
-    {
       name: 'server-composition-owns-wiring',
       severity: 'error',
       from: { path: '^apps/server/src/(?!bootstrap/|modules/)' },

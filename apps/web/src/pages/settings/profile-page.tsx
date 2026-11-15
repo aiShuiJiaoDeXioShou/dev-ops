@@ -1,12 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  ApiTokenSection,
-  changePassword,
-  sessionQueryOptions,
-  updateUserName,
-  useSession,
-} from '@/features/identity/public'
+import { ApiTokenSection } from '@/features/identity/ui/api-token-section'
+import { changePassword, updateUserName } from '@/features/identity/api/auth-client'
+import { sessionQueryOptions } from '@/features/identity/api/queries'
+import { useSession } from '@/features/identity/model/session'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { useToast } from '@/shared/ui/toast'

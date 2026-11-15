@@ -1,6 +1,6 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { AppLayout } from '@/app/layouts/app-layout'
-import { RequireAuth } from '@/features/identity/public'
+import { RequireAuth } from '@/features/identity/ui/require-auth'
 import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { DelayedAppShellSkeleton, DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { NotFoundPage } from '@/pages/not-found'

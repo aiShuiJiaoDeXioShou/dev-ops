@@ -1,6 +1,6 @@
 import { ShieldAlert } from 'lucide-react'
-import { StorageBucketManagement } from '@/features/storage/public'
-import { useSession } from '@/features/identity/public'
+import { StorageBucketManagement } from '@/features/storage/ui/storage-bucket-management'
+import { useSession } from '@/features/identity/model/session'
 import { EmptyState } from '@/shared/ui/page-state'
 
 /**

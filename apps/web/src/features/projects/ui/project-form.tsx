@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createIdempotencyKey } from '@dev-ops/api-client'
-import { useTeamRepositories } from '@/features/code/public'
+import { useTeamRepositories } from '@/features/code/api/queries'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'

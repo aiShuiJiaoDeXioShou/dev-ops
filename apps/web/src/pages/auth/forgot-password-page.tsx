@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
-import { requestPasswordReset } from '@/features/identity/public'
+import { requestPasswordReset } from '@/features/identity/api/auth-client'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 

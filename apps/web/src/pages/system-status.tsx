@@ -1,4 +1,4 @@
-import { ConnectionStatus } from '@/features/system/public'
+import { default as ConnectionStatus } from '@/features/system/ui/connection-status'
 
 /**
  * 展示后端与数据库连接详情，复用工作台的同一份查询缓存。

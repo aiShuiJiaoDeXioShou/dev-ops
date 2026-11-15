@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { GitMerge, GitPullRequest, GitPullRequestClosed, X } from 'lucide-react'
+import { listProjectRepositoriesQueryOptions } from '@/features/code/api/queries'
 import {
-  listProjectRepositoriesQueryOptions,
   pullRequestDiffQueryOptions,
   pullRequestQueryOptions,
   pullRequestsAllQueryOptions,
-} from '@/features/code/public'
+} from '@/features/code/api/pr-queries'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/utils'

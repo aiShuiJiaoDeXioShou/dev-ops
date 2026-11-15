@@ -13,16 +13,17 @@ import {
   GitBranch,
   History,
 } from 'lucide-react'
-import { projectQueryOptions } from '@/features/projects/public'
-import { CodeChangeSection, CodeInvocationLogSheet } from '@/features/tools/public'
+import { projectQueryOptions } from '@/features/projects/api/queries'
+import { CodeChangeSection } from '@/features/tools/ui/code-change-section'
+import { CodeInvocationLogSheet } from '@/features/tools/ui/code-invocation-log'
+import { CommitHistoryDialog } from '@/features/code/ui/commit-history-dialog'
+import { pickDefaultPreviewPath } from '@/features/code/lib/default-preview'
 import {
-  CommitHistoryDialog,
-  pickDefaultPreviewPath,
   projectRepositoriesQueryOptions,
   repositoryBranchesQueryOptions,
   repositoryFileQueryOptions,
   repositoryTreeQueryOptions,
-} from '@/features/code/public'
+} from '@/features/code/api/queries'
 import { describeRequestError } from '@/shared/api/errors'
 import { PageError } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'

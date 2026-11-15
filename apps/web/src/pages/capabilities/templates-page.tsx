@@ -1,6 +1,6 @@
 import { EmptyState } from '@/shared/ui/page-state'
-import { useSession } from '@/features/identity/public'
-import { TemplateList } from '@/features/knowledge/public'
+import { useSession } from '@/features/identity/model/session'
+import { TemplateList } from '@/features/knowledge/ui/template-list'
 
 /** 能力—AGENTS.md 模板页面。 */
 export function Component() {

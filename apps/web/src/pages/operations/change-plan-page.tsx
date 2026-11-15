@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
-import { useSession } from '@/features/identity/public'
-import { projectQueryOptions } from '@/features/projects/public'
+import { useSession } from '@/features/identity/model/session'
+import { projectQueryOptions } from '@/features/projects/api/queries'
 import { Badge } from '@/shared/ui/controls/badge'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { Button } from '@/shared/ui/controls/button'
@@ -16,14 +16,14 @@ import { Textarea } from '@/shared/ui/controls/textarea'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { useToast } from '@/shared/ui/toast'
+import { changePlanQueryOptions } from '@/features/operations/api/queries'
 import {
-  changePlanQueryOptions,
   ENVIRONMENT_LABELS,
   EXECUTION_STATUS_LABELS,
   OPERATION_KIND_LABELS,
   PLAN_STATUS_LABELS,
   VERIFICATION_STATUS_LABELS,
-} from '@/features/operations/public'
+} from '@/features/operations/model/labels'
 
 const PLAN_STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
   pending: 'warning',

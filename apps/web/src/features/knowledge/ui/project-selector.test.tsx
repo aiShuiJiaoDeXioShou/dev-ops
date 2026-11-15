@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
-import { SessionProvider } from '@/features/identity/public'
+import { SessionProvider } from '@/features/identity/model/session'
 import { server } from '@/test/server'
 import { ProjectSelector } from './project-selector'
 
