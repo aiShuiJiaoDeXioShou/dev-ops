@@ -1,9 +1,33 @@
 import type { UserRef } from '../identity/identity.display.ts'
-import { loadUserRefs } from '../identity/identity.display.ts'
-import type { Database } from '../../platform/database/client.ts'
 import { codeChange } from './tools.tables.ts'
 
-type CodeChangeRow = typeof codeChange.$inferSelect
+/** 代码变更读取所需字段，补丁正文只用于创建运行。 */
+export const codeChangeViewColumns = {
+  id: codeChange.id,
+  project_id: codeChange.project_id,
+  repository_id: codeChange.repository_id,
+  base_ref: codeChange.base_ref,
+  base_sha: codeChange.base_sha,
+  branch_name: codeChange.branch_name,
+  commit_message: codeChange.commit_message,
+  patch_sha256: codeChange.patch_sha256,
+  patch_size_bytes: codeChange.patch_size_bytes,
+  validation_workflow_path: codeChange.validation_workflow_path,
+  status: codeChange.status,
+  pipeline_run_id: codeChange.pipeline_run_id,
+  validation_result: codeChange.validation_result,
+  pull_request_number: codeChange.pull_request_number,
+  pull_request_url: codeChange.pull_request_url,
+  diff_sha256: codeChange.diff_sha256,
+  diff_size_bytes: codeChange.diff_size_bytes,
+  error_code: codeChange.error_code,
+  error_message: codeChange.error_message,
+  created_by_user_id: codeChange.created_by_user_id,
+  created_at: codeChange.created_at,
+  finished_at: codeChange.finished_at,
+}
+
+export type CodeChangeViewRow = Pick<typeof codeChange.$inferSelect, keyof typeof codeChangeViewColumns>
 
 /** 受控代码修改视图；不返回补丁正文，只返回摘要与结果引用。 */
 export interface CodeChangeView {
@@ -31,21 +55,15 @@ export interface CodeChangeView {
 
 /**
  * 代码变更行转视图。
- * @param db 数据库连接。
  * @param row 代码变更行。
- * @param repositoryName 可选的仓库展示名；不传时只展示标识。
+ * @param createdBy 批量加载的创建人引用；记录缺失时为 null。
  * @returns 代码变更视图，不包含补丁正文。
  */
-export async function toCodeChangeView(
-  db: Database,
-  row: CodeChangeRow,
-  repositoryName: string | null = null,
-): Promise<CodeChangeView> {
-  const refs = await loadUserRefs(db, [row.created_by_user_id])
+export function toCodeChangeView(row: CodeChangeViewRow, createdBy: UserRef | null): CodeChangeView {
   return {
     id: row.id,
     projectId: row.project_id,
-    repository: { id: row.repository_id, name: repositoryName },
+    repository: { id: row.repository_id, name: null },
     baseRef: row.base_ref,
     baseSha: row.base_sha,
     branchName: row.branch_name,
@@ -68,23 +86,8 @@ export async function toCodeChangeView(
           },
     errorCode: row.error_code,
     errorMessage: row.error_message,
-    createdBy: refs.get(row.created_by_user_id) ?? null,
+    createdBy,
     createdAt: row.created_at.toISOString(),
     finishedAt: row.finished_at === null ? null : row.finished_at.toISOString(),
   }
-}
-
-/**
- * 批量转换代码变更行。
- * @param db 数据库连接。
- * @param rows 代码变更行数组。
- * @param repositoryNames 仓库标识到名称的映射。
- * @returns 代码变更视图数组。
- */
-export async function toCodeChangeViews(
-  db: Database,
-  rows: CodeChangeRow[],
-  repositoryNames: Map<string, string | null>,
-): Promise<CodeChangeView[]> {
-  return Promise.all(rows.map((row) => toCodeChangeView(db, row, repositoryNames.get(row.repository_id) ?? null)))
 }

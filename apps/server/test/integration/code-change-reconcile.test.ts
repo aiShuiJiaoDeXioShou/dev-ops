@@ -2,10 +2,13 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { eq } from 'drizzle-orm'
-import { pipelineRun, pipelineRunStep } from '../../src/modules/pipeline/pipeline.tables.ts'
+import { pipelineArtifact, pipelineRun, pipelineRunStep } from '../../src/modules/pipeline/pipeline.tables.ts'
 import { codeChange } from '../../src/modules/tools/tools.tables.ts'
-import { reconcileCodeChangeFromRun } from '../../src/modules/tools/tools.code-change.service.ts'
-import { setupPipelineContext } from '../helpers/operations.ts'
+import {
+  reconcileCodeChangeFromRun,
+  reconcilePendingCodeChanges,
+} from '../../src/modules/tools/tools.code-change.service.ts'
+import { asRecord, expectSuccess, injectJson, items, setupPipelineContext } from '../helpers/operations.ts'
 
 test('T033 运行收口后回填代码变更状态', { timeout: 60_000 }, async (t) => {
   const context = await setupPipelineContext(t)
@@ -35,7 +38,7 @@ test('T033 运行收口后回填代码变更状态', { timeout: 60_000 }, async 
     timeout_seconds: 900,
     finished_at: new Date(),
   })
-  await db.insert(codeChange).values({
+  const change = {
     id: codeChangeId,
     team_id: context.teamId,
     project_id: context.projectId,
@@ -54,7 +57,18 @@ test('T033 运行收口后回填代码变更状态', { timeout: 60_000 }, async 
     status: 'running',
     pipeline_run_id: runId,
     created_by_user_id: context.developer.userId,
-  })
+  }
+  await db.insert(codeChange).values([
+    change,
+    ...Array.from({ length: 50 }, (_, index) => ({
+      ...change,
+      id: randomUUID(),
+      invocation_id: randomUUID(),
+      pipeline_run_id: null,
+      status: 'queued',
+      created_at: new Date(index * 1000),
+    })),
+  ])
 
   await db.insert(pipelineRunStep).values({
     id: randomUUID(),
@@ -67,12 +81,60 @@ test('T033 运行收口后回填代码变更状态', { timeout: 60_000 }, async 
     status: 'succeeded',
   })
 
-  assert.equal(await reconcileCodeChangeFromRun(db, runId), true)
+  const queries = t.mock.method(db.$client, 'query')
+  const list = expectSuccess(
+    await injectJson(context.app, 'GET', `/api/v1/projects/${context.projectId}/tools/code-changes`, {
+      cookie: context.developer.cookie,
+    }),
+    '读取项目代码变更列表',
+  )
+  const listItems = items(list).map((item) => asRecord(item, 'codeChange'))
+  assert.equal(listItems.length, 50)
+  assert.equal(listItems[0]?.id, codeChangeId)
+  assert.equal(listItems[0]?.status, 'running')
+  assert.equal(asRecord(listItems[0]?.createdBy, 'createdBy').userId, context.developer.userId)
+  const statements = queries.mock.calls.flatMap(({ arguments: [query] }: { arguments: unknown[] }) => {
+    if (typeof query === 'string') return [query]
+    return typeof query === 'object' && query !== null && 'text' in query && typeof query.text === 'string'
+      ? [query.text]
+      : []
+  })
+  queries.mock.restore()
+  const listStatements = statements.filter((sql) => /from\s+(?:"[^"]+"\.)?"code_change"/i.test(sql))
+  assert.equal(listStatements.length, 1)
+  assert.doesNotMatch(listStatements[0] ?? '', /"patch"/)
+  assert.equal(statements.filter((sql) => /from\s+(?:"[^"]+"\.)?"user".*\sin\s*\(/i.test(sql)).length, 1)
+  assert.ok(statements.every((sql) => !/^\s*update\b/i.test(sql)))
+
+  const failOnReconcileError = () => assert.fail('代码变更回填失败')
+  await reconcilePendingCodeChanges(db, failOnReconcileError)
   const [row] = await db.select().from(codeChange).where(eq(codeChange.id, codeChangeId))
   assert.equal(row?.status, 'succeeded')
   assert.equal(row?.error_code, null)
-  const validation = row?.validation_result as { steps?: unknown[]; failedStepIndex?: number | null }
-  assert.equal(validation.steps?.length, 1)
+  const validation = asRecord(row?.validation_result, 'validation')
+  assert.ok(Array.isArray(validation.steps))
+  assert.equal(validation.steps.length, 1)
   assert.equal(validation.failedStepIndex, null)
+  assert.equal(row?.diff_sha256, null)
+
+  const artifactSha = 'd'.repeat(64)
+  await db.insert(pipelineArtifact).values({
+    id: randomUUID(),
+    team_id: context.teamId,
+    project_id: context.projectId,
+    run_id: runId,
+    step_index: 0,
+    name: 'code-change-diff',
+    storage_key: `runs/${runId}/code-change.diff`,
+    size_bytes: 24,
+    sha256: artifactSha,
+    status: 'available',
+  })
+  await reconcilePendingCodeChanges(db, failOnReconcileError)
+  const [updated] = await db
+    .select({ diffSha: codeChange.diff_sha256 })
+    .from(codeChange)
+    .where(eq(codeChange.id, codeChangeId))
+  assert.equal(updated?.diffSha, artifactSha)
   assert.equal(await reconcileCodeChangeFromRun(db, runId), false)
 })

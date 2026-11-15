@@ -6,7 +6,7 @@ import { createPipelineStorage } from '../modules/pipeline/pipeline.storage.ts'
 import { cleanupExpiredPipelineArtifacts } from '../modules/pipeline/pipeline.retention.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createAttachmentCleanup } from '../modules/attachments/attachments.cleanup.ts'
-import { reconcileCodeChangeFromRun } from '../modules/tools/tools.code-change.service.ts'
+import { reconcileCodeChangeFromRun, reconcilePendingCodeChanges } from '../modules/tools/tools.code-change.service.ts'
 import { reconcileChangeExecutionFromRun } from '../modules/operations/operations.execution.service.ts'
 
 export type { PipelineSchedulerLogger } from '../modules/pipeline/pipeline.scheduler.ts'
@@ -74,6 +74,12 @@ export function createWorker(
     cycleRunning = true
     try {
       await scheduler.runCycle()
+      await reconcilePendingCodeChanges(database.db, (runId, error) => {
+        log('warn', '代码变更结果暂未回填', {
+          runId,
+          errorType: error instanceof Error ? error.name : typeof error,
+        })
+      })
     } catch (error) {
       log('error', '流水线调度周期失败', {
         error: error instanceof Error ? error.message : '未知错误',

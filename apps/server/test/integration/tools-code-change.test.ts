@@ -4,6 +4,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { test } from 'node:test'
+import { reconcileCodeChangeFromRun } from '../../src/modules/tools/tools.code-change.service.ts'
 import { codeChange as codeChangeTable } from '../../src/modules/tools/tools.tables.ts'
 import { pipelineArtifact, pipelineRun } from '../../src/modules/pipeline/pipeline.tables.ts'
 import {
@@ -83,7 +84,7 @@ test('T039 代码变更：能力授权、补丁校验、幂等与队列', { time
   })
   expectFailure(viewerCreate, 'FORBIDDEN', '浏览者创建')
 
-  // 模拟运行成功并产出差异，读取详情时回填差异元数据。
+  // 模拟运行终态回调，详情读取已登记的差异元数据。
   const runId = stringField(codeChange, 'pipelineRunId')
   await context.app.db
     .update(pipelineRun)
@@ -105,6 +106,7 @@ test('T039 代码变更：能力授权、补丁校验、幂等与队列', { time
     sha256: createHash('sha256').update(diffContent).digest('hex'),
     status: 'available',
   })
+  assert.equal(await reconcileCodeChangeFromRun(context.app.db, runId), true)
   const detail = expectSuccess(
     await injectJson(app, 'GET', `/api/v1/tools/code-changes/${codeChangeId}`, { cookie: developer.cookie }),
     '读取代码变更详情',

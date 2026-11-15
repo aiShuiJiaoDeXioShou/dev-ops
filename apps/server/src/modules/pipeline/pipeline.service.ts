@@ -916,32 +916,6 @@ export function createPipelineService(deps: PipelineServiceDeps) {
   }
 
   /**
-   * 内部读取运行产物（不做用户权限校验），供 Worker/服务回填业务元数据使用。
-   * @param runId 运行标识。
-   * @param name 产物名。
-   * @returns 内容、摘要、大小与存储键；不存在时返回 null。
-   */
-  async function readRunArtifactInternal(
-    runId: string,
-    name: string,
-  ): Promise<{ content: string; sha256: string; sizeBytes: number; storageKey: string } | null> {
-    const artifacts = await findPipelineArtifacts(db, runId)
-    const row = artifacts.find((artifact) => artifact.name === name)
-    if (!row || row.status !== 'available') return null
-    try {
-      const buffer = await storage.readArtifact(row.storage_key)
-      return {
-        content: buffer.toString('utf8'),
-        sha256: row.sha256,
-        sizeBytes: Number(row.size_bytes),
-        storageKey: row.storage_key,
-      }
-    } catch {
-      return null
-    }
-  }
-
-  /**
    * 读取运行产物文本，供验证与展示使用。
    * @param actor 当前用户；须对运行所属项目有读取权限。
    * @param runId 运行标识。
@@ -1060,7 +1034,6 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     createInternalRun,
     getInternalRunStatus,
     readRunArtifact,
-    readRunArtifactInternal,
     createCodeChangeRun,
   }
 }

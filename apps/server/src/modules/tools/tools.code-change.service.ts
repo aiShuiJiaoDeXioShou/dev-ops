@@ -1,9 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { loadUserRefs } from '../identity/identity.display.ts'
 import type { SessionUser } from '../identity/identity.session.ts'
+import {
+  findPipelineArtifactByRunName,
+  findPipelineRunById,
+  findPipelineRunSteps,
+} from '../pipeline/pipeline.repository.ts'
+import { isTerminalRunStatus, PIPELINE_TERMINAL_RUN_STATUSES } from '../pipeline/pipeline.state.ts'
+import { pipelineArtifact, pipelineRun } from '../pipeline/pipeline.tables.ts'
 import { getProjectRoleContext, requireToolCapabilityGrant } from './tools.capabilities.ts'
 import {
   beginInvocation,
@@ -13,7 +21,7 @@ import {
   requireIdempotencyKey,
 } from './tools.service.ts'
 import { codeChange } from './tools.tables.ts'
-import { toCodeChangeView, type CodeChangeView } from './tools.view.ts'
+import { codeChangeViewColumns, toCodeChangeView, type CodeChangeView, type CodeChangeViewRow } from './tools.view.ts'
 
 /** 代码修改依赖的流水线端口。 */
 export interface ToolsPipelinePort {
@@ -37,9 +45,6 @@ export interface ToolsPipelinePort {
       idempotencyKey: string
     },
   ): Promise<{ runId: string }>
-  getInternalRunStatus(
-    runId: string,
-  ): Promise<{ status: string; finishedAt: string | null; errorCode: string | null } | null>
   readRunArtifact(
     actor: SessionUser,
     runId: string,
@@ -51,10 +56,6 @@ export interface ToolsPipelinePort {
     runId: string,
     reason?: string,
   ): Promise<{ run: { runId: string; status: string }; created: boolean }>
-  readRunArtifactInternal(
-    runId: string,
-    name: string,
-  ): Promise<{ content: string; sha256: string; sizeBytes: number; storageKey: string } | null>
 }
 
 /** 代码修改依赖的代码读取端口。 */
@@ -93,6 +94,8 @@ export interface CreateCodeChangeInput {
 const BRANCH_PATTERN = /^[A-Za-z0-9._/-]+$/
 const SHA256_PATTERN = /^[0-9a-f]{64}$/
 const COMMIT_SHA_PATTERN = /^[0-9a-f]{7,64}$/
+const ACTIVE_CODE_CHANGE_STATUSES = ['queued', 'running']
+const DIFF_ARTIFACT_NAME = 'code-change-diff'
 
 function validateBranch(branchName: string, baseRef: string): string {
   const branch = branchName.trim()
@@ -156,54 +159,34 @@ export function createCodeChangeService(deps: {
 }) {
   const { db, pipeline, code } = deps
 
-  async function syncStatus(row: typeof codeChange.$inferSelect) {
-    if (row.status !== 'queued' && row.status !== 'running') return row
+  async function syncStatus(row: CodeChangeViewRow) {
     if (!row.pipeline_run_id) return row
-    const run = await pipeline.getInternalRunStatus(row.pipeline_run_id)
-    if (!run) return row
-    if (
-      run.status === 'queued' ||
-      run.status === 'assigned' ||
-      run.status === 'running' ||
-      run.status === 'cancelling'
-    ) {
-      return row
-    }
-    const mapped = run.status === 'succeeded' ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : 'failed'
-    const diff =
-      mapped === 'succeeded' && row.pipeline_run_id
-        ? await pipeline.readRunArtifactInternal(row.pipeline_run_id, 'code-change-diff').catch(() => null)
-        : null
-    const [updated] = await db
-      .update(codeChange)
-      .set({
-        status: mapped,
-        finished_at: run.finishedAt ? new Date(run.finishedAt) : new Date(),
-        error_code: mapped === 'succeeded' ? null : (run.errorCode ?? 'CODE_CHANGE_FAILED'),
-        error_message: mapped === 'succeeded' ? null : '代码修改运行未成功结束',
-        ...(diff
-          ? {
-              diff_storage_key: diff.storageKey,
-              diff_sha256: diff.sha256,
-              diff_size_bytes: diff.sizeBytes,
-            }
-          : {}),
-        updated_at: new Date(),
-      })
-      .where(eq(codeChange.id, row.id))
-      .returning()
-    return updated ?? row
+    const needsDiff = row.status === 'succeeded' && row.diff_sha256 === null
+    if (!ACTIVE_CODE_CHANGE_STATUSES.includes(row.status) && !needsDiff) return row
+    await reconcileCodeChangeFromRun(db, row.pipeline_run_id)
+    // Worker 可能已经更新了该记录，重新读取以避免使用并发更新前的状态。
+    return loadCodeChange(row.id)
   }
 
+  /**
+   * 读取代码变更的响应字段。
+   * @param codeChangeId 代码变更标识。
+   * @returns 代码变更投影。
+   * @throws 记录不存在时抛出 CODE_CHANGE_NOT_FOUND。
+   */
   async function loadCodeChange(codeChangeId: string) {
-    const [row] = await db.select().from(codeChange).where(eq(codeChange.id, codeChangeId)).limit(1)
+    const [row] = await db
+      .select(codeChangeViewColumns)
+      .from(codeChange)
+      .where(eq(codeChange.id, codeChangeId))
+      .limit(1)
     if (!row) throw new ApiError(ERROR_CODES.CODE_CHANGE_NOT_FOUND, '代码变更不存在')
     return row
   }
 
-  async function viewOf(row: typeof codeChange.$inferSelect): Promise<CodeChangeView> {
-    const synced = await syncStatus(row)
-    return toCodeChangeView(db, synced, null)
+  async function viewOf(row: CodeChangeViewRow): Promise<CodeChangeView> {
+    const refs = await loadUserRefs(db, [row.created_by_user_id])
+    return toCodeChangeView(row, refs.get(row.created_by_user_id) ?? null)
   }
 
   /**
@@ -262,7 +245,7 @@ export function createCodeChangeService(deps: {
         .where(eq(codeChange.invocation_id, invocation.invocationId))
         .limit(1)
       if (!existing) throw new ApiError(ERROR_CODES.CODE_CHANGE_NOT_FOUND, '重复请求的代码变更不存在')
-      return { codeChange: await viewOf(existing), invocationId: invocation.invocationId }
+      return { codeChange: await viewOf(await syncStatus(existing)), invocationId: invocation.invocationId }
     }
     const codeChangeId = randomUUID()
     await db.insert(codeChange).values({
@@ -324,19 +307,30 @@ export function createCodeChangeService(deps: {
       if (error instanceof ApiError) throw error
       throw new ApiError(ERROR_CODES.CODE_CHANGE_CONFLICT, '创建代码修改运行失败')
     }
-    return { codeChange: await viewOf(await loadCodeChange(codeChangeId)), invocationId: invocation.invocationId }
+    const created = await syncStatus(await loadCodeChange(codeChangeId))
+    return { codeChange: await viewOf(created), invocationId: invocation.invocationId }
   }
 
-  /** 列出项目代码变更，按创建时间倒序。 */
+  /**
+   * 分页上限内读取项目代码变更及创建人。运行终态由后台回填。
+   * @param actor 当前用户，须拥有项目读取权限。
+   * @param projectId 项目标识。
+   * @returns 按创建时间倒序排列的最近 50 条记录。
+   * @throws 项目不存在或用户无权访问时抛出业务错误。
+   */
   async function listCodeChanges(actor: SessionUser, projectId: string): Promise<CodeChangeView[]> {
     await getProjectRoleContext(db, actor, projectId)
     const rows = await db
-      .select()
+      .select(codeChangeViewColumns)
       .from(codeChange)
       .where(eq(codeChange.project_id, projectId))
       .orderBy(desc(codeChange.created_at), codeChange.id)
       .limit(50)
-    return Promise.all(rows.map((row) => viewOf(row)))
+    const refs = await loadUserRefs(
+      db,
+      rows.map((row) => row.created_by_user_id),
+    )
+    return rows.map((row) => toCodeChangeView(row, refs.get(row.created_by_user_id) ?? null))
   }
 
   /** 读取代码变更详情；项目成员可读。 */
@@ -354,7 +348,7 @@ export function createCodeChangeService(deps: {
     const row = await loadCodeChange(codeChangeId)
     await getProjectRoleContext(db, actor, row.project_id)
     if (!row.pipeline_run_id) throw new ApiError(ERROR_CODES.CODE_CHANGE_DIFF_UNAVAILABLE, '差异尚未生成')
-    const artifact = await pipeline.readRunArtifact(actor, row.pipeline_run_id, 'code-change-diff', 524_288)
+    const artifact = await pipeline.readRunArtifact(actor, row.pipeline_run_id, DIFF_ARTIFACT_NAME, 524_288)
     if (!artifact) throw new ApiError(ERROR_CODES.CODE_CHANGE_DIFF_UNAVAILABLE, '差异产物不可用')
     const sizeBytes = Buffer.byteLength(artifact.content, 'utf8')
     const truncated = sizeBytes > deps.diffResponseMaxBytes
@@ -492,21 +486,45 @@ export function createCodeChangeService(deps: {
 export type CodeChangeService = ReturnType<typeof createCodeChangeService>
 
 /**
- * 运行终态收口后回填代码变更状态；由 Worker 在运行进入终态时调用。
+ * 回填运行终态、校验结果和已登记的差异元数据。
  * @param db 数据库连接。
  * @param runId 流水线运行标识。
- * @returns 是否更新了代码变更记录。
- * @remarks 只读 pipeline_run，写入归属 tools 的 code_change；重复调用幂等。
+ * @returns 是否更新了代码变更记录；没有待回填内容时为 false。
+ * @remarks 条件写入允许 Worker、终态回调及写操作并发触发；读取产物元数据无需打开文件。
  */
 export async function reconcileCodeChangeFromRun(db: Database, runId: string): Promise<boolean> {
-  const [change] = await db.select().from(codeChange).where(eq(codeChange.pipeline_run_id, runId)).limit(1)
+  const [change] = await db
+    .select({ id: codeChange.id, status: codeChange.status, diffSha256: codeChange.diff_sha256 })
+    .from(codeChange)
+    .where(eq(codeChange.pipeline_run_id, runId))
+    .limit(1)
   if (!change) return false
-  if (change.status !== 'queued' && change.status !== 'running') return false
-  const { findPipelineRunById, findPipelineRunSteps } = await import('../pipeline/pipeline.repository.ts')
+  const isActive = ACTIVE_CODE_CHANGE_STATUSES.includes(change.status)
+  if (!isActive && (change.status !== 'succeeded' || change.diffSha256 !== null)) return false
   const run = await findPipelineRunById(db, runId)
-  if (!run) return false
-  const terminal = new Set(['succeeded', 'failed', 'cancelled', 'interrupted'])
-  if (!terminal.has(run.status)) return false
+  if (!run || !isTerminalRunStatus(run.status)) return false
+  const artifact =
+    run.status === 'succeeded' ? await findPipelineArtifactByRunName(db, runId, DIFF_ARTIFACT_NAME) : null
+  const diff =
+    artifact?.status === 'available'
+      ? {
+          diff_storage_key: artifact.storage_key,
+          diff_sha256: artifact.sha256,
+          diff_size_bytes: Number(artifact.size_bytes),
+        }
+      : null
+
+  // 补齐旧记录或晚到的差异产物，不重新写入已经收口的业务状态。
+  if (!isActive) {
+    if (!diff) return false
+    const [updated] = await db
+      .update(codeChange)
+      .set({ ...diff, updated_at: new Date() })
+      .where(and(eq(codeChange.id, change.id), eq(codeChange.status, 'succeeded'), isNull(codeChange.diff_sha256)))
+      .returning({ id: codeChange.id })
+    return updated !== undefined
+  }
+
   const status = run.status === 'succeeded' ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : 'failed'
   const steps = await findPipelineRunSteps(db, runId)
   const validationResult = {
@@ -530,9 +548,58 @@ export async function reconcileCodeChangeFromRun(db: Database, runId: string): P
       error_code: status === 'succeeded' ? null : (run.error_code ?? 'CODE_CHANGE_FAILED'),
       error_message: status === 'succeeded' ? null : '代码修改运行未成功结束',
       validation_result: validationResult,
+      ...diff,
       updated_at: new Date(),
     })
-    .where(and(eq(codeChange.id, change.id), inArray(codeChange.status, ['queued', 'running'])))
+    .where(and(eq(codeChange.id, change.id), inArray(codeChange.status, ACTIVE_CODE_CHANGE_STATUSES)))
     .returning({ id: codeChange.id })
   return updated !== undefined
+}
+
+/**
+ * 重试终态回调漏写的记录和晚到的差异产物，每个 Worker 周期最多处理 20 条。
+ * @param db 数据库连接。
+ * @param onError 单条回填失败时的日志回调；下个周期可重试。
+ * @returns 本周期的待回填记录处理完毕后完成。
+ * @throws 无法查询待回填记录时向调用方传播数据库错误。
+ */
+export async function reconcilePendingCodeChanges(
+  db: Database,
+  onError: (runId: string, error: unknown) => void,
+): Promise<void> {
+  const runs = await db
+    .select({ runId: pipelineRun.id })
+    .from(codeChange)
+    .innerJoin(pipelineRun, eq(pipelineRun.id, codeChange.pipeline_run_id))
+    .leftJoin(
+      pipelineArtifact,
+      and(
+        eq(pipelineArtifact.run_id, pipelineRun.id),
+        eq(pipelineArtifact.name, DIFF_ARTIFACT_NAME),
+        eq(pipelineArtifact.status, 'available'),
+      ),
+    )
+    .where(
+      or(
+        and(
+          inArray(codeChange.status, ACTIVE_CODE_CHANGE_STATUSES),
+          inArray(pipelineRun.status, PIPELINE_TERMINAL_RUN_STATUSES),
+        ),
+        and(
+          eq(codeChange.status, 'succeeded'),
+          eq(pipelineRun.status, 'succeeded'),
+          isNull(codeChange.diff_sha256),
+          isNotNull(pipelineArtifact.id),
+        ),
+      ),
+    )
+    .orderBy(codeChange.updated_at, codeChange.id)
+    .limit(20)
+  for (const { runId } of runs) {
+    try {
+      await reconcileCodeChangeFromRun(db, runId)
+    } catch (error) {
+      onError(runId, error)
+    }
+  }
 }
