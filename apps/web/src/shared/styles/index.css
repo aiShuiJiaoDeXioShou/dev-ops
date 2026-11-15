@@ -2341,6 +2341,23 @@ button:disabled,
   padding-bottom: 3px;
 }
 
+/* 多行输入框右下角的拖拽手柄由浏览器绘制：Chromium 用固定深灰 #666，比 token 化边框
+   (#e2e2e3) 深一倍以上，在圆角内显得突兀。这里把内置手柄改成透明，再用两条 token 色
+   斜线自绘同尺寸手柄；拖拽调高仍由浏览器原生 resize 承担，只换外观不改交互。
+   Firefox 不支持 ::-webkit-resizer，会保留自身手柄，无需额外处理。 */
+[data-slot='textarea'] {
+  --textarea-grip: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+  background-repeat: no-repeat;
+  background-position: right 3px bottom 3px;
+  background-size: 9px 9px;
+  background-image:
+    linear-gradient(135deg, transparent 0 3px, var(--textarea-grip) 3px 4px, transparent 4px),
+    linear-gradient(135deg, transparent 0 6px, var(--textarea-grip) 6px 7px, transparent 7px);
+}
+[data-slot='textarea']::-webkit-resizer {
+  background: transparent;
+}
+
 /* 列表标题按钮：共享 Button 的默认内边距/高度会打断表格行高，这里统一回原型尺寸。 */
 .item-title {
   display: inline-flex;
