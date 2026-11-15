@@ -2329,8 +2329,12 @@ button:disabled,
   width: 14px;
   height: 14px;
 }
+/* 输入框撑满筛选框内容区（外框 32px − 上下边框 2px − 上下内边距 10px = 20px）：
+   5px 内边距下 `height: auto` 只会取 text-sm 行高比例算出的 17.14px 行盒，光标比外框短一截；
+   行高同步为 20px 后光标与内容区等高，不会被输入框自身裁掉上下端。 */
 .search .search-input {
-  height: auto;
+  height: 20px;
+  line-height: 20px;
   border: 0;
   background: transparent;
   padding: 0;

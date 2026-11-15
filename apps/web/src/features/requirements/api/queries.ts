@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 
 export type RequirementListStatus = 'pending' | 'in_development' | 'submitted' | 'in_testing' | 'passed' | 'cancelled'
@@ -10,12 +10,13 @@ export interface RequirementListFilters {
   pageSize?: number
 }
 
-/** 项目需求列表。 */
+/** 项目需求列表；翻页或改筛选时沿用上一页数据，避免列表在请求期间卸载整块内容。 */
 export function requirementListQueryOptions(projectId: string, filters: RequirementListFilters) {
   return queryOptions({
     queryKey: ['requirements', 'list', projectId, filters],
     queryFn: ({ signal }) => apiClient.listRequirements(projectId, filters, { signal }),
     enabled: Boolean(projectId),
+    placeholderData: keepPreviousData,
   })
 }
 
