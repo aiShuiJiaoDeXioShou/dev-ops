@@ -6,7 +6,6 @@
   --soft: #f5f6f7;
   --selected: #ebeef2;
   --ink: #0f1115;
-  --muted: #61666b;
   --quiet: #81858c;
   --line: rgba(0, 0, 0, 0.08);
   --green: #269650;
@@ -99,7 +98,7 @@ h3 {
   stroke-linejoin: round;
 }
 .muted {
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .quiet {
   color: var(--quiet);
@@ -163,7 +162,7 @@ h3 {
   width: 32px;
   height: 32px;
   border-radius: 7px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .icon-btn:hover {
   background: var(--selected);
@@ -181,7 +180,7 @@ h3 {
   border-radius: 5px;
   padding: 3px 7px;
   font-size: 11px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   white-space: nowrap;
 }
 .badge.blue {
@@ -275,7 +274,7 @@ h3 {
 .workspace {
   padding: 0 14px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   display: flex;
   gap: 9px;
   align-items: center;
@@ -395,7 +394,7 @@ h3 {
 .project-title > .icon {
   width: 26px;
   height: 26px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .project-title .icon {
   width: 20px;
@@ -426,7 +425,7 @@ h3 {
   padding: 11px 2px 13px;
   position: relative;
   white-space: nowrap;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 13px;
 }
 .tab[aria-selected='true'] {
@@ -458,7 +457,7 @@ h3 {
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   margin-bottom: 30px;
   min-height: 40px;
 }
@@ -518,7 +517,7 @@ h3 {
   padding: 2px 8px;
   border-radius: 20px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .filters {
   display: flex;
@@ -537,7 +536,7 @@ h3 {
   padding: 7px 11px;
   font-size: 12px;
   border-right: 1px solid var(--line);
-  color: var(--muted);
+  color: var(--muted-foreground);
   background: white;
 }
 .segment:last-child {
@@ -552,7 +551,7 @@ h3 {
   background: transparent;
   padding: 7px 0;
   max-width: 140px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 12px;
 }
 .search {
@@ -645,7 +644,7 @@ h3 {
 .item-cell > .icon {
   width: 17px;
   height: 17px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .table .row {
   gap: 7px;
@@ -850,7 +849,7 @@ h3 {
   margin: 15px 0 8px;
 }
 .card p {
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.7;
   margin: 8px 0 17px;
@@ -1110,7 +1109,7 @@ dialog h2 {
   padding: 13px 15px;
   border-radius: 9px;
   background: var(--soft);
-  color: var(--muted);
+  color: var(--muted-foreground);
   font-size: 12px;
   line-height: 1.8;
   margin-bottom: 20px;
@@ -1514,7 +1513,7 @@ dialog h2 {
   align-items: center;
   gap: 7px;
   font-size: 20px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   padding: 4px 7px;
   border-radius: 8px;
 }
@@ -1541,7 +1540,7 @@ dialog h2 {
   gap: 7px;
   padding: 9px 13px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   border: 1px solid var(--line);
   border-radius: 20px;
 }
@@ -1610,7 +1609,7 @@ dialog h2 {
   white-space: nowrap;
   padding: 6px 10px;
   border-radius: 6px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .mention-categories button.active {
   background: var(--blue-soft);
@@ -1776,7 +1775,7 @@ dialog h2 {
   padding: 7px 14px;
   border-radius: 7px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .category-pills button.active {
   background: var(--selected);
@@ -1836,7 +1835,7 @@ dialog h2 {
 .skill-card p {
   font-size: 13px;
   line-height: 1.8;
-  color: var(--muted);
+  color: var(--muted-foreground);
   min-height: 47px;
   margin-bottom: 20px;
 }
@@ -1896,7 +1895,7 @@ dialog h2 {
 }
 .template-card p {
   font-size: 13px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   line-height: 1.7;
   min-height: 44px;
 }
@@ -1933,7 +1932,7 @@ dialog h2 {
   font-size: 14px;
   line-height: 1.8;
   margin: 20px 0;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 @media (min-width: 1700px) {
   .bot-content {
@@ -2163,7 +2162,7 @@ dialog h2 {
 .agent-name small {
   display: block;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .agent-name small > span {
   color: #90939a;
@@ -2177,7 +2176,7 @@ dialog h2 {
   gap: 6px;
   font-size: 12px;
   white-space: nowrap;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .bot-status .dot {
   width: 6px;
@@ -2189,7 +2188,7 @@ dialog h2 {
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .scope-tag .icon,
 .runtime-cell .icon {
@@ -2213,7 +2212,7 @@ dialog h2 {
 .agent-profile p {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .agent-detail-tabs {
   margin: 10px 22px 0;
@@ -2229,7 +2228,7 @@ dialog h2 {
 .agent-purpose {
   font-size: 13px;
   line-height: 1.9;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .agent-details .properties {
   grid-template-columns: 110px minmax(0, 1fr);
@@ -2282,7 +2281,7 @@ dialog h2 {
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 11px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .tool-pills .icon {
   width: 13px;
@@ -2466,7 +2465,7 @@ dialog h2 {
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   padding: 0 4px;
   margin-bottom: 14px;
 }
@@ -2531,7 +2530,7 @@ dialog h2 {
 }
 .roster-role {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 .roster-snippet {
   font-size: 11px;
@@ -3054,7 +3053,7 @@ dialog h2 {
   align-items: center;
   gap: 5px;
   margin-left: auto;
-  color: var(--muted);
+  color: var(--muted-foreground);
   white-space: nowrap;
 }
 .project-owner .avatar {
@@ -3099,7 +3098,7 @@ dialog h2 {
 }
 .project-metrics span {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-foreground);
   white-space: nowrap;
 }
 .project-card-footer {
@@ -3121,7 +3120,7 @@ dialog h2 {
 }
 .progress-caption b {
   font-weight: 500;
-  color: var(--muted);
+  color: var(--muted-foreground);
   margin-left: 4px;
 }
 progress {
@@ -3387,7 +3386,7 @@ select.btn:hover:not(:disabled) {
   height: 16px;
   flex-shrink: 0;
   fill: none;
-  stroke: var(--muted);
+  stroke: var(--muted-foreground);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;

@@ -92,9 +92,54 @@ async function captureLayout(page: Page, testInfo: TestInfo, name: string): Prom
 /** 记录页面主内容与布局；页面依赖的 API 全部来自确定性 mock。 */
 async function expectPageSnapshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   const layout = await captureLayout(page, testInfo, name)
-  expect(JSON.stringify(layout, null, 2)).toMatchSnapshot(`${name}.json`)
+  const stableLayout = { ...layout, smallTargets: layout.smallTargets.map(normalizeRelativeTime) }
+  expect(JSON.stringify(stableLayout, null, 2)).toMatchSnapshot(`${name}.json`)
   expect(normalizeRelativeTime(await page.locator('main').ariaSnapshot())).toMatchSnapshot(`${name}.aria.txt`)
 }
+
+test('[desktop] [mobile] 工作区与项目设置弹窗沿用明暗主题的弱背景和次级文字色', async ({ page }, testInfo) => {
+  await prepare(page, '/projects')
+  const trigger = page.getByRole('button', { name: /项目设置/ }).first()
+  const dialog = page.getByRole('dialog')
+  for (const mode of ['light', 'dark']) {
+    await page.evaluate((dark) => document.documentElement.classList.toggle('dark', dark), mode === 'dark')
+    await trigger.click()
+    await expect(dialog).toBeVisible()
+    const tokens = await dialog.evaluate((element) => {
+      const read = (scope: Element) => {
+        const style = getComputedStyle(scope)
+        return [style.getPropertyValue('--muted').trim(), style.getPropertyValue('--muted-foreground').trim()]
+      }
+      const shell = document.querySelector('.shell')
+      return {
+        root: read(document.documentElement),
+        shell: shell && read(shell),
+        dialog: read(element),
+      }
+    })
+    expect(tokens.root[0]).toBeTruthy()
+    expect(tokens.root[1]).toBeTruthy()
+    expect(tokens.root[0]).not.toBe(tokens.root[1])
+    expect(tokens.shell).toEqual(tokens.root)
+    expect(tokens.dialog).toEqual(tokens.root)
+    if (testInfo.project.name === 'desktop') {
+      const close = dialog.getByRole('button', { name: '关闭', exact: true })
+      const mutedBackground = await close.evaluate((element) => {
+        const sample = document.createElement('span')
+        sample.style.backgroundColor = 'var(--muted)'
+        element.append(sample)
+        const background = getComputedStyle(sample).backgroundColor
+        sample.remove()
+        return background
+      })
+      await close.hover()
+      await expect(close).toHaveCSS('background-color', mutedBackground)
+    }
+    await page.screenshot({ path: testInfo.outputPath(`theme-${mode}.png`) })
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+  }
+})
 
 test.describe('[desktop] 核心页面', () => {
   test('[desktop] 项目首页展示项目卡片与晴雨表', async ({ page }, testInfo) => {
