@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
 import { server } from '@/test/server'
 import { ToastProvider } from '@/shared/ui/toast'
+import { projectRepositoriesQueryOptions } from '../api/queries'
 import { LinkRepositoryDialog } from './link-repository-dialog'
 
 function ok(data: unknown) {
@@ -42,8 +43,11 @@ describe('LinkRepositoryDialog', () => {
       }),
     )
     const onOpenChange = vi.fn()
+    const queryClient = createQueryClient()
+    const { queryKey } = projectRepositoriesQueryOptions('project-1')
+    queryClient.setQueryData(queryKey, { requestId: 'trace', data: [] })
     render(
-      <QueryClientProvider client={createQueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <LinkRepositoryDialog projectId="project-1" open onOpenChange={onOpenChange} />
         </ToastProvider>
@@ -55,6 +59,7 @@ describe('LinkRepositoryDialog', () => {
     await userEvent.click(screen.getByRole('button', { name: '关联仓库' }))
     expect(linkedRepositoryId).toBe('repo-2')
     expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true)
   })
 
   it('没有可用仓库时提示去团队设置同步', async () => {

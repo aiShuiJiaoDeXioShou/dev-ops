@@ -15,7 +15,7 @@ import {
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
-import { availableRepositoriesQueryOptions } from '../api/queries'
+import { availableRepositoriesQueryOptions, projectRepositoriesQueryOptions } from '../api/queries'
 
 /**
  * 从团队已同步仓库中为项目关联一个仓库；关联成功后关闭并刷新仓库列表。
@@ -45,7 +45,7 @@ export function LinkRepositoryDialog({
     mutationFn: () => apiClient.linkRepository(projectId, { repositoryId }),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['code', 'project-repositories', projectId] }),
+        queryClient.invalidateQueries({ queryKey: projectRepositoriesQueryOptions(projectId).queryKey }),
         queryClient.invalidateQueries({ queryKey: ['code', 'available-repositories', projectId] }),
       ])
       showToast('仓库已关联。', 'success')

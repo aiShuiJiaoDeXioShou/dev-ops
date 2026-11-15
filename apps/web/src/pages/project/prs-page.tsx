@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { GitMerge, GitPullRequest, GitPullRequestClosed, X } from 'lucide-react'
-import { listProjectRepositoriesQueryOptions } from '@/features/code/api/queries'
+import { projectRepositoriesQueryOptions } from '@/features/code/api/queries'
 import {
   pullRequestDiffQueryOptions,
   pullRequestQueryOptions,
@@ -102,7 +102,7 @@ export function Component() {
   const [selectedNumber, setSelectedNumber] = useState('')
   const [selectedFile, setSelectedFile] = useState('')
   const [showFullDiff, setShowFullDiff] = useState(false)
-  const repositories = useQuery(listProjectRepositoriesQueryOptions(projectId))
+  const repositories = useQuery(projectRepositoriesQueryOptions(projectId))
   const currentRepositoryId = repositoryId || repositories.data?.data[0]?.id || ''
   const repository = repositories.data?.data.find((item) => item.id === currentRepositoryId)
   const list = useQuery(pullRequestsAllQueryOptions(projectId, currentRepositoryId))

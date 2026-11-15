@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createIdempotencyKey } from '@dev-ops/api-client'
-import { useTeamRepositories } from '@/features/code/api/queries'
+import { projectRepositoriesQueryOptions, useTeamRepositories } from '@/features/code/api/queries'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
@@ -52,7 +52,9 @@ export function ProjectForm({ teamId, open, onOpenChange, onCreated }: ProjectFo
     onSuccess: async (result) => {
       const linked = Boolean(repositoryId)
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
-      if (linked) await queryClient.invalidateQueries({ queryKey: ['code', 'project-repositories', result.project.id] })
+      if (linked) {
+        await queryClient.invalidateQueries({ queryKey: projectRepositoriesQueryOptions(result.project.id).queryKey })
+      }
       setName('')
       setDescription('')
       setRepositoryId('')

@@ -32,7 +32,7 @@ export function RepositoryPicker({ projectId, canManage }: { projectId: string; 
   const [unlinkReason, setUnlinkReason] = useState('')
   const invalidate = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['code', 'project-repositories', projectId] }),
+      queryClient.invalidateQueries({ queryKey: projectRepositoriesQueryOptions(projectId).queryKey }),
       queryClient.invalidateQueries({ queryKey: ['code', 'available-repositories', projectId] }),
     ])
   }
