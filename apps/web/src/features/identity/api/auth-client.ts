@@ -40,7 +40,23 @@ export interface AuthSession {
   session: { id: string; expiresAt: string }
 }
 
-async function authRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isAuthSession(data: unknown): data is AuthSession {
+  if (!isRecord(data) || !isRecord(data.user) || !isRecord(data.session)) return false
+  const { user, session } = data
+  return (
+    typeof user.id === 'string' &&
+    typeof user.name === 'string' &&
+    typeof user.email === 'string' &&
+    typeof session.id === 'string' &&
+    typeof session.expiresAt === 'string'
+  )
+}
+
+async function authRequest(path: string, init: RequestInit = {}): Promise<{ status: number; data: unknown }> {
   let response: Response
   try {
     response = await fetch(`/api/v1/auth${path}`, {
@@ -77,17 +93,24 @@ async function authRequest<T>(path: string, init: RequestInit = {}): Promise<T> 
     const description = response.status === 401 ? fallback : toFriendlyAuthMessage(serverMessage, fallback)
     throw new AuthRequestError(description, code, response.status)
   }
-  if (response.status === 204) return undefined as T
+  if (response.status === 204) return { status: response.status, data: null }
   try {
-    return (await response.json()) as T
+    const data: unknown = await response.json()
+    return { status: response.status, data }
   } catch {
     throw new AuthRequestError('认证服务返回了无法解析的数据。', 'INVALID_RESPONSE', response.status)
   }
 }
 
-/** 读取当前会话；未登录返回 null。 */
+/**
+ * 读取当前会话，并校验认证服务返回的用户和会话字段。
+ * @returns 当前会话；未登录或服务返回空响应时为 null。
+ * @throws 请求失败或响应与会话结构不符时抛出 AuthRequestError。
+ */
 export async function getSession(): Promise<AuthSession | null> {
-  return authRequest<AuthSession | null>('/get-session')
+  const { data, status } = await authRequest('/get-session')
+  if (data === null || isAuthSession(data)) return data
+  throw new AuthRequestError('认证服务返回了无法解析的数据。', 'INVALID_RESPONSE', status)
 }
 
 /** 邮箱密码登录。 */

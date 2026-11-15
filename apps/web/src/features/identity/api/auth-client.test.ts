@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AuthRequestError, signInEmail } from './auth-client'
+import { AuthRequestError, getSession, signInEmail } from './auth-client'
 
 function stubFetch(status: number, body: unknown) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })),
+    vi.fn(
+      async () =>
+        new Response(status === 204 ? null : JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        }),
+    ),
   )
 }
 
@@ -33,5 +39,27 @@ describe('认证错误文案', () => {
     await expect(signInEmail('user@example.test', 'password-123')).rejects.toMatchObject({
       message: '密码重置暂不可用，请联系平台管理员。',
     })
+  })
+})
+
+describe('会话响应校验', () => {
+  const session = {
+    user: { id: 'user-1', name: '开发者', email: 'user@example.test' },
+    session: { id: 'session-1', expiresAt: '2099-01-01T00:00:00.000Z' },
+  }
+
+  it('读取完整会话', async () => {
+    stubFetch(200, session)
+    await expect(getSession()).resolves.toEqual(session)
+  })
+
+  it('将未登录的空响应归一为 null', async () => {
+    stubFetch(204, null)
+    await expect(getSession()).resolves.toBeNull()
+  })
+
+  it('拒绝结构不合法的 JSON 响应', async () => {
+    stubFetch(200, { ...session, session: { id: 'session-1' } })
+    await expect(getSession()).rejects.toMatchObject({ code: 'INVALID_RESPONSE', status: 200 })
   })
 })
