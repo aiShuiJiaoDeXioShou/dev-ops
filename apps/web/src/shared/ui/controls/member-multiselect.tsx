@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react'
-import { avatarToneClassName } from '@/shared/lib/avatar-tone'
+import { avatarToneClassName, memberInitial } from '@/shared/lib/avatar-tone'
 import { cn } from '@/shared/lib/utils'
 import { Button } from './button'
 
@@ -54,15 +54,6 @@ export interface MemberMultiSelectProps {
 }
 
 const ROLE_LABELS: Record<MemberRole, string> = { admin: '管理员', developer: '开发者', viewer: '浏览者' }
-
-/**
- * 取成员姓名首字作为头像占位；头像图片能力接入后替换此处，不改变标签结构。
- * @param name 成员姓名。
- * @returns 单个首字符；姓名为空时返回问号。
- */
-function memberInitial(name: string): string {
-  return name.trim().charAt(0) || '?'
-}
 
 /**
  * 飞书式成员多选控件：标签区 + 检索输入 + 候选列表（勾选态）。

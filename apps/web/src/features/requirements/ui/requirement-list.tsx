@@ -23,7 +23,7 @@ import { RequirementForm } from './requirement-form'
 
 /** 项目需求列表与右侧详情；结构与事项页一致。 */
 export function RequirementList({ projectId }: { projectId: string }) {
-  const { role } = useSession()
+  const { role, user } = useSession()
   const project = useQuery(projectQueryOptions(projectId))
   const [params, setParams] = useSearchParams()
   const state = parseListState(params, { statuses: Object.keys(REQUIREMENT_STATUS_LABELS) })
@@ -197,6 +197,7 @@ export function RequirementList({ projectId }: { projectId: string }) {
         <RequirementForm
           projectId={projectId}
           teamId={project.data.data.teamId}
+          currentUserId={user.id}
           open={createOpen}
           onOpenChange={setCreateOpen}
           onSaved={(id) => update({ openId: id })}

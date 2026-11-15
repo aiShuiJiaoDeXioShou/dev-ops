@@ -20,6 +20,7 @@ import {
   type MemberOption,
   type MemberSelectionDetail,
 } from '@/shared/ui/controls/member-multiselect'
+import { MemberSelect } from '@/shared/ui/controls/member-select'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
@@ -36,6 +37,7 @@ type UpdateBody = ApiBody<'/api/v1/requirements/{requirementId}/update', 'post'>
 interface RequirementFormProps {
   projectId: string
   teamId: string
+  currentUserId: string
   open: boolean
   onOpenChange: (open: boolean) => void
   requirement?: RequirementDetail | null
@@ -50,9 +52,9 @@ interface RequirementFieldErrors {
 }
 
 /**
- * 把团队接口返回值转换为成员多选候选；候选只保留正常成员。
+ * 把团队接口返回值转换为成员选项，保留可用性用于回填已停用的负责人。
  * @param member 团队接口返回的成员。
- * @returns 成员多选所需选项；已停用成员不进入候选。
+ * @returns 成员选择控件使用的展示数据。
  */
 function toMemberOption(member: {
   userId: string
@@ -81,8 +83,20 @@ function focusField(target: HTMLElement | null) {
   target?.focus()
 }
 
-/** 创建或编辑需求；仅管理员/开发者可提交。 */
-export function RequirementForm({ projectId, teamId, open, onOpenChange, requirement, onSaved }: RequirementFormProps) {
+/**
+ * 渲染需求创建和编辑表单，负责人选择随表单一起保存。
+ * @param props 项目、团队、当前用户、待编辑需求与弹窗回调。
+ * @returns 需求表单弹窗；保存失败时保留草稿。
+ */
+export function RequirementForm({
+  projectId,
+  teamId,
+  currentUserId,
+  open,
+  onOpenChange,
+  requirement,
+  onSaved,
+}: RequirementFormProps) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
@@ -99,6 +113,7 @@ export function RequirementForm({ projectId, teamId, open, onOpenChange, require
   const [attachmentError, setAttachmentError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<RequirementFieldErrors>({})
   const [error, setError] = useState('')
+  const [formBody, setFormBody] = useState<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLTextAreaElement>(null)
   const externalUrlRef = useRef<HTMLInputElement>(null)
@@ -200,7 +215,8 @@ export function RequirementForm({ projectId, teamId, open, onOpenChange, require
   }
 
   const memberList = members.data?.data ?? []
-  const memberOptions = memberList.map(toMemberOption).filter((option) => option.available)
+  const teamMemberOptions = memberList.map(toMemberOption)
+  const memberOptions = teamMemberOptions.filter((option) => option.available)
   const collaboratorDetails: MemberSelectionDetail[] = collaboratorUserIds.map((userId) => {
     const existing = requirement?.collaborators.find((item) => item.userId === userId)
     if (existing) {
@@ -214,6 +230,15 @@ export function RequirementForm({ projectId, teamId, open, onOpenChange, require
     return { userId, name: '未知成员', status: 'missing', available: false }
   })
   const membersError = members.isError ? describeRequestError(members.error).description : null
+  const ownerPickerProps = {
+    options: memberOptions,
+    currentUserId,
+    loading: members.isPending || members.isFetching,
+    error: membersError,
+    onRetry: () => void members.refetch(),
+    disabled: mutation.isPending,
+    collisionBoundary: formBody,
+  }
   const hasUnfinishedAttachmentsPending = hasUnfinishedAttachments(attachments)
   /**
    * 同步附件行并清除上一次的附件阻塞提示。
@@ -234,7 +259,7 @@ export function RequirementForm({ projectId, teamId, open, onOpenChange, require
                 : '创建需求'}
             </DialogTitle>
           </DialogFormHeader>
-          <DialogFormBody>
+          <DialogFormBody ref={setFormBody}>
             <div className="space-y-6">
               <FormSection title="基本信息">
                 <FormField label="标题" htmlFor="requirement-title" required error={fieldErrors.title}>
@@ -324,34 +349,26 @@ export function RequirementForm({ projectId, teamId, open, onOpenChange, require
               <FormSection title="负责人与协作人">
                 <FormGrid>
                   <FormField label="研发负责人" htmlFor="requirement-dev-owner">
-                    <Select
-                      className="flex w-full"
+                    <MemberSelect
+                      {...ownerPickerProps}
                       id="requirement-dev-owner"
                       value={devOwnerUserId}
-                      onChange={(event) => setDevOwnerUserId(event.target.value)}
-                    >
-                      <option value="">未指定</option>
-                      {memberList.map((member) => (
-                        <option key={member.userId} value={member.userId}>
-                          {member.name}
-                        </option>
-                      ))}
-                    </Select>
+                      onValueChange={setDevOwnerUserId}
+                      selectedDetail={
+                        teamMemberOptions.find((member) => member.userId === devOwnerUserId) ?? requirement?.devOwner
+                      }
+                    />
                   </FormField>
                   <FormField label="测试负责人" htmlFor="requirement-test-owner">
-                    <Select
-                      className="flex w-full"
+                    <MemberSelect
+                      {...ownerPickerProps}
                       id="requirement-test-owner"
                       value={testOwnerUserId}
-                      onChange={(event) => setTestOwnerUserId(event.target.value)}
-                    >
-                      <option value="">未指定</option>
-                      {memberList.map((member) => (
-                        <option key={member.userId} value={member.userId}>
-                          {member.name}
-                        </option>
-                      ))}
-                    </Select>
+                      onValueChange={setTestOwnerUserId}
+                      selectedDetail={
+                        teamMemberOptions.find((member) => member.userId === testOwnerUserId) ?? requirement?.testOwner
+                      }
+                    />
                   </FormField>
                 </FormGrid>
                 <FormField

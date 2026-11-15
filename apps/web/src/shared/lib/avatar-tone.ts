@@ -23,3 +23,12 @@ export function avatarToneClassName(seed: string): string {
   }
   return AVATAR_TONES[hash % AVATAR_TONES.length] ?? AVATAR_TONES[0]
 }
+
+/**
+ * 取成员姓名首字作为头像占位。
+ * @param name 成员姓名。
+ * @returns 首字符，姓名为空时返回问号。
+ */
+export function memberInitial(name: string): string {
+  return name.trim().charAt(0) || '?'
+}

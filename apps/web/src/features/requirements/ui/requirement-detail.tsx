@@ -389,6 +389,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
       <RequirementForm
         projectId={detail.projectId}
         teamId={detail.teamId}
+        currentUserId={user.id}
         open={editOpen}
         onOpenChange={setEditOpen}
         requirement={detail}
