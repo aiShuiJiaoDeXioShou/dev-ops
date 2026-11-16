@@ -28,6 +28,31 @@ export interface ConfigurationServiceDeps {
 }
 
 /**
+ * 按团队和凭据标识解密有效 Git 凭据，供已校验连接归属的服务端用例使用。
+ * @param db 数据库连接。
+ * @param cipher 凭据加解密器。
+ * @param teamId 连接所属团队。
+ * @param secretId 团队内的凭据标识。
+ * @returns 凭据明文，由调用方限制在适配器生命周期内使用。
+ * @throws 凭据缺失、已经撤销或解密失败时抛出。
+ */
+export async function decryptConfiguredSecret(
+  db: Database,
+  cipher: SecretCipher,
+  teamId: string,
+  secretId: string,
+): Promise<string> {
+  const row = await findSecretForDecrypt(db, teamId, secretId)
+  if (!row) throw new ApiError(ERROR_CODES.NOT_FOUND, '凭据不存在或已撤销')
+  return cipher.decrypt({
+    ciphertext: row.ciphertext,
+    iv: row.iv,
+    authTag: row.auth_tag,
+    keyVersion: row.key_version,
+  })
+}
+
+/**
  * 创建凭据配置服务。
  * @param deps 数据库、加解密器与密码二次校验依赖。
  * @returns 凭据创建、列表、撤销、明文查看与内部解密用例。
@@ -100,22 +125,21 @@ export function createConfigurationService(deps: ConfigurationServiceDeps) {
     return metadata(row)
   }
 
-  async function decryptTeamSecret(teamId: string, secretId: string): Promise<string> {
-    const row = await findSecretForDecrypt(db, teamId, secretId)
-    if (!row) throw new ApiError(ERROR_CODES.NOT_FOUND, '凭据不存在或已撤销')
-    return deps.cipher.decrypt({
-      ciphertext: row.ciphertext,
-      iv: row.iv,
-      authTag: row.auth_tag,
-      keyVersion: row.key_version,
-    })
+  /**
+   * 解密团队中的有效凭据，供服务端内部使用。
+   * @param teamId 连接所属团队。
+   * @param secretId 团队内凭据标识。
+   * @returns 凭据明文；无权访问的记录或解密失败时拒绝。
+   */
+  function decryptSecret(teamId: string, secretId: string): Promise<string> {
+    return decryptConfiguredSecret(db, deps.cipher, teamId, secretId)
   }
 
   return {
     createSecret,
     listSecrets: listTeamSecrets,
     revokeSecret: revokeTeamSecret,
-    decryptSecret: decryptTeamSecret,
+    decryptSecret,
     credentials,
     environmentVariables,
   }

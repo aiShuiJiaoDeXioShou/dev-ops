@@ -132,6 +132,14 @@ apps/server/
 - 所有自研业务接口只注册 GET/POST，返回 HTTP 200 信封；未知 API 路径也返回 200 + `NOT_FOUND`。未处理异常才返回 500。
 - root 初始化：`pnpm --dir apps/server seed:root`；本地 SMTP 可使用 Mailpit（`SMTP_URL=smtp://127.0.0.1:1025`）。
 
+## 项目首页晴雨表
+
+`GET /api/v1/teams/:teamId/project-activity` 按团队权限和项目筛选读取 PostgreSQL。事项活动读取平台活动表；提交和 PR 读取按仓库、UTC 日期、来源预聚合的日统计。同一仓库在热力图只计一次，项目卡片分别显示各项目关联仓库的未关闭 PR 数。
+
+部署时先执行 `pnpm --dir apps/server db:migrate`，并运行现有 Worker（本地用 `pnpm --dir apps/server dev:worker`）。Worker 复用 Git 连接凭据，每轮领取一个到期仓库，正常情况下每仓库约 5 分钟轮询一次。保留最近 371 个 UTC 日期。提交从默认分支回填，分支头不变时跳过更新，快进时追加，分支切换或无法验证快进时重建对应仓库。PR 按创建日计数，按更新时间增量核对，每天重新核对一次，未关闭计数包含窗口之外的 PR。
+
+未完成回填、来源不可用、请求窗口早于缓存范围或超过 15 分钟未核对时，相应 `sourceStatus` 为 `unknown`。项目关联的任一仓库 PR 来源不可用时，项目未关闭 PR 数以 `null` 表示。单仓同步使用 60 秒预算，每次分页扫描最多 80 页，超限时按来源失败处理。仓库解绑、Git 连接失效或凭据撤销后，接口按当前关系和权限排除对应统计。
+
 ## V0.2 实现说明（进行中）
 
 - 新增 `delivery` 模块：构建记录、产物引用、构建事项关联与更正历史；路由 `POST /api/v1/projects/:projectId/builds`、`GET /api/v1/builds/:buildId` 等，全部只使用 GET/POST 与统一信封。

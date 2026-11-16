@@ -5,6 +5,7 @@ import {
   type GitAdapter,
   type GitAdapterInput,
   type GitCommitDetail,
+  type GitCommitComparisonInput,
   type GitCommitInput,
   type GitCommitListInput,
   type GitCommitSummary,
@@ -37,6 +38,7 @@ import {
   normalizePageInput,
   parseGitHubCommit,
   parseGitHubCommitDetail,
+  parseGitHubFastForward,
   parseGitHubPullRequest,
   parseGitHubPullRequestFile,
   parseGitHubReviewFact,
@@ -266,9 +268,22 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
     const { page, pageSize } = normalizePageInput(input)
     const params: Record<string, unknown> = { owner, repo, per_page: pageSize, page }
     if (input.ref) params.sha = input.ref
+    if (input.since) params.since = input.since
     const data = await requestData('GET /repos/{owner}/{repo}/commits', params)
     if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'GitHub 提交列表不合法')
-    return data.map((item) => parseGitHubCommit(item))
+    return data.map((item) => parseGitHubCommit(item, input.since !== undefined))
+  }
+
+  async function listFastForwardCommits(input: GitCommitComparisonInput): Promise<GitCommitSummary[] | null> {
+    const { owner, repo } = requireAllowed(input)
+    const data = await requestData('GET /repos/{owner}/{repo}/compare/{basehead}', {
+      owner,
+      repo,
+      basehead: `${input.base}...${input.head}`,
+      per_page: 100,
+      page: 1,
+    })
+    return parseGitHubFastForward(data, input.base, input.head)
   }
 
   async function getCommit(input: GitCommitInput): Promise<GitCommitDetail> {
@@ -402,6 +417,7 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
     getFile,
     listBranches,
     listCommits,
+    listFastForwardCommits,
     getCommit,
     listPullRequests,
     getPullRequest,

@@ -201,8 +201,13 @@ export function buildPullRequestDetail(
   return { ...summary, ...finalizePullRequestFiles(files, sourceHasMore) }
 }
 
-/** 解析 GitHub REST 提交对象。 */
-export function parseGitHubCommit(raw: unknown): GitCommitSummary {
+/**
+ * 解析 GitHub REST 提交对象。
+ * @param raw 来源提交对象。
+ * @param useCommitterDate 晴雨表使用提交者时间，与来源的日期筛选口径一致。
+ * @returns 提交摘要；来源缺少有效提交标识或时间时抛出 GitAdapterError。
+ */
+export function parseGitHubCommit(raw: unknown, useCommitterDate = false): GitCommitSummary {
   const record = requireRecord(raw, 'GitHub 提交')
   const commit = isRecord(record.commit) ? record.commit : {}
   const author = isRecord(commit.author) ? commit.author : {}
@@ -211,9 +216,28 @@ export function parseGitHubCommit(raw: unknown): GitCommitSummary {
     sha: requireText(record.sha, 'sha'),
     title: firstLine(toText(commit.message)),
     authorName: toText(author.name) || toText(committer.name),
-    committedAt: requireTimestamp(author.date ?? committer.date, 'commit.author.date'),
+    committedAt: requireTimestamp(
+      useCommitterDate ? (committer.date ?? author.date) : (author.date ?? committer.date),
+      'commit.date',
+    ),
     url: optionalText(record.html_url),
   }
+}
+
+/**
+ * 解析 GitHub 比较结果，仅接受同一祖先上的完整新增提交集。
+ * @param raw 比较接口原始数据。
+ * @param base 上一轮同步的分支头。
+ * @param head 本次固定的分支头。
+ * @returns 可用于增量计数的提交；分叉、回退或结果截断时返回 null。
+ */
+export function parseGitHubFastForward(raw: unknown, base: string, head: string): GitCommitSummary[] | null {
+  const record = requireRecord(raw, 'GitHub 提交比较')
+  if (record.status !== 'ahead' || record.behind_by !== 0 || !Array.isArray(record.commits)) return null
+  if (!isRecord(record.merge_base_commit) || record.merge_base_commit.sha !== base) return null
+  const commits = record.commits.map((item: unknown) => parseGitHubCommit(item, true))
+  if (new Set(commits.map((item) => item.sha)).size !== record.ahead_by) return null
+  return commits.some((item) => item.sha === head) ? commits : null
 }
 
 /** 解析 GitHub REST 提交变更文件对象；只保留数量信息，不返回补丁。 */
@@ -283,8 +307,13 @@ export function parseGitHubReviewFact(raw: unknown): GitReviewFact {
   }
 }
 
-/** 解析 Gitea 提交对象；兼容 commit 内时间或顶层 created 字段。 */
-export function parseGiteaCommit(raw: unknown): GitCommitSummary {
+/**
+ * 解析 Gitea 提交对象，兼容顶层 created 字段。
+ * @param raw 来源提交对象。
+ * @param useCommitterDate 晴雨表使用提交者时间，与来源的日期筛选口径一致。
+ * @returns 提交摘要；来源缺少有效提交标识或时间时抛出 GitAdapterError。
+ */
+export function parseGiteaCommit(raw: unknown, useCommitterDate = false): GitCommitSummary {
   const record = requireRecord(raw, 'Gitea 提交')
   const commit = isRecord(record.commit) ? record.commit : {}
   const author = isRecord(commit.author) ? commit.author : {}
@@ -293,7 +322,10 @@ export function parseGiteaCommit(raw: unknown): GitCommitSummary {
     sha: requireText(record.sha, 'sha'),
     title: firstLine(toText(commit.message)),
     authorName: toText(author.name) || toText(committer.name),
-    committedAt: requireTimestamp(author.date ?? committer.date ?? record.created, 'commit.author.date'),
+    committedAt: requireTimestamp(
+      (useCommitterDate ? (committer.date ?? author.date) : (author.date ?? committer.date)) ?? record.created,
+      'commit.date',
+    ),
     url: optionalText(record.html_url),
   }
 }

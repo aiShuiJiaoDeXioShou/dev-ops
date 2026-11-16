@@ -148,13 +148,25 @@ export interface GitReadPort {
   listCommits?(input: {
     repository: { namespace: string; name: string }
     ref?: string
+    since?: string
     page: number
     pageSize: number
   }): Promise<GitCommitSummaryPort[]>
+  /**
+   * 读取两个固定提交之间的完整快进增量，供后台统计使用。
+   * @param input 仓库、上一轮分支头和本轮分支头。
+   * @returns 可以安全追加的提交；分叉或来源无法证明完整性时返回 null。
+   */
+  listFastForwardCommits?(input: {
+    repository: { namespace: string; name: string }
+    base: string
+    head: string
+  }): Promise<GitCommitSummaryPort[] | null>
   getCommit?(input: { repository: { namespace: string; name: string }; ref: string }): Promise<GitCommitDetailPort>
   listPullRequests?(input: {
     repository: { namespace: string; name: string }
     state?: PullRequestStateFilter
+    sort?: 'updated'
     author?: string
     page: number
     pageSize: number
@@ -409,8 +421,12 @@ function gitErrorToCheckStatus(error: unknown): { status: string; errorCode: str
   return { status: 'unavailable', errorCode: 'unavailable' }
 }
 
-/** 提取适配器错误码；非适配器错误或未约定错误码返回 null。 */
-function gitAdapterErrorCode(error: unknown): string | null {
+/**
+ * 提取约定的 Git 适配器错误码，供业务读取与后台同步处理。
+ * @param error 来源读取抛出的未知值。
+ * @returns 已知错误码，其余返回 null。
+ */
+export function gitAdapterErrorCode(error: unknown): string | null {
   if (typeof error !== 'object' || error === null || !('code' in error)) return null
   const code = error.code
   return typeof code === 'string' && GIT_ERROR_CODES.has(code) ? code : null

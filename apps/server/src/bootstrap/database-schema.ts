@@ -16,6 +16,11 @@ export { storageBucket, storageBucketEvent } from '../modules/storage/storage.ta
 export { attachment } from '../modules/attachments/attachments.tables.ts'
 export { project, projectService, projectServiceRepository } from '../modules/projects/projects.tables.ts'
 export {
+  projectDashboardDay,
+  projectDashboardPullRequest,
+  projectDashboardRepository,
+} from '../modules/projects/projects.dashboard.tables.ts'
+export {
   requirement,
   requirementCollaborator,
   requirementTestSubmission,

@@ -330,6 +330,43 @@ const githubFiles = [
 // 超过 1MB 的差异文本，用于验证返回前缀并标记截断。
 const oversizedDiff = '+line\n'.repeat(180_000)
 
+test('GitHub 晴雨表只接受祖先一致且完整的快进提交', async () => {
+  const base = 'a'.repeat(40)
+  const head = githubCommit.sha
+  const committer = { name: 'Alice', date: '2026-11-10T10:00:00Z' }
+  const response = {
+    status: 'ahead',
+    ahead_by: 1,
+    behind_by: 0,
+    merge_base_commit: { sha: base },
+    commits: [{ ...githubCommit, commit: { ...githubCommit.commit, committer } }],
+  }
+  const adapter = createGitHubAppAdapter({
+    ...baseInput,
+    authKind: 'github_app_installation',
+    allowedRepositories: readAllowed,
+    appId: '1',
+    privateKey: 'key',
+    installationId: 2,
+    client: {
+      async request(route, params) {
+        assert.equal(route, 'GET /repos/{owner}/{repo}/compare/{basehead}')
+        assert.equal(params?.basehead, `${base}...${head}`)
+        return { data: response }
+      },
+    },
+  })
+  assert.ok(adapter.listFastForwardCommits)
+  const compare = () => adapter.listFastForwardCommits?.({ repository: readRepository, base, head })
+  const commits = await compare()
+  assert.equal(commits?.[0]?.committedAt, committer.date)
+  response.ahead_by = 2
+  assert.equal(await compare(), null)
+  response.status = 'diverged'
+  response.ahead_by = 1
+  assert.equal(await compare(), null)
+})
+
 test('GitHub App 适配器读取提交、PR、变更文件与差异并标记截断', async () => {
   const calls: Array<{ route: string; params?: Record<string, unknown> }> = []
   const client: GitHubAppClient = {
@@ -688,6 +725,46 @@ const giteaReview = {
   state: 'APPROVED',
   submitted_at: '2026-11-09T09:00:00Z',
 }
+
+test('Gitea 晴雨表使用双向范围验证快进，并显式按 PR 更新时间排序', async () => {
+  const base = 'a'.repeat(40)
+  const head = giteaCommit.sha
+  const queries: URLSearchParams[] = []
+  let supportsExclusion = true
+  const adapter = createGiteaAdapter({
+    provider: 'gitea',
+    authKind: 'gitea_token',
+    instanceUrl: 'https://gitea.example.test',
+    token: 'token',
+    fetch: async (url) => {
+      const query = new URL(url).searchParams
+      queries.push(query)
+      if (query.has('sort')) return jsonResponse([])
+      if (query.get('sha') === base) return jsonResponse(supportsExclusion ? [] : [giteaCommit])
+      return jsonResponse(query.get('page') === '1' ? [giteaCommit] : [])
+    },
+  })
+  assert.ok(adapter.listFastForwardCommits)
+  const input = { repository: readRepository, base, head }
+  const commits = await adapter.listFastForwardCommits(input)
+  assert.deepEqual(
+    commits?.map((item) => item.sha),
+    [head],
+  )
+  assert.deepEqual(
+    queries.map((query) => [query.get('sha'), query.get('not'), query.get('page')]),
+    [
+      [base, head, '1'],
+      [head, base, '1'],
+      [head, base, '2'],
+    ],
+  )
+  supportsExclusion = false
+  assert.equal(await adapter.listFastForwardCommits(input), null)
+  assert.ok(adapter.listPullRequests)
+  await adapter.listPullRequests({ repository: readRepository, page: 1, pageSize: 50, state: 'all', sort: 'updated' })
+  assert.equal(queries.at(-1)?.get('sort'), 'recentupdate')
+})
 
 test('Gitea 适配器读取提交、PR、变更文件与差异并按能力降级', async () => {
   const urls: string[] = []

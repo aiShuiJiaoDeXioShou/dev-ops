@@ -1,9 +1,13 @@
-import { and, count, eq, gte, inArray, lt, sql } from 'drizzle-orm'
+import { and, count, eq, gte, inArray, lt, lte, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { activity } from '../collaboration/collaboration.tables.ts'
 import { requirement } from '../requirements/requirements.tables.ts'
 import { bug } from '../bugs/bugs.tables.ts'
 import { gitRepository, projectRepository } from '../code/code.tables.ts'
+import { secret } from '../configuration/configuration.tables.ts'
+import { gitConnection } from '../integrations/integrations.tables.ts'
+import { DASHBOARD_MAX_CACHE_AGE_MS } from './projects.dashboard.constants.ts'
+import { projectDashboardDay, projectDashboardRepository } from './projects.dashboard.tables.ts'
 
 export interface ProjectItemCounts {
   total: number
@@ -12,19 +16,135 @@ export interface ProjectItemCounts {
   pendingBugs: number
 }
 
-/** 读取项目仓库列表（含默认分支），供晴雨表来源读取。 */
-export async function findProjectRepositoriesForDashboard(db: Database, projectIds: string[]) {
-  if (projectIds.length === 0) return []
-  return db
-    .select({
-      projectId: projectRepository.project_id,
-      repositoryId: gitRepository.id,
-      defaultBranch: gitRepository.default_branch,
-      status: gitRepository.status,
-    })
-    .from(projectRepository)
-    .innerJoin(gitRepository, eq(gitRepository.id, projectRepository.repository_id))
-    .where(inArray(projectRepository.project_id, projectIds))
+/**
+ * 加载首页可见仓库的日统计和未关闭 PR 数，使用同一数据库快照读取来源状态与统计。
+ * @param db 数据库连接。
+ * @param input 已授权团队、当前项目集合、UTC 窗口、展示来源与读取时间。
+ * @returns 去重后的仓库日统计，以及按项目关联计算的 PR 数；未知来源不贡献计数。
+ */
+export async function readDashboardRepositoryActivity(
+  db: Database,
+  input: {
+    teamId: string
+    projectIds: string[]
+    from: string
+    to: string
+    source: 'all' | 'code' | 'pull_request'
+    now: Date
+  },
+) {
+  const { teamId, projectIds, from, to, source, now } = input
+  const result = {
+    codeOk: true,
+    pullRequestOk: true,
+    codeByDay: new Map<string, number>(),
+    pullRequestByDay: new Map<string, number>(),
+    pendingByProject: new Map<string, number | null>(),
+  }
+  if (projectIds.length === 0) return result
+  const checkedAfter = new Date(now.getTime() - DASHBOARD_MAX_CACHE_AGE_MS)
+  return db.transaction(
+    async (tx) => {
+      const rows = await tx
+        .select({
+          projectId: projectRepository.project_id,
+          repositoryId: projectRepository.repository_id,
+          repositoryStatus: gitRepository.status,
+          defaultBranch: gitRepository.default_branch,
+          connectionStatus: gitConnection.status,
+          secretId: gitConnection.secret_id,
+          secretStatus: secret.status,
+          commitBranch: projectDashboardRepository.commit_branch,
+          commitFrom: projectDashboardRepository.commit_from,
+          commitCheckedAt: projectDashboardRepository.commit_checked_at,
+          commitsAvailable: projectDashboardRepository.commits_available,
+          pullRequestFrom: projectDashboardRepository.pull_request_from,
+          pullRequestCheckedAt: projectDashboardRepository.pull_request_checked_at,
+          pullRequestsAvailable: projectDashboardRepository.pull_requests_available,
+          openPullRequests: projectDashboardRepository.open_pull_requests,
+        })
+        .from(projectRepository)
+        .leftJoin(
+          gitRepository,
+          and(eq(gitRepository.id, projectRepository.repository_id), eq(gitRepository.team_id, teamId)),
+        )
+        .leftJoin(
+          gitConnection,
+          and(
+            eq(gitConnection.id, gitRepository.connection_id),
+            eq(gitConnection.team_id, teamId),
+            eq(gitConnection.provider_key, gitRepository.provider_key),
+          ),
+        )
+        .leftJoin(secret, and(eq(secret.id, gitConnection.secret_id), eq(secret.team_id, teamId)))
+        .leftJoin(projectDashboardRepository, eq(projectDashboardRepository.id, gitRepository.id))
+        .where(and(eq(projectRepository.team_id, teamId), inArray(projectRepository.project_id, projectIds)))
+
+      const codeRepos = new Set<string>()
+      const pullRequestRepos = new Set<string>()
+      for (const row of rows) {
+        const { openPullRequests } = row
+        const isAuthorized =
+          row.repositoryStatus === 'available' &&
+          row.connectionStatus === 'active' &&
+          (row.secretId === null || row.secretStatus === 'active')
+        const hasCode =
+          isAuthorized &&
+          row.commitsAvailable &&
+          row.commitBranch === row.defaultBranch &&
+          row.commitCheckedAt !== null &&
+          row.commitCheckedAt >= checkedAfter
+        const hasPullRequests =
+          isAuthorized &&
+          row.pullRequestsAvailable &&
+          openPullRequests !== null &&
+          row.pullRequestCheckedAt !== null &&
+          row.pullRequestCheckedAt >= checkedAfter
+        if (hasCode) codeRepos.add(row.repositoryId)
+        if (hasPullRequests) pullRequestRepos.add(row.repositoryId)
+        if (!hasCode || row.commitFrom === null || row.commitFrom > from) result.codeOk = false
+        if (!hasPullRequests || row.pullRequestFrom === null || row.pullRequestFrom > from) result.pullRequestOk = false
+        const pending = result.pendingByProject.get(row.projectId)
+        result.pendingByProject.set(
+          row.projectId,
+          hasPullRequests && pending !== null ? (pending ?? 0) + openPullRequests : null,
+        )
+      }
+      const scopes = []
+      if (codeRepos.size > 0 && source !== 'pull_request') {
+        scopes.push(
+          and(eq(projectDashboardDay.source, 'code'), inArray(projectDashboardDay.repository_id, [...codeRepos])),
+        )
+      }
+      if (pullRequestRepos.size > 0 && source !== 'code') {
+        scopes.push(
+          and(
+            eq(projectDashboardDay.source, 'pull_request'),
+            inArray(projectDashboardDay.repository_id, [...pullRequestRepos]),
+          ),
+        )
+      }
+      if (scopes.length === 0) return result
+      const days = await tx
+        .select({
+          date: projectDashboardDay.activity_date,
+          source: projectDashboardDay.source,
+          value: sql<number>`sum(${projectDashboardDay.activity_count})`.mapWith(Number),
+        })
+        .from(projectDashboardDay)
+        .where(
+          and(or(...scopes), gte(projectDashboardDay.activity_date, from), lte(projectDashboardDay.activity_date, to)),
+        )
+        .groupBy(projectDashboardDay.activity_date, projectDashboardDay.source)
+      for (const day of days) {
+        if (day.source === 'code') result.codeByDay.set(day.date, day.value)
+        else if (day.source === 'pull_request') result.pullRequestByDay.set(day.date, day.value)
+        else throw new Error('数据库晴雨表活动来源不合法')
+      }
+      return result
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  )
 }
 
 /**

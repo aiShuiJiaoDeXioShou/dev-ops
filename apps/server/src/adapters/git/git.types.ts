@@ -150,8 +150,16 @@ export interface GitCommitListInput {
   repository: GitRepositoryRef
   /** 分支、标签或提交标识；缺省由调用方改用仓库默认分支。 */
   ref?: string
+  /** 晴雨表回填的提交日期下限，ISO 8601 时间；普通提交列表不设置。 */
+  since?: string
   page: number
   pageSize: number
+}
+
+export interface GitCommitComparisonInput {
+  repository: GitRepositoryRef
+  base: string
+  head: string
 }
 
 export interface GitCommitInput {
@@ -190,6 +198,8 @@ export interface GitCommitDetail extends GitCommitSummary {
 export interface GitPullRequestListInput {
   repository: GitRepositoryRef
   state?: GitPullRequestFilterState
+  /** 按来源最近更新时间降序排列，用于晴雨表增量核对。 */
+  sort?: 'updated'
   /** 来源作者名筛选；提供方列表接口不支持时由适配器在已读取页内过滤。 */
   author?: string
   page: number
@@ -255,6 +265,8 @@ export interface GitAdapter {
    * 返回当前页摘要，来源分页由 page/pageSize 控制，单页不超过 100 条。
    */
   listCommits?(input: GitCommitListInput): Promise<GitCommitSummary[]>
+  /** 仅在能证明 base 是 head 的祖先且差异完整时返回新增提交，否则返回 null。 */
+  listFastForwardCommits?(input: GitCommitComparisonInput): Promise<GitCommitSummary[] | null>
   /** 读取提交详情与变更文件；来源能力不支持时可以不实现，不存在时抛 not_found。 */
   getCommit?(input: GitCommitInput): Promise<GitCommitDetail>
   /**

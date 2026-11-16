@@ -8,6 +8,8 @@ import { createSecretCipher } from '../modules/configuration/configuration.crypt
 import { createAttachmentCleanup } from '../modules/attachments/attachments.cleanup.ts'
 import { reconcileCodeChangeFromRun, reconcilePendingCodeChanges } from '../modules/tools/tools.code-change.service.ts'
 import { reconcileChangeExecutionFromRun } from '../modules/operations/operations.execution.service.ts'
+import { createProjectDashboardSync } from '../modules/projects/projects.dashboard-sync.ts'
+import { createGitConnectionAdapterFactory } from './create-git-connection-adapter.ts'
 
 export type { PipelineSchedulerLogger } from '../modules/pipeline/pipeline.scheduler.ts'
 
@@ -16,9 +18,11 @@ const SCHEDULE_INTERVAL_MS = 2_000
 
 /** 附件清理周期间隔（毫秒）；临时附件 24 小时保留期下 10 分钟粒度足够。 */
 const ATTACHMENT_CLEANUP_INTERVAL_MS = 10 * 60 * 1000
+/** 每轮只领取一个仓库，独立于流水线调度循环。 */
+const DASHBOARD_POLL_INTERVAL_MS = 5_000
 
 /**
- * 组装流水线调度 Worker 的进程依赖。
+ * 组装流水线调度与项目活动同步 Worker 的进程依赖。
  * @param config 已校验配置。
  * @param onDatabaseIdleError 空闲连接异常回调。
  * @param log 结构化日志输出函数，由入口注入。
@@ -48,6 +52,12 @@ export function createWorker(
   const secretCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY
     ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY)
     : null
+  const dashboardSync = createProjectDashboardSync({
+    db: database.db,
+    resolveAdapter: createGitConnectionAdapterFactory({ config, db: database.db, cipher: secretCipher }),
+    log: (message, context) => log('warn', message, context),
+  })
+  const dashboardShutdown = new AbortController()
   const pipelineStorage = createPipelineStorage({
     rootDir: config.PIPELINE_STORAGE_DIR,
     maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
@@ -65,6 +75,8 @@ export function createWorker(
   })
   let timer: NodeJS.Timeout | null = null
   let cleanupTimer: NodeJS.Timeout | null = null
+  let dashboardTimer: NodeJS.Timeout | null = null
+  let dashboardCycle: Promise<void> | null = null
   let cycleRunning = false
   let cleanupRunning = false
   let closing = false
@@ -110,6 +122,17 @@ export function createWorker(
     }
   }
 
+  function scheduleDashboardSync(): void {
+    if (dashboardCycle || closing) return
+    dashboardCycle = dashboardSync(dashboardShutdown.signal)
+      .catch((error: unknown) => {
+        log('error', '晴雨表同步周期失败', { errorType: error instanceof Error ? error.name : typeof error })
+      })
+      .finally(() => {
+        dashboardCycle = null
+      })
+  }
+
   return {
     /**
      * 启动 Worker：验证数据库后开始周期调度。
@@ -119,15 +142,19 @@ export function createWorker(
       await database.check()
       await runCycleOnce()
       await runAttachmentCleanupOnce()
+      if (closing) return
       timer = setInterval(() => {
         void runCycleOnce()
       }, SCHEDULE_INTERVAL_MS)
       cleanupTimer = setInterval(() => {
         void runAttachmentCleanupOnce()
       }, ATTACHMENT_CLEANUP_INTERVAL_MS)
+      scheduleDashboardSync()
+      dashboardTimer = setInterval(scheduleDashboardSync, DASHBOARD_POLL_INTERVAL_MS)
       log('info', 'pipeline worker 已启动', {
         intervalMs: SCHEDULE_INTERVAL_MS,
         attachmentCleanupIntervalMs: ATTACHMENT_CLEANUP_INTERVAL_MS,
+        dashboardPollIntervalMs: DASHBOARD_POLL_INTERVAL_MS,
       })
     },
     /** 主动执行一次调度周期；测试与运维排查使用。 */
@@ -148,6 +175,9 @@ export function createWorker(
         clearInterval(cleanupTimer)
         cleanupTimer = null
       }
+      if (dashboardTimer) clearInterval(dashboardTimer)
+      dashboardShutdown.abort()
+      await dashboardCycle
       await database.close()
     },
   }

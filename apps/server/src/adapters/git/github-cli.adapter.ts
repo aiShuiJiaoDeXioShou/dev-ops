@@ -5,6 +5,7 @@ import {
   type GitAdapter,
   type GitAdapterInput,
   type GitCommitDetail,
+  type GitCommitComparisonInput,
   type GitCommitInput,
   type GitCommitListInput,
   type GitCommitSummary,
@@ -37,6 +38,7 @@ import {
   normalizePageInput,
   parseGitHubCommit,
   parseGitHubCommitDetail,
+  parseGitHubFastForward,
   parseGitHubPullRequest,
   parseGitHubPullRequestFile,
   parseGitHubReviewFact,
@@ -186,10 +188,17 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
   async function listCommits(input: GitCommitListInput): Promise<GitCommitSummary[]> {
     const slug = requireAllowed(input)
     const { page, pageSize } = normalizePageInput(input)
-    const query = buildQuery({ sha: input.ref, per_page: pageSize, page })
+    const query = buildQuery({ sha: input.ref, since: input.since, per_page: pageSize, page })
     const data = parseJson<unknown>(await run(['api', `repos/${slug}/commits${query}`]))
     if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'GitHub 提交列表不合法')
-    return data.map((item) => parseGitHubCommit(item))
+    return data.map((item) => parseGitHubCommit(item, input.since !== undefined))
+  }
+
+  async function listFastForwardCommits(input: GitCommitComparisonInput): Promise<GitCommitSummary[] | null> {
+    const slug = requireAllowed(input)
+    const range = `${encodeURIComponent(input.base)}...${encodeURIComponent(input.head)}`
+    const output = await run(['api', `repos/${slug}/compare/${range}?per_page=100&page=1`], MAX_DIFF_OUTPUT_BYTES)
+    return parseGitHubFastForward(parseJson<unknown>(output), input.base, input.head)
   }
 
   async function getCommit(input: GitCommitInput): Promise<GitCommitDetail> {
@@ -364,6 +373,7 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
     getFile,
     listBranches,
     listCommits,
+    listFastForwardCommits,
     getCommit,
     listPullRequests,
     getPullRequest,

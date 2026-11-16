@@ -8,12 +8,7 @@ import { createKnowledgeService } from '../modules/knowledge/knowledge.service.t
 import { createRequirementsService } from '../modules/requirements/requirements.service.ts'
 import { createBugsService } from '../modules/bugs/bugs.service.ts'
 import { createCodeService } from '../modules/code/code.service.ts'
-import { readFile } from 'node:fs/promises'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
-import { createGitAdapter } from '../adapters/git/git.registry.ts'
-import { createGitHubCliAdapter } from '../adapters/git/github-cli.adapter.ts'
-import { createGitHubAppAdapter } from '../adapters/git/github.adapter.ts'
-import { createGiteaAdapter } from '../adapters/git/gitea.adapter.ts'
 import { findGitConnectionById } from '../modules/integrations/integrations.repository.ts'
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
 import { verifySessionPassword } from '../modules/identity/identity.password.ts'
@@ -40,6 +35,7 @@ import { createSecretCipher } from '../modules/configuration/configuration.crypt
 import { createIntegrationsService, type GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createSmtpMailer } from '../adapters/mail/smtp-mailer.ts'
 import type { MailSender } from '../adapters/mail/mail.types.ts'
+import { createGitConnectionAdapterFactory } from './create-git-connection-adapter.ts'
 
 /**
  * 组装进程级依赖：数据库连接、认证实例与后续业务模块。
@@ -76,40 +72,13 @@ export function createServices(
         verifyPassword: (headers, password) => verifySessionPassword(auth, headers, password),
       })
     : null
-  type ConnectionRow = Parameters<GitAdapterFactory>[0]
-  async function buildGitAdapter(connection: ConnectionRow): Promise<GitAdapter> {
-    const { provider_key: provider, auth_kind: authKind, instance_url: instanceUrl } = connection
-    if (provider === 'gitea') {
-      if (authKind !== 'gitea_token') throw new Error('数据库中的 Gitea 连接授权方式不合法')
-      if (!configuration || !connection.secret_id) throw new Error('Gitea 凭据未配置')
-      const token = await configuration.decryptSecret(connection.team_id, connection.secret_id)
-      return createGitAdapter(
-        config,
-        { provider, authKind, instanceUrl },
-        {
-          gitea: (selected) => createGiteaAdapter({ ...selected, token }),
-        },
-      )
-    }
-    if (provider !== 'github') throw new Error('数据库中的 Git 提供方不合法')
-    if (authKind === 'github_cli') {
-      return createGitAdapter(config, { provider, authKind, instanceUrl }, { githubCli: createGitHubCliAdapter })
-    }
-    if (authKind !== 'github_app_installation') throw new Error('数据库中的 GitHub 连接授权方式不合法')
-    const { GITHUB_APP_ID: appId, GITHUB_APP_PRIVATE_KEY_PATH: keyPath } = config
-    if (!appId || !keyPath) throw new Error('GitHub App 凭据未配置')
-    const installationId = Number(connection.external_identity)
-    if (!Number.isSafeInteger(installationId) || installationId <= 0) throw new Error('GitHub App 安装 ID 无效')
-    const privateKey = await readFile(keyPath, 'utf8')
-    return createGitAdapter(
+  const gitAdapterFactory =
+    options.gitAdapterFactory ??
+    createGitConnectionAdapterFactory({
       config,
-      { provider, authKind, instanceUrl },
-      {
-        githubApp: (selected) => createGitHubAppAdapter({ ...selected, appId, privateKey, installationId }),
-      },
-    )
-  }
-  const gitAdapterFactory = options.gitAdapterFactory ?? buildGitAdapter
+      db: database.db,
+      cipher: secretCipher,
+    })
   const integrations = createIntegrationsService({
     db: database.db,
     config,
@@ -127,10 +96,7 @@ export function createServices(
       }),
     listActiveConnectionIds: options.activeConnectionIds ?? integrations.listActiveConnections,
   })
-  const projectDashboard = createProjectDashboardService({
-    db: database.db,
-    git: { listCommits: code.listRepositoryCommits, listPullRequests: code.listRepositoryPullRequests },
-  })
+  const projectDashboard = createProjectDashboardService({ db: database.db })
   // 附件数量与保留期策略先于业务服务装配，供需求与缺陷在各自事务内绑定/解绑。
   const attachmentPolicy = {
     maxFileBytes: config.ATTACHMENT_MAX_BYTES,

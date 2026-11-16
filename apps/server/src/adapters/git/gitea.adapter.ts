@@ -2,6 +2,7 @@ import {
   GitAdapterError,
   type GitAdapter,
   type GitAdapterInput,
+  type GitCommitComparisonInput,
   type GitCommitDetail,
   type GitCommitInput,
   type GitCommitListInput,
@@ -155,9 +156,36 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     const slug = `${input.repository.namespace}/${input.repository.name}`
     const { page, pageSize } = normalizePageInput(input)
     const sha = input.ref ? `&sha=${encodeURIComponent(input.ref)}` : ''
-    const data = await request<unknown>(`/repos/${slug}/commits?page=${page}&limit=${pageSize}${sha}`)
+    const since = input.since
+      ? `&since=${encodeURIComponent(input.since)}&stat=false&verification=false&files=false`
+      : ''
+    const data = await request<unknown>(`/repos/${slug}/commits?page=${page}&limit=${pageSize}${sha}${since}`)
     if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'Gitea 提交列表不合法')
-    return data.map((item) => parseGiteaCommit(item))
+    return data.map((item) => parseGiteaCommit(item, input.since !== undefined))
+  }
+
+  async function listFastForwardCommits(input: GitCommitComparisonInput): Promise<GitCommitSummary[] | null> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const { base, head } = input
+    const readRange = async (sha: string, excluded: string, page: number, limit: number) => {
+      const query = new URLSearchParams({
+        sha,
+        not: excluded,
+        page: String(page),
+        limit: String(limit),
+        stat: 'false',
+        verification: 'false',
+        files: 'false',
+      })
+      const data = await request<unknown>(`/repos/${slug}/commits?${query}`)
+      if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'Gitea 提交比较不合法')
+      return data.map((item: unknown) => parseGiteaCommit(item, true))
+    }
+    // 反向差集为空才证明旧提交仍可达；忽略 not 的旧实例会返回旧分支头，从而触发重建。
+    if ((await readRange(base, head, 1, 1)).length > 0) return null
+    const added = await readRange(head, base, 1, 50)
+    if (!added.some((item) => item.sha === head)) return null
+    return (await readRange(head, base, 2, 50)).length === 0 ? added : null
   }
 
   async function getCommit(input: GitCommitInput): Promise<GitCommitDetail> {
@@ -170,7 +198,8 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     const slug = `${input.repository.namespace}/${input.repository.name}`
     const { page, pageSize } = normalizePageInput(input)
     const state = encodeURIComponent(input.state ?? 'open')
-    const data = await request<unknown>(`/repos/${slug}/pulls?state=${state}&page=${page}&limit=${pageSize}`)
+    const sort = input.sort === 'updated' ? '&sort=recentupdate' : ''
+    const data = await request<unknown>(`/repos/${slug}/pulls?state=${state}&page=${page}&limit=${pageSize}${sort}`)
     if (!Array.isArray(data)) throw new GitAdapterError('invalid_response', 'Gitea PR 列表不合法')
     // 列表接口不携带评审信息，reviewStatus 保持 unknown；详情读取时再按评审记录推导。
     return filterPullRequestsByAuthor(
@@ -324,6 +353,7 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     getFile,
     listBranches,
     listCommits,
+    listFastForwardCommits,
     getCommit,
     listPullRequests,
     getPullRequest,

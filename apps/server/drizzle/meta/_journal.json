@@ -183,6 +183,13 @@
       "when": 1794357822928,
       "tag": "0025_v04b_execution_run_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794839103016,
+      "tag": "0026_project_dashboard_activity",
+      "breakpoints": true
     }
   ]
 }
