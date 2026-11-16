@@ -1,10 +1,11 @@
 {
-  "path": "/settings/storage-buckets",
+  "path": "/platform",
   "viewport": {
     "width": 1440,
     "height": 1000
   },
   "headings": [
+    "平台管理",
     "储存桶"
   ],
   "tabs": [],

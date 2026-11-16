@@ -1,10 +1,16 @@
-import { Navigate, type RouteObject } from 'react-router'
+import { Navigate, Outlet, type RouteObject } from 'react-router'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { RequireAuth } from '@/features/identity/ui/require-auth'
+import { useSession } from '@/features/identity/model/session'
 import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { DelayedAppShellSkeleton, DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { NotFoundPage } from '@/pages/not-found'
 import { RouteErrorPage } from './route-error'
+
+function RequirePlatformRoot() {
+  const { isPlatformAdmin } = useSession()
+  return isPlatformAdmin ? <Outlet /> : <NotFoundPage />
+}
 
 /**
  * 创建应用路由；认证页公开，业务页统一经过 RequireAuth 与会话上下文。
@@ -120,9 +126,15 @@ export function createAppRoutes(): RouteObject[] {
               HydrateFallback: DelayedPageSkeleton,
             },
             {
-              path: 'settings/storage-buckets',
-              lazy: () => import('@/pages/settings/storage-buckets-page'),
-              HydrateFallback: DelayedPageSkeleton,
+              Component: RequirePlatformRoot,
+              children: [
+                {
+                  path: 'platform',
+                  lazy: () => import('@/pages/platform/platform-management-page'),
+                  HydrateFallback: DelayedPageSkeleton,
+                },
+                { path: 'settings/storage-buckets', element: <Navigate to="/platform" replace /> },
+              ],
             },
             {
               path: 'system/status',

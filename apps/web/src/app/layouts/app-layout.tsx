@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Activity, Box, Folder, LayoutGrid, LogOut, Menu, Shield, Users, X as XIcon } from 'lucide-react'
+import { Activity, Folder, LayoutGrid, LogOut, Menu, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
@@ -37,14 +37,14 @@ export function AppLayout() {
       ['/capabilities', '能力'],
       ['/vault', '凭据库'],
       ['/settings/pipeline-nodes', '执行节点'],
-      ['/settings/storage-buckets', '储存桶'],
       ['/settings/team', '团队管理'],
       ['/settings/profile', '个人页面'],
       ['/system/status', '系统状态'],
     ]
+    if (isPlatformAdmin) titles.push(['/platform', '平台管理'])
     const matched = titles.find(([path]) => location.pathname === path || location.pathname.startsWith(path + '/'))
     document.title = matched ? `${matched[1]} · DevOps` : 'DevOps 项目开发平台'
-  }, [location.pathname])
+  }, [isPlatformAdmin, location.pathname])
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -136,12 +136,12 @@ export function AppLayout() {
           <div className="nav-label">管理与设置</div>
           {isPlatformAdmin && (
             <NavLink
-              to="/settings/storage-buckets"
+              to="/platform"
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
-              <Box className="size-4.5" aria-hidden="true" />
-              储存桶
+              <Settings2 className="size-4.5" aria-hidden="true" />
+              平台管理
             </NavLink>
           )}
           {(!currentTeam || role === 'admin') && (

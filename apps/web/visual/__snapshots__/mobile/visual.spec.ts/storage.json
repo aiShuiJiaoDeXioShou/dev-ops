@@ -1,0 +1,18 @@
+{
+  "path": "/platform",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "headings": [
+    "平台管理",
+    "储存桶"
+  ],
+  "tabs": [],
+  "rows": 2,
+  "statusTexts": [],
+  "documentOverflow": false,
+  "interactiveCount": 8,
+  "nonPointerControls": [],
+  "smallTargets": []
+}

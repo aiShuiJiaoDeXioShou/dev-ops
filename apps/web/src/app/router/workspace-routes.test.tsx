@@ -6,7 +6,8 @@ import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
-import { server } from '@/test/server'
+import { server, success, teamFixture } from '@/test/server'
+import { localBucketFixture } from '@/test/storage-handlers'
 import { createAppRoutes } from './routes'
 
 const disposers: Array<() => void> = []
@@ -106,6 +107,43 @@ describe('工作区路由与数据状态', () => {
     server.use(http.get('*/api/v1/auth/get-session', () => HttpResponse.json(null)))
     renderApplication('/projects')
     expect(await screen.findByRole('heading', { name: '登录研发工作台', level: 1 })).toBeVisible()
+  })
+
+  it.each(['/platform', '/settings/storage-buckets'])('团队管理员直接访问 %s 时看不到平台管理', async (path) => {
+    const listBuckets = vi.fn(() => success({ buckets: [localBucketFixture] }))
+    server.use(
+      http.get('*/api/v1/me/teams', () =>
+        success({ teams: [{ ...teamFixture, role: 'admin' }], isPlatformAdmin: false }),
+      ),
+      http.get('*/api/v1/platform/storage-buckets', listBuckets),
+    )
+    const router = renderApplication(path)
+
+    expect(await screen.findByText('页面不存在')).toBeVisible()
+    expect(screen.queryByRole('link', { name: '平台管理' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '储存桶' })).not.toBeInTheDocument()
+    expect(document.title).not.toContain('平台管理')
+    expect(router.state.location.pathname).toBe(path)
+    expect(listBuckets).not.toHaveBeenCalled()
+  })
+
+  it('root 无需团队角色即可通过平台管理入口访问储存桶，旧链接跳转到新地址', async () => {
+    server.use(
+      http.get('*/api/v1/me/teams', () => success({ teams: [], isPlatformAdmin: true })),
+      http.get('*/api/v1/platform/storage-buckets', () => success({ buckets: [localBucketFixture] })),
+    )
+    const router = renderApplication('/settings/team')
+
+    await userEvent.click(await screen.findByRole('link', { name: '平台管理' }))
+    expect(await screen.findByRole('heading', { name: '平台管理', level: 1 })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '储存桶', level: 2 })).toBeVisible()
+    expect(await screen.findByRole('row', { name: /内置本地桶/ })).toBeVisible()
+    expect(screen.queryByRole('link', { name: '储存桶' })).not.toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/platform')
+
+    await act(() => router.navigate('/settings/storage-buckets'))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/platform'))
+    expect(await screen.findByRole('button', { name: '新建储存桶' })).toBeVisible()
   })
 
   it('导航到系统状态复用缓存，支持返回与直接访问深链接', async () => {

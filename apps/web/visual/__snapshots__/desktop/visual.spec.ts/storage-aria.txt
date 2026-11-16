@@ -1,6 +1,7 @@
 - main:
-  - heading "储存桶" [level=1]
-  - paragraph: 附件默认写入默认储存桶。内置本地桶始终存在且不可删除；自定义桶需通过连接测试后才能设为默认。
+  - heading "平台管理" [level=1]
+  - heading "储存桶" [level=2]
+  - paragraph: 附件写入默认储存桶。自定义桶通过读写测试后可设为默认。
   - button "新建储存桶"
   - region "储存桶列表":
     - table:

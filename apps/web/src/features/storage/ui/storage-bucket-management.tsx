@@ -103,16 +103,15 @@ export function StorageBucketManagement() {
   }
 
   return (
-    <div className="content">
-      <div className="page-head">
+    <div className="mt-5 min-w-0">
+      <div className="settings-section-head flex-wrap">
         <div>
-          <h1>储存桶</h1>
-          <p className="small quiet">
-            附件默认写入默认储存桶。内置本地桶始终存在且不可删除；自定义桶需通过连接测试后才能设为默认。
-          </p>
+          <h2 className="settings-section-title">储存桶</h2>
+          <p className="mt-1 text-sm text-muted-foreground">附件写入默认储存桶。自定义桶通过读写测试后可设为默认。</p>
         </div>
         <Button
           type="button"
+          className="max-md:min-h-10"
           onClick={(event) => openForm(null, event.currentTarget)}
           disabled={createMutation.isPending}
         >
@@ -185,17 +184,17 @@ export function StorageBucketManagement() {
                         {bucket.kind === 'local' && <p className="text-xs text-muted-foreground">部署服务器本地目录</p>}
                       </div>
                     </TableCell>
-                    <TableCell>{BUCKET_KIND_LABELS[bucket.kind]}</TableCell>
+                    <TableCell className="whitespace-nowrap">{BUCKET_KIND_LABELS[bucket.kind]}</TableCell>
                     <TableCell>
                       <Badge variant={bucket.status === 'enabled' ? 'outline' : 'secondary'}>
                         {BUCKET_STATUS_LABELS[bucket.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="min-w-40">
                       <ProbeCell bucket={bucket} />
                     </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap justify-end gap-2">
+                    <TableCell className="min-w-44">
+                      <div className="flex flex-wrap justify-end gap-2 max-md:*:min-h-10">
                         <Button
                           type="button"
                           size="sm"

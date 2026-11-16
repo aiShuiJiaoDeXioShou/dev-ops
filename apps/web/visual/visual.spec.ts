@@ -249,14 +249,13 @@ test.describe('[desktop] 核心页面', () => {
     }
   })
 
-  test('[desktop] 运维变更、能力、凭据、团队、节点、储存桶、个人页', async ({ page }, testInfo) => {
+  test('[desktop] 运维变更、能力、凭据、团队、节点、个人页', async ({ page }, testInfo) => {
     const pages: Array<[string, string, string]> = [
       ['changes', '/operations/changes', '变更'],
       ['skills', '/capabilities/skills', '技能库'],
       ['vault', '/vault', '凭据库'],
       ['team', '/settings/team?tab=connections', 'DevOps 研发团队'],
       ['nodes', '/settings/pipeline-nodes', '执行节点'],
-      ['storage', '/settings/storage-buckets', '储存桶'],
       ['profile', '/settings/profile', '个人页面'],
     ]
     for (const [name, path, heading] of pages) {
@@ -265,6 +264,25 @@ test.describe('[desktop] 核心页面', () => {
       await expectPageSnapshot(page, testInfo, name)
     }
   })
+})
+
+test('[desktop] [mobile] 平台管理储存桶与新建弹窗', async ({ page }, testInfo) => {
+  await prepare(page, '/platform')
+  await expect(page.getByRole('heading', { name: '平台管理', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '储存桶', level: 2 })).toBeVisible()
+  const list = page.getByRole('region', { name: '储存桶列表' })
+  await expect(list.getByRole('table')).toBeVisible()
+  if (testInfo.project.name === 'mobile') {
+    const scrollable = list.locator('[data-slot="table-container"]')
+    expect(await scrollable.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390)
+  }
+  await expectPageSnapshot(page, testInfo, 'storage')
+  const create = page.getByRole('button', { name: '新建储存桶' })
+  await create.click()
+  await expect(page.getByRole('dialog', { name: '新建储存桶' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(create).toBeFocused()
 })
 
 test.describe('[desktop] 关键弹窗', () => {

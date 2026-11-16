@@ -272,6 +272,6 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 ## 附件存储与部署（V0.5）
 
 - 默认使用本地存储桶，根目录由 `ATTACHMENT_STORAGE_DIR` 指定（默认 `./attachment-data`）。该目录必须可写、与数据库备份一同保留，并在部署层做持久化挂载或备份策略；当前 `deploy/compose.yaml` 只包含 PostgreSQL，应用与存储目录按实际部署方式挂载。
-- 平台管理员可在 `/settings/storage-buckets` 接入 S3 兼容桶并设为默认；桶凭据使用 `GIT_CREDENTIAL_ENCRYPTION_KEY` 加密保存，界面与接口只返回掩码，日志不记录凭据。
+- 平台 root 用户可在「平台管理 → 储存桶」（`/platform`）接入 S3 兼容桶并设为默认；桶凭据使用 `GIT_CREDENTIAL_ENCRYPTION_KEY` 加密保存，界面与接口只返回掩码，日志不记录凭据。
 - 附件下载是继流水线产物之后的第二条例外：成功返回二进制流并带 `X-Content-SHA256`，失败返回 HTTP 200 统一信封。
 - 未绑定临时附件保留 24 小时后由 Worker 每 10 分钟清理；已绑定附件的对象删除在事务提交后执行，失败由清理任务重试。
