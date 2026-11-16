@@ -19,7 +19,8 @@ import {
   canRemoveBucket,
   canSetBucketDefault,
 } from '../model/labels'
-import type { StorageBucket } from '../model/types'
+import type { StorageBucket, StorageProbeResult } from '../model/types'
+import { cn } from '@/shared/lib/utils'
 import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
@@ -29,21 +30,36 @@ import { formatDateTime } from '@/shared/lib/format'
 import { StorageBucketConfirmDialog } from './storage-bucket-confirm-dialog'
 import { StorageBucketFormDialog } from './storage-bucket-form-dialog'
 
-/**
- * 渲染储存桶的最近探测结论：结论、原因与时间必须同时可见，不能只靠颜色。
- * @param props.bucket 储存桶视图。
- * @returns 探测结论单元格内容；从未测试时给出明确状态。
- */
+const PROBE_STATUS_COLORS: Record<StorageProbeResult, string> = {
+  read_write: 'bg-success',
+  read_only: 'bg-warning',
+  unreachable: 'bg-destructive',
+  auth_failed: 'bg-destructive',
+}
+
+/** 显示探测结论与时间，异常时在下一行提供可操作的原因。 */
 function ProbeCell({ bucket }: { bucket: StorageBucket }) {
   const probe = bucket.lastProbe
   if (!probe) return <span className="text-sm text-muted-foreground">尚未测试</span>
   return (
-    <div className="space-y-1">
-      <Badge variant={probe.result === 'read_write' ? 'outline' : 'secondary'}>
-        {PROBE_RESULT_LABELS[probe.result]}
-      </Badge>
-      {probe.message && <p className="max-w-64 text-xs break-words text-muted-foreground">{probe.message}</p>}
-      {probe.at && <p className="text-xs text-muted-foreground">{formatDateTime(probe.at)}</p>}
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <Badge variant="secondary" className="gap-1.5">
+          <span
+            className={cn('size-1.5 shrink-0 rounded-full', PROBE_STATUS_COLORS[probe.result])}
+            aria-hidden="true"
+          />
+          {PROBE_RESULT_LABELS[probe.result]}
+        </Badge>
+        {probe.at && (
+          <time dateTime={probe.at} className="text-xs whitespace-nowrap text-muted-foreground tabular-nums">
+            {formatDateTime(probe.at)}
+          </time>
+        )}
+      </div>
+      {probe.result !== 'read_write' && probe.message && (
+        <p className="max-w-64 text-xs leading-relaxed wrap-anywhere text-muted-foreground">{probe.message}</p>
+      )}
     </div>
   )
 }

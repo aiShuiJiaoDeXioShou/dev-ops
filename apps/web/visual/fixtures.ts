@@ -10890,7 +10890,11 @@ export const apiFixtures: Record<string, unknown> = {
           region: null,
           pathPrefix: null,
           accessKeyHint: null,
-          lastProbe: null,
+          lastProbe: {
+            result: 'read_write',
+            message: '本地目录可读写',
+            at: '2026-11-11T04:01:00.000Z',
+          },
           version: 1,
           updatedAt: '2026-11-10T18:34:40.591Z',
         },
