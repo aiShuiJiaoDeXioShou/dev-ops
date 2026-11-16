@@ -128,7 +128,7 @@ apps/server/
 - 项目：`/teams/:teamId/projects`、`/projects/:projectId`、`/update`、`/stats`。
 - 需求：项目需求列表/创建、详情/更新、评论/活动、提测/测试/通过/取消/恢复等动作、提测历史。
 - Bug：项目 Bug 列表/创建、详情/更新、修复/回归/关闭/重开、需求关联、评论/活动。
-- 需求与 Bug 评论响应包含作者标识 `authorUserId` 和展示名 `authorName`。列表按页批量查询作者。
+- 需求与 Bug 评论响应包含作者标识 `authorUserId`、展示名 `authorName` 和可选头像 `authorImage`。列表按页批量查询作者。团队成员、项目负责人及事项详情中的人员引用使用可选的 `image` 字段。头像为平台保存的 JPEG 缩略图，沿用对应接口的访问权限。
 - 集成：`/git-providers`、团队 Git 连接、检查/同步/撤权、授权回调；Gitea Token 与 GitHub App 凭据加密保存。
 - 代码：项目仓库关联/移除、可关联仓库、代码引用创建/刷新/移除。
 - 所有自研业务接口只注册 GET/POST，返回 HTTP 200 信封；未知 API 路径也返回 200 + `NOT_FOUND`。未处理异常才返回 500。

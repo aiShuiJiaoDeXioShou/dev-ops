@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { Client } from 'pg'
+import sharp from 'sharp'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
 import { migrateDatabase } from '../../src/platform/database/migrate.ts'
@@ -233,6 +234,57 @@ test('需求创建、内容校验、筛选、版本、评论、活动、项目�
   assert.equal(comments.json().data.items[0].authorUserId, devUser.userId)
   assert.equal(comments.json().data.items[0].authorName, comment.json().data.authorName)
   assert.equal(comments.json().data.items[0].authorName, '开发者')
+
+  await t.test('历史评论与成员资料读取当前头像，跨团队仍拒绝访问', async () => {
+    assert.equal(comments.json().data.items[0].authorImage, undefined)
+    const jpeg = await sharp({ create: { width: 160, height: 160, channels: 3, background: 'blue' } })
+      .jpeg()
+      .toBuffer()
+    const change = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/update-user',
+      headers: { cookie: devUser.cookie, origin: config.APP_ORIGIN },
+      payload: { image: `data:image/jpeg;base64,${jpeg.toString('base64')}` },
+    })
+    assert.equal(change.statusCode, 200, change.body)
+    const session = await app.inject({ url: '/api/v1/auth/get-session', headers: { cookie: devUser.cookie } })
+    const savedImage: unknown = session.json().user.image
+    assert.equal(typeof savedImage, 'string')
+
+    const commentsUrl = `/api/v1/requirements/${requirementId}/comments`
+    const reloaded = await app.inject({ url: commentsUrl, headers: { cookie: viewerUser.cookie } })
+    assert.equal(reloaded.json().data.items[0].authorImage, savedImage)
+    const ownerUpdate = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/update-user',
+      headers: { cookie: adminUser.cookie, origin: config.APP_ORIGIN },
+      payload: { image: `data:image/jpeg;base64,${jpeg.toString('base64')}` },
+    })
+    assert.equal(ownerUpdate.statusCode, 200, ownerUpdate.body)
+    const detail = await app.inject({
+      url: `/api/v1/requirements/${requirementId}`,
+      headers: { cookie: viewerUser.cookie },
+    })
+    assert.equal(detail.json().data.devOwner.userId, adminUser.userId)
+    assert.equal(detail.json().data.devOwner.image, savedImage)
+
+    const projects = await app.inject({
+      url: `/api/v1/teams/${teamId}/projects`,
+      headers: { cookie: viewerUser.cookie },
+    })
+    assert.equal(projects.json().data.items[0].owner.image, savedImage)
+
+    const members = await app.inject({
+      url: `/api/v1/teams/${teamId}/members`,
+      headers: { cookie: viewerUser.cookie },
+    })
+    const listedMembers: { userId: string; image?: string }[] = members.json().data
+    assert.equal(listedMembers.find(({ userId }) => userId === devUser.userId)?.image, savedImage)
+    assert.equal(listedMembers.find(({ userId }) => userId === viewerUser.userId)?.image, undefined)
+
+    const other = await app.inject({ url: commentsUrl, headers: { cookie: otherUser.cookie } })
+    assert.equal(other.json().code, 'FORBIDDEN')
+  })
 
   const activities = await app.inject({
     method: 'GET',

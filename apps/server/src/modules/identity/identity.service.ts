@@ -5,6 +5,7 @@ import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { displayAvatar } from './identity.avatar.ts'
 import type { IdentityAuth } from './identity.auth.ts'
 import {
   countActiveAdmins,
@@ -72,6 +73,7 @@ export interface InvitationView {
 export interface TeamMemberView {
   userId: string
   name: string
+  image?: string
   email: string
   role: TeamRole
   status: string
@@ -108,12 +110,15 @@ function invitationView(
 function memberView(row: {
   userId: string
   name: string
+  image: string | null
   email: string
   role: string
   status: string
   joinedAt: Date
 }): TeamMemberView {
+  const image = displayAvatar(row.image)
   return {
+    ...(image && { image }),
     userId: row.userId,
     name: row.name,
     email: row.email,
@@ -294,6 +299,7 @@ export function createIdentityService(deps: IdentityServiceDeps) {
       userId: user.id,
       name: user.name,
       email: user.email,
+      image: user.image,
       role: updated.role,
       status: updated.status,
       joinedAt: updated.joined_at,

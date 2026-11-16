@@ -165,7 +165,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
   }
 
   async function ownerRefFor(teamId: string, userId: string): Promise<OwnerRef> {
-    const refs = await loadOwnerRefs(db, teamId, [userId])
+    const refs = await loadOwnerRefs(db, teamId, [userId], { includeImage: true })
     return ownerRefOf(userId, refs) ?? { userId, name: '未知用户', status: 'missing', available: false }
   }
 
@@ -228,6 +228,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       db,
       teamId,
       rows.map((row) => row.owner_user_id),
+      { includeImage: true },
     )
     return {
       items: rows.map((row) =>

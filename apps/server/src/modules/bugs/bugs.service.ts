@@ -121,7 +121,7 @@ export function createBugsService(deps: BugsServiceDeps) {
         db,
         requirementIds.map((item) => item.requirementId),
       ),
-      loadOwnerRefs(db, row.team_id, ownerUserIds),
+      loadOwnerRefs(db, row.team_id, ownerUserIds, { includeImage: true }),
     ])
     return toBugDetail({
       row,

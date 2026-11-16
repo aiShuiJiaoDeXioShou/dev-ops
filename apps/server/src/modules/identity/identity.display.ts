@@ -1,26 +1,33 @@
+import { displayAvatar } from './identity.avatar.ts'
 import { findTeamMemberStatuses, findUserSummariesByIds, type IdentityExecutor } from './identity.repository.ts'
 
 const UNKNOWN_USER_NAME = '未知用户'
 
-/** 用户展示引用，仅包含对外展示需要的标识与姓名。 */
+/** 用户展示引用，包含对外展示需要的标识、姓名和可选头像。 */
 export interface UserRef {
   userId: string
   name: string
+  image?: string
 }
 
 /**
  * 按标识批量加载用户展示引用，统一处理姓名缺失时的兜底文案。
  * @param executor 数据库连接或事务。
  * @param userIds 用户标识集合，重复项会由底层查询去重。
+ * @param options.includeImage 是否读取工作区头像。
  * @returns 以用户标识为键的展示引用 Map。
  */
 export async function loadUserRefs(
   executor: Pick<IdentityExecutor, 'select'>,
   userIds: string[],
+  options: { includeImage?: boolean } = {},
 ): Promise<Map<string, UserRef>> {
-  const summaries = await findUserSummariesByIds(executor, userIds)
+  const summaries = await findUserSummariesByIds(executor, userIds, options)
   return new Map(
-    summaries.map((summary) => [summary.id, { userId: summary.id, name: summary.name ?? UNKNOWN_USER_NAME }]),
+    summaries.map((summary) => {
+      const image = displayAvatar(summary.image)
+      return [summary.id, { userId: summary.id, name: summary.name ?? UNKNOWN_USER_NAME, ...(image && { image }) }]
+    }),
   )
 }
 
@@ -59,15 +66,17 @@ export interface OwnerRef extends UserRef {
  * @param executor 数据库连接或事务。
  * @param teamId 负责人所属团队。
  * @param userIds 用户标识集合。
+ * @param options.includeImage 是否读取工作区头像。
  * @returns 用户标识到负责人引用的 Map。
  */
 export async function loadOwnerRefs(
   executor: IdentityExecutor,
   teamId: string,
   userIds: string[],
+  options: { includeImage?: boolean } = {},
 ): Promise<Map<string, OwnerRef>> {
   const [refs, statuses] = await Promise.all([
-    loadUserRefs(executor, userIds),
+    loadUserRefs(executor, userIds, options),
     findTeamMemberStatuses(executor, teamId, userIds),
   ])
   return new Map(
@@ -78,8 +87,7 @@ export async function loadOwnerRefs(
       return [
         userId,
         {
-          userId,
-          name: ref?.name ?? UNKNOWN_USER_NAME,
+          ...(ref ?? { userId, name: UNKNOWN_USER_NAME }),
           status,
           available: status === 'active',
         },

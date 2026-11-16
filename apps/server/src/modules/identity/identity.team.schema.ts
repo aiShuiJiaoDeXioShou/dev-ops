@@ -1,5 +1,6 @@
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
+import { avatarImageSchema } from './identity.avatar.ts'
 
 const roleSchema = Type.Union([Type.Literal('admin'), Type.Literal('developer'), Type.Literal('viewer')])
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
@@ -19,6 +20,7 @@ const invitationSchema = Type.Object({
 const memberSchema = Type.Object({
   userId: uuidSchema,
   name: Type.String(),
+  image: avatarImageSchema,
   email: Type.String(),
   role: roleSchema,
   status: Type.String(),

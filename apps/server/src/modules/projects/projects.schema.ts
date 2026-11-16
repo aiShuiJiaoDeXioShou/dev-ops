@@ -1,5 +1,6 @@
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
+import { avatarImageSchema } from '../identity/identity.avatar.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const projectSchema = Type.Object({
@@ -10,6 +11,7 @@ const projectSchema = Type.Object({
   owner: Type.Object({
     userId: uuidSchema,
     name: Type.String(),
+    image: avatarImageSchema,
     status: Type.Union([Type.Literal('active'), Type.Literal('disabled'), Type.Literal('missing')]),
     available: Type.Boolean(),
   }),

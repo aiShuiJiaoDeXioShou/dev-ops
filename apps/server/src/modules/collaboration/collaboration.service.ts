@@ -44,6 +44,7 @@ export interface CommentView {
   entityId: string
   authorUserId: string
   authorName: string
+  authorImage?: string
   bodyMarkdown: string
   createdAt: string
 }
@@ -110,7 +111,9 @@ function validateActivityEntityType(value: string): ActivityEntityType {
 }
 
 function mapComment(row: Awaited<ReturnType<typeof insertComment>>, authors: Map<string, UserRef>): CommentView {
+  const authorImage = authors.get(row.author_user_id)?.image
   return {
+    ...(authorImage && { authorImage }),
     id: row.id,
     teamId: row.team_id,
     projectId: row.project_id,
@@ -199,7 +202,7 @@ export async function addComment(
 ): Promise<CommentView> {
   const entityType = validateCommentEntityType(input.entityType)
   const bodyMarkdown = requireNonEmpty(input.bodyMarkdown, '评论', 20_000)
-  const authors = await loadUserRefs(executor, [input.authorUserId])
+  const authors = await loadUserRefs(executor, [input.authorUserId], { includeImage: true })
   const row = await insertComment(executor, {
     id: randomUUID(),
     teamId: input.teamId,
@@ -235,6 +238,7 @@ export async function listComments(
   const authors = await loadUserRefs(
     executor,
     rows.map((row) => row.author_user_id),
+    { includeImage: true },
   )
   return {
     items: rows.map((row) => mapComment(row, authors)),

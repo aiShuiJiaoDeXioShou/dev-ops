@@ -127,6 +127,7 @@ export async function listTeamMembers(db: Database, teamId: string) {
       userId: teamMember.user_id,
       name: authUser.name,
       email: authUser.email,
+      image: authUser.image,
       role: teamMember.role,
       status: teamMember.status,
       joinedAt: teamMember.joined_at,
@@ -315,7 +316,7 @@ export async function findTeamByName(db: Database, name: string) {
  */
 export async function findUserById(executor: IdentityExecutor, userId: string) {
   const [row] = await executor
-    .select({ id: authUser.id, email: authUser.email, name: authUser.name })
+    .select({ id: authUser.id, email: authUser.email, name: authUser.name, image: authUser.image })
     .from(authUser)
     .where(eq(authUser.id, userId))
     .limit(1)
@@ -323,19 +324,21 @@ export async function findUserById(executor: IdentityExecutor, userId: string) {
 }
 
 /**
- * 按标识批量读取用户摘要，供其他模块一次填充负责人姓名，替代逐条查询。
+ * 按标识批量读取用户摘要，供其他模块填充姓名和头像，替代逐条查询。
  * @param executor 数据库连接或事务。
  * @param userIds 用户标识集合；重复标识会被去重。
+ * @param options.includeImage 是否读取头像，只在用于头像展示的响应打开。
  * @returns 用户摘要数组；空数组直接返回空数组，不访问数据库。
  */
 export async function findUserSummariesByIds(
   executor: Pick<IdentityExecutor, 'select'>,
   userIds: string[],
+  options: { includeImage?: boolean } = {},
 ): Promise<UserSummary[]> {
   if (userIds.length === 0) return []
   const uniqueUserIds = [...new Set(userIds)]
   return executor
-    .select({ id: authUser.id, name: authUser.name })
+    .select({ id: authUser.id, name: authUser.name, ...(options.includeImage ? { image: authUser.image } : {}) })
     .from(authUser)
     .where(inArray(authUser.id, uniqueUserIds))
 }

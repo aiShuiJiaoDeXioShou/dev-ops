@@ -1,6 +1,7 @@
 import { Type } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 import { commentSchema } from '../collaboration/comment.schema.ts'
+import { avatarImageSchema } from '../identity/identity.avatar.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const statusSchema = Type.Union([
@@ -13,6 +14,7 @@ const statusSchema = Type.Union([
 const ownerSchema = Type.Object({
   userId: uuidSchema,
   name: Type.String(),
+  image: avatarImageSchema,
   status: Type.Union([Type.Literal('active'), Type.Literal('disabled'), Type.Literal('missing')]),
   available: Type.Boolean(),
 })

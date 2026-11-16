@@ -102,7 +102,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       ...(row.test_owner_user_id === null ? [] : [row.test_owner_user_id]),
       ...collaboratorRows.map((item) => item.userId),
     ]
-    const refs = await loadOwnerRefs(db, row.team_id, ownerUserIds)
+    const refs = await loadOwnerRefs(db, row.team_id, ownerUserIds, { includeImage: true })
     return toRequirementDetail({
       row,
       collaborators: collaboratorRows,

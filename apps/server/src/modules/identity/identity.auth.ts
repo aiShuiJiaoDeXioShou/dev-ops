@@ -5,23 +5,17 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import sharp from 'sharp'
 import type { AppConfig } from '../../platform/config/env.ts'
 import type { Database } from '../../platform/database/client.ts'
+import { AVATAR_MAX_BYTES, AVATAR_PREFIX, displayAvatar } from './identity.avatar.ts'
 import { authAccount, authSession, authUser, authVerification } from './identity.tables.ts'
 
 const AVATAR_SIZE = 160
-const AVATAR_MAX_BYTES = 32 * 1024
-const AVATAR_PREFIX = 'data:image/jpeg;base64,'
 
 async function normalizeAvatar(image: unknown): Promise<string> {
   const invalid = () => APIError.fromStatus('BAD_REQUEST', { message: '头像无法保存，请重新选择图片。' })
-  if (
-    typeof image !== 'string' ||
-    !image.startsWith(AVATAR_PREFIX) ||
-    image.length > AVATAR_PREFIX.length + Math.ceil(AVATAR_MAX_BYTES / 3) * 4
-  ) {
-    throw invalid()
-  }
+  const dataUrl = displayAvatar(image)
+  if (dataUrl === undefined) throw invalid()
 
-  const encoded = image.slice(AVATAR_PREFIX.length)
+  const encoded = dataUrl.slice(AVATAR_PREFIX.length)
   const bytes = Buffer.from(encoded, 'base64')
   if (
     bytes.length < 3 ||
