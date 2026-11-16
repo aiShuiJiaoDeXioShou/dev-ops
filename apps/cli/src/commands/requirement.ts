@@ -385,7 +385,7 @@ function registerRequirementReadCommands(requirement: Command, context: CliConte
 
   requirement
     .command('eligibility')
-    .description('查询需求是否满足测试通过条件，列出阻碍的关联 Bug')
+    .description('查询需求当前状态是否允许测试通过')
     .argument('<requirementId>', '需求标识')
     .action(async (requirementId: string, _options: unknown, command: Command) => {
       const business = await businessContext(command, context)
@@ -627,23 +627,13 @@ function registerRequirementActionCommands(requirement: Command, context: CliCon
 
   requirement
     .command('pass-test')
-    .description('测试通过；先检查关联 Bug 是否全部解决，不满足时列出阻碍项')
+    .description('填写测试结论并通过处于测试中的需求')
     .argument('<requirementId>', '需求标识')
     .option('--expected-version <version>', '期望的当前版本；省略时先读取最新版本')
     .option('--conclusion <text>', '测试结论（必填）')
     .action(async (requirementId: string, options: PassTestOptions, command: Command) => {
       const conclusion = requireText(options.conclusion, '缺少 --conclusion 参数')
       const action = await prepareAction(context, command, requirementId, options.expectedVersion)
-      const eligibility = await action.business.client.getRequirementTestPassEligibility(requirementId)
-      if (!eligibility.data.eligible) {
-        const blockers = eligibility.data.blockers.map((bug) => `#${bug.number} ${bug.title}（${bug.status}）`)
-        const detail =
-          blockers.length === 0 ? '需求当前状态不满足测试通过条件' : `存在未解决的关联 Bug：${blockers.join('、')}`
-        throw new CliError(`不能通过测试：${detail}`, 1, {
-          code: 'PRECONDITION_FAILED',
-          requestId: eligibility.requestId,
-        })
-      }
       const result = await action.business.client.passRequirementTest(
         requirementId,
         { version: action.version, conclusion },

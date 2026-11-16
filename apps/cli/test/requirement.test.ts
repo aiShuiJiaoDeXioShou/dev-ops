@@ -567,10 +567,17 @@ test('requirement cancel 无 --yes 时退出 2 且不发送请求', async (t) =>
   assert.match(String(error.message), /--yes/)
 })
 
-test('requirement pass-test 先检查测试条件并列出阻碍 Bug', async (t) => {
+test('requirement pass-test 直接提交结论，未解决的关联 Bug 随详情返回', async (t) => {
+  const detail = {
+    id: 'requirement-1',
+    status: 'passed',
+    linkedBugs: [{ id: 'bug-1', number: 12, title: '登录失败', status: 'pending' }],
+  }
   const stub = await startStub(t, (request) => {
-    assert.equal(request.pathname, '/api/v1/requirements/requirement-1/test-pass-eligibility')
-    return { eligible: false, blockers: [{ id: 'bug-1', number: 12, title: '登录失败', status: 'open' }] }
+    assert.equal(request.method, 'POST')
+    assert.equal(request.pathname, '/api/v1/requirements/requirement-1/pass-test')
+    assert.deepEqual(request.body, { version: 7, conclusion: '测试通过' })
+    return detail
   })
   const result = await execute([
     'requirement',
@@ -584,40 +591,19 @@ test('requirement pass-test 先检查测试条件并列出阻碍 Bug', async (t)
     stub.baseUrl,
     '--json',
   ])
-  assert.equal(result.code, 1)
-  assert.equal(result.stdout, '')
+  assert.deepEqual(successData(result), detail)
+  assert.equal(result.stderr, '')
   assert.equal(stub.requests.length, 1)
-  const error = jsonBody(result.stderr)
-  assert.equal(error.code, 'PRECONDITION_FAILED')
-  assert.match(String(error.message), /登录失败/)
-  assert.match(String(error.message), /#12/)
 })
 
-test('requirement eligibility 输出条件，满足时 pass-test 提交结论', async (t) => {
+test('requirement eligibility 仍可单独读取状态资格', async (t) => {
   const stub = await startStub(t, (request) => {
-    if (request.method === 'GET') return { eligible: true, blockers: [] }
-    return { id: 'requirement-1', status: 'passed' }
+    assert.equal(request.method, 'GET')
+    assert.equal(request.pathname, '/api/v1/requirements/requirement-1/test-pass-eligibility')
+    return { eligible: true, blockers: [] }
   })
   const eligibility = await execute(['requirement', 'eligibility', 'requirement-1', '--server', stub.baseUrl, '--json'])
   assert.deepEqual(successData(eligibility), { eligible: true, blockers: [] })
-
-  const passed = await execute([
-    'requirement',
-    'pass-test',
-    'requirement-1',
-    '--conclusion',
-    '回归通过',
-    '--expected-version',
-    '7',
-    '--server',
-    stub.baseUrl,
-    '--json',
-  ])
-  assert.deepEqual(successData(passed), { id: 'requirement-1', status: 'passed' })
-  const request = stub.requests.at(-1)
-  assert.ok(request)
-  assert.equal(request.pathname, '/api/v1/requirements/requirement-1/pass-test')
-  assert.deepEqual(request.body, { version: 7, conclusion: '回归通过' })
 })
 
 test('评论、活动与提测历史按分页读取并归一化输出', async (t) => {

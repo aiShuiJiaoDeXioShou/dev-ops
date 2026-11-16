@@ -61,6 +61,7 @@ devops project repository branches <projectId> --repository <repositoryId>
 devops requirement list --project <projectId>
 devops requirement get <requirementId> --json
 devops requirement submit-test <requirementId> --test-owner <userId> --scope-note "登录页" --self-test-result passed
+devops requirement pass-test <requirementId> --conclusion "主流程通过"
 
 devops bug list --project <projectId>
 devops bug create --project <projectId> --title "登录失败" --phenomenon "..." --expected "..." --reproduction "..."
@@ -69,6 +70,8 @@ devops git provider list
 devops git connection list
 devops project code-reference add <projectId> --repository <repositoryId> --target-type requirement --target-id <requirementId> --object-type commit --remote-id <sha>
 ```
+
+`requirement pass-test` 直接提交测试结论。未解决的关联 Bug 可继续处理，提醒由 Web 的测试通过弹窗显示。
 
 ### 交付上报（V0.2）
 
