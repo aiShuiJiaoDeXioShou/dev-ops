@@ -17,6 +17,7 @@ export interface DashboardQuery {
   source?: string
   search?: string
   status?: string
+  repositoryId?: string
   from?: string
   to?: string
 }
@@ -113,6 +114,7 @@ export function createProjectDashboardService(deps: { db: Database }) {
     const { rows: projectRows } = await findProjects(db, teamId, {
       search: query.search?.trim() || undefined,
       status: query.status,
+      repositoryId: query.repositoryId,
       page: 1,
       pageSize: 100,
     })

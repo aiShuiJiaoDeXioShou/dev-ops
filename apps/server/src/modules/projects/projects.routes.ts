@@ -8,6 +8,8 @@ import {
   projectListQuerySchema,
   projectListResponseSchema,
   projectParamsSchema,
+  projectRepositoryOptionsQuerySchema,
+  projectRepositoryOptionsResponseSchema,
   projectResponseSchema,
   projectStatsResponseSchema,
   projectTeamParamsSchema,
@@ -27,6 +29,25 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
   app,
   options,
 ) => {
+  app.get(
+    '/teams/:teamId/project-repositories',
+    {
+      schema: {
+        description: '读取团队项目已关联的仓库筛选选项。',
+        params: projectTeamParamsSchema,
+        querystring: projectRepositoryOptionsQuerySchema,
+        response: { 200: projectRepositoryOptionsResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireActor(request)
+      return success(
+        await options.service.listProjectRepositoryOptions(user, request.params.teamId, request.query),
+        request.id,
+      )
+    },
+  )
+
   app.get(
     '/teams/:teamId/projects',
     {

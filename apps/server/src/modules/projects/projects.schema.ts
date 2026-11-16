@@ -29,9 +29,37 @@ const projectListSchema = Type.Object({
 })
 const statsSchema = Type.Object({ openRequirements: Type.Integer(), openBugs: Type.Integer() })
 
+export const projectRepositoryFilterSchema = Type.Optional(
+  Type.String({
+    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    description: '按当前团队已关联的仓库标识筛选项目。',
+  }),
+)
+export const projectRepositoryOptionsQuerySchema = Type.Object({
+  page: Type.Optional(Type.Integer({ minimum: 1 })),
+  pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+})
+export const projectRepositoryOptionsResponseSchema = apiResponseSchema(
+  Type.Object({
+    items: Type.Array(
+      Type.Object({
+        id: uuidSchema,
+        namespace: Type.String(),
+        name: Type.String(),
+        providerKey: Type.String(),
+        connectionName: Type.Union([Type.String(), Type.Null()]),
+      }),
+    ),
+    page: Type.Integer(),
+    pageSize: Type.Integer(),
+    total: Type.Integer(),
+  }),
+)
+
 export const projectListQuerySchema = Type.Object({
   search: Type.Optional(Type.String({ maxLength: 200 })),
   status: Type.Optional(Type.Union([Type.Literal('active'), Type.Literal('paused'), Type.Literal('ended')])),
+  repositoryId: projectRepositoryFilterSchema,
   ownerUnavailable: Type.Optional(Type.Boolean()),
   page: Type.Optional(Type.Integer({ minimum: 1 })),
   pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),

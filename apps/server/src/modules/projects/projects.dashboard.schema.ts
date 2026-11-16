@@ -1,5 +1,6 @@
 import { Type } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
+import { projectRepositoryFilterSchema } from './projects.schema.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const dateSchema = Type.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })
@@ -10,6 +11,7 @@ export const projectActivityQuerySchema = Type.Object({
   ),
   search: Type.Optional(Type.String({ maxLength: 200 })),
   status: Type.Optional(Type.Union([Type.Literal('active'), Type.Literal('paused'), Type.Literal('ended')])),
+  repositoryId: projectRepositoryFilterSchema,
   from: Type.Optional(dateSchema),
   to: Type.Optional(dateSchema),
 })

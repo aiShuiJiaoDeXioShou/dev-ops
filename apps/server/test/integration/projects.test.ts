@@ -7,6 +7,8 @@ import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
 import { migrateDatabase } from '../../src/platform/database/migrate.ts'
 import { team, teamMember } from '../../src/modules/identity/identity.tables.ts'
+import { gitRepository, projectRepository } from '../../src/modules/code/code.tables.ts'
+import { gitConnection } from '../../src/modules/integrations/integrations.tables.ts'
 import { createAuthenticatedUser } from '../support/auth.ts'
 import { FakeMailer } from '../support/fake-mailer.ts'
 
@@ -154,6 +156,107 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
     headers: { cookie: adminUser.cookie },
   })
   assert.equal(noReason.json().code, 'VALIDATION_ERROR')
+
+  await t.test('仓库选项去重，列表与晴雨表按仓库筛选后再分页', async () => {
+    const second = await app.inject({
+      method: 'POST',
+      url: `/api/v1/teams/${teamId}/projects`,
+      payload: { name: '内部平台客户端' },
+      headers: { cookie: adminUser.cookie },
+    })
+    assert.equal(second.json().success, true, second.body)
+    const secondId = second.json<{ data: { id: string } }>().data.id
+    const unrelated = await app.inject({
+      method: 'POST',
+      url: `/api/v1/teams/${teamId}/projects`,
+      payload: { name: '其他项目' },
+      headers: { cookie: adminUser.cookie },
+    })
+    assert.equal(unrelated.json().success, true, unrelated.body)
+
+    const connectionId = randomUUID()
+    const sharedId = randomUUID()
+    const webId = randomUUID()
+    await app.db.insert(gitConnection).values({
+      id: connectionId,
+      team_id: teamId,
+      provider_key: 'gitea',
+      auth_kind: 'gitea_token',
+      instance_url: 'https://git.example.test',
+      name: '团队 Gitea',
+      created_by_user_id: adminUser.userId,
+    })
+    await app.db.insert(gitRepository).values(
+      [
+        { id: sharedId, name: 'core' },
+        { id: webId, name: 'web' },
+        { id: randomUUID(), name: 'unlinked' },
+      ].map(({ id, name }) => ({
+        id,
+        team_id: teamId,
+        connection_id: connectionId,
+        provider_key: 'gitea',
+        remote_repository_id: name,
+        namespace: 'team',
+        name,
+        web_url: `https://git.example.test/team/${name}`,
+      })),
+    )
+    await app.db.insert(projectRepository).values(
+      [
+        { projectId: project.id, repositoryId: sharedId },
+        { projectId: secondId, repositoryId: sharedId },
+        { projectId: secondId, repositoryId: webId },
+      ].map(({ projectId, repositoryId }) => ({
+        id: randomUUID(),
+        team_id: teamId,
+        project_id: projectId,
+        repository_id: repositoryId,
+        created_by_user_id: adminUser.userId,
+      })),
+    )
+
+    const optionsPath = `/api/v1/teams/${teamId}/project-repositories`
+    const options = await app.inject({ url: optionsPath, headers: { cookie: viewerUser.cookie } })
+    assert.deepEqual(options.json().data.items, [
+      { id: sharedId, namespace: 'team', name: 'core', providerKey: 'gitea', connectionName: '团队 Gitea' },
+      { id: webId, namespace: 'team', name: 'web', providerKey: 'gitea', connectionName: '团队 Gitea' },
+    ])
+    const optionsPage = await app.inject({
+      url: `${optionsPath}?page=2&pageSize=1`,
+      headers: { cookie: viewerUser.cookie },
+    })
+    assert.equal(optionsPage.json().data.total, 2)
+    assert.equal(optionsPage.json().data.items[0].id, webId)
+    const denied = await app.inject({ url: optionsPath, headers: { cookie: otherUser.cookie } })
+    assert.equal(denied.json().code, 'FORBIDDEN')
+
+    const filterPath = `/api/v1/teams/${teamId}/projects?repositoryId=${sharedId}`
+    const projectIds: string[] = []
+    for (const page of [1, 2]) {
+      const filtered = await app.inject({
+        url: `${filterPath}&page=${page}&pageSize=1`,
+        headers: { cookie: viewerUser.cookie },
+      })
+      const result = filtered.json<{ data: { total: number; items: Array<{ id: string }> } }>().data
+      assert.equal(result.total, 2)
+      assert.equal(result.items.length, 1)
+      projectIds.push(...result.items.map((item) => item.id))
+    }
+    assert.deepEqual(new Set(projectIds), new Set([project.id, secondId]))
+    const paused = await app.inject({
+      url: `${filterPath}&status=paused&search=${encodeURIComponent('内部平台')}`,
+      headers: { cookie: viewerUser.cookie },
+    })
+    assert.equal(paused.json().data.total, 1)
+    assert.equal(paused.json().data.items[0].id, project.id)
+    const dashboard = await app.inject({
+      url: `/api/v1/teams/${teamId}/project-activity?repositoryId=${sharedId}&source=activity`,
+      headers: { cookie: viewerUser.cookie },
+    })
+    const summary = dashboard.json<{ data: { projects: Array<{ projectId: string }> } }>().data.projects
+    assert.deepEqual(new Set(summary.map((item) => item.projectId)), new Set(projectIds))
+  })
 
   const stats = await app.inject({
     method: 'GET',

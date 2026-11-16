@@ -14,6 +14,7 @@ import {
   deleteServiceRepository,
   findProjectById,
   findProjectByName,
+  findProjectRepositoryOptions,
   findProjectServiceById,
   findProjectServiceByName,
   findProjectServices,
@@ -206,6 +207,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     filters: {
       search?: string
       status?: string
+      repositoryId?: string
       ownerUnavailable?: boolean
       page?: number
       pageSize?: number
@@ -219,6 +221,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     const { rows, total } = await findProjects(db, teamId, {
       search: filters.search?.trim() || undefined,
       status: filters.status,
+      repositoryId: filters.repositoryId,
       ownerUnavailable: filters.ownerUnavailable,
       page,
       pageSize,
@@ -247,6 +250,19 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       pageSize,
       total,
     }
+  }
+
+  /** 校验团队读取权限后，分页提供项目仓库筛选选项。 */
+  async function listProjectRepositoryOptions(
+    actor: SessionUser,
+    teamId: string,
+    filters: { page?: number; pageSize?: number },
+  ) {
+    await requireTeamMember(db, actor.id, teamId)
+    const page = filters.page ?? 1
+    const pageSize = filters.pageSize ?? 20
+    validatePage(page, pageSize)
+    return findProjectRepositoryOptions(db, teamId, { page, pageSize })
   }
 
   async function createProject(
@@ -613,6 +629,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
 
   return {
     listProjects,
+    listProjectRepositoryOptions,
     createProject,
     getProject,
     updateProject: updateProjectDetails,

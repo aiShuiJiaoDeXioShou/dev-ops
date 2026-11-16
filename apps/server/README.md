@@ -44,6 +44,8 @@ pnpm --dir apps/server dev
 
 该代理仅用于 Vite 开发服务器。部署时需要在网关配置同源 `/api` 转发。接口文档通过后端地址访问。
 
+项目首页用 `GET /api/v1/teams/:teamId/project-repositories` 分页读取该团队项目已关联的仓库。同一仓库关联多个项目时只返回一个选项。`GET /api/v1/teams/:teamId/projects` 和 `GET /api/v1/teams/:teamId/project-activity` 都接受可选的 `repositoryId`，按关联仓库筛选项目，再分页或聚合统计。
+
 ## 环境变量
 
 配置定义位于 [platform/config/env.ts](src/platform/config/env.ts)，非法值会阻止服务启动。端口接受范围为 1 到 65535 的整数。

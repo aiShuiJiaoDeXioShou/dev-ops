@@ -1,7 +1,9 @@
-import { and, count, desc, eq, ilike, notExists, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, ilike, notExists, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { project, projectService, projectServiceRepository } from './projects.tables.ts'
 import { teamMember } from '../identity/identity.tables.ts'
+import { gitRepository, projectRepository } from '../code/code.tables.ts'
+import { gitConnection } from '../integrations/integrations.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type ProjectExecutor = Database | TransactionDatabase
@@ -9,6 +11,7 @@ export type ProjectExecutor = Database | TransactionDatabase
 export interface ProjectListFilters {
   search?: string
   status?: string
+  repositoryId?: string
   ownerUnavailable?: boolean
   page: number
   pageSize: number
@@ -55,7 +58,7 @@ export async function findProjectByName(db: Database, teamId: string, name: stri
  * 查询团队项目分页。
  * @param db 数据库连接。
  * @param teamId 团队标识。
- * @param filters 检索、状态、分页条件。
+ * @param filters 检索、状态、关联仓库及分页条件。
  * @returns 项目行与总数。
  */
 export async function findProjects(db: Database, teamId: string, filters: ProjectListFilters) {
@@ -66,6 +69,24 @@ export async function findProjects(db: Database, teamId: string, filters: Projec
     if (searchCondition) conditions.push(searchCondition)
   }
   if (filters.status) conditions.push(eq(project.status, filters.status))
+  if (filters.repositoryId) {
+    conditions.push(
+      exists(
+        db
+          .select({ id: projectRepository.id })
+          .from(projectRepository)
+          .innerJoin(gitRepository, eq(gitRepository.id, projectRepository.repository_id))
+          .where(
+            and(
+              eq(projectRepository.project_id, project.id),
+              eq(projectRepository.team_id, teamId),
+              eq(gitRepository.team_id, teamId),
+              eq(projectRepository.repository_id, filters.repositoryId),
+            ),
+          ),
+      ),
+    )
+  }
   if (filters.ownerUnavailable) {
     conditions.push(
       notExists(
@@ -94,6 +115,57 @@ export async function findProjects(db: Database, teamId: string, filters: Projec
     db.select({ value: count() }).from(project).where(where),
   ])
   return { rows, total: total?.value ?? 0 }
+}
+
+/**
+ * 读取当前团队项目实际使用的仓库，每个仓库只返回一次。
+ * @param db 数据库连接。
+ * @param teamId 团队标识。
+ * @param pagination 页码及每页数量。
+ * @returns 仓库选项及去重后的总数。
+ */
+export async function findProjectRepositoryOptions(
+  db: Database,
+  teamId: string,
+  { page, pageSize }: { page: number; pageSize: number },
+) {
+  const where = and(
+    eq(gitRepository.team_id, teamId),
+    exists(
+      db
+        .select({ id: projectRepository.id })
+        .from(projectRepository)
+        .innerJoin(project, eq(project.id, projectRepository.project_id))
+        .where(
+          and(
+            eq(projectRepository.repository_id, gitRepository.id),
+            eq(projectRepository.team_id, teamId),
+            eq(project.team_id, teamId),
+          ),
+        ),
+    ),
+  )
+  const [items, [total]] = await Promise.all([
+    db
+      .select({
+        id: gitRepository.id,
+        namespace: gitRepository.namespace,
+        name: gitRepository.name,
+        providerKey: gitRepository.provider_key,
+        connectionName: gitConnection.name,
+      })
+      .from(gitRepository)
+      .leftJoin(
+        gitConnection,
+        and(eq(gitConnection.id, gitRepository.connection_id), eq(gitConnection.team_id, teamId)),
+      )
+      .where(where)
+      .orderBy(asc(gitRepository.namespace), asc(gitRepository.name), asc(gitRepository.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
+    db.select({ value: count() }).from(gitRepository).where(where),
+  ])
+  return { items, page, pageSize, total: total?.value ?? 0 }
 }
 
 /** 插入项目。 */
