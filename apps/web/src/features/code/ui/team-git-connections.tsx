@@ -167,14 +167,15 @@ export function TeamGitConnections({
   return (
     <div className="repo-settings">
       <section className="card">
-        <div className="section-heading">
+        <div className="section-heading max-md:flex-col max-md:items-start">
           <h3>Git 连接</h3>
-          <span className="spacer" />
+          <span className="spacer hidden md:block" />
           {canManage && (
             <div className="row flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
+                className="max-md:min-h-10"
                 disabled={createGithub.isPending}
                 onClick={() => createGithub.mutate()}
               >
@@ -192,7 +193,7 @@ export function TeamGitConnections({
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button ref={giteaTrigger} type="button" variant="outline" size="sm">
+                  <Button ref={giteaTrigger} type="button" variant="outline" size="sm" className="max-md:min-h-10">
                     添加 Gitea 连接
                   </Button>
                 </DialogTrigger>
@@ -303,9 +304,9 @@ export function TeamGitConnections({
             {activeConnections.map((connection) => {
               const status = STATUS_LABELS[connection.status] ?? { label: connection.status, variant: 'neutral' }
               return (
-                <div className="connection-item" key={connection.id}>
-                  <div>
-                    <div className="row">
+                <div className="connection-item flex-col md:flex-row" key={connection.id}>
+                  <div className="min-w-0 wrap-anywhere">
+                    <div className="row flex-wrap">
                       <strong>{connection.name}</strong>
                       <Tag variant={status.variant}>{status.label}</Tag>
                     </div>
@@ -325,12 +326,12 @@ export function TeamGitConnections({
                       {connection.lastErrorCode ? ` · ${connection.lastErrorCode}` : ''}
                     </p>
                   </div>
-                  <span className="spacer" />
                   {canManage && (
-                    <div className="row">
+                    <div className="row flex-wrap md:ml-auto md:shrink-0">
                       <Button
                         variant="outline"
                         size="sm"
+                        className="max-md:min-h-10"
                         disabled={checkConnection.isPending}
                         onClick={() => checkConnection.mutate(connection.id)}
                       >
@@ -339,6 +340,7 @@ export function TeamGitConnections({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="max-md:min-h-10"
                         disabled={syncRepositories.isPending}
                         onClick={() => syncRepositories.mutate(connection.id)}
                       >
@@ -349,6 +351,7 @@ export function TeamGitConnections({
                       <Button
                         variant="destructive"
                         size="sm"
+                        className="max-md:min-h-10"
                         onClick={() => {
                           setRevokeTarget({ id: connection.id, name: connection.name })
                           setRevokeReason('')
@@ -368,9 +371,9 @@ export function TeamGitConnections({
             <summary>已撤销连接（{revokedConnections.length}）</summary>
             <div className="repo-list">
               {revokedConnections.map((connection) => (
-                <div className="connection-item" key={connection.id}>
-                  <div>
-                    <div className="row">
+                <div className="connection-item flex-col md:flex-row" key={connection.id}>
+                  <div className="min-w-0 wrap-anywhere">
+                    <div className="row flex-wrap">
                       <strong>{connection.name}</strong>
                       <Tag>已撤销</Tag>
                     </div>
