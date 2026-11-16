@@ -256,6 +256,8 @@ export interface GitAdapter {
   getObject(input: GitObjectInput): Promise<GitObjectSnapshot>
   /** 读取仓库文件树；部分历史适配器测试替身可以不实现。 */
   listTree?(input: GitTreeInput): Promise<GitTreeEntry[]>
+  /** 读取指定目录的直接子项，根目录使用空路径。 */
+  listDirectory?(input: GitFileInput): Promise<GitTreeEntry[]>
   /** 读取仓库文件内容；部分历史适配器测试替身可以不实现。 */
   getFile?(input: GitFileInput): Promise<GitFileContent>
   /** 读取仓库分支列表；部分历史适配器测试替身可以不实现。 */

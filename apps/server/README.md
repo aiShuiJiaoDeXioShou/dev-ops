@@ -133,6 +133,12 @@ apps/server/
 - 所有自研业务接口只注册 GET/POST，返回 HTTP 200 信封；未知 API 路径也返回 200 + `NOT_FOUND`。未处理异常才返回 500。
 - root 初始化：`pnpm --dir apps/server seed:root`；本地 SMTP 可使用 Mailpit（`SMTP_URL=smtp://127.0.0.1:1025`）。
 
+## 项目代码目录
+
+`GET /api/v1/projects/:projectId/repositories/:repositoryId/tree` 提供可选的 `branch` 和 `path`。传入 `path=` 读取根目录，传入仓库相对路径只返回该目录的直接子项。条目的 `path` 仍然是相对于仓库根目录的路径。省略 `path` 保留递归清单行为，供 CLI 和流水线使用。
+
+Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文。查询结果在 60 秒内可直接复用，离开后未被使用的条目按客户端默认策略在 5 分钟后回收。
+
 ## 项目首页晴雨表
 
 `GET /api/v1/teams/:teamId/project-activity` 按团队权限和项目筛选读取 PostgreSQL。事项活动读取平台活动表；提交和 PR 读取按仓库、UTC 日期、来源预聚合的日统计。同一仓库在热力图只计一次，项目卡片分别显示各项目关联仓库的未关闭 PR 数。

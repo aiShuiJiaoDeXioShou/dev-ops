@@ -153,6 +153,7 @@ test('代码提交与 PR 读取：权限、分页、筛选、来源失败分类�
   let lastPullRequestState: string | undefined
   let lastPullRequestAuthor: string | undefined
   let listPullRequestsCalls = 0
+  const directoryReads: Array<{ path: string; ref: string }> = []
   const throwIfFailure = () => {
     if (failure) throw failure
   }
@@ -165,6 +166,18 @@ test('代码提交与 PR 读取：权限、分页、筛选、来源失败分类�
     },
     async getObject() {
       return { objectType: 'commit', remoteId: 'x', title: 'x', state: 'available', url: null }
+    },
+    async listTree() {
+      return [
+        { path: 'src', type: 'directory', size: null },
+        { path: 'src/main.ts', type: 'file', size: 4 },
+      ]
+    },
+    async listDirectory({ path, ref }) {
+      directoryReads.push({ path, ref })
+      return path
+        ? [{ path: `${path}/main.ts`, type: 'file', size: 4 }]
+        : [{ path: 'src', type: 'directory', size: null }]
     },
     async listCommits(input) {
       lastCommitsRef = input.ref
@@ -354,6 +367,29 @@ test('代码提交与 PR 读取：权限、分页、筛选、来源失败分类�
   assert.equal(anonymous.statusCode, 200)
   assert.equal(anonymous.json().success, false)
   assert.equal(anonymous.json().code, 'UNAUTHENTICATED')
+
+  const headers = { cookie: viewerUser.cookie }
+  const rootTree = await app.inject({ method: 'GET', url: `${baseUrl}/tree?path=`, headers })
+  assert.equal(rootTree.json().success, true, rootTree.body)
+  assert.deepEqual(
+    rootTree.json().data.entries.map((entry: { path: string }) => entry.path),
+    ['src'],
+  )
+  const childTree = await app.inject({ method: 'GET', url: `${baseUrl}/tree?path=src&branch=feature%2Fcode`, headers })
+  assert.equal(childTree.json().success, true, childTree.body)
+  assert.deepEqual(
+    childTree.json().data.entries.map((entry: { path: string }) => entry.path),
+    ['src/main.ts'],
+  )
+  const recursiveTree = await app.inject({ method: 'GET', url: `${baseUrl}/tree`, headers })
+  assert.equal(recursiveTree.json().success, true, recursiveTree.body)
+  assert.equal(recursiveTree.json().data.entries.length, 2)
+  const invalidDirectory = await app.inject({ method: 'GET', url: `${baseUrl}/tree?path=src%2F..%2Fother`, headers })
+  assert.equal(invalidDirectory.json().code, 'VALIDATION_ERROR')
+  assert.deepEqual(directoryReads, [
+    { path: '', ref: 'main' },
+    { path: 'src', ref: 'feature/code' },
+  ])
 
   // 浏览者可以读取提交列表，ref 缺省使用仓库默认分支，信封、分页与最近核对时间稳定。
   const commitsResponse = await app.inject({

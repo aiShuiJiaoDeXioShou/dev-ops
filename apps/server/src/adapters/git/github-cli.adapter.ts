@@ -30,6 +30,7 @@ import {
   type GitTreeEntry,
   type GitTreeInput,
 } from './git.types.ts'
+import { readGitHubDirectory } from './git.directory.ts'
 import {
   GIT_READ_LIMITS,
   aggregateReviewStatus,
@@ -48,6 +49,7 @@ import {
 const execFileAsync = promisify(execFile)
 const DEFAULT_TIMEOUT_MS = 10_000
 const DEFAULT_MAX_OUTPUT_BYTES = 1_000_000
+const MAX_DIRECTORY_OUTPUT_BYTES = 7_000_000
 // 差异文本允许读取到上限的四倍再主动截断，避免来源输出略超上限时直接失败而不是标记截断。
 const MAX_DIFF_OUTPUT_BYTES = GIT_READ_LIMITS.maxDiffBytes * 4
 
@@ -113,7 +115,12 @@ function createRunner(options: GitHubCliAdapterOptions): GhExecFile {
     try {
       const result = await execFileAsync('gh', args, {
         timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-        maxBuffer: Math.max(options.maxOutputBytes ?? 0, DEFAULT_MAX_OUTPUT_BYTES, MAX_DIFF_OUTPUT_BYTES),
+        maxBuffer: Math.max(
+          options.maxOutputBytes ?? 0,
+          DEFAULT_MAX_OUTPUT_BYTES,
+          MAX_DIFF_OUTPUT_BYTES,
+          MAX_DIRECTORY_OUTPUT_BYTES,
+        ),
         encoding: 'utf8',
         env: { ...process.env, GH_PROMPT_DISABLED: '1' },
       })
@@ -319,6 +326,26 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
       .filter((item) => item.path.length > 0)
   }
 
+  async function listDirectory(input: GitFileInput): Promise<GitTreeEntry[]> {
+    const slug = repoSlug(input)
+    if (!isAllowlisted(slug, allowed)) throw new GitAdapterError('unsupported', '仓库不在允许范围内')
+    const path = input.path
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    const limit = options.maxOutputBytes ?? MAX_DIRECTORY_OUTPUT_BYTES
+    return readGitHubDirectory({
+      ref: input.ref,
+      path: input.path,
+      readContents: async () =>
+        parseJson<unknown>(
+          await run(['api', `repos/${slug}/contents/${path}${buildQuery({ ref: input.ref })}`], limit),
+        ),
+      readTree: async (ref) =>
+        parseJson<unknown>(await run(['api', `repos/${slug}/git/trees/${encodeURIComponent(ref)}`], limit)),
+    })
+  }
+
   async function getFile(input: GitFileInput): Promise<GitFileContent> {
     const slug = repoSlug(input)
     if (!isAllowlisted(slug, allowed)) throw new GitAdapterError('unsupported', '仓库不在允许范围内')
@@ -370,6 +397,7 @@ export function createGitHubCliAdapter(options: GitHubCliAdapterOptions): GitAda
     },
     getObject,
     listTree,
+    listDirectory,
     getFile,
     listBranches,
     listCommits,

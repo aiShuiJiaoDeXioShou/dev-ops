@@ -27,6 +27,7 @@ import {
   type GitTreeEntry,
   type GitTreeInput,
 } from './git.types.ts'
+import { parseGitDirectory } from './git.directory.ts'
 import {
   GIT_READ_LIMITS,
   aggregateReviewStatus,
@@ -298,6 +299,17 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
       .filter((item) => item.path.length > 0)
   }
 
+  async function listDirectory(input: GitFileInput): Promise<GitTreeEntry[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    const path = input.path
+      .split('/')
+      .map((segment) => encodeURIComponent(segment))
+      .join('/')
+    const suffix = path ? `/${path}` : ''
+    const entries = await request<unknown>(`/repos/${slug}/contents${suffix}?ref=${encodeURIComponent(input.ref)}`)
+    return parseGitDirectory(entries, input.path)
+  }
+
   async function getFile(input: GitFileInput): Promise<GitFileContent> {
     const slug = `${input.repository.namespace}/${input.repository.name}`
     const encodedPath = input.path
@@ -350,6 +362,7 @@ export function createGiteaAdapter(options: GiteaAdapterOptions): GitAdapter {
     },
     getObject,
     listTree,
+    listDirectory,
     getFile,
     listBranches,
     listCommits,

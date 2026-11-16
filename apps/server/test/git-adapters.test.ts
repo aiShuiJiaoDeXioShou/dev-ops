@@ -982,3 +982,66 @@ test('提交详情来源缺少 files 时标记不支持，超过上限时标记�
   assert.equal(truncatedDetail.files.length, 100)
   assert.equal(truncatedDetail.filesTruncated, true)
 })
+
+test('GitHub App 按目录读取，宽目录沿指定分支逐层读取非递归子树', async () => {
+  const directorySha = 'a'.repeat(40)
+  const calls: Array<{ route: string; params: Record<string, unknown> | undefined }> = []
+  const adapter = createGitHubAppAdapter({
+    provider: 'github',
+    authKind: 'github_app_installation',
+    instanceUrl: 'https://github.com',
+    appId: '1',
+    privateKey: 'fake-key',
+    installationId: 1,
+    client: {
+      async request(route, params) {
+        calls.push({ route, params })
+        if (route.endsWith('/contents/{path}')) return { data: Array.from({ length: 1000 }, () => ({})) }
+        if (params?.ref === directorySha) return { data: { tree: [{ path: 'main.ts', type: 'blob', size: 4 }] } }
+        return { data: { tree: [{ path: 'src', type: 'tree', sha: directorySha }] } }
+      },
+    },
+  })
+  assert.ok(adapter.listDirectory)
+  const input = { repository: { namespace: 'acme', name: 'repo' }, ref: 'feature/code', path: '' }
+  assert.deepEqual(await adapter.listDirectory(input), [{ path: 'src', type: 'directory', size: null }])
+  assert.deepEqual(await adapter.listDirectory({ ...input, path: 'src' }), [
+    { path: 'src/main.ts', type: 'file', size: 4 },
+  ])
+  assert.deepEqual(
+    calls.map(({ params }) => params?.ref),
+    [input.ref, input.ref, input.ref, directorySha],
+  )
+  assert.ok(calls.every(({ params }) => !Object.hasOwn(params ?? {}, 'recursive')))
+})
+
+test('GitHub CLI 与 Gitea 仅读取已展开目录并保留仓库相对路径', async () => {
+  const calls: string[] = []
+  const entries = [{ path: 'src/a b/child', type: 'dir' }]
+  const cli = createGitHubCliAdapter({
+    ...baseInput,
+    allowedRepositories: allowed,
+    exec: async (args) => {
+      calls.push(args.join(' '))
+      return { stdout: JSON.stringify(entries), stderr: '' }
+    },
+  })
+  const gitea = createGiteaAdapter({
+    provider: 'gitea',
+    authKind: 'gitea_token',
+    instanceUrl: 'https://git.example.test',
+    token: 'fake-token',
+    fetch: async (url) => {
+      calls.push(url)
+      return Response.json(entries)
+    },
+  })
+  assert.ok(cli.listDirectory && gitea.listDirectory)
+  const repository = { namespace: 'aiShuiJiaoDeXioShou', name: 'dev-ops' }
+  const input = { repository, ref: 'feature/code', path: 'src/a b' }
+  const expected = [{ path: 'src/a b/child', type: 'directory', size: null }]
+  assert.deepEqual(await cli.listDirectory(input), expected)
+  assert.deepEqual(await gitea.listDirectory(input), expected)
+  assert.ok(calls.every((call) => call.includes('/contents/src/a%20b?ref=feature%2Fcode')))
+  assert.ok(calls.every((call) => !call.includes('recursive')))
+})

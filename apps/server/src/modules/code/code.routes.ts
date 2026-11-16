@@ -103,6 +103,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
           request.params.projectId,
           request.params.repositoryId,
           request.query.branch,
+          request.query.path,
         ),
         request.id,
       )

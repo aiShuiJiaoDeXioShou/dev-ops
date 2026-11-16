@@ -43,7 +43,12 @@ export const repositoryQuerySchema = Type.Object({
 })
 export const repositoryListResponseSchema = apiResponseSchema(Type.Array(repositorySchema))
 export const repositoryBranchesResponseSchema = apiResponseSchema(Type.Object({ branches: Type.Array(Type.String()) }))
-export const repositoryTreeQuerySchema = Type.Object({ branch: Type.Optional(Type.String({ maxLength: 200 })) })
+export const repositoryTreeQuerySchema = Type.Object({
+  branch: Type.Optional(Type.String({ maxLength: 200 })),
+  path: Type.Optional(
+    Type.String({ maxLength: 500, description: '仓库相对目录；空字符串读取根目录，省略时读取递归树' }),
+  ),
+})
 export const repositoryTreeResponseSchema = apiResponseSchema(
   Type.Object({ branch: Type.String(), entries: Type.Array(treeEntrySchema) }),
 )

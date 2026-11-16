@@ -30,6 +30,7 @@ import {
   type GitTreeEntry,
   type GitTreeInput,
 } from './git.types.ts'
+import { readGitHubDirectory } from './git.directory.ts'
 import {
   GIT_READ_LIMITS,
   aggregateReviewStatus,
@@ -178,6 +179,31 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
         size: typeof item.size === 'number' ? item.size : null,
       }))
       .filter((item) => item.path.length > 0)
+  }
+
+  async function listDirectory(input: GitFileInput): Promise<GitTreeEntry[]> {
+    const slug = `${input.repository.namespace}/${input.repository.name}`
+    if (!isAllowlisted(slug, options.allowedRepositories))
+      throw new GitAdapterError('unsupported', '仓库不在允许范围内')
+    const repo = { owner: input.repository.namespace, repo: input.repository.name }
+    try {
+      return await readGitHubDirectory({
+        ref: input.ref,
+        path: input.path,
+        readContents: async () =>
+          (
+            await client.request('GET /repos/{owner}/{repo}/contents/{path}', {
+              ...repo,
+              path: input.path,
+              ref: input.ref,
+            })
+          ).data,
+        readTree: async (ref) =>
+          (await client.request('GET /repos/{owner}/{repo}/git/trees/{ref}', { ...repo, ref })).data,
+      })
+    } catch (error) {
+      throw classify(error)
+    }
   }
 
   async function getFile(input: GitFileInput): Promise<GitFileContent> {
@@ -414,6 +440,7 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
     },
     getObject,
     listTree,
+    listDirectory,
     getFile,
     listBranches,
     listCommits,

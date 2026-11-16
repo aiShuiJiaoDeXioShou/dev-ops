@@ -139,6 +139,11 @@ export interface GitReadPort {
     remoteId: string
   }): Promise<GitObjectSnapshotPort>
   listTree?(input: { repository: { namespace: string; name: string }; ref: string }): Promise<GitTreeEntryPort[]>
+  listDirectory?(input: {
+    repository: { namespace: string; name: string }
+    ref: string
+    path: string
+  }): Promise<GitTreeEntryPort[]>
   getFile?(input: {
     repository: { namespace: string; name: string }
     ref: string
@@ -517,20 +522,41 @@ export function createCodeService(deps: CodeServiceDeps) {
     }
   }
 
-  async function listRepositoryTree(actor: SessionUser, projectId: string, repositoryId: string, branch?: string) {
+  /**
+   * 读取已授权仓库的一层目录或兼容的递归树。
+   * @param actor 已登录用户。
+   * @param projectId 项目标识。
+   * @param repositoryId 已关联仓库标识。
+   * @param branch 分支，省略时使用仓库默认分支。
+   * @param path 仓库相对目录；空字符串为根目录，省略时返回递归树。
+   * @returns 实际读取的分支和仓库相对路径条目。
+   * @throws 目录路径无效、仓库无权访问或 Git 来源读取失败时抛出业务错误。
+   */
+  async function listRepositoryTree(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    branch?: string,
+    path?: string,
+  ) {
+    if (
+      path &&
+      (path.includes('\\') || path.split('/').some((segment) => !segment || segment === '.' || segment === '..'))
+    ) {
+      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '目录路径不合法')
+    }
     const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
-    if (!adapter.listTree) throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持浏览文件')
     const ref = (branch?.trim() || repository.default_branch || '').trim()
     if (!ref) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库没有可用分支')
+    const input = { repository: { namespace: repository.namespace, name: repository.name }, ref }
     try {
-      const entries = await adapter.listTree({
-        repository: { namespace: repository.namespace, name: repository.name },
-        ref,
-      })
-      return { branch: ref, entries }
+      const entries =
+        path === undefined ? await adapter.listTree?.(input) : await adapter.listDirectory?.({ ...input, path })
+      if (entries !== undefined) return { branch: ref, entries }
     } catch (error) {
       repositoryReadError(error)
     }
+    throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持浏览文件')
   }
 
   async function readRepositoryFileAtRef(
