@@ -20,7 +20,7 @@ import { projectRepositoriesQueryOptions } from '../api/queries'
 
 /**
  * 项目已关联仓库列表：查看来源状态并解除关联。
- * 添加仓库由代码仓库区域的“关联仓库”二级弹窗负责。
+ * 添加仓库由代码仓库区域的“添加仓库”二级弹窗负责。
  * @param props.projectId 项目标识；canManage 当前用户是否允许解除关联。
  * @returns 已关联仓库卡片与解除确认弹窗。
  */
@@ -74,7 +74,7 @@ export function RepositoryPicker({ projectId, canManage }: { projectId: string; 
             onRetry={() => void projectRepos.refetch()}
           />
         ) : repositories.length === 0 ? (
-          <p className="section-note">还没有关联仓库。使用上方「关联仓库」按钮添加。</p>
+          <p className="section-note">还没有关联仓库。使用上方「添加仓库」按钮添加。</p>
         ) : (
           <div className="repo-list">
             {repositories.map((repository) => (

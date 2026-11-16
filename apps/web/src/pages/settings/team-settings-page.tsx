@@ -96,7 +96,12 @@ export function Component() {
           )}
         </TabsContent>
         <TabsContent value="connections" className="space-y-8">
-          <TeamGitConnections teamId={currentTeam.id} canManage={canManage} />
+          <TeamGitConnections
+            key={currentTeam.id}
+            teamId={currentTeam.id}
+            canManage={canManage}
+            authorizationResult={searchParams.get('git')}
+          />
           <NodeManagementEntry teamId={currentTeam.id} canManage={canManage} />
         </TabsContent>
       </Tabs>

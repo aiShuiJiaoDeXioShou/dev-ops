@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
-import { Combobox } from '@/shared/ui/controls/combobox'
+import { GitRepositorySelect } from '@/features/code/ui/git-repository-select'
 import { Input } from '@/shared/ui/controls/input'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
@@ -83,13 +83,6 @@ export function ProjectForm({ teamId, open, onOpenChange, onCreated }: ProjectFo
     setError('')
     onOpenChange(false)
   }
-  const repositoryOptions = [
-    { value: '', label: '暂不关联仓库' },
-    ...teamRepositories.repositories.map((repository) => ({
-      value: repository.id,
-      label: `${repository.namespace}/${repository.name}`,
-    })),
-  ]
   return (
     <Dialog
       open={open}
@@ -117,24 +110,27 @@ export function ProjectForm({ teamId, open, onOpenChange, onCreated }: ProjectFo
               placeholder="简要说明项目目标与范围"
             />
           </label>
-          <div className="space-y-1.5">
-            <span className="block text-sm font-medium">关联仓库（可选）</span>
-            <Combobox
-              value={repositoryId}
-              onValueChange={setRepositoryId}
-              options={repositoryOptions}
-              placeholder="暂不关联仓库"
-              searchPlaceholder="搜索仓库"
-              emptyMessage="没有匹配的仓库"
-              disabled={teamRepositories.isLoading}
-              aria-label="关联仓库（可选）"
-            />
-          </div>
-          <p className="text-xs leading-5 text-muted-foreground">
-            {teamRepositories.repositories.length === 0
-              ? '当前团队还没有已同步的仓库。可以先创建项目，再到代码页添加 Git 连接。'
-              : '项目创建后会立即关联所选仓库；也可以稍后到代码页调整。'}
-          </p>
+          <GitRepositorySelect
+            value={repositoryId}
+            onValueChange={setRepositoryId}
+            repositories={teamRepositories.repositories}
+            connections={teamRepositories.connections}
+            label="关联仓库（可选）"
+            optional
+            disabled={teamRepositories.isLoading || mutation.isPending}
+          />
+          {teamRepositories.hasError ? (
+            <div className="row">
+              <p role="status" className="small quiet">
+                有些连接的仓库加载失败。
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void teamRepositories.retry()}>
+                重试
+              </Button>
+            </div>
+          ) : !teamRepositories.isLoading && teamRepositories.repositories.length === 0 ? (
+            <p className="small quiet">请在「团队管理 → 连接与节点」添加 GitHub 或 Gitea 连接。</p>
+          ) : null}
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}

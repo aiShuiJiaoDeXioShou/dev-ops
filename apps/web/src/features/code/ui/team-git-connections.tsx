@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
@@ -12,6 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
@@ -35,13 +36,23 @@ const EMPTY_GITEA_FORM = { name: '', instanceUrl: '', token: '' }
 /**
  * 团队级 Git 连接管理：添加、检查、同步仓库和撤销连接。
  * GitHub App 安装授权由团队共享，成员无需各自绑定 GitHub 账号。
- * @param props.teamId 团队标识；canManage 当前用户是否具备管理员写权限。
+ * @param props 团队标识、管理员权限和可选的 GitHub 回调结果。
  * @returns 连接列表、添加表单和撤销确认；非管理员为只读视图。
  */
-export function TeamGitConnections({ teamId, canManage }: { teamId: string; canManage: boolean }) {
+export function TeamGitConnections({
+  teamId,
+  canManage,
+  authorizationResult,
+}: {
+  teamId: string
+  canManage: boolean
+  authorizationResult?: string | null
+}) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const connections = useQuery(gitConnectionsQueryOptions(teamId))
+  const giteaTrigger = useRef<HTMLButtonElement>(null)
+  const [giteaOpen, setGiteaOpen] = useState(false)
   const [giteaForm, setGiteaForm] = useState(EMPTY_GITEA_FORM)
   const [error, setError] = useState('')
   const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string } | null>(null)
@@ -51,6 +62,8 @@ export function TeamGitConnections({ teamId, canManage }: { teamId: string; canM
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['code', 'connections', teamId] }),
       queryClient.invalidateQueries({ queryKey: ['code', 'connection-repositories'] }),
+      queryClient.invalidateQueries({ queryKey: ['code', 'available-repositories'] }),
+      queryClient.invalidateQueries({ queryKey: ['code', 'project-repositories'] }),
     ])
   }
   const handleError = (cause: unknown) => {
@@ -80,13 +93,17 @@ export function TeamGitConnections({ teamId, canManage }: { teamId: string; canM
         instanceUrl: giteaForm.instanceUrl.trim(),
         token: giteaForm.token,
       }),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
+      setGiteaOpen(false)
       setGiteaForm(EMPTY_GITEA_FORM)
       setError('')
       await invalidate()
-      showToast('Gitea 连接已添加。', 'success')
+      if (result.data && 'status' in result.data && result.data.status !== 'active') {
+        showToast('Gitea 连接已保存，请检查连接后重试同步。', 'error')
+      } else {
+        showToast('Gitea 连接已添加。', 'success')
+      }
     },
-    onError: handleError,
   })
   const checkConnection = useMutation({
     mutationFn: (connectionId: string) => apiClient.checkGitConnection(connectionId),
@@ -142,6 +159,8 @@ export function TeamGitConnections({ teamId, canManage }: { teamId: string; canM
   }
 
   const connectionItems = connections.data?.data ?? []
+  const canSubmitGitea =
+    Boolean(giteaForm.name.trim() && giteaForm.instanceUrl.trim() && giteaForm.token) && !createGitea.isPending
   const activeConnections = connectionItems.filter((connection) => connection.status !== 'revoked')
   const revokedConnections = connectionItems.filter((connection) => connection.status === 'revoked')
 
@@ -152,14 +171,124 @@ export function TeamGitConnections({ teamId, canManage }: { teamId: string; canM
           <h3>Git 连接</h3>
           <span className="spacer" />
           {canManage && (
-            <Button variant="outline" size="sm" disabled={createGithub.isPending} onClick={() => createGithub.mutate()}>
-              {createGithub.isPending ? '跳转中…' : '添加 GitHub 连接'}
-            </Button>
+            <div className="row flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={createGithub.isPending}
+                onClick={() => createGithub.mutate()}
+              >
+                {createGithub.isPending ? '跳转中…' : '添加 GitHub 连接'}
+              </Button>
+              <Dialog
+                open={giteaOpen}
+                onOpenChange={(next) => {
+                  if (createGitea.isPending) return
+                  setGiteaOpen(next)
+                  if (next) {
+                    createGitea.reset()
+                    setError('')
+                  } else setGiteaForm(EMPTY_GITEA_FORM)
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button ref={giteaTrigger} type="button" variant="outline" size="sm">
+                    添加 Gitea 连接
+                  </Button>
+                </DialogTrigger>
+                <DialogContent
+                  onCloseAutoFocus={(event) => {
+                    event.preventDefault()
+                    giteaTrigger.current?.focus()
+                  }}
+                >
+                  <DialogHeader>
+                    <DialogTitle>添加 Gitea 连接</DialogTitle>
+                    <DialogDescription>
+                      使用要连接的 Gitea 账号签发的 Token。一个团队可以添加多个账号。
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form
+                    className="space-y-4"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      if (canSubmitGitea) createGitea.mutate()
+                    }}
+                  >
+                    <label className="field">
+                      连接名称
+                      <Input
+                        required
+                        autoComplete="off"
+                        value={giteaForm.name}
+                        maxLength={120}
+                        placeholder="例如 Gitea 工作账号"
+                        onChange={(event) => setGiteaForm((form) => ({ ...form, name: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      实例地址
+                      <Input
+                        required
+                        type="url"
+                        autoComplete="off"
+                        value={giteaForm.instanceUrl}
+                        maxLength={2048}
+                        placeholder="https://gitea.example.com"
+                        onChange={(event) => setGiteaForm((form) => ({ ...form, instanceUrl: event.target.value }))}
+                      />
+                    </label>
+                    <label className="field">
+                      访问 Token
+                      <Input
+                        required
+                        type="password"
+                        autoComplete="new-password"
+                        value={giteaForm.token}
+                        maxLength={100000}
+                        onChange={(event) => setGiteaForm((form) => ({ ...form, token: event.target.value }))}
+                      />
+                    </label>
+                    {createGitea.isError && (
+                      <p role="alert" className="field-error">
+                        {describeRequestError(createGitea.error).description}
+                      </p>
+                    )}
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={createGitea.isPending}
+                        onClick={() => {
+                          setGiteaOpen(false)
+                          setGiteaForm(EMPTY_GITEA_FORM)
+                        }}
+                      >
+                        取消
+                      </Button>
+                      <Button type="submit" disabled={!canSubmitGitea}>
+                        {createGitea.isPending ? '添加中…' : '添加连接'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </div>
         <p className="section-note">
-          GitHub App 安装授权是团队级共享授权，成员无需各自绑定 GitHub 账号。连接、检查和同步仓库仅管理员可操作。
+          管理员可以添加多个 GitHub 个人账号或组织、Gitea 账号。项目从团队已同步的仓库中选择。
         </p>
+        {authorizationResult === 'connected' && (
+          <p role="status" className="section-note">
+            GitHub 已连接，已同步授权仓库。
+          </p>
+        )}
+        {authorizationResult === 'failed' && (
+          <p role="alert" className="field-error">
+            GitHub 授权未完成。核对所选账号、组织和仓库权限后重新授权。
+          </p>
+        )}
         {activeConnections.length === 0 ? (
           <EmptyState
             title="还没有可用的 Git 连接"
@@ -187,6 +316,9 @@ export function TeamGitConnections({ teamId, canManage }: { teamId: string; canM
                       {AUTH_LABELS[connection.authKind] ?? connection.authKind}
                       {' · '}
                       {connection.instanceUrl}
+                      {connection.authKind !== 'github_app_installation' && connection.externalIdentity
+                        ? ` · ${connection.externalIdentity}`
+                        : ''}
                     </p>
                     <p className="small quiet">
                       最近检查 {formatDateTime(connection.lastCheckedAt)}
@@ -251,55 +383,9 @@ export function TeamGitConnections({ teamId, canManage }: { teamId: string; canM
             </div>
           </details>
         )}
-        {canManage && (
-          <details className="connection-form">
-            <summary>添加 Gitea 连接</summary>
-            <div className="form-grid">
-              <label className="field">
-                连接名称
-                <Input
-                  value={giteaForm.name}
-                  maxLength={120}
-                  placeholder="例如 Gitea 主站"
-                  onChange={(event) => setGiteaForm((form) => ({ ...form, name: event.target.value }))}
-                />
-              </label>
-              <label className="field">
-                实例地址
-                <Input
-                  value={giteaForm.instanceUrl}
-                  maxLength={2048}
-                  placeholder="https://gitea.example.com"
-                  onChange={(event) => setGiteaForm((form) => ({ ...form, instanceUrl: event.target.value }))}
-                />
-              </label>
-              <label className="field full">
-                访问 Token
-                <Input
-                  type="password"
-                  value={giteaForm.token}
-                  maxLength={100000}
-                  placeholder="只保存服务端加密后的凭据"
-                  onChange={(event) => setGiteaForm((form) => ({ ...form, token: event.target.value }))}
-                />
-              </label>
-              <div className="form-actions field full">
-                <Button
-                  type="button"
-                  disabled={
-                    !giteaForm.name.trim() || !giteaForm.instanceUrl.trim() || !giteaForm.token || createGitea.isPending
-                  }
-                  onClick={() => createGitea.mutate()}
-                >
-                  {createGitea.isPending ? '添加中…' : '添加 Gitea 连接'}
-                </Button>
-              </div>
-            </div>
-          </details>
-        )}
       </section>
 
-      {error && (
+      {error && !giteaOpen && (
         <p role="alert" className="field-error">
           {error}
         </p>

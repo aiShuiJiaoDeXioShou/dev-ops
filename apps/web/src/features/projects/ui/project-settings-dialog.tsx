@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/model/session'
 import { LinkRepositoryDialog } from '@/features/code/ui/link-repository-dialog'
@@ -33,8 +33,9 @@ export function ProjectSettingsDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { role } = useSession()
+  const { role, currentTeam } = useSession()
   const project = useQuery(projectQueryOptions(projectId))
+  const addRepositoryTrigger = useRef<HTMLButtonElement>(null)
   const [linkOpen, setLinkOpen] = useState(false)
   const canManage = role === 'admin' || role === 'developer'
   return (
@@ -91,14 +92,29 @@ export function ProjectSettingsDialog({
                 <div className="settings-section-head">
                   <h3 className="settings-section-title">代码仓库</h3>
                   {canManage && (
-                    <Button type="button" variant="outline" size="sm" onClick={() => setLinkOpen(true)}>
-                      关联仓库
+                    <Button
+                      ref={addRepositoryTrigger}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLinkOpen(true)}
+                    >
+                      添加仓库
                     </Button>
                   )}
                 </div>
                 <p className="section-note">一个项目可以关联多个仓库；代码页和 PR 页可在仓库间切换。</p>
                 <RepositoryPicker projectId={projectId} canManage={canManage} />
-                <LinkRepositoryDialog projectId={projectId} open={linkOpen} onOpenChange={setLinkOpen} />
+                <LinkRepositoryDialog
+                  teamId={currentTeam?.id ?? ''}
+                  projectId={projectId}
+                  open={linkOpen}
+                  onOpenChange={setLinkOpen}
+                  onCloseAutoFocus={(event) => {
+                    event.preventDefault()
+                    addRepositoryTrigger.current?.focus()
+                  }}
+                />
               </TabsContent>
               <TabsContent value="services">
                 <ServiceManagement projectId={projectId} />

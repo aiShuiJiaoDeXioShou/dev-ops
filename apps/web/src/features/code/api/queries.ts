@@ -72,35 +72,35 @@ async function listAllConnectionRepositories(connectionId: string, signal: Abort
 
 /**
  * 汇总团队所有有效 Git 连接下可用的仓库，供新建项目时直接选择。
- * 已撤销连接不再提供仓库；同一远端仓库可能同时存在于多条连接中，按提供方与 Web 地址去重。
+ * 已撤销连接不再提供仓库；同一远端仓库保留不同连接下的候选项。
  * @param teamId 团队标识。
  * @param enabled 是否允许立即请求，弹窗关闭时可延迟加载。
- * @returns 去重后的仓库列表和加载状态；连接不存在时返回空数组。
+ * @returns 按连接区分的仓库列表和加载状态；连接不存在时返回空数组。
  */
 export function useTeamRepositories(teamId: string, enabled = true) {
   const connections = useQuery({ ...gitConnectionsQueryOptions(teamId), enabled: enabled && Boolean(teamId) })
-  const connectionIds =
-    connections.data?.data.filter((connection) => connection.status === 'active').map((connection) => connection.id) ??
-    []
+  const activeConnections = connections.data?.data.filter((connection) => connection.status === 'active') ?? []
   const repositoryQueries = useQueries({
-    queries: connectionIds.map((connectionId) =>
+    queries: activeConnections.map(({ id: connectionId }) =>
       queryOptions({
         queryKey: ['code', 'connection-repositories', connectionId, 'all'],
         queryFn: ({ signal }) => listAllConnectionRepositories(connectionId, signal),
-        enabled: Boolean(connectionId),
+        enabled: enabled && Boolean(connectionId),
       }),
     ),
   })
   const repositories = repositoryQueries
     .flatMap((query) => query.data ?? [])
     .filter((repository) => repository.status === 'available')
-  const uniqueRepositories = [
-    ...new Map(
-      repositories.map((repository) => [`${repository.providerKey}:${repository.webUrl}`, repository]),
-    ).values(),
-  ]
   return {
-    repositories: uniqueRepositories,
+    repositories,
+    connections: activeConnections,
+    hasError: connections.isError || repositoryQueries.some((query) => query.isError),
+    retry: () =>
+      Promise.all([
+        connections.refetch(),
+        ...repositoryQueries.filter((query) => query.isError).map((query) => query.refetch()),
+      ]),
     isLoading: connections.isPending || repositoryQueries.some((query) => query.isPending),
   }
 }

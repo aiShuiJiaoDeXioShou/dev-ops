@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
-import { Combobox } from '@/shared/ui/controls/combobox'
+import { GitRepositorySelect } from './git-repository-select'
 import {
   Dialog,
   DialogContent,
@@ -15,25 +15,35 @@ import {
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
-import { availableRepositoriesQueryOptions, projectRepositoriesQueryOptions } from '../api/queries'
+import {
+  availableRepositoriesQueryOptions,
+  gitConnectionsQueryOptions,
+  projectRepositoriesQueryOptions,
+} from '../api/queries'
 
 /**
  * 从团队已同步仓库中为项目关联一个仓库；关联成功后关闭并刷新仓库列表。
- * @param props.projectId 项目标识；open 弹窗状态；onOpenChange 关闭回调。
+ * @param props 团队和项目标识及受控弹窗状态。
  * @returns 带搜索的组合框和关联按钮的二级弹窗。
  */
 export function LinkRepositoryDialog({
   projectId,
+  teamId,
   open,
   onOpenChange,
+  onCloseAutoFocus,
 }: {
   projectId: string
+  teamId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCloseAutoFocus?: (event: Event) => void
 }) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const available = useQuery({ ...availableRepositoriesQueryOptions(projectId), enabled: open })
+  const connections = useQuery({ ...gitConnectionsQueryOptions(teamId), enabled: open && Boolean(teamId) })
+  const linked = useQuery({ ...projectRepositoriesQueryOptions(projectId), enabled: open })
   const [repositoryId, setRepositoryId] = useState('')
   const [error, setError] = useState('')
   useEffect(() => {
@@ -57,46 +67,44 @@ export function LinkRepositoryDialog({
       showToast(message, 'error')
     },
   })
-  const repositories = available.data ?? []
+  const linkedIds = new Set(linked.data?.data.map((repository) => repository.id))
+  const repositories = (available.data ?? []).filter((repository) => !linkedIds.has(repository.id))
+  const loadError = available.error ?? connections.error ?? linked.error
+  const isPending = available.isPending || linked.isPending || (Boolean(teamId) && connections.isPending)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="link-repository-dialog">
+      <DialogContent className="link-repository-dialog" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
-          <DialogTitle>关联仓库</DialogTitle>
-          <DialogDescription>从团队已同步的仓库中选择；一个项目可以关联多个仓库，可重复添加。</DialogDescription>
+          <DialogTitle>添加项目仓库</DialogTitle>
+          <DialogDescription>选择已授权的 GitHub 或 Gitea 仓库。</DialogDescription>
         </DialogHeader>
-        {available.isPending ? (
+        {isPending ? (
           <DelayedLoading pending>
             <PageLoading message="可用仓库加载中…" />
           </DelayedLoading>
-        ) : available.isError ? (
+        ) : loadError ? (
           <PageError
             title="可用仓库加载失败"
-            description={describeRequestError(available.error).description}
-            requestId={describeRequestError(available.error).requestId}
-            retrying={available.isFetching}
-            onRetry={() => void available.refetch()}
+            description={describeRequestError(loadError).description}
+            requestId={describeRequestError(loadError).requestId}
+            retrying={available.isFetching || connections.isFetching || linked.isFetching}
+            onRetry={() => void Promise.all([available.refetch(), connections.refetch(), linked.refetch()])}
           />
         ) : repositories.length === 0 ? (
           <p className="section-note">
-            团队还没有已同步的可用仓库。请让团队管理员在「团队设置 → 连接与节点」中添加并同步 Git 连接。
+            {linkedIds.size && available.data?.length
+              ? '已关联所有可用仓库。可以在「团队管理 → 连接与节点」授权更多仓库。'
+              : '团队还没有已同步的可用仓库。请让团队管理员在「团队管理 → 连接与节点」添加 GitHub 或 Gitea 连接。'}
           </p>
         ) : (
-          <label className="block space-y-1.5 text-sm font-medium">
-            仓库
-            <Combobox
-              value={repositoryId}
-              onValueChange={setRepositoryId}
-              options={repositories.map((repository) => ({
-                value: repository.id,
-                label: `${repository.namespace}/${repository.name}`,
-              }))}
-              placeholder="选择仓库"
-              searchPlaceholder="搜索仓库"
-              emptyMessage="没有匹配的仓库"
-              aria-label="选择仓库"
-            />
-          </label>
+          <GitRepositorySelect
+            repositories={repositories}
+            connections={connections.data?.data ?? []}
+            value={repositoryId}
+            onValueChange={setRepositoryId}
+            label="选择仓库"
+            disabled={link.isPending}
+          />
         )}
         {error && (
           <p role="alert" className="field-error">
@@ -109,10 +117,15 @@ export function LinkRepositoryDialog({
           </Button>
           <Button
             type="button"
-            disabled={!repositoryId || link.isPending || repositories.length === 0}
+            disabled={
+              Boolean(loadError) ||
+              isPending ||
+              link.isPending ||
+              !repositories.some((repository) => repository.id === repositoryId)
+            }
             onClick={() => link.mutate()}
           >
-            {link.isPending ? '关联中…' : '关联仓库'}
+            {link.isPending ? '添加中…' : '添加仓库'}
           </Button>
         </DialogFooter>
       </DialogContent>

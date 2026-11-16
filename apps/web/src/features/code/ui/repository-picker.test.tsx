@@ -30,7 +30,7 @@ describe('RepositoryPicker', () => {
         <RepositoryPicker projectId="project-1" canManage />
       </QueryClientProvider>,
     )
-    expect(await screen.findByText('还没有关联仓库。使用上方「关联仓库」按钮添加。')).toBeInTheDocument()
+    expect(await screen.findByText('还没有关联仓库。使用上方「添加仓库」按钮添加。')).toBeInTheDocument()
   })
 
   it('展示已关联仓库', async () => {

@@ -13,10 +13,10 @@ function ok(data: unknown) {
   return HttpResponse.json({ success: true, code: 'OK', message: 'ok', requestId: 'trace', data })
 }
 
-const repository = (id: string, name: string) => ({
+const repository = (id: string, name: string, connectionId = 'conn-1', providerKey = 'github') => ({
   id,
-  connectionId: 'conn-1',
-  providerKey: 'github',
+  connectionId,
+  providerKey,
   namespace: 'acme',
   name,
   webUrl: `https://github.com/acme/${name}`,
@@ -24,17 +24,38 @@ const repository = (id: string, name: string) => ({
   status: 'available',
 })
 
+const gitConnection = (id: string, providerKey: string, name: string) => ({
+  id,
+  providerKey,
+  name,
+  teamId: 'team-1',
+  instanceUrl: 'https://example.test',
+  status: 'active',
+  authKind: 'test',
+  externalIdentity: null,
+  lastCheckedAt: null,
+  lastErrorCode: null,
+  repositoryScopeSyncedAt: null,
+  createdAt: '2026-11-01T00:00:00Z',
+})
+
 describe('LinkRepositoryDialog', () => {
-  it('搜索选择仓库后提交关联请求并关闭', async () => {
+  it('按来源区分同名仓库并提交选中连接的仓库', async () => {
     let linkedRepositoryId = ''
     server.use(
       http.get('*/api/v1/projects/project-1/repositories/available', () =>
         ok({
-          items: [repository('repo-1', 'dev-ops'), repository('repo-2', 'lkwg')],
+          items: [repository('repo-1', 'lkwg'), repository('repo-2', 'lkwg', 'conn-2', 'gitea')],
           page: 1,
           pageSize: 100,
           total: 2,
         }),
+      ),
+      http.get('*/api/v1/teams/team-1/git-connections', () =>
+        ok([gitConnection('conn-1', 'github', '个人账号'), gitConnection('conn-2', 'gitea', '工作账号')]),
+      ),
+      http.get('*/api/v1/projects/project-1/repositories', () =>
+        ok(linkedRepositoryId ? [repository('repo-2', 'lkwg', 'conn-2', 'gitea')] : []),
       ),
       http.post('*/api/v1/projects/project-1/repositories', async ({ request }) => {
         const body = (await request.json()) as { repositoryId: string }
@@ -49,21 +70,24 @@ describe('LinkRepositoryDialog', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <LinkRepositoryDialog projectId="project-1" open onOpenChange={onOpenChange} />
+          <LinkRepositoryDialog teamId="team-1" projectId="project-1" open onOpenChange={onOpenChange} />
         </ToastProvider>
       </QueryClientProvider>,
     )
-    await userEvent.click(await screen.findByRole('combobox', { name: '选择仓库' }))
+    await userEvent.selectOptions(await screen.findByRole('combobox', { name: '来源连接' }), 'conn-2')
+    await userEvent.click(screen.getByRole('combobox', { name: '选择仓库' }))
     await userEvent.type(await screen.findByLabelText('搜索仓库'), 'lkwg')
     await userEvent.click(await screen.findByRole('option', { name: 'acme/lkwg' }))
-    await userEvent.click(screen.getByRole('button', { name: '关联仓库' }))
+    await userEvent.click(screen.getByRole('button', { name: '添加仓库' }))
     expect(linkedRepositoryId).toBe('repo-2')
     expect(onOpenChange).toHaveBeenCalledWith(false)
-    expect(queryClient.getQueryState(queryKey)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryData(queryKey)).toMatchObject({ data: [{ id: 'repo-2' }] })
   })
 
   it('没有可用仓库时提示去团队设置同步', async () => {
     server.use(
+      http.get('*/api/v1/teams/team-1/git-connections', () => ok([])),
+      http.get('*/api/v1/projects/project-1/repositories', () => ok([])),
       http.get('*/api/v1/projects/project-1/repositories/available', () =>
         ok({ items: [], page: 1, pageSize: 100, total: 0 }),
       ),
@@ -71,7 +95,7 @@ describe('LinkRepositoryDialog', () => {
     render(
       <QueryClientProvider client={createQueryClient()}>
         <ToastProvider>
-          <LinkRepositoryDialog projectId="project-1" open onOpenChange={() => undefined} />
+          <LinkRepositoryDialog teamId="team-1" projectId="project-1" open onOpenChange={() => undefined} />
         </ToastProvider>
       </QueryClientProvider>,
     )
