@@ -5,6 +5,7 @@ import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Select } from '@/shared/ui/controls/select'
@@ -197,7 +198,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
                 >
                   <TableCell>
                     <span className="item-cell">
-                      <span className="avatar">{member.name.slice(0, 1)}</span>
+                      <UserAvatar name={member.name} image={member.image} className="size-6" />
                       <strong>{member.name}</strong>
                       {member.userId === user?.id && <span className="badge">我</span>}
                     </span>

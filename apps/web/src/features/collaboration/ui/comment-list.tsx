@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { avatarToneClassName, memberInitial } from '@/shared/lib/avatar-tone'
 import { formatDateTime } from '@/shared/lib/format'
-import { cn } from '@/shared/lib/utils'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { commentsQueryOptions, type CollabTarget } from '../api/queries'
@@ -32,15 +31,7 @@ export function CommentList({ target, targetId }: { target: CollabTarget; target
       {comments.map((comment) => (
         <li key={comment.id} className="rounded-lg border bg-card p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span
-              aria-hidden="true"
-              className={cn(
-                'grid size-7 shrink-0 place-items-center rounded-full text-xs font-medium',
-                avatarToneClassName(comment.authorUserId),
-              )}
-            >
-              {memberInitial(comment.authorName)}
-            </span>
+            <UserAvatar name={comment.authorName} image={comment.authorImage} toneSeed={comment.authorUserId} />
             <span className="text-sm font-medium wrap-anywhere">{comment.authorName}</span>
             <time dateTime={comment.createdAt} className="text-xs text-muted-foreground">
               {formatDateTime(comment.createdAt)}

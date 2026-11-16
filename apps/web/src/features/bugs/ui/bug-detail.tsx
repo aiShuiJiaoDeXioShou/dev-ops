@@ -10,6 +10,7 @@ import { WorkItemDetailSheet } from '@/shared/ui/controls/work-item-detail-sheet
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline } from '@/features/collaboration/ui/activity-timeline'
 import { CommentForm } from '@/features/collaboration/ui/comment-form'
+import { CollaboratorTags } from '@/features/collaboration/ui/collaborator-tags'
 import { CommentList } from '@/features/collaboration/ui/comment-list'
 import { WorkItemLinks } from '@/features/collaboration/ui/work-item-links'
 import { CodeReferenceDialog } from '@/features/code/ui/code-reference-dialog'
@@ -26,43 +27,8 @@ import { describeAttachmentError } from '@/features/attachments/lib/errors'
 import { removeAttachment } from '@/features/attachments/api/attachments-api'
 import type { AttachmentSummary } from '@/features/attachments/model/types'
 import { projectQueryOptions } from '@/features/projects/api/queries'
-import { avatarToneClassName } from '@/shared/lib/avatar-tone'
-import { cn } from '@/shared/lib/utils'
-import type { BugDetail } from '../model/types'
 import { BugActionDialog, type BugAction } from './bug-action-dialog'
 import { BugForm } from './bug-form'
-
-/** 缺陷协作人员展示标签；失效成员保留并标注。 */
-function CollaboratorTags({ members }: { members: BugDetail['collaborators'] }) {
-  if (members.length === 0) return <span>无</span>
-  return (
-    <ul className="flex flex-wrap gap-1.5" aria-label="协作人员">
-      {members.map((member) => (
-        <li
-          key={member.userId}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border py-0.5 pr-2 pl-0.5 text-xs',
-            member.available
-              ? 'border-border bg-secondary text-secondary-foreground'
-              : 'border-destructive/40 bg-destructive/10 text-destructive',
-          )}
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              'grid size-5 shrink-0 place-items-center rounded-full text-xs font-medium',
-              avatarToneClassName(member.userId),
-            )}
-          >
-            {member.name.slice(0, 1)}
-          </span>
-          <span className="max-w-40 truncate">{member.name}</span>
-          {!member.available && <span className="shrink-0">已失效</span>}
-        </li>
-      ))}
-    </ul>
-  )
-}
 
 /** Bug 详情：基本信息、回归历史、动作、评论与活动。 */
 export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () => void }) {

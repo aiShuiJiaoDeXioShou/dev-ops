@@ -15,14 +15,11 @@ import {
 } from '@/shared/ui/controls/dialog'
 import { FormField, FormGrid, FormSection } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
-import {
-  MemberMultiSelect,
-  type MemberOption,
-  type MemberSelectionDetail,
-} from '@/shared/ui/controls/member-multiselect'
+import { MemberMultiSelect, type MemberSelectionDetail } from '@/shared/ui/controls/member-multiselect'
 import { MemberSelect } from '@/shared/ui/controls/member-select'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
+import { toMemberOption } from '@/features/identity/model/team-member'
 import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import { AttachmentField } from '@/features/attachments/ui/attachment-field'
 import { describeAttachmentError } from '@/features/attachments/lib/errors'
@@ -49,29 +46,6 @@ interface RequirementFieldErrors {
   title?: string
   contentMarkdown?: string
   externalUrl?: string
-}
-
-/**
- * 把团队接口返回值转换为成员选项，保留可用性用于回填已停用的负责人。
- * @param member 团队接口返回的成员。
- * @returns 成员选择控件使用的展示数据。
- */
-function toMemberOption(member: {
-  userId: string
-  name: string
-  email: string
-  role: 'admin' | 'developer' | 'viewer'
-  status: string
-}): MemberOption {
-  const isActive = member.status === 'active'
-  return {
-    userId: member.userId,
-    name: member.name,
-    email: member.email,
-    role: member.role,
-    status: isActive ? 'active' : 'disabled',
-    available: isActive,
-  }
 }
 
 /**
@@ -217,18 +191,16 @@ export function RequirementForm({
   const memberList = members.data?.data ?? []
   const teamMemberOptions = memberList.map(toMemberOption)
   const memberOptions = teamMemberOptions.filter((option) => option.available)
-  const collaboratorDetails: MemberSelectionDetail[] = collaboratorUserIds.map((userId) => {
-    const existing = requirement?.collaborators.find((item) => item.userId === userId)
-    if (existing) {
-      return { userId, name: existing.name, status: existing.status, available: existing.available }
-    }
-    const member = memberList.find((item) => item.userId === userId)
-    if (member) {
-      const isActive = member.status === 'active'
-      return { userId, name: member.name, status: isActive ? 'active' : 'disabled', available: isActive }
-    }
-    return { userId, name: '未知成员', status: 'missing', available: false }
-  })
+  const collaboratorDetails: MemberSelectionDetail[] = collaboratorUserIds.map(
+    (userId) =>
+      teamMemberOptions.find((member) => member.userId === userId) ??
+      requirement?.collaborators.find((member) => member.userId === userId) ?? {
+        userId,
+        name: '未知成员',
+        status: 'missing',
+        available: false,
+      },
+  )
   const membersError = members.isError ? describeRequestError(members.error).description : null
   const ownerPickerProps = {
     options: memberOptions,

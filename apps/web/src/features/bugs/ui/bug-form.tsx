@@ -16,13 +16,10 @@ import {
 } from '@/shared/ui/controls/dialog'
 import { FormField, FormGrid, FormSection } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
-import {
-  MemberMultiSelect,
-  type MemberOption,
-  type MemberSelectionDetail,
-} from '@/shared/ui/controls/member-multiselect'
+import { MemberMultiSelect, type MemberSelectionDetail } from '@/shared/ui/controls/member-multiselect'
 import { MemberSelect } from '@/shared/ui/controls/member-select'
 import { Textarea } from '@/shared/ui/controls/textarea'
+import { toMemberOption } from '@/features/identity/model/team-member'
 import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import { AttachmentField } from '@/features/attachments/ui/attachment-field'
 import { describeAttachmentError } from '@/features/attachments/lib/errors'
@@ -38,29 +35,6 @@ interface BugFieldErrors {
   phenomenon?: string
   expectedBehavior?: string
   reproduction?: string
-}
-
-/**
- * 把团队接口返回值转换为成员选项，保留状态以展示已停用的修复负责人。
- * @param member 团队接口返回的成员。
- * @returns 成员选择控件使用的展示数据。
- */
-function toMemberOption(member: {
-  userId: string
-  name: string
-  email: string
-  role: 'admin' | 'developer' | 'viewer'
-  status: string
-}): MemberOption {
-  const isActive = member.status === 'active'
-  return {
-    userId: member.userId,
-    name: member.name,
-    email: member.email,
-    role: member.role,
-    status: isActive ? 'active' : 'disabled',
-    available: isActive,
-  }
 }
 
 /**
@@ -219,12 +193,16 @@ export function BugForm({
   const memberList = members.data?.data ?? []
   const teamMemberOptions = memberList.map(toMemberOption)
   const memberOptions = teamMemberOptions.filter((option) => option.available)
-  const collaboratorDetails: MemberSelectionDetail[] = collaboratorUserIds.map((userId) => {
-    const member = memberList.find((item) => item.userId === userId)
-    if (!member) return { userId, name: '未知成员', status: 'missing', available: false }
-    const isActive = member.status === 'active'
-    return { userId, name: member.name, status: isActive ? 'active' : 'disabled', available: isActive }
-  })
+  const collaboratorDetails: MemberSelectionDetail[] = collaboratorUserIds.map(
+    (userId) =>
+      teamMemberOptions.find((member) => member.userId === userId) ??
+      bug?.collaborators.find((member) => member.userId === userId) ?? {
+        userId,
+        name: '未知成员',
+        status: 'missing',
+        available: false,
+      },
+  )
   const membersError = members.isError ? describeRequestError(members.error).description : null
   const hasUnfinishedAttachmentsPending = hasUnfinishedAttachments(attachments)
   /**

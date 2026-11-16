@@ -9,6 +9,7 @@ import { WorkItemDetailSheet } from '@/shared/ui/controls/work-item-detail-sheet
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline } from '@/features/collaboration/ui/activity-timeline'
 import { CommentForm } from '@/features/collaboration/ui/comment-form'
+import { CollaboratorTags } from '@/features/collaboration/ui/collaborator-tags'
 import { CommentList } from '@/features/collaboration/ui/comment-list'
 import { WorkItemLinks } from '@/features/collaboration/ui/work-item-links'
 import { CodeReferenceCard } from '@/features/code/ui/code-reference-card'
@@ -26,44 +27,9 @@ import { Markdown } from '@/shared/lib/markdown'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { requirementQueryOptions, submissionQueryOptions } from '../api/queries'
 import { canWriteRequirements, isEditable, requirementMutations } from '../api/mutations'
-import { avatarToneClassName } from '@/shared/lib/avatar-tone'
-import { cn } from '@/shared/lib/utils'
 import { REQUIREMENT_STATUS_LABELS, SELF_TEST_LABELS, requirementStatusTone } from '../model/labels'
-import type { RequirementDetail } from '../model/types'
 import { RequirementActionDialog, type RequirementAction } from './requirement-action-dialog'
 import { RequirementForm } from './requirement-form'
-
-/** 需求协作人员展示标签；失效成员保留并标注，不从历史数据中静默丢弃。 */
-function CollaboratorTags({ members }: { members: RequirementDetail['collaborators'] }) {
-  if (members.length === 0) return <span>无</span>
-  return (
-    <ul className="flex flex-wrap gap-1.5" aria-label="协作人员">
-      {members.map((member) => (
-        <li
-          key={member.userId}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border py-0.5 pr-2 pl-0.5 text-xs',
-            member.available
-              ? 'border-border bg-secondary text-secondary-foreground'
-              : 'border-destructive/40 bg-destructive/10 text-destructive',
-          )}
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              'grid size-5 shrink-0 place-items-center rounded-full text-xs font-medium',
-              avatarToneClassName(member.userId),
-            )}
-          >
-            {member.name.slice(0, 1)}
-          </span>
-          <span className="max-w-40 truncate">{member.name}</span>
-          {!member.available && <span className="shrink-0">已失效</span>}
-        </li>
-      ))}
-    </ul>
-  )
-}
 
 /** 需求详情：范围字段、关联、流程动作、评论与活动。 */
 export function RequirementDetailPane({ requirementId, onClose }: { requirementId: string; onClose: () => void }) {

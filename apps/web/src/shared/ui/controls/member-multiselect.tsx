@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { Popover as PopoverPrimitive } from 'radix-ui'
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react'
-import { avatarToneClassName, memberInitial } from '@/shared/lib/avatar-tone'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from './button'
 
@@ -12,6 +12,7 @@ export type MemberStatus = 'active' | 'disabled' | 'missing'
 export interface MemberOption {
   userId: string
   name: string
+  image?: string | null
   email: string
   role: MemberRole
   status: MemberStatus
@@ -20,11 +21,12 @@ export interface MemberOption {
 
 /**
  * 已选成员的展示详情。
- * 业务记录回填时只能提供姓名、状态与可用性，因此邮箱与角色缺省，避免伪造候选数据。
+ * 业务记录回填时提供姓名、可选头像、状态与可用性，因此邮箱与角色缺省，避免伪造候选数据。
  */
 export interface MemberSelectionDetail {
   userId: string
   name: string
+  image?: string | null
   status: MemberStatus
   available: boolean
 }
@@ -203,7 +205,7 @@ export function MemberMultiSelect({
   }
 
   /**
-   * 渲染已选标签：头像占位 + 姓名 + 移除；失效成员额外标注。
+   * 渲染已选标签：头像 + 姓名 + 移除；失效成员额外标注。
    * @param userId 已选成员 id。
    * @returns 标签元素；找不到详情时以“未知成员”兜底，不丢弃历史数据。
    */
@@ -223,16 +225,7 @@ export function MemberMultiSelect({
             : 'border-border bg-secondary text-secondary-foreground',
         )}
       >
-        <span
-          aria-hidden="true"
-          data-slot="member-tag-avatar"
-          className={cn(
-            'grid size-5 shrink-0 place-items-center rounded-full text-xs font-medium',
-            avatarToneClassName(userId),
-          )}
-        >
-          {memberInitial(name)}
-        </span>
+        <UserAvatar name={name} image={detail?.image} toneSeed={userId} className="size-5" />
         <span className="max-w-40 truncate">{name}</span>
         {invalid && <span className="shrink-0">已失效</span>}
         {!disabled && (
@@ -390,16 +383,7 @@ export function MemberMultiSelect({
                       onMouseEnter={() => setHighlighted(index)}
                       onClick={() => toggleMember(option)}
                     >
-                      <span
-                        aria-hidden="true"
-                        data-slot="member-option-avatar"
-                        className={cn(
-                          'grid size-7 shrink-0 place-items-center rounded-full text-xs font-medium',
-                          avatarToneClassName(option.userId),
-                        )}
-                      >
-                        {memberInitial(option.name)}
-                      </span>
+                      <UserAvatar name={option.name} image={option.image} toneSeed={option.userId} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate">
                           {option.name}

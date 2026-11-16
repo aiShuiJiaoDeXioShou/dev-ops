@@ -3,7 +3,7 @@ import { useSession } from '@/features/identity/model/session'
 import { ApiTokenSection } from '@/features/identity/ui/api-token-section'
 import { ChangePasswordDialog } from '@/features/identity/ui/change-password-dialog'
 import { EditProfileDialog } from '@/features/identity/ui/edit-profile-dialog'
-import { ProfileAvatar } from '@/features/identity/ui/profile-avatar'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 
 /**
@@ -38,7 +38,7 @@ export function Component() {
           <section className="max-w-2xl divide-y rounded-xl border bg-card" aria-labelledby="profile-name">
             <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
               <div className="flex min-w-0 items-center gap-3">
-                <ProfileAvatar name={user.name} image={user.image} className="size-12 text-lg" />
+                <UserAvatar name={user.name} image={user.image} className="size-12 text-lg" />
                 <h2 id="profile-name" className="mb-0 wrap-anywhere text-base font-semibold">
                   {user.name}
                 </h2>

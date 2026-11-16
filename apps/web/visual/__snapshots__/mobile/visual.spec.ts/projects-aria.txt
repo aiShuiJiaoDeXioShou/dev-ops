@@ -392,7 +392,7 @@
       - /url: /projects/b297c9a0-9503-524a-b1e7-bec5342996c7/requirements
     - paragraph: dev-proj-update
     - button "[audit] 权限测试项目项目设置"
-    - text: 进行中 管 管理员
+    - text: 进行中 管理员
     - link "0 待处理需求":
       - /url: /projects/b297c9a0-9503-524a-b1e7-bec5342996c7/requirements
       - strong: "0"
@@ -414,7 +414,7 @@
       - /url: /projects/76814609-c626-5568-9489-7d25f2d4b376/requirements
     - paragraph: "[audit] 用于 UI 审计的临时项目，请勿删除。"
     - button "[audit] 项目-UI-审计项目设置"
-    - text: 进行中 管 管理员
+    - text: 进行中 管理员
     - link "0 待处理需求":
       - /url: /projects/76814609-c626-5568-9489-7d25f2d4b376/requirements
       - strong: "0"
@@ -436,7 +436,7 @@
       - /url: /projects/ea012525-b981-53de-810f-773c485546b3/requirements
     - paragraph: 暂无项目说明
     - button "[audit] dev project项目设置"
-    - text: 进行中 开 开发同学
+    - text: 进行中 开发同学
     - link "0 待处理需求":
       - /url: /projects/ea012525-b981-53de-810f-773c485546b3/requirements
       - strong: "0"
@@ -458,7 +458,7 @@
       - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/requirements
     - paragraph: 项目管理与运维平台本体（平台自举测试项目）
     - button "dev-ops 平台项目设置"
-    - text: 进行中 管 管理员
+    - text: 进行中 管理员
     - link "7 待处理需求":
       - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/requirements
       - strong: "7"

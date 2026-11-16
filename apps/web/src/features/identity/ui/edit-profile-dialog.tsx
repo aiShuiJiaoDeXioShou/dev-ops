@@ -13,7 +13,7 @@ import { Input } from '@/shared/ui/controls/input'
 import { useToast } from '@/shared/ui/toast'
 import { updateProfile, type AuthUser } from '../api/auth-client'
 import { sessionQueryOptions } from '../api/queries'
-import { ProfileAvatar } from './profile-avatar'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 
 const AVATAR_SIZE = 160
 const MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -119,6 +119,15 @@ export function EditProfileDialog({ user }: { user: AuthUser }) {
         session?.user.id === user.id ? { ...session, user: { ...session.user, ...input } } : session,
       )
       void queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey })
+      for (const queryKey of [
+        ['identity', 'members'],
+        ['collaboration', 'comments'],
+        ['projects', 'list'],
+        ['requirements', 'detail'],
+        ['bugs', 'detail'],
+      ]) {
+        void queryClient.invalidateQueries({ queryKey })
+      }
       setOpen(false)
       showToast('个人资料已保存。', 'success')
     } catch (cause) {
@@ -155,7 +164,7 @@ export function EditProfileDialog({ user }: { user: AuthUser }) {
         </DialogHeader>
         <form className="space-y-5" onSubmit={(event) => void save(event)}>
           <div className="flex flex-wrap items-center gap-4">
-            <ProfileAvatar name={name} image={image} className="size-16 text-xl" />
+            <UserAvatar name={name} image={image} className="size-16 text-xl" />
             <div className="min-w-0 space-y-1.5">
               <div className="flex flex-wrap gap-2">
                 <Input

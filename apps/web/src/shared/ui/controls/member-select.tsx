@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import { Popover } from 'radix-ui'
-import { avatarToneClassName, memberInitial } from '@/shared/lib/avatar-tone'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from './button'
 import { Input } from './input'
@@ -181,15 +181,7 @@ export function MemberSelect({
                 <span id={valueId} className="min-w-0">
                   {value ? (
                     <span className="inline-flex max-w-full items-center gap-1 rounded-full border bg-secondary py-0.5 pr-2 pl-0.5">
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          'grid size-5 shrink-0 place-items-center rounded-full text-xs font-medium',
-                          avatarToneClassName(value),
-                        )}
-                      >
-                        {memberInitial(selectedName)}
-                      </span>
+                      <UserAvatar name={selectedName} image={selected?.image} toneSeed={value} className="size-5" />
                       <span className="truncate">{selectedName}</span>
                       {unavailable && <span className="shrink-0 text-xs text-destructive">已失效</span>}
                     </span>
@@ -243,15 +235,7 @@ export function MemberSelect({
                 }}
                 onClick={() => choose(member.userId)}
               >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'grid size-7 shrink-0 place-items-center rounded-full text-xs font-medium',
-                    avatarToneClassName(member.userId),
-                  )}
-                >
-                  {memberInitial(member.name)}
-                </span>
+                <UserAvatar name={member.name} image={member.image} toneSeed={member.userId} />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline gap-1">
                     <span className="truncate">{member.name}</span>

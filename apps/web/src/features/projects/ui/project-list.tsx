@@ -5,6 +5,7 @@ import { ArrowRight, Folder, Plus, Search, Settings, TriangleAlert, Users } from
 import { useSession } from '@/features/identity/model/session'
 import { describeRequestError } from '@/shared/api/errors'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 import { EmptyState } from '@/shared/ui/page-state'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
@@ -207,7 +208,7 @@ export function ProjectList() {
                     {PROJECT_STATUS_LABELS[project.status]}
                   </span>
                   <span className="project-owner">
-                    <span className="avatar compact">{project.owner.name.slice(0, 1)}</span>
+                    <UserAvatar name={project.owner.name} image={project.owner.image} className="size-5" />
                     {project.owner.name}
                   </span>
                 </div>
