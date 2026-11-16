@@ -119,7 +119,8 @@ function FileTree({
           <div key={node.path}>
             <button
               type="button"
-              className={`file ${!isDirectory && activePath === node.path ? 'active' : ''} ${isDirectory ? (isExpanded ? 'directory expanded' : 'directory') : ''}`}
+              className={`file ${!isDirectory && activePath === node.path ? 'active' : ''} ${isDirectory ? 'directory' : ''}`}
+              aria-expanded={isDirectory ? isExpanded : undefined}
               style={{ paddingLeft: 10 + depth * 14 }}
               onClick={() => (isDirectory ? onToggle(node.path) : onSelect(node.path))}
             >

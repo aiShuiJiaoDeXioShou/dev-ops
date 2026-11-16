@@ -194,6 +194,18 @@ test.describe('[desktop] 核心页面', () => {
         await expect(page.getByRole('tab', { name: /测试/ }).first()).toBeVisible()
       }
       if (name === 'code') {
+        const fileTree = page.getByRole('navigation', { name: '文件目录' })
+        const directory = fileTree.getByRole('button', { name: '.devops', exact: true })
+        const subdirectory = fileTree.getByRole('button', { name: 'workflows', exact: true })
+        await expect(directory).toHaveAttribute('aria-expanded', 'false')
+        await expect(directory.locator('.lucide-chevron-right')).toHaveCSS('transform', 'none')
+        await directory.click()
+        await expect(directory).toHaveAttribute('aria-expanded', 'true')
+        await expect(directory.locator('.lucide-chevron-down')).toHaveCSS('transform', 'none')
+        await expect(subdirectory).toBeVisible()
+        await directory.click()
+        await expect(subdirectory).toHaveCount(0)
+
         // 代码变更收进工具栏抽屉；写能力调用由日志图标打开，均不再铺在代码浏览器下方。
         await page.getByRole('button', { name: '代码变更' }).first().click()
         await expect(page.locator('.code-change-card').first()).toBeVisible()
