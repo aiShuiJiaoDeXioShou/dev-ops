@@ -52,7 +52,7 @@ export function ProjectList() {
   }, [filters.search])
   useEffect(() => {
     if (searchInput === filters.search) return
-    // 搜索输入防抖后再改 URL 和查询条件，避免逐字触发项目列表和耗时晴雨表请求。
+    // 搜索输入防抖后再改 URL 和查询条件，避免逐字触发项目列表与晴雨表请求。
     const timer = window.setTimeout(() => {
       const next = updateProjectFilters(parseProjectFilters(params), { search: searchInput })
       setParams(projectFilterParams(next))

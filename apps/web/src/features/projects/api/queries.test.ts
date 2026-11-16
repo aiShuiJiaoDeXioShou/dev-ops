@@ -9,13 +9,10 @@ describe('projectListQueryOptions', () => {
 })
 
 describe('projectActivityQueryOptions', () => {
-  it('项目晴雨表在一个会话内缓存，不随重新挂载或窗口聚焦刷新', () => {
+  it('项目晴雨表缓存一分钟，页面打开期间读取后台同步结果', () => {
     const options = projectActivityQueryOptions('team-1', { source: 'all' })
-    expect(options.staleTime).toBe(Number.POSITIVE_INFINITY)
-    expect(options.gcTime).toBe(60 * 60_000)
-    expect(options.refetchOnWindowFocus).toBe(false)
-    expect(options.refetchOnReconnect).toBe(false)
-    expect(options.retry).toBe(false)
+    expect(options.staleTime).toBe(60_000)
+    expect(options.refetchInterval).toBe(60_000)
     expect(options.placeholderData).toBeDefined()
   })
 
