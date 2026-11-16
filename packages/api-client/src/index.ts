@@ -383,6 +383,50 @@ export function createApiClient(options: ApiClientOptions) {
     async me(options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/me', 'get'>>('/api/v1/me', 'GET', undefined, options)
     },
+    /** 读取浏览器当前用户的 GitHub 绑定状态，不返回授权凭据。 */
+    async getGitHubAccount(options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/me/github-account', 'get'>>(
+        '/api/v1/me/github-account',
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 发起当前账号的 GitHub 授权，成功后返回浏览器应打开的授权地址。 */
+    async authorizeGitHubAccount(
+      body: ApiBody<'/api/v1/me/github-account/authorize', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/me/github-account/authorize', 'post'>>(
+        '/api/v1/me/github-account/authorize',
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 检查项目成员的个人 GitHub 权限后取得写操作地址。
+     * @param projectId 项目标识。
+     * @param repositoryId 项目已关联的 GitHub 仓库。
+     * @param body 创建 PR 或编辑分支文件的操作。
+     * @param options 请求取消等调用选项。
+     * @returns GitHub 地址；未绑定、权限不足或连接失效时抛出业务错误。
+     */
+    async openGitHubRepositoryAction(
+      projectId: string,
+      repositoryId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/repositories/{repositoryId}/github-action', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/projects/{projectId}/repositories/{repositoryId}/github-action', 'post'>
+      >(
+        `/api/v1/projects/${segment(projectId)}/repositories/${segment(repositoryId)}/github-action`,
+        'POST',
+        body,
+        options,
+      )
+    },
     /** 读取当前账号的 API Token 元数据。 */
     async listApiTokens(options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/me/tokens', 'get'>>('/api/v1/me/tokens', 'GET', undefined, options)
