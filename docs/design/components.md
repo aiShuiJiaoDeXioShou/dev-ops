@@ -124,7 +124,7 @@ import { Dialog } from 'radix-ui'
 - **FormField**（`shared/ui/controls/form-field.tsx`）：统一标签、必填标记、帮助文案与字段级错误（`role="alert"`），错误紧贴控件，提交失败滚动并聚焦首个错误字段。
 - **FormSection / FormGrid**：字段分组间距 24px、组内 16px；桌面双列、窄屏单列。
 - **Dialog `layout="form"`**：桌面宽 720px、最大高 `calc(100vh - 64px)`；标题栏 84px、底部操作栏 76px，仅内容区滚动；默认布局行为不变。
-- **MemberSelect**（`shared/ui/controls/member-select.tsx`）：需求负责人使用可清空的人员单选。展开时在原位置按姓名或邮箱搜索，候选显示头像、姓名、邮箱与已选勾号。用 `FormField` 的 `htmlFor` 关联字段 ID，清空返回空字符串，随表单一起保存。
+- **MemberSelect**（`shared/ui/controls/member-select.tsx`）：需求负责人和 Bug 修复负责人使用可清空的人员单选。展开时在原位置按姓名或邮箱搜索，候选显示头像、姓名、邮箱与已选勾号。用 `FormField` 的 `htmlFor` 关联字段 ID，清空返回空字符串，随表单一起保存。
 - **MemberMultiSelect**：已选标签 = 20px 头像位（姓名首字占位，头像功能上线后替换）+ 姓名 + 移除；候选行 = 28px 头像位 + 姓名 + 团队角色 + 勾选态；支持姓名/邮箱检索、键盘操作与失效标记。
 - **AttachmentField / AttachmentList**：附件行包含文件图标、名称（长名中间省略）、大小、进度/取消/重试；列表提供下载与删除二次确认；全部上传完成前禁止提交。
 

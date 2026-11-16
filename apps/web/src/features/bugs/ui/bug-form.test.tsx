@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
-import { server, success } from '@/test/server'
+import { memberFixture, server, success } from '@/test/server'
+import type { BugDetail } from '../model/types'
 import { BugForm } from './bug-form'
 
 /** 上传成功时固定返回的临时附件摘要，便于断言提交体。 */
@@ -43,10 +44,17 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = ResizeObserverStub
 }
 
-function renderForm() {
+function renderForm(options: { bug?: BugDetail; requirementId?: string } = {}) {
   return render(
     <QueryClientProvider client={createQueryClient()}>
-      <BugForm projectId="project-1" teamId="team-1" open onOpenChange={() => undefined} />
+      <BugForm
+        projectId="project-1"
+        teamId="team-1"
+        currentUserId={memberFixture.userId}
+        open
+        onOpenChange={() => undefined}
+        {...options}
+      />
     </QueryClientProvider>,
   )
 }
@@ -113,10 +121,57 @@ describe('BugForm', () => {
     await userEvent.click(within(listbox).getByRole('option', { name: /测试用户/ }))
     expect(await screen.findByRole('button', { name: '移除 测试用户' })).toBeInTheDocument()
   })
+
+  it('编辑时回填已离队的修复负责人，清空后仍用原版本保存', async () => {
+    const bug: BugDetail = {
+      id: 'bug-1',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      number: 1,
+      title: '上传附件后列表为空',
+      status: 'pending',
+      fixOwner: { userId: 'left-user', name: '离队同学', status: 'missing', available: false },
+      regressionOwner: null,
+      version: 3,
+      updatedAt: '2026-11-11T00:00:00.000Z',
+      phenomenon: '上传后列表为空',
+      expectedBehavior: '列表显示附件',
+      reproduction: '上传截图',
+      reproductionUnknown: false,
+      evidenceText: null,
+      evidenceUrl: null,
+      createdByUserId: memberFixture.userId,
+      createdAt: '2026-11-11T00:00:00.000Z',
+      collaborators: [],
+      attachments: [],
+      linkedRequirements: [],
+      linkedCodeReferences: [],
+      regressions: [],
+    }
+    let submittedBody: unknown
+    server.use(
+      http.post('*/api/v1/bugs/bug-1/update', async ({ request }) => {
+        submittedBody = await request.json()
+        return success({ id: bug.id })
+      }),
+    )
+    renderForm({ bug })
+    const owner = () => screen.getByRole('button', { name: '修复负责人' })
+    expect(owner()).toHaveTextContent('离队同学已失效')
+    await userEvent.click(owner())
+    expect(screen.getByRole('combobox', { name: '修复负责人' })).toHaveFocus()
+    expect(await screen.findByText('清除选择')).toBeInTheDocument()
+    await userEvent.keyboard('{ArrowUp}{Enter}')
+    expect(owner()).toHaveTextContent('未指定')
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(submittedBody).toMatchObject({ fixOwnerUserId: null, version: bug.version, title: bug.title }),
+    )
+  })
 })
 
 describe('BugForm 附件接入', () => {
-  it('从需求详情快捷创建时附件与协作人只归属新缺陷', async () => {
+  it('从需求详情快捷创建时一并提交修复负责人、附件和需求关联', async () => {
     let submittedBody: unknown = null
     server.use(
       http.post('*/api/v1/projects/project-1/attachments', () => success({ attachment: uploadedAttachmentFixture })),
@@ -125,18 +180,21 @@ describe('BugForm 附件接入', () => {
         return success({ id: 'bug-1' })
       }),
     )
-    render(
-      <QueryClientProvider client={createQueryClient()}>
-        <BugForm projectId="project-1" teamId="team-1" open onOpenChange={() => undefined} requirementId="req-1" />
-      </QueryClientProvider>,
-    )
+    renderForm({ requirementId: 'req-1' })
     const input = await readyFileInput()
     await userEvent.upload(input, new File(['shot'], '截图.png', { type: 'image/png' }))
     expect(await screen.findByText(/已上传/)).toBeInTheDocument()
     await fillRequiredFields()
+    await userEvent.click(screen.getByRole('button', { name: '修复负责人' }))
+    const search = screen.getByRole('combobox', { name: '修复负责人' })
+    await userEvent.type(search, memberFixture.email.toUpperCase())
+    expect(await screen.findByText(memberFixture.email)).toBeInTheDocument()
+    await userEvent.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: '修复负责人' })).toHaveTextContent(memberFixture.name)
     await userEvent.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() => expect(submittedBody).not.toBeNull())
     expect(submittedBody).toMatchObject({
+      fixOwnerUserId: memberFixture.userId,
       attachmentIds: ['att-1'],
       collaboratorUserIds: [],
       requirementIds: ['req-1'],
@@ -153,11 +211,7 @@ describe('BugForm 附件接入', () => {
         ),
       ),
     )
-    render(
-      <QueryClientProvider client={createQueryClient()}>
-        <BugForm projectId="project-1" teamId="team-1" open onOpenChange={() => undefined} />
-      </QueryClientProvider>,
-    )
+    renderForm()
     const input = await readyFileInput()
     await userEvent.upload(input, new File(['shot'], '截图.png', { type: 'image/png' }))
     expect(await screen.findByText(/已上传/)).toBeInTheDocument()

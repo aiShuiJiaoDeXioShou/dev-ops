@@ -68,6 +68,7 @@ export function MemberSelect({
   const initialIndex = selectedIndex >= 0 || matches.length === 0 ? selectedIndex : 0
   const activeIndex = highlighted !== null && highlighted < optionCount ? highlighted : initialIndex
   const canResetSearch = !loading && keyword !== '' && matches.length === 0
+  const hasSearchAction = Boolean(error) || canResetSearch
   const emptyMessage = keyword ? '无匹配成员' : '暂无可选成员'
   const status = error ?? (matches.length === 0 && (loading ? '成员加载中…' : emptyMessage))
 
@@ -131,7 +132,7 @@ export function MemberSelect({
                 ref={searchRef}
                 role="combobox"
                 type="text"
-                className={cn('h-11', (error || canResetSearch) && 'pr-24')}
+                className={cn('h-11', hasSearchAction && 'pr-24')}
                 placeholder="搜索姓名或邮箱"
                 value={query}
                 autoFocus
@@ -143,23 +144,23 @@ export function MemberSelect({
                 onChange={(event) => changeQuery(event.target.value)}
                 onKeyDown={handleSearchKey}
               />
-              {(error || canResetSearch) && (
-                <Button
-                  type="button"
-                  data-slot="member-select-search-action"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-1/2 right-1 h-10 -translate-y-1/2 px-2 text-xs"
-                  disabled={loading}
-                  onClick={() => {
-                    searchRef.current?.focus()
-                    if (error) onRetry()
-                    else changeQuery('')
-                  }}
-                >
-                  {error ? '重试' : '清除搜索'}
-                </Button>
-              )}
+              {/* 触屏会在点击处理后判断是否点到浮层外，保留按钮节点才能识别为搜索区内操作。 */}
+              <Button
+                type="button"
+                data-slot="member-select-search-action"
+                variant="ghost"
+                size="sm"
+                className="absolute top-1/2 right-1 h-10 -translate-y-1/2 px-2 text-xs"
+                hidden={!hasSearchAction}
+                disabled={loading}
+                onClick={() => {
+                  searchRef.current?.focus()
+                  if (error) onRetry()
+                  else changeQuery('')
+                }}
+              >
+                {error ? '重试' : '清除搜索'}
+              </Button>
             </>
           ) : (
             <Popover.Trigger asChild>

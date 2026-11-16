@@ -21,7 +21,7 @@ import {
   type MemberOption,
   type MemberSelectionDetail,
 } from '@/shared/ui/controls/member-multiselect'
-import { Select } from '@/shared/ui/controls/select'
+import { MemberSelect } from '@/shared/ui/controls/member-select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import { AttachmentField } from '@/features/attachments/ui/attachment-field'
@@ -41,9 +41,9 @@ interface BugFieldErrors {
 }
 
 /**
- * 把团队接口返回值转换为成员多选候选；候选只保留正常成员。
+ * 把团队接口返回值转换为成员选项，保留状态以展示已停用的修复负责人。
  * @param member 团队接口返回的成员。
- * @returns 成员多选所需选项；已停用成员不进入候选。
+ * @returns 成员选择控件使用的展示数据。
  */
 function toMemberOption(member: {
   userId: string
@@ -72,10 +72,15 @@ function focusField(target: HTMLElement | null) {
   target?.focus()
 }
 
-/** 创建或编辑 Bug。 */
+/**
+ * 渲染 Bug 创建和编辑表单，修复负责人随表单一起保存。
+ * @param props 项目、团队、当前用户、待编辑 Bug、关联需求与弹窗回调。
+ * @returns Bug 表单弹窗，保存失败时保留草稿。
+ */
 export function BugForm({
   projectId,
   teamId,
+  currentUserId,
   open,
   onOpenChange,
   bug,
@@ -84,6 +89,7 @@ export function BugForm({
 }: {
   projectId: string
   teamId: string
+  currentUserId: string
   open: boolean
   onOpenChange: (open: boolean) => void
   bug?: BugDetail | null
@@ -106,6 +112,7 @@ export function BugForm({
   const [attachmentError, setAttachmentError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<BugFieldErrors>({})
   const [error, setError] = useState('')
+  const [formBody, setFormBody] = useState<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const phenomenonRef = useRef<HTMLTextAreaElement>(null)
   const expectedBehaviorRef = useRef<HTMLTextAreaElement>(null)
@@ -210,7 +217,8 @@ export function BugForm({
   }
 
   const memberList = members.data?.data ?? []
-  const memberOptions = memberList.map(toMemberOption).filter((option) => option.available)
+  const teamMemberOptions = memberList.map(toMemberOption)
+  const memberOptions = teamMemberOptions.filter((option) => option.available)
   const collaboratorDetails: MemberSelectionDetail[] = collaboratorUserIds.map((userId) => {
     const member = memberList.find((item) => item.userId === userId)
     if (!member) return { userId, name: '未知成员', status: 'missing', available: false }
@@ -234,7 +242,7 @@ export function BugForm({
           <DialogFormHeader>
             <DialogTitle className="text-xl">{bug ? '编辑 Bug' : '创建 Bug'}</DialogTitle>
           </DialogFormHeader>
-          <DialogFormBody>
+          <DialogFormBody ref={setFormBody}>
             <div className="space-y-6">
               <FormSection title="基本信息">
                 <FormField label="标题" htmlFor="bug-title" required error={fieldErrors.title}>
@@ -329,19 +337,21 @@ export function BugForm({
               </FormSection>
               <FormSection title="负责人与协作人">
                 <FormField label="修复负责人" htmlFor="bug-fix-owner">
-                  <Select
-                    className="flex w-full"
+                  <MemberSelect
                     id="bug-fix-owner"
                     value={fixOwnerUserId}
-                    onChange={(event) => setFixOwnerUserId(event.target.value)}
-                  >
-                    <option value="">未指定</option>
-                    {memberList.map((member) => (
-                      <option key={member.userId} value={member.userId}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </Select>
+                    onValueChange={setFixOwnerUserId}
+                    options={memberOptions}
+                    selectedDetail={
+                      teamMemberOptions.find((member) => member.userId === fixOwnerUserId) ?? bug?.fixOwner
+                    }
+                    currentUserId={currentUserId}
+                    loading={members.isPending || members.isFetching}
+                    error={membersError}
+                    onRetry={() => void members.refetch()}
+                    disabled={mutation.isPending}
+                    collisionBoundary={formBody}
+                  />
                 </FormField>
                 <FormField
                   label="协作人员"

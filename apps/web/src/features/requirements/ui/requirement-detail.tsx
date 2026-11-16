@@ -363,6 +363,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
           <BugForm
             projectId={detail.projectId}
             teamId={detail.teamId}
+            currentUserId={user.id}
             requirementId={detail.id}
             open={bugOpen}
             onOpenChange={setBugOpen}

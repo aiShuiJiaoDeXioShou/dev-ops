@@ -24,7 +24,7 @@ import { BugForm } from './bug-form'
 
 /** 项目 Bug 列表与右侧详情；结构与事项页一致。 */
 export function BugList({ projectId }: { projectId: string }) {
-  const { role } = useSession()
+  const { role, user } = useSession()
   const project = useQuery(projectQueryOptions(projectId))
   const [params, setParams] = useSearchParams()
   const state = parseListState(params, { statuses: Object.keys(BUG_STATUS_LABELS) })
@@ -194,6 +194,7 @@ export function BugList({ projectId }: { projectId: string }) {
         <BugForm
           projectId={projectId}
           teamId={project.data.data.teamId}
+          currentUserId={user.id}
           open={createOpen}
           onOpenChange={setCreateOpen}
           onSaved={(id) => update({ openId: id })}

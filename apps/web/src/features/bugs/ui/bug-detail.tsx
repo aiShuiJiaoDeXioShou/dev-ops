@@ -373,6 +373,7 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
       <BugForm
         projectId={bug.projectId}
         teamId={bug.teamId}
+        currentUserId={user.id}
         open={editOpen}
         onOpenChange={setEditOpen}
         bug={bug}
