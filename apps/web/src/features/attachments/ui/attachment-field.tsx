@@ -10,6 +10,7 @@ import { formatFileSize, truncateFileName } from '../lib/display'
 import { hasUnfinishedAttachments } from '../lib/pending'
 import { isUploadAborted, uploadAttachment, type AttachmentUploadHandle } from '../lib/upload'
 import type { PendingAttachment } from '../model/types'
+import { AttachmentPreviewButton } from './attachment-preview'
 
 /** 同时上传的文件数上限；避免一次选择多个大文件时抢占带宽并拖慢整体反馈。 */
 const MAX_CONCURRENT_UPLOADS = 3
@@ -137,6 +138,7 @@ export function AttachmentField({
           status: 'done',
           progress: 100,
           attachmentId: attachment.id,
+          contentType: attachment.contentType,
           error: undefined,
         })
       })
@@ -297,6 +299,11 @@ export function AttachmentField({
           )}
         </div>
         <div className="flex items-center gap-1">
+          {row.status === 'done' && row.attachmentId && (
+            <AttachmentPreviewButton
+              file={{ id: row.attachmentId, fileName: row.fileName, contentType: row.contentType ?? null }}
+            />
+          )}
           {row.status === 'uploading' && (
             <Button
               type="button"

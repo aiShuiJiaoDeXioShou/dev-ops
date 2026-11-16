@@ -82,13 +82,13 @@ function isAttachmentPolicy(value: unknown): value is AttachmentPolicy {
 }
 
 /**
- * 发起同源 JSON 请求并处理网络异常。
+ * 发起同源附件请求并处理网络异常。
  * @param path 以 `/api/v1` 开头的接口路径。
  * @param init fetch 选项；调用方负责指定方法与请求体。
- * @returns 原始响应，供统一信封解析。
+ * @returns 原始响应，供调用方解析信封或文件流。
  * @throws RequestError 网络不可达时抛出；请求被取消时原样抛出取消原因。
  */
-async function requestJson(path: string, init: RequestInit): Promise<Response> {
+async function requestAttachment(path: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(path, { credentials: 'same-origin', headers: { Accept: 'application/json' }, ...init })
   } catch (cause) {
@@ -98,13 +98,48 @@ async function requestJson(path: string, init: RequestInit): Promise<Response> {
 }
 
 /**
+ * 生成当前会话可访问的同源附件下载地址，临时附件也经服务端校验。
+ * @param attachmentId 附件标识。
+ * @returns 附件下载接口路径。
+ */
+export function attachmentDownloadPath(attachmentId: string): string {
+  return `/api/v1/attachments/${encodeURIComponent(attachmentId)}/download`
+}
+
+/**
+ * 通过既有下载接口读取预览文件，按响应类型区分二进制和业务失败信封。
+ * @param attachmentId 待预览的附件标识。
+ * @param signal 关闭预览时取消请求的信号。
+ * @returns 下载接口返回的文件内容。
+ * @throws RequestError 无权限、文件不可用或返回值不是文件时抛出。
+ */
+export async function fetchAttachmentBlob(attachmentId: string, signal: AbortSignal): Promise<Blob> {
+  const response = await requestAttachment(attachmentDownloadPath(attachmentId), {
+    method: 'GET',
+    signal,
+    headers: { Accept: 'application/octet-stream' },
+  })
+  const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+  if (response.ok && contentType === 'application/octet-stream') return response.blob()
+  if (contentType === 'application/json') await readEnvelopeData(response)
+  throw new RequestError('附件响应格式不正确，请重试。', {
+    code: 'INVALID_RESPONSE',
+    status: response.status,
+    requestId: response.headers.get('x-request-id'),
+  })
+}
+
+/**
  * 读取附件上传策略；上限值由服务端集中配置，前端据此做前置校验。
  * @param signal 查询取消信号。
  * @returns 单文件、单次、单记录上限与临时附件保留小时数。
  * @throws RequestError 请求失败或响应不符合信封契约时抛出。
  */
 export async function fetchAttachmentPolicy(signal?: AbortSignal): Promise<AttachmentPolicy> {
-  const response = await requestJson('/api/v1/attachments/policy', { method: 'GET', ...(signal ? { signal } : {}) })
+  const response = await requestAttachment('/api/v1/attachments/policy', {
+    method: 'GET',
+    ...(signal ? { signal } : {}),
+  })
   const data = await readEnvelopeData(response)
   if (!isAttachmentPolicy(data)) {
     throw new RequestError('附件上传限制响应格式不正确，请稍后重试。', { code: 'INVALID_RESPONSE' })
@@ -119,7 +154,7 @@ export async function fetchAttachmentPolicy(signal?: AbortSignal): Promise<Attac
  * @throws RequestError 无权限、附件不存在或存储不可用时抛出。
  */
 export async function removeAttachment(attachmentId: string): Promise<void> {
-  const response = await requestJson(`/api/v1/attachments/${encodeURIComponent(attachmentId)}/remove`, {
+  const response = await requestAttachment(`/api/v1/attachments/${encodeURIComponent(attachmentId)}/remove`, {
     method: 'POST',
   })
   await readEnvelopeData(response)

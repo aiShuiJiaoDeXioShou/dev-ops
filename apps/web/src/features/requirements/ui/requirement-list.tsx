@@ -125,6 +125,7 @@ export function RequirementList({ projectId }: { projectId: string }) {
                   className={`clickable-row${state.openId === item.id ? ' selected' : ''}`}
                   onClick={(event) => {
                     if (isNestedInteractiveTarget(event.target)) return
+                    event.currentTarget.querySelector<HTMLButtonElement>('.item-title')?.focus({ preventScroll: true })
                     update({ openId: item.id })
                   }}
                 >
@@ -135,7 +136,10 @@ export function RequirementList({ projectId }: { projectId: string }) {
                         type="button"
                         variant="ghost"
                         className="item-title"
-                        onClick={() => update({ openId: item.id })}
+                        onClick={(event) => {
+                          event.currentTarget.focus({ preventScroll: true })
+                          update({ openId: item.id })
+                        }}
                       >
                         <span className="item-id">#{item.number}</span>
                         <span className="item-title-text">{item.title}</span>

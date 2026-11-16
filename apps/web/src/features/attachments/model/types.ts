@@ -23,6 +23,8 @@ export interface PendingAttachment {
   progress: number
   /** 上传成功后由服务端返回的附件标识。 */
   attachmentId?: string
+  /** 上传完成后用于判断可预览的格式。 */
+  contentType?: string | null
   /** 失败原因，用于行内展示与重试提示。 */
   error?: string
 }

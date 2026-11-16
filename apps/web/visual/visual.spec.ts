@@ -1,4 +1,4 @@
-import { test, expect, type Page, type TestInfo } from '@playwright/test'
+import { test, expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { installApiMocks } from './mock-api'
 import { VISUAL_IDS } from './fixtures'
 
@@ -90,11 +90,16 @@ async function captureLayout(page: Page, testInfo: TestInfo, name: string): Prom
 }
 
 /** 记录页面主内容与布局；页面依赖的 API 全部来自确定性 mock。 */
-async function expectPageSnapshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
+async function expectPageSnapshot(
+  page: Page,
+  testInfo: TestInfo,
+  name: string,
+  ariaRoot: Locator = page.locator('main'),
+): Promise<void> {
   const layout = await captureLayout(page, testInfo, name)
   const stableLayout = { ...layout, smallTargets: layout.smallTargets.map(normalizeRelativeTime) }
   expect(JSON.stringify(stableLayout, null, 2)).toMatchSnapshot(`${name}.json`)
-  expect(normalizeRelativeTime(await page.locator('main').ariaSnapshot())).toMatchSnapshot(`${name}.aria.txt`)
+  expect(normalizeRelativeTime(await ariaRoot.ariaSnapshot())).toMatchSnapshot(`${name}.aria.txt`)
 }
 
 test('[desktop] [mobile] 工作区与项目设置弹窗沿用明暗主题的弱背景和次级文字色', async ({ page }, testInfo) => {
@@ -156,9 +161,17 @@ test.describe('[desktop] 核心页面', () => {
     await expect(page.locator('.filter-select svg')).toHaveCount(1)
     const filterBox = await page.locator('.filter-select').first().boundingBox()
     expect(filterBox?.width ?? 0).toBeLessThanOrEqual(140)
-    await page.locator('.item-title').first().click()
-    await expect(page.locator('aside[aria-label="需求详情"]')).toBeVisible()
-    await expectPageSnapshot(page, testInfo, 'requirement-detail')
+    const trigger = page.locator('.item-title').first()
+    await trigger.click()
+    const detail = page.getByRole('dialog', { name: '需求详情' })
+    await expect(detail).toBeVisible()
+    await expect.poll(async () => (await detail.boundingBox())?.width).toBe(760)
+    await expectPageSnapshot(page, testInfo, 'requirement-detail', detail)
+    await detail.getByRole('button', { name: '全屏', exact: true }).click()
+    await expect.poll(async () => (await detail.boundingBox())?.width).toBe(1440)
+    await page.keyboard.press('Escape')
+    await expect(detail).toBeHidden()
+    await expect(trigger).toBeFocused()
   })
 
   test('[desktop] Bug、代码、PR、流水线、产物、环境变量', async ({ page }, testInfo) => {
@@ -278,11 +291,10 @@ test.describe('[mobile] 关键页面', () => {
     const filterBox = await page.locator('.filter-select').first().boundingBox()
     expect(filterBox?.width ?? 0).toBeLessThanOrEqual(140)
     await page.locator('.item-title').first().click()
-    await expect(page.locator('aside[aria-label="需求详情"]')).toBeVisible()
-    const box = await page.locator('aside[aria-label="需求详情"]').boundingBox()
-    expect(box?.x).toBeLessThanOrEqual(1)
-    expect(box?.width).toBeLessThanOrEqual(390)
-    await expectPageSnapshot(page, testInfo, 'requirement-detail')
+    const detail = page.getByRole('dialog', { name: '需求详情' })
+    await expect(detail).toBeVisible()
+    await expect.poll(async () => (await detail.boundingBox())?.width).toBe(390)
+    await expectPageSnapshot(page, testInfo, 'requirement-detail', detail)
   })
 
   test('[mobile] 团队设置与项目设置弹窗', async ({ page }, testInfo) => {

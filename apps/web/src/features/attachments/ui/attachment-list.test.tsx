@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
+import { createQueryClient } from '@/shared/api/query-client'
+import { server } from '@/test/server'
 import { truncateFileName } from '../lib/display'
 import type { AttachmentSummary } from '../model/types'
 import { AttachmentList } from './attachment-list'
@@ -80,6 +84,38 @@ describe('AttachmentList', () => {
   it('canDelete 为 false 时不展示删除入口', () => {
     render(<AttachmentList attachments={[attachment()]} canDelete={allowNone} onDelete={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /删除附件/ })).not.toBeInTheDocument()
+  })
+
+  it('预览识别 HTTP 200 的业务失败，重试后把文件作为纯文本显示', async () => {
+    let calls = 0
+    server.use(
+      http.get('*/api/v1/attachments/attachment-1/download', () => {
+        calls += 1
+        if (calls === 1) {
+          return HttpResponse.json({
+            success: false,
+            code: 'ATTACHMENT_NOT_FOUND',
+            requestId: 'preview-1',
+          })
+        }
+        return new HttpResponse('<strong>错误日志</strong>', {
+          headers: { 'content-type': 'application/octet-stream' },
+        })
+      }),
+    )
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <AttachmentList
+          attachments={[attachment({ fileName: '复现日志.txt', contentType: 'text/plain' })]}
+          canDelete={allowNone}
+          onDelete={vi.fn()}
+        />
+      </QueryClientProvider>,
+    )
+    await userEvent.click(screen.getByRole('button', { name: '预览附件 复现日志.txt' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('附件不存在或已被删除。')
+    await userEvent.click(screen.getByRole('button', { name: '重试' }))
+    expect(await screen.findByText('<strong>错误日志</strong>')).toBeInTheDocument()
   })
 
   it('删除前二次确认，说明不可恢复且默认焦点不落在危险按钮', async () => {

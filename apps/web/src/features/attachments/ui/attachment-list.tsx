@@ -14,6 +14,7 @@ import { Skeleton } from '@/shared/ui/controls/skeleton'
 import { formatDateTime } from '@/shared/lib/format'
 import { formatFileSize, truncateFileName } from '../lib/display'
 import type { AttachmentSummary } from '../model/types'
+import { AttachmentPreviewButton } from './attachment-preview'
 
 /** 详情附件列表属性。 */
 export interface AttachmentListProps {
@@ -36,7 +37,7 @@ export interface AttachmentListProps {
 }
 
 /**
- * 渲染详情附件列表：文件名、大小、上传者、时间与受鉴权下载链接，并承载删除二次确认。
+ * 渲染详情附件列表，提供受鉴权的预览、下载和删除二次确认。
  * @param props 附件数据、加载/错误状态、角色判定与删除回调。
  * @returns 覆盖 loading / empty / error / 列表 / 删除确认的附件区内容。
  */
@@ -102,6 +103,7 @@ export function AttachmentList({
                 </p>
               </div>
               <div className="flex items-center gap-2">
+                <AttachmentPreviewButton file={attachment} />
                 <a
                   href={attachment.downloadUrl}
                   download={attachment.fileName}

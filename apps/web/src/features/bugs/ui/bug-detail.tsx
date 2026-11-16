@@ -6,6 +6,7 @@ import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
+import { WorkItemDetailSheet } from '@/shared/ui/controls/work-item-detail-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline } from '@/features/collaboration/ui/activity-timeline'
 import { CommentForm } from '@/features/collaboration/ui/comment-form'
@@ -120,27 +121,23 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
   })
   if (query.isPending)
     return (
-      <aside className="details" aria-label="Bug 详情">
-        <div className="detail-scroll">
-          <DelayedLoading pending>
-            <PageLoading message="Bug 加载中…" />
-          </DelayedLoading>
-        </div>
-      </aside>
+      <WorkItemDetailSheet label="Bug 详情" onClose={onClose}>
+        <DelayedLoading pending>
+          <PageLoading message="Bug 加载中…" />
+        </DelayedLoading>
+      </WorkItemDetailSheet>
     )
   if (query.isError) {
     const described = describeRequestError(query.error)
     return (
-      <aside className="details" aria-label="Bug 详情">
-        <div className="detail-scroll">
-          <PageError
-            title="Bug 加载失败"
-            description={described.description}
-            requestId={described.requestId}
-            onRetry={() => void query.refetch()}
-          />
-        </div>
-      </aside>
+      <WorkItemDetailSheet label="Bug 详情" onClose={onClose}>
+        <PageError
+          title="Bug 加载失败"
+          description={described.description}
+          requestId={described.requestId}
+          onRetry={() => void query.refetch()}
+        />
+      </WorkItemDetailSheet>
     )
   }
   const bug = query.data.data
@@ -153,213 +150,207 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
     role !== 'viewer' &&
     (role === 'admin' || attachment.uploadedBy.userId === user.id || project.data?.data.owner.userId === user.id)
   return (
-    <aside className="details" aria-label="Bug 详情">
-      <div className="detail-top">
-        <span className="detail-top-title">Bug 详情</span>
-        <span className="spacer" />
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          返回列表
-        </Button>
-      </div>
-      <div className="detail-scroll">
-        <div className="space-y-5">
-          <header className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs text-muted-foreground">Bug #{bug.number}</p>
-              <h2 className="mt-1 text-lg font-semibold leading-6">{bug.title}</h2>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <StatusBadge tone={bugStatusTone(bug.status)}>
-                  {BUG_STATUS_LABELS[bug.status] ?? bug.status}
-                </StatusBadge>
-                <span className="text-xs text-muted-foreground">更新 {formatDateTime(bug.updatedAt)}</span>
-              </div>
+    <WorkItemDetailSheet
+      label="Bug 详情"
+      onClose={onClose}
+      heading={
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Bug #{bug.number}</p>
+            <h2 className="mt-1 text-lg font-semibold leading-6">{bug.title}</h2>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <StatusBadge tone={bugStatusTone(bug.status)}>{BUG_STATUS_LABELS[bug.status] ?? bug.status}</StatusBadge>
+              <span className="text-xs text-muted-foreground">更新 {formatDateTime(bug.updatedAt)}</span>
             </div>
-          </header>
-          <div className="flex flex-wrap gap-2">
-            {canWrite && bug.status === 'pending' && (
-              <Button size="sm" onClick={() => startFix.mutate()} disabled={startFix.isPending}>
-                开始修复
-              </Button>
-            )}
-            {canWrite && bug.status === 'in_fix' && (
-              <Button size="sm" onClick={() => setAction('submit-regression')}>
-                提交回归
-              </Button>
-            )}
-            {canWrite && bug.status === 'in_regression' && (
-              <Button size="sm" onClick={() => setAction('record-regression')}>
-                记录回归结论
-              </Button>
-            )}
-            {canWrite && bug.status === 'in_regression' && (
-              <Button size="sm" variant="outline" onClick={() => setAction('withdraw-regression')}>
-                撤回回归
-              </Button>
-            )}
-            {canWrite && ['pending', 'in_fix', 'in_regression'].includes(bug.status) && (
-              <Button size="sm" variant="outline" onClick={() => setAction('close')}>
-                关闭
-              </Button>
-            )}
-            {canWrite && ['resolved', 'closed'].includes(bug.status) && (
-              <Button size="sm" onClick={() => setAction('reopen')}>
-                重开
-              </Button>
-            )}
-            {canWrite && isEditableBug(bug.status) && (
-              <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-                编辑
-              </Button>
-            )}
-            <RemoteBugActions projectId={bug.projectId} bugId={bug.id} canWrite={canWrite} />
           </div>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
+        </header>
+      }
+    >
+      <div className="space-y-5">
+        <div className="flex flex-wrap gap-2">
+          {canWrite && bug.status === 'pending' && (
+            <Button size="sm" onClick={() => startFix.mutate()} disabled={startFix.isPending}>
+              开始修复
+            </Button>
           )}
-          <dl className="grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-xs text-muted-foreground">修复负责人</dt>
-              <dd className="mt-1">{bug.fixOwner?.name ?? '未指定'}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">回归负责人</dt>
-              <dd className="mt-1">{bug.regressionOwner?.name ?? '未指定'}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">协作人员</dt>
-              <dd className="mt-1">
-                <CollaboratorTags members={bug.collaborators ?? []} />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">关联需求</dt>
-              <dd className="mt-1">
-                {bug.linkedRequirements.length
-                  ? bug.linkedRequirements.map((item) => `#${item.number} ${item.title}`).join('；')
-                  : '无'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">代码引用</dt>
-              <dd className="mt-1">
-                {bug.linkedCodeReferences.length
-                  ? bug.linkedCodeReferences.map((item) => (
-                      <div key={item.id} className="flex items-center gap-2">
-                        <span>{item.title || item.remoteId}</span>
-                        <Tag variant={item.lastCheckStatus === 'ok' ? 'green' : 'red'}>{item.lastCheckStatus}</Tag>
-                        <Button size="xs" variant="ghost" onClick={() => refreshCode.mutate(item.id)}>
-                          刷新
-                        </Button>
-                      </div>
-                    ))
-                  : '无'}
-              </dd>
-              {canWrite && (
-                <Button size="xs" variant="outline" className="mt-2" onClick={() => setCodeOpen(true)}>
-                  添加引用
-                </Button>
-              )}
-            </div>
-          </dl>
-          {canWrite && (
-            <div className="flex flex-wrap items-center gap-2">
-              <Select
-                className="min-w-56"
-                aria-label="关联需求"
-                value={linkRequirementId}
-                onChange={(event) => setLinkRequirementId(event.target.value)}
-              >
-                <option value="">选择同项目需求</option>
-                {(requirements.data?.data.items ?? [])
-                  .filter((item) => !bug.linkedRequirements.some((linked) => linked.id === item.id))
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      #{item.number} {item.title}
-                    </option>
-                  ))}
-              </Select>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!linkRequirementId || link.isPending}
-                onClick={() => link.mutate()}
-              >
-                关联需求
-              </Button>
-            </div>
+          {canWrite && bug.status === 'in_fix' && (
+            <Button size="sm" onClick={() => setAction('submit-regression')}>
+              提交回归
+            </Button>
           )}
-          <section className="space-y-2 text-sm">
-            <h3 className="font-semibold">现象与预期</h3>
-            <p className="whitespace-pre-wrap">{bug.phenomenon}</p>
-            <p className="text-xs text-muted-foreground">预期：{bug.expectedBehavior}</p>
-            {bug.reproduction && <p className="whitespace-pre-wrap text-muted-foreground">复现：{bug.reproduction}</p>}
-            {bug.reproductionUnknown && <p className="text-muted-foreground">复现：明确无法稳定复现</p>}
-            {bug.evidenceText || bug.evidenceUrl ? (
-              <div className="space-y-1 pt-1">
-                <h3 className="font-semibold">证据</h3>
-                {bug.evidenceText ? <p className="whitespace-pre-wrap">{bug.evidenceText}</p> : null}
-                {bug.evidenceUrl ? (
-                  <a className="text-primary underline" href={bug.evidenceUrl} target="_blank" rel="noreferrer">
-                    查看外部证据
-                  </a>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
-          <section className="space-y-2" aria-label="附件">
-            <h3 className="text-sm font-semibold">附件</h3>
-            <AttachmentList
-              attachments={bug.attachments ?? []}
-              canDelete={canDeleteAttachment}
-              onDelete={(attachment) => removeAttachmentMutation.mutate(attachment)}
-              deletingId={removeAttachmentMutation.isPending ? (removeAttachmentMutation.variables?.id ?? null) : null}
-              deleteError={attachmentError}
-            />
-          </section>
-          <section className="space-y-2">
-            <h3 className="text-sm font-semibold">回归历史</h3>
-            {bug.regressions.length ? (
-              <ol className="space-y-2">
-                {bug.regressions.map((item) => (
-                  <li key={item.id} className="rounded-lg border p-3 text-sm">
-                    <div className="flex justify-between gap-2">
-                      <span>
-                        第 {item.attempt} 次 · {REGRESSION_RESULT_LABELS[item.result] ?? item.result}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</span>
-                    </div>
-                    <p className="mt-1 text-muted-foreground">{item.fixSummary}</p>
-                    {item.failureReason && <p className="mt-1 text-xs text-destructive">{item.failureReason}</p>}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="text-sm text-muted-foreground">暂无回归记录。</p>
-            )}
-          </section>
-          <Tabs defaultValue="comments">
-            <TabsList>
-              <TabsTrigger value="comments">评论</TabsTrigger>
-              <TabsTrigger value="activities">活动</TabsTrigger>
-            </TabsList>
-            <TabsContent value="comments" className="space-y-4">
-              <CommentList target="bug" targetId={bug.id} />
-              <CommentForm target="bug" targetId={bug.id} disabled={!canWrite} />
-            </TabsContent>
-            <TabsContent value="activities">
-              <ActivityTimeline target="bug" targetId={bug.id} />
-            </TabsContent>
-          </Tabs>
-          <CodeReferenceDialog
-            projectId={bug.projectId}
-            targetType="bug"
-            targetId={bug.id}
-            open={codeOpen}
-            onOpenChange={setCodeOpen}
-          />
+          {canWrite && bug.status === 'in_regression' && (
+            <Button size="sm" onClick={() => setAction('record-regression')}>
+              记录回归结论
+            </Button>
+          )}
+          {canWrite && bug.status === 'in_regression' && (
+            <Button size="sm" variant="outline" onClick={() => setAction('withdraw-regression')}>
+              撤回回归
+            </Button>
+          )}
+          {canWrite && ['pending', 'in_fix', 'in_regression'].includes(bug.status) && (
+            <Button size="sm" variant="outline" onClick={() => setAction('close')}>
+              关闭
+            </Button>
+          )}
+          {canWrite && ['resolved', 'closed'].includes(bug.status) && (
+            <Button size="sm" onClick={() => setAction('reopen')}>
+              重开
+            </Button>
+          )}
+          {canWrite && isEditableBug(bug.status) && (
+            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+              编辑
+            </Button>
+          )}
+          <RemoteBugActions projectId={bug.projectId} bugId={bug.id} canWrite={canWrite} />
         </div>
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs text-muted-foreground">修复负责人</dt>
+            <dd className="mt-1">{bug.fixOwner?.name ?? '未指定'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">回归负责人</dt>
+            <dd className="mt-1">{bug.regressionOwner?.name ?? '未指定'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">协作人员</dt>
+            <dd className="mt-1">
+              <CollaboratorTags members={bug.collaborators ?? []} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">关联需求</dt>
+            <dd className="mt-1">
+              {bug.linkedRequirements.length
+                ? bug.linkedRequirements.map((item) => `#${item.number} ${item.title}`).join('；')
+                : '无'}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">代码引用</dt>
+            <dd className="mt-1">
+              {bug.linkedCodeReferences.length
+                ? bug.linkedCodeReferences.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2">
+                      <span>{item.title || item.remoteId}</span>
+                      <Tag variant={item.lastCheckStatus === 'ok' ? 'green' : 'red'}>{item.lastCheckStatus}</Tag>
+                      <Button size="xs" variant="ghost" onClick={() => refreshCode.mutate(item.id)}>
+                        刷新
+                      </Button>
+                    </div>
+                  ))
+                : '无'}
+            </dd>
+            {canWrite && (
+              <Button size="xs" variant="outline" className="mt-2" onClick={() => setCodeOpen(true)}>
+                添加引用
+              </Button>
+            )}
+          </div>
+        </dl>
+        {canWrite && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              className="min-w-56"
+              aria-label="关联需求"
+              value={linkRequirementId}
+              onChange={(event) => setLinkRequirementId(event.target.value)}
+            >
+              <option value="">选择同项目需求</option>
+              {(requirements.data?.data.items ?? [])
+                .filter((item) => !bug.linkedRequirements.some((linked) => linked.id === item.id))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    #{item.number} {item.title}
+                  </option>
+                ))}
+            </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!linkRequirementId || link.isPending}
+              onClick={() => link.mutate()}
+            >
+              关联需求
+            </Button>
+          </div>
+        )}
+        <section className="space-y-2 text-sm">
+          <h3 className="font-semibold">现象与预期</h3>
+          <p className="whitespace-pre-wrap">{bug.phenomenon}</p>
+          <p className="text-xs text-muted-foreground">预期：{bug.expectedBehavior}</p>
+          {bug.reproduction && <p className="whitespace-pre-wrap text-muted-foreground">复现：{bug.reproduction}</p>}
+          {bug.reproductionUnknown && <p className="text-muted-foreground">复现：明确无法稳定复现</p>}
+          {bug.evidenceText || bug.evidenceUrl ? (
+            <div className="space-y-1 pt-1">
+              <h3 className="font-semibold">证据</h3>
+              {bug.evidenceText ? <p className="whitespace-pre-wrap">{bug.evidenceText}</p> : null}
+              {bug.evidenceUrl ? (
+                <a className="text-primary underline" href={bug.evidenceUrl} target="_blank" rel="noreferrer">
+                  查看外部证据
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+        <section className="space-y-2" aria-label="附件">
+          <h3 className="text-sm font-semibold">附件</h3>
+          <AttachmentList
+            attachments={bug.attachments ?? []}
+            canDelete={canDeleteAttachment}
+            onDelete={(attachment) => removeAttachmentMutation.mutate(attachment)}
+            deletingId={removeAttachmentMutation.isPending ? (removeAttachmentMutation.variables?.id ?? null) : null}
+            deleteError={attachmentError}
+          />
+        </section>
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">回归历史</h3>
+          {bug.regressions.length ? (
+            <ol className="space-y-2">
+              {bug.regressions.map((item) => (
+                <li key={item.id} className="rounded-lg border p-3 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span>
+                      第 {item.attempt} 次 · {REGRESSION_RESULT_LABELS[item.result] ?? item.result}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</span>
+                  </div>
+                  <p className="mt-1 text-muted-foreground">{item.fixSummary}</p>
+                  {item.failureReason && <p className="mt-1 text-xs text-destructive">{item.failureReason}</p>}
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted-foreground">暂无回归记录。</p>
+          )}
+        </section>
+        <Tabs defaultValue="comments">
+          <TabsList>
+            <TabsTrigger value="comments">评论</TabsTrigger>
+            <TabsTrigger value="activities">活动</TabsTrigger>
+          </TabsList>
+          <TabsContent value="comments" className="space-y-4">
+            <CommentList target="bug" targetId={bug.id} />
+            <CommentForm target="bug" targetId={bug.id} disabled={!canWrite} />
+          </TabsContent>
+          <TabsContent value="activities">
+            <ActivityTimeline target="bug" targetId={bug.id} />
+          </TabsContent>
+        </Tabs>
+        <CodeReferenceDialog
+          projectId={bug.projectId}
+          targetType="bug"
+          targetId={bug.id}
+          open={codeOpen}
+          onOpenChange={setCodeOpen}
+        />
       </div>
       <BugActionDialog
         bug={bug}
@@ -379,6 +370,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
         bug={bug}
         onSaved={onClose}
       />
-    </aside>
+    </WorkItemDetailSheet>
   )
 }

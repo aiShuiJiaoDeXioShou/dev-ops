@@ -13,6 +13,7 @@ export function toPendingAttachments(attachments: AttachmentSummary[]): PendingA
     status: 'done',
     progress: 100,
     attachmentId: attachment.id,
+    contentType: attachment.contentType,
   }))
 }
 

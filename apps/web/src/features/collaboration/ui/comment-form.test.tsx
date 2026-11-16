@@ -28,7 +28,13 @@ describe('CommentForm', () => {
           code: 'OK',
           message: 'ok',
           requestId: 'trace',
-          data: { id: 'c', authorUserId: 'u', bodyMarkdown: '评论', createdAt: '2026-11-10T00:00:00.000Z' },
+          data: {
+            id: 'c',
+            authorUserId: 'u',
+            authorName: '开发同学',
+            bodyMarkdown: '评论',
+            createdAt: '2026-11-10T00:00:00.000Z',
+          },
         })
       }),
     )

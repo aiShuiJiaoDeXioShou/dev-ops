@@ -5,6 +5,7 @@
     "height": 1000
   },
   "headings": [
+    "需求详情",
     "平台体验迭代 2026-11：核心交互修复与流水线自举验收",
     "内容",
     "背景",
@@ -42,7 +43,7 @@
     "已通过"
   ],
   "documentOverflow": false,
-  "interactiveCount": 48,
+  "interactiveCount": 50,
   "nonPointerControls": [],
   "smallTargets": [
     "项目",

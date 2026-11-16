@@ -1937,6 +1937,36 @@ a.skill-title:hover {
   min-height: 0;
 }
 
+/* 事项详情覆盖列表，标题区固定，长正文在浮层内独立滚动。 */
+.work-item-detail-sheet[data-side='right'] {
+  width: min(760px, 100vw);
+  max-width: none;
+  height: 100dvh;
+}
+.work-item-detail-sheet[data-expanded='true'] {
+  width: 100vw;
+}
+.work-item-detail-heading,
+.work-item-detail-body {
+  width: 100%;
+  max-width: 1160px;
+  margin-inline: auto;
+  padding: 20px 24px;
+}
+.attachment-preview-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(860px, calc(100vw - 32px));
+  max-height: 86dvh;
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .work-item-detail-heading,
+  .work-item-detail-body {
+    padding: 16px;
+  }
+}
+
 /* 窄屏详情以整屏覆盖方式出现；放在基础规则之后，避免被 sticky 覆盖。 */
 @media (max-width: 1080px) {
   .details {
