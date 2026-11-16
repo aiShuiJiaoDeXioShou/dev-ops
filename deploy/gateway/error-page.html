@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>{{title}} · DevOps</title>
+    <style>
+      :root {
+        /* {{light}} */
+        font-family: Geist, system-ui, sans-serif;
+        color: var(--foreground);
+        background: var(--background);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          /* {{dark}} */
+        }
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        box-sizing: border-box;
+        min-height: 100vh;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        text-align: center;
+      }
+      .art {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 190px;
+        height: 150px;
+        margin: 0 auto 22px;
+        background: radial-gradient(
+          circle closest-side,
+          color-mix(in srgb, var(--primary) 12%, transparent),
+          transparent
+        );
+      }
+      .art::before {
+        position: absolute;
+        width: 156px;
+        height: 62px;
+        border: 1px dashed color-mix(in srgb, var(--primary) 24%, transparent);
+        border-radius: 50%;
+        transform: rotate(-14deg);
+        content: '';
+      }
+      .art img {
+        position: relative;
+        width: 96px;
+        height: 96px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      p {
+        max-width: 520px;
+        margin: 10px auto 22px;
+        color: var(--mutedForeground);
+        font-size: 0.875rem;
+        line-height: 1.8;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+      }
+      .actions a {
+        display: inline-flex;
+        align-items: center;
+        box-sizing: border-box;
+        min-height: 44px;
+        padding: 0 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-decoration: none;
+      }
+      .actions a:first-child {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: var(--primaryForeground);
+      }
+      .actions a:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 3px;
+      }
+      @media (max-width: 640px) {
+        .art {
+          height: 130px;
+          margin-bottom: 12px;
+        }
+        .art img {
+          width: 82px;
+          height: 82px;
+        }
+        .art::before {
+          width: 132px;
+          height: 54px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section aria-labelledby="error-title">
+        <div class="art" aria-hidden="true"><img src="{{image}}" width="96" height="96" alt="" /></div>
+        <h1 id="error-title">{{title}}</h1>
+        <p>{{description}}</p>
+        <div class="actions">
+          <a href="">重新加载</a>
+          <a href="/projects">返回项目列表</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { Button } from '@/shared/ui/controls/button'
+import { GATEWAY_FAILURES } from './gateway-failures'
 import { EmptyState, type EmptyStateMascot } from './page-state'
 
 interface FailureContent {
@@ -18,13 +19,7 @@ const FAILURES: Partial<Record<number, FailureContent>> = {
   },
   429: { title: '请求过于频繁', description: '请稍等片刻后重新加载页面。', mascot: 'signal' },
   500: { title: '页面暂时无法加载', description: '服务处理请求时出错，请重新加载后再试。', mascot: 'orbit' },
-  502: {
-    title: '暂时无法连接服务',
-    description: '上游服务未返回有效响应（HTTP 502），请稍后重新加载。',
-    mascot: 'signal',
-  },
-  503: { title: '服务暂时不可用', description: '服务可能正在维护或繁忙（HTTP 503），请稍后重试。', mascot: 'signal' },
-  504: { title: '服务响应超时', description: '等待上游服务响应超时（HTTP 504），请稍后重试。', mascot: 'signal' },
+  ...GATEWAY_FAILURES,
 }
 
 /**

@@ -1,0 +1,7 @@
+**
+!design/tokens.json
+!apps/web/src/shared/ui/gateway-failures.ts
+!apps/web/public/prototype/bots/bot-signal.svg
+!deploy/gateway/default.conf.template
+!deploy/gateway/error-page.html
+!deploy/gateway/render-error-pages.mjs
