@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { check, index, integer, jsonb, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 import { appSchema } from '../../platform/database/namespace.ts'
+import type { WorkItemPlan } from '../collaboration/work-item-plan.ts'
 
 /** 需求：项目内的事项，编号在项目内稳定。 */
 export const requirement = appSchema.table(
@@ -18,6 +19,7 @@ export const requirement = appSchema.table(
     acceptance_criteria: text('acceptance_criteria'),
     dev_owner_user_id: uuid('dev_owner_user_id'),
     test_owner_user_id: uuid('test_owner_user_id'),
+    work_plan: jsonb('work_plan').$type<WorkItemPlan>().notNull().default([]),
     status: text('status').notNull().default('pending'),
     version: integer('version').notNull().default(1),
     created_by_user_id: uuid('created_by_user_id').notNull(),

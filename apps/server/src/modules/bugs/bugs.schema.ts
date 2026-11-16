@@ -1,6 +1,7 @@
 import { Type } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 import { commentSchema } from '../collaboration/comment.schema.ts'
+import { workItemPlanSchema } from '../collaboration/work-item-plan.ts'
 import { avatarImageSchema } from '../identity/identity.avatar.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
@@ -80,6 +81,7 @@ const bugDetailSchema = Type.Object({
   reproductionUnknown: Type.Boolean(),
   evidenceText: Type.Union([Type.String(), Type.Null()]),
   evidenceUrl: Type.Union([Type.String(), Type.Null()]),
+  plan: Type.Optional(workItemPlanSchema),
   createdByUserId: uuidSchema,
   createdAt: Type.String(),
   collaborators: Type.Array(ownerSchema),
@@ -146,8 +148,10 @@ export const updateBugBodySchema = Type.Object(
     evidenceText: Type.Optional(Type.Union([Type.String({ maxLength: 20000 }), Type.Null()])),
     evidenceUrl: Type.Optional(Type.Union([Type.String({ maxLength: 2048 }), Type.Null()])),
     fixOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
+    regressionOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
     attachmentIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 10 })),
+    plan: Type.Optional(workItemPlanSchema),
   },
   { additionalProperties: false },
 )

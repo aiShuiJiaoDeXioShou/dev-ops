@@ -126,6 +126,12 @@ apps/server/
 
 ## V0.1 已实现模块与路由
 
+`POST /api/v1/requirements/:requirementId/update` 与 `POST /api/v1/bugs/:bugId/update` 使用版本号保存局部字段。标题、派工和协作人可按权限维护。需求提测后以及 Bug 提交回归后，需通过相应流程动作回到可改范围的阶段再修订正文、复现或附件清单。当前回归负责人的调整从撤回回归开始。
+
+详情返回的 `plan` 保存本事项的规划节点和待办。同一更新接口可传入完整 `plan` 替换当前规划。节点和待办的 `startsOn`、`endsOn` 均允许设为 `null`。规划写入增加事项版本并记录操作历史。
+
+`POST /api/v1/projects/:projectId/code-references` 带 `replaceReferenceId` 时，核对新目标后在同一事务替换同一事项的引用。需求与 Bug 的解除关联及代码引用移除沿用现有操作接口，原因写入操作记录。
+
 - 身份：`/api/v1/auth/*`（Better Auth 协议端点，保留库状态码，显式例外）、`/me/teams`、`/platform/teams`、团队邀请/成员接口。
 - 项目：`/teams/:teamId/projects`、`/projects/:projectId`、`/update`、`/stats`。
 - 需求：项目需求列表/创建、详情/更新、评论/活动、提测/测试/通过/取消/恢复等动作、提测历史。

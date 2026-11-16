@@ -1,6 +1,7 @@
 import { Type } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 import { commentSchema } from '../collaboration/comment.schema.ts'
+import { workItemPlanSchema } from '../collaboration/work-item-plan.ts'
 import { avatarImageSchema } from '../identity/identity.avatar.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
@@ -76,6 +77,7 @@ const requirementDetailSchema = Type.Object({
   externalUrl: Type.Union([Type.String(), Type.Null()]),
   externalSummary: Type.Union([Type.String(), Type.Null()]),
   acceptanceCriteria: Type.Union([Type.String(), Type.Null()]),
+  plan: Type.Optional(workItemPlanSchema),
   collaborators: Type.Array(ownerSchema),
   attachments: Type.Array(attachmentSummarySchema),
   latestTestSubmission: Type.Union([testSubmissionSchema, Type.Null()]),
@@ -147,6 +149,7 @@ export const updateRequirementBodySchema = Type.Object(
     testOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
     attachmentIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 10 })),
+    plan: Type.Optional(workItemPlanSchema),
   },
   { additionalProperties: false },
 )

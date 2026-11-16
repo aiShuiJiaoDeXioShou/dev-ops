@@ -13,6 +13,7 @@ import {
   type PageResult,
 } from '../collaboration/collaboration.service.ts'
 import { findActiveTeamMemberIds, isActiveTeamMember } from '../identity/identity.repository.ts'
+import { validateWorkItemPlan, type WorkItemPlan } from '../collaboration/work-item-plan.ts'
 import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -285,8 +286,10 @@ export function createBugsService(deps: BugsServiceDeps) {
       evidenceText?: string | null
       evidenceUrl?: string | null
       fixOwnerUserId?: string | null
+      regressionOwnerUserId?: string | null
       collaboratorUserIds?: string[]
       attachmentIds?: string[]
+      plan?: WorkItemPlan
     },
   ) {
     if (!Number.isSafeInteger(input.version) || input.version < 1) {
@@ -294,9 +297,21 @@ export function createBugsService(deps: BugsServiceDeps) {
     }
     const { row: current, project } = await requireBug(actor, bugId)
     await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
-    if (!EDITABLE_BUG_STATUSES.has(current.status)) {
+    const changesScope =
+      input.phenomenon !== undefined ||
+      input.expectedBehavior !== undefined ||
+      input.reproduction !== undefined ||
+      input.reproductionUnknown !== undefined ||
+      input.evidenceText !== undefined ||
+      input.evidenceUrl !== undefined ||
+      input.attachmentIds !== undefined
+    if (changesScope && !EDITABLE_BUG_STATUSES.has(current.status)) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '当前 Bug 状态不允许直接修改现象、预期与复现信息')
     }
+    if (input.regressionOwnerUserId !== undefined && current.status === 'in_regression') {
+      throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '请先撤回当前回归，再调整回归负责人')
+    }
+    const plan = input.plan === undefined ? undefined : validateWorkItemPlan(input.plan)
     const title = input.title === undefined ? undefined : normalizeBugTitle(input.title)
     const phenomenon = input.phenomenon === undefined ? undefined : requiredText(input.phenomenon, '现象')
     const expectedBehavior =
@@ -313,11 +328,15 @@ export function createBugsService(deps: BugsServiceDeps) {
     if (input.fixOwnerUserId && !(await isActiveTeamMember(db, project.teamId, input.fixOwnerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '修复负责人不是正常团队成员')
     }
+    if (input.regressionOwnerUserId && !(await isActiveTeamMember(db, project.teamId, input.regressionOwnerUserId))) {
+      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '回归负责人不是正常团队成员')
+    }
     const collaborators =
       input.collaboratorUserIds === undefined
         ? undefined
         : await validateCollaborators(project.teamId, input.collaboratorUserIds)
     const changes: Record<string, unknown> = {}
+    if (plan !== undefined) changes.plan = { nodeCount: plan.length }
     if (title !== undefined && title !== current.title) changes.title = [current.title, title]
     if (phenomenon !== undefined && phenomenon !== current.phenomenon)
       changes.phenomenon = [current.phenomenon, phenomenon]
@@ -331,6 +350,8 @@ export function createBugsService(deps: BugsServiceDeps) {
     }
     if (input.fixOwnerUserId !== undefined && input.fixOwnerUserId !== current.fix_owner_user_id)
       changes.fixOwner = [current.fix_owner_user_id, input.fixOwnerUserId]
+    if (input.regressionOwnerUserId !== undefined && input.regressionOwnerUserId !== current.regression_owner_user_id)
+      changes.regressionOwner = [current.regression_owner_user_id, input.regressionOwnerUserId]
 
     const row = await db.transaction(async (tx) => {
       await lockProjectForWrite(tx, project.id)
@@ -344,6 +365,8 @@ export function createBugsService(deps: BugsServiceDeps) {
         evidenceText,
         evidenceUrl,
         fixOwnerUserId: input.fixOwnerUserId,
+        regressionOwnerUserId: input.regressionOwnerUserId,
+        plan,
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
       if (input.attachmentIds !== undefined) {
@@ -671,11 +694,12 @@ export function createBugsService(deps: BugsServiceDeps) {
     const { row: current, project } = await requireBug(actor, bugId)
     if (version !== current.version) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
     await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
-    if (!(await findBugLink(db, bugId, requirementId))) throw new ApiError(ERROR_CODES.NOT_FOUND, '关联不存在')
     const note = reasonText(reason, '移除原因')
     await db.transaction(async (tx) => {
       await lockProjectForWrite(tx, project.id)
-      await deleteBugLink(tx, bugId, requirementId)
+      const locked = await lockBug(tx, bugId)
+      if (locked?.version !== version) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
+      if (!(await deleteBugLink(tx, bugId, requirementId))) throw new ApiError(ERROR_CODES.NOT_FOUND, '关联不存在')
       await appendActivity(tx, {
         teamId: project.teamId,
         projectId: project.id,

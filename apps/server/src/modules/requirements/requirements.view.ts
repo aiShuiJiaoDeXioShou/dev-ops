@@ -88,6 +88,7 @@ export function toRequirementDetail(input: RequirementDetailMapping): Requiremen
     externalUrl: row.external_url,
     externalSummary: row.external_summary,
     acceptanceCriteria: row.acceptance_criteria,
+    plan: row.work_plan,
     collaborators: collaborators.map(
       (item) =>
         ownerRefOf(item.userId, refs) ?? { userId: item.userId, name: '未知用户', status: 'missing', available: false },

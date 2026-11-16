@@ -204,10 +204,47 @@ test('需求创建、内容校验、筛选、版本、评论、活动、项目�
   const frozen = await app.inject({
     method: 'POST',
     url: `/api/v1/requirements/${requirementId}/update`,
-    payload: { version: 3, title: '不允许' },
+    payload: { version: 3, contentMode: 'markdown', contentMarkdown: '未重新交接的范围' },
     headers: { cookie: devUser.cookie },
   })
   assert.equal(frozen.json().code, 'INVALID_TRANSITION')
+
+  const plan = [
+    {
+      id: 'in_testing',
+      title: '验收',
+      startsOn: null,
+      endsOn: null,
+      tasks: [{ id: 'check-login', title: '检查登录', startsOn: '2026-11-18', endsOn: '2026-11-19', done: false }],
+    },
+  ]
+  const edit = await app.inject({
+    method: 'POST',
+    url: `/api/v1/requirements/${requirementId}/update`,
+    payload: { version: 3, title: '登录能力 v3', testOwnerUserId: devUser.userId, plan },
+    headers: { cookie: devUser.cookie },
+  })
+  assert.equal(edit.json().success, true, edit.body)
+  assert.equal(edit.json().data.status, 'submitted')
+  assert.equal(edit.json().data.testOwner.userId, devUser.userId)
+  assert.deepEqual(edit.json().data.plan, plan)
+
+  const invalidPlan = await app.inject({
+    method: 'POST',
+    url: `/api/v1/requirements/${requirementId}/update`,
+    payload: {
+      version: 4,
+      plan: [{ id: 'extra', title: '错误日期', startsOn: '2026-02-30', endsOn: null, tasks: [] }],
+    },
+    headers: { cookie: devUser.cookie },
+  })
+  assert.equal(invalidPlan.json().code, 'VALIDATION_ERROR')
+  const planned = await app.inject({
+    url: `/api/v1/requirements/${requirementId}`,
+    headers: { cookie: viewerUser.cookie },
+  })
+  assert.deepEqual(planned.json().data.plan, plan)
+  assert.equal(planned.json().data.version, 4)
 
   const viewerComment = await app.inject({
     method: 'POST',

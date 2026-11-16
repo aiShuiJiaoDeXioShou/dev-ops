@@ -181,6 +181,7 @@ export async function updateBug(
     evidenceUrl?: string | null
     fixOwnerUserId?: string | null
     regressionOwnerUserId?: string | null
+    plan?: BugRow['work_plan']
     status?: string
   },
 ) {
@@ -196,6 +197,7 @@ export async function updateBug(
       ...(values.evidenceUrl === undefined ? {} : { evidence_url: values.evidenceUrl }),
       ...(values.fixOwnerUserId === undefined ? {} : { fix_owner_user_id: values.fixOwnerUserId }),
       ...(values.regressionOwnerUserId === undefined ? {} : { regression_owner_user_id: values.regressionOwnerUserId }),
+      ...(values.plan === undefined ? {} : { work_plan: values.plan }),
       ...(values.status === undefined ? {} : { status: values.status }),
       version: sql`${bug.version} + 1`,
       updated_at: new Date(),
@@ -275,11 +277,19 @@ export async function insertBugLink(
   })
 }
 
-/** 删除 Bug 需求关联。 */
+/**
+ * 删除指定的 Bug 与需求关联。
+ * @param executor 数据库连接或事务。
+ * @param bugId Bug 标识。
+ * @param requirementId 需求标识。
+ * @returns 是否实际删除了一条关联。
+ */
 export async function deleteBugLink(executor: BugExecutor, bugId: string, requirementId: string) {
-  await executor
+  const [removed] = await executor
     .delete(bugRequirementLink)
     .where(and(eq(bugRequirementLink.bug_id, bugId), eq(bugRequirementLink.requirement_id, requirementId)))
+    .returning({ id: bugRequirementLink.id })
+  return removed !== undefined
 }
 
 /** 查询当前 pending 回归记录。 */

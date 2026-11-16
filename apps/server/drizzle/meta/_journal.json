@@ -211,6 +211,13 @@
       "when": 1794852413448,
       "tag": "0029_github_user_authorization",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794855051050,
+      "tag": "0030_work_item_plan",
+      "breakpoints": true
     }
   ]
 }

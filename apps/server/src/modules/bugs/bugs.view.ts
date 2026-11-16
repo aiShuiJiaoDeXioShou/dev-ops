@@ -83,6 +83,7 @@ export function toBugDetail(input: BugDetailMapping): BugDetail {
     reproductionUnknown: row.reproduction_unknown,
     evidenceText: row.evidence_text,
     evidenceUrl: row.evidence_url,
+    plan: row.work_plan,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at.toISOString(),
     collaborators: collaborators.map(

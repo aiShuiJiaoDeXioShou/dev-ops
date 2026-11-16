@@ -13,12 +13,19 @@ import {
   type PageResult,
 } from '../collaboration/collaboration.service.ts'
 import { findActiveTeamMemberIds, isActiveTeamMember } from '../identity/identity.repository.ts'
+import { validateWorkItemPlan, type WorkItemPlan } from '../collaboration/work-item-plan.ts'
 import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
 import type { AttachmentBindingUseCases } from '../attachments/attachments.binding.ts'
-import { EDITABLE_STATUSES, normalizeTitle, validateContent, validateStatus } from './requirements.rules.ts'
+import {
+  EDITABLE_REQUIREMENT_SCOPE_STATUSES,
+  isRequirementStatus,
+  normalizeTitle,
+  validateContent,
+  validateStatus,
+} from './requirements.rules.ts'
 import {
   countOpenRequirementsByProjects,
   findCollaboratorUserIds,
@@ -286,6 +293,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       testOwnerUserId?: string | null
       collaboratorUserIds?: string[]
       attachmentIds?: string[]
+      plan?: WorkItemPlan
     },
   ) {
     if (!Number.isSafeInteger(input.version) || input.version < 1) {
@@ -293,18 +301,26 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     }
     const { row: current, project } = await requireRequirement(actor, requirementId)
     await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
-    if (!EDITABLE_STATUSES.has(current.status)) {
+    const changesScope =
+      input.contentMode !== undefined ||
+      input.contentMarkdown !== undefined ||
+      input.externalUrl !== undefined ||
+      input.externalSummary !== undefined ||
+      input.acceptanceCriteria !== undefined ||
+      input.attachmentIds !== undefined
+    if (changesScope && !EDITABLE_REQUIREMENT_SCOPE_STATUSES.has(current.status)) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '当前需求状态不允许修改范围字段')
     }
+    const plan = input.plan === undefined ? undefined : validateWorkItemPlan(input.plan)
     const title = input.title === undefined ? undefined : normalizeTitle(input.title)
     const content =
       input.contentMode === undefined
         ? undefined
         : validateContent({
             contentMode: input.contentMode,
-            contentMarkdown: input.contentMarkdown ?? current.content_markdown,
-            externalUrl: input.externalUrl ?? current.external_url,
-            externalSummary: input.externalSummary ?? current.external_summary,
+            contentMarkdown: input.contentMarkdown === undefined ? current.content_markdown : input.contentMarkdown,
+            externalUrl: input.externalUrl === undefined ? current.external_url : input.externalUrl,
+            externalSummary: input.externalSummary === undefined ? current.external_summary : input.externalSummary,
           })
     if (
       input.contentMode === undefined &&
@@ -325,9 +341,16 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     }
 
     const changes: Record<string, unknown> = {}
+    if (plan !== undefined) changes.plan = { nodeCount: plan.length }
     if (title !== undefined && title !== current.title) changes.title = [current.title, title]
-    if (content && content.contentMode !== current.content_mode)
-      changes.contentMode = [current.content_mode, content.contentMode]
+    if (
+      content &&
+      (content.contentMode !== current.content_mode ||
+        content.contentMarkdown !== current.content_markdown ||
+        content.externalUrl !== current.external_url ||
+        content.externalSummary !== current.external_summary)
+    )
+      changes.contentUpdated = true
     if (acceptance !== undefined && acceptance !== current.acceptance_criteria)
       changes.acceptanceCriteria = [current.acceptance_criteria, acceptance || null]
     if (input.devOwnerUserId !== undefined && input.devOwnerUserId !== current.dev_owner_user_id)
@@ -347,6 +370,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         acceptanceCriteria: acceptance === undefined ? undefined : acceptance.length > 0 ? acceptance : null,
         devOwnerUserId: input.devOwnerUserId,
         testOwnerUserId: input.testOwnerUserId,
+        plan,
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '需求已被更新，请刷新后重试')
       if (input.attachmentIds !== undefined) {
@@ -445,10 +469,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   async function requireWorkflow(actor: SessionUser, requirementId: string) {
     const { row, project } = await requireRequirement(actor, requirementId)
     await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
-    if (
-      !EDITABLE_STATUSES.has(row.status) &&
-      !['submitted', 'in_testing', 'passed', 'cancelled'].includes(row.status)
-    ) {
+    if (!isRequirementStatus(row.status)) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '当前需求状态不允许该操作')
     }
     return { row, project }

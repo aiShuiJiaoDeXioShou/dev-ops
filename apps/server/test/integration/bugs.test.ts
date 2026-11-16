@@ -221,10 +221,39 @@ test('Bug 完整状态机、回归历史、关联、关闭重开、计数与权�
   const frozen = await app.inject({
     method: 'POST',
     url: `/api/v1/bugs/${bug.id}/update`,
-    payload: { version: bug.version, title: '不允许改' },
+    payload: { version: bug.version, phenomenon: '未重新回归的现象' },
     headers: { cookie: devUser.cookie },
   })
   assert.equal(frozen.json().code, 'INVALID_TRANSITION')
+
+  const plan = [
+    {
+      id: 'in_regression',
+      title: '补充回归',
+      startsOn: null,
+      endsOn: null,
+      tasks: [{ id: 'check', title: '重试验证', startsOn: null, endsOn: null, done: true }],
+    },
+  ]
+  const metadata = await app.inject({
+    method: 'POST',
+    url: `/api/v1/bugs/${bug.id}/update`,
+    payload: { version: bug.version, title: '登录状态待回归', fixOwnerUserId: null, plan },
+    headers: { cookie: devUser.cookie },
+  })
+  assert.equal(metadata.json().success, true, metadata.body)
+  bug = metadata.json().data
+  assert.equal(bug.status, 'in_regression')
+  assert.equal(bug.fixOwner, null)
+  assert.deepEqual(metadata.json().data.plan, plan)
+
+  const frozenVerifier = await app.inject({
+    method: 'POST',
+    url: `/api/v1/bugs/${bug.id}/update`,
+    payload: { version: bug.version, regressionOwnerUserId: null },
+    headers: { cookie: devUser.cookie },
+  })
+  assert.equal(frozenVerifier.json().code, 'INVALID_TRANSITION')
 
   const withdraw = await app.inject({
     method: 'POST',

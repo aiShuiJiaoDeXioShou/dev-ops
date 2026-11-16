@@ -1,5 +1,6 @@
 import type { AttachmentSummary } from '../attachments/attachments.view.ts'
 import type { OwnerRef } from '../identity/identity.display.ts'
+import type { WorkItemPlan } from '../collaboration/work-item-plan.ts'
 
 /** Bug 摘要读模型：列表与跨模块关联展示所需的最小字段，不包含现象与复现正文。 */
 export interface BugSummary {
@@ -81,6 +82,7 @@ export interface BugDetail extends BugListItem {
   reproductionUnknown: boolean
   evidenceText: string | null
   evidenceUrl: string | null
+  plan: WorkItemPlan
   createdByUserId: string
   createdAt: string
   collaborators: OwnerView[]

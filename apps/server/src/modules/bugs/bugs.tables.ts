@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   primaryKey,
   text,
   timestamp,
@@ -12,6 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { appSchema } from '../../platform/database/namespace.ts'
+import type { WorkItemPlan } from '../collaboration/work-item-plan.ts'
 
 /** 内部 Bug；现象、预期与复现信息是建单必填的业务事实。 */
 export const bug = appSchema.table(
@@ -30,6 +32,7 @@ export const bug = appSchema.table(
     evidence_url: text('evidence_url'),
     fix_owner_user_id: uuid('fix_owner_user_id'),
     regression_owner_user_id: uuid('regression_owner_user_id'),
+    work_plan: jsonb('work_plan').$type<WorkItemPlan>().notNull().default([]),
     status: text('status').notNull().default('pending'),
     version: integer('version').notNull().default(1),
     created_by_user_id: uuid('created_by_user_id').notNull(),

@@ -169,6 +169,7 @@ export async function updateRequirement(
     acceptanceCriteria?: string | null
     devOwnerUserId?: string | null
     testOwnerUserId?: string | null
+    plan?: RequirementRow['work_plan']
   },
 ) {
   const [row] = await tx
@@ -182,6 +183,7 @@ export async function updateRequirement(
       ...(values.acceptanceCriteria === undefined ? {} : { acceptance_criteria: values.acceptanceCriteria }),
       ...(values.devOwnerUserId === undefined ? {} : { dev_owner_user_id: values.devOwnerUserId }),
       ...(values.testOwnerUserId === undefined ? {} : { test_owner_user_id: values.testOwnerUserId }),
+      ...(values.plan === undefined ? {} : { work_plan: values.plan }),
       version: sql`${requirement.version} + 1`,
       updated_at: new Date(),
     })

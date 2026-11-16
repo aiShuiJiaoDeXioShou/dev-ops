@@ -10,7 +10,7 @@ export const REQUIREMENT_STATUSES: ReadonlySet<string> = new Set([
   'passed',
   'cancelled',
 ])
-export const EDITABLE_STATUSES: ReadonlySet<string> = new Set(['pending', 'in_development'])
+export const EDITABLE_REQUIREMENT_SCOPE_STATUSES: ReadonlySet<string> = new Set(['pending', 'in_development'])
 
 /** 去除标题首尾空白并校验长度。 */
 export function normalizeTitle(title: string): string {
