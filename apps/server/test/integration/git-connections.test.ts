@@ -1,23 +1,33 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { eq } from 'drizzle-orm'
 import { gitRepository } from '../../src/modules/code/code.tables.ts'
+import { teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { createIntegrationsService } from '../../src/modules/integrations/integrations.service.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
 import { ApiError } from '../../src/platform/http/errors.ts'
+import { createAuthenticatedUser } from '../support/auth.ts'
 import { setupPipelineContext } from './pipeline-harness.ts'
 
 test('GitHub App 多安装绑定、用户授权范围与重复授权', { timeout: 90_000 }, async (t) => {
   const context = await setupPipelineContext(t)
   const db = context.app.db
   const actor = { id: context.admin.userId, name: '团队管理员', email: 'admin@example.test' }
+  const secondAdminUser = await createAuthenticatedUser(context.app, { name: '第二位管理员' })
+  const secondAdmin = { id: secondAdminUser.userId, name: '第二位管理员', email: 'second-admin@example.test' }
+  await db.insert(teamMember).values({
+    id: randomUUID(),
+    team_id: context.teamId,
+    user_id: secondAdmin.id,
+    role: 'admin',
+    status: 'active',
+  })
   const developer = { id: context.developer.userId, name: '开发者', email: 'developer@example.test' }
   const config = loadConfig({
     NODE_ENV: 'test',
     DATABASE_URL: context.runtimeUrl,
     AUTH_SECRET: 'test-auth-secret-at-least-32-characters',
-    GITHUB_AUTH_MODE: 'app',
     GITHUB_APP_SLUG: 'devops-test',
     GITHUB_APP_CLIENT_ID: 'Iv1_test',
     GITHUB_APP_CLIENT_SECRET: 'test-only-secret',
@@ -62,15 +72,15 @@ test('GitHub App 多安装绑定、用户授权范围与重复授权', { timeout
     service.createConnection(user, context.teamId, { providerKey: 'github', name: 'GitHub' })
   await assert.rejects(() => requestConnection(developer), denied)
 
-  async function startAuthorization(installationId: number, code: string) {
-    const pending = await requestConnection()
+  async function startAuthorization(installationId: number, code: string, user = actor) {
+    const pending = await requestConnection(user)
     assert.ok('authorizationUrl' in pending)
     const installUrl = new URL(pending.authorizationUrl)
     assert.equal(installUrl.pathname, '/apps/devops-test/installations/new')
     const state = installUrl.searchParams.get('state')
     assert.ok(state)
     await assert.rejects(() => service.completeAuthorization(developer, 'github', { state, installationId }), denied)
-    const authorization = await service.completeAuthorization(actor, 'github', { state, installationId })
+    const authorization = await service.completeAuthorization(user, 'github', { state, installationId })
     assert.ok('authorizationUrl' in authorization)
     const url = new URL(authorization.authorizationUrl)
     assert.equal(url.pathname, '/login/oauth/authorize')
@@ -92,9 +102,12 @@ test('GitHub App 多安装绑定、用户授权范围与重复授权', { timeout
   const first = await service.completeAuthorization(actor, 'github', await startAuthorization(11, 'first'))
   assert.ok('id' in first)
   assert.equal(first.name, 'GitHub account-11 (#11)')
-  const second = await service.completeAuthorization(actor, 'github', await startAuthorization(12, 'second'))
+  const secondState = await startAuthorization(12, 'second', secondAdmin)
+  await assert.rejects(() => service.completeAuthorization(actor, 'github', secondState), denied)
+  const second = await service.completeAuthorization(secondAdmin, 'github', secondState)
   assert.ok('id' in second)
   assert.notEqual(second.id, first.id)
+  assert.equal(second.externalIdentity, '12')
   const projectRepositories = () =>
     db.select({ id: gitRepository.id }).from(gitRepository).where(eq(gitRepository.connection_id, first.id))
   const previous = await projectRepositories()
@@ -104,7 +117,7 @@ test('GitHub App 多安装绑定、用户授权范围与重复授权', { timeout
   assert.equal(renewed.id, first.id)
   assert.deepEqual(await projectRepositories(), previous)
   const appConnections = (await service.listConnections(actor, context.teamId)).filter(
-    (row) => row.authKind === 'github_app_installation',
+    (row) => row.externalIdentity === '11' || row.externalIdentity === '12',
   )
-  assert.equal(appConnections.length, 2)
+  assert.deepEqual(new Set(appConnections.map((row) => row.id)), new Set([first.id, second.id]))
 })

@@ -173,7 +173,8 @@ test('项目晴雨表：事项活动、项目摘要、筛选、来源未知与�
       provider_key: 'github',
       instance_url: 'https://github.com',
       name: '活动来源',
-      auth_kind: 'github_cli',
+      auth_kind: 'github_app_installation',
+      external_identity: '1',
       created_by_user_id: adminUser.userId,
     })
     await app.db.insert(gitRepository).values({

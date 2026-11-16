@@ -1,7 +1,5 @@
-import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { promisify } from 'node:util'
 import { createAppAuth } from '@octokit/auth-app'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import type { RunPlanGit } from '@dev-ops/pipeline-protocol'
@@ -18,9 +16,6 @@ import {
   projectEnvVar,
 } from '../configuration/configuration.tables.ts'
 import { findGitConnectionById } from '../integrations/integrations.repository.ts'
-
-const execFileAsync = promisify(execFile)
-const GH_TOKEN_TIMEOUT_MS = 5_000
 
 /** Git 短期凭据签发失败；不包含底层令牌或错误详情，避免凭据进入日志。 */
 export class PipelineCredentialError extends Error {
@@ -83,19 +78,6 @@ function toRemoteUrl(webUrl: string): string {
   return `${url.origin}${path.endsWith('.git') ? path : `${path}.git`}`
 }
 
-/** 通过本机 GitHub CLI 读取登录令牌；仅 stg/开发环境使用 cli 模式。 */
-async function readGitHubCliToken(): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync('gh', ['auth', 'token'], { timeout: GH_TOKEN_TIMEOUT_MS })
-    const token = stdout.trim()
-    if (token.length === 0) throw new PipelineCredentialError('GitHub CLI 未返回有效令牌')
-    return token
-  } catch (error) {
-    if (error instanceof PipelineCredentialError) throw error
-    throw new PipelineCredentialError('GitHub CLI 令牌不可用，无法签发 Git 凭据')
-  }
-}
-
 /**
  * 创建流水线凭据提供者：签发短期 Git 凭据并解析运行时 secrets 引用。
  * @param deps 数据库、应用配置与可选的团队凭据解密器。
@@ -131,32 +113,24 @@ export function createPipelineCredentialProvider(deps: PipelineCredentialProvide
         commitSha: repository.commitSha,
       }
     }
-    if (connection.auth_kind === 'github_app_installation') {
-      if (!config.GITHUB_APP_ID || !config.GITHUB_APP_PRIVATE_KEY_PATH) {
-        throw new PipelineCredentialError('GitHub App 凭据未配置')
-      }
-      const installationId = Number(connection.external_identity)
-      if (!Number.isSafeInteger(installationId) || installationId <= 0) {
-        throw new PipelineCredentialError('GitHub App 安装标识不合法')
-      }
-      const privateKey = await readFile(config.GITHUB_APP_PRIVATE_KEY_PATH, 'utf8')
-      const auth = createAppAuth({ appId: config.GITHUB_APP_ID, privateKey, installationId })
-      const result = await auth({ type: 'installation' })
-      return {
-        remoteUrl,
-        username: 'x-access-token',
-        password: result.token,
-        expiresAt: result.expiresAt,
-        commitSha: repository.commitSha,
-      }
+    if (connection.auth_kind !== 'github_app_installation') {
+      throw new PipelineCredentialError('Git 连接授权方式已停用，无法签发凭据')
     }
-    // cli 模式没有平台侧 App 身份，复用本机 gh 登录令牌；凭据只在租约有效期内下发。
-    const token = await readGitHubCliToken()
+    if (!config.GITHUB_APP_ID || !config.GITHUB_APP_PRIVATE_KEY_PATH) {
+      throw new PipelineCredentialError('GitHub App 凭据未配置')
+    }
+    const installationId = Number(connection.external_identity)
+    if (!Number.isSafeInteger(installationId) || installationId <= 0) {
+      throw new PipelineCredentialError('GitHub App 安装标识不合法')
+    }
+    const privateKey = await readFile(config.GITHUB_APP_PRIVATE_KEY_PATH, 'utf8')
+    const auth = createAppAuth({ appId: config.GITHUB_APP_ID, privateKey, installationId })
+    const result = await auth({ type: 'installation' })
     return {
       remoteUrl,
       username: 'x-access-token',
-      password: token,
-      expiresAt: leaseExpiresAt.toISOString(),
+      password: result.token,
+      expiresAt: result.expiresAt,
       commitSha: repository.commitSha,
     }
   }

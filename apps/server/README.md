@@ -68,11 +68,12 @@ pnpm --dir apps/server dev
 | `SMTP_URL`                       | 未设置                            | SMTP 提交地址；本地 Mailpit 为 `smtp://127.0.0.1:1025`            |
 | `MAIL_FROM`                      | 未设置                            | 邀请与密码找回发件人                                              |
 | `GIT_CREDENTIAL_ENCRYPTION_KEY`  | 未设置                            | 32 字节 base64，Git 凭据 AES-256-GCM 加密密钥                     |
-| `GITHUB_AUTH_MODE`               | `cli`                             | GitHub 数据源：stg 用 `cli`（已登录 `gh`），生产用 `app`          |
-| `GITHUB_ALLOWED_REPOS`           | 空                                | `cli` 模式仓库 allowlist，逗号分隔 `owner/repo`                   |
-| `GITHUB_APP_ID`                  | 未设置                            | `app` 模式 GitHub App ID                                          |
-| `GITHUB_APP_PRIVATE_KEY_PATH`    | 未设置                            | `app` 模式 App 私钥文件路径                                       |
-| `GITHUB_APP_SLUG`                | 未设置                            | `app` 模式安装入口 slug                                           |
+| `GITHUB_ALLOWED_REPOS`           | 空                                | 可选仓库白名单，逗号分隔 `owner/repo`；留空时使用 App 安装范围    |
+| `GITHUB_APP_ID`                  | 未设置                            | GitHub App ID，用于签发安装令牌                                   |
+| `GITHUB_APP_PRIVATE_KEY_PATH`    | 未设置                            | GitHub App 私钥文件路径                                           |
+| `GITHUB_APP_SLUG`                | 未设置                            | GitHub App 安装入口 slug                                          |
+| `GITHUB_APP_CLIENT_ID`           | 未设置                            | GitHub App 的用户授权客户端标识                                   |
+| `GITHUB_APP_CLIENT_SECRET`       | 未设置                            | GitHub App 的用户授权客户端密钥                                   |
 | `ATTACHMENT_STORAGE_DIR`         | `./attachment-data`               | 本地储存桶根目录；需可写并纳入备份                                |
 | `ATTACHMENT_MAX_BYTES`           | `52428800`                        | 单附件上限（字节），范围 1 MB–2 GB                                |
 | `ATTACHMENT_MAX_PER_SUBMIT`      | `10`                              | 单次提交附件数量上限，范围 1–50                                   |

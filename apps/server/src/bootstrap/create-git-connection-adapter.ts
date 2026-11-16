@@ -1,7 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { createGitAdapter } from '../adapters/git/git.registry.ts'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
-import { createGitHubCliAdapter } from '../adapters/git/github-cli.adapter.ts'
 import { createGitHubAppAdapter } from '../adapters/git/github.adapter.ts'
 import { createGiteaAdapter } from '../adapters/git/gitea.adapter.ts'
 import type { SecretCipher } from '../modules/configuration/configuration.crypto.ts'
@@ -32,30 +30,23 @@ export function createGitConnectionAdapterFactory(deps: {
       if (authKind !== 'gitea_token') throw new Error('数据库中的 Gitea 连接授权方式不合法')
       if (!cipher || !connection.secret_id) throw new Error('Gitea 凭据未配置')
       const token = await decryptConfiguredSecret(db, cipher, connection.team_id, connection.secret_id)
-      return createGitAdapter(
-        config,
-        { provider, authKind, instanceUrl },
-        {
-          gitea: (selected) => createGiteaAdapter({ ...selected, token }),
-        },
-      )
+      return createGiteaAdapter({ provider, authKind, instanceUrl, token })
     }
     if (provider !== 'github') throw new Error('数据库中的 Git 提供方不合法')
-    if (authKind === 'github_cli') {
-      return createGitAdapter(config, { provider, authKind, instanceUrl }, { githubCli: createGitHubCliAdapter })
-    }
-    if (authKind !== 'github_app_installation') throw new Error('数据库中的 GitHub 连接授权方式不合法')
+    if (authKind !== 'github_app_installation') throw new Error('GitHub 连接需要通过 GitHub App 授权')
     const { GITHUB_APP_ID: appId, GITHUB_APP_PRIVATE_KEY_PATH: keyPath } = config
     if (!appId || !keyPath) throw new Error('GitHub App 凭据未配置')
     const installationId = Number(connection.external_identity)
     if (!Number.isSafeInteger(installationId) || installationId <= 0) throw new Error('GitHub App 安装 ID 无效')
     const privateKey = await readFile(keyPath, 'utf8')
-    return createGitAdapter(
-      config,
-      { provider, authKind, instanceUrl },
-      {
-        githubApp: (selected) => createGitHubAppAdapter({ ...selected, appId, privateKey, installationId }),
-      },
-    )
+    return createGitHubAppAdapter({
+      provider,
+      authKind,
+      instanceUrl,
+      allowedRepositories: config.GITHUB_ALLOWED_REPOS,
+      appId,
+      privateKey,
+      installationId,
+    })
   }
 }

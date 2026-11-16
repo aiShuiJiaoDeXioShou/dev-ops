@@ -70,8 +70,6 @@ test('Git 连接创建、检查、同步、仓库关联、代码引用、撤权�
     DATABASE_URL: runtimeUrl.href,
     AUTH_SECRET: 'test-auth-secret-at-least-32-characters',
     GIT_CREDENTIAL_ENCRYPTION_KEY: encryptionKey,
-    GITHUB_AUTH_MODE: 'cli',
-    GITHUB_ALLOWED_REPOS: 'aiShuiJiaoDeXioShou/dev-ops',
     APP_ORIGIN: 'http://localhost:5173',
     AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
     DB_STATEMENT_TIMEOUT_MS: '1000',
@@ -132,7 +130,18 @@ test('Git 连接创建、检查、同步、仓库关联、代码引用、撤权�
     headers: { cookie: viewerUser.cookie },
   })
   assert.equal(providers.json().success, true)
-  assert.equal(providers.json().data.length, 2)
+  assert.deepEqual(providers.json().data, [
+    { providerKey: 'github', name: 'GitHub', authModes: ['github_app_installation'] },
+    { providerKey: 'gitea', name: 'Gitea', authModes: ['gitea_token'] },
+  ])
+
+  const missingAppConfig = await app.inject({
+    method: 'POST',
+    url: `/api/v1/teams/${teamId}/git-connections`,
+    payload: { providerKey: 'github', name: 'GitHub' },
+    headers: { cookie: adminUser.cookie },
+  })
+  assert.equal(missingAppConfig.json().code, 'PRECONDITION_FAILED')
 
   const viewerCreate = await app.inject({
     method: 'POST',

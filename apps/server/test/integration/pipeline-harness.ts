@@ -547,7 +547,8 @@ export async function setupPipelineContext(t: TestContext): Promise<PipelineTest
     instance_url: 'https://github.com',
     name: 'GitHub',
     status: 'active',
-    auth_kind: 'github_cli',
+    auth_kind: 'github_app_installation',
+    external_identity: '1',
     created_by_user_id: adminActor.userId,
   })
   const repositoryId = randomUUID()
@@ -600,7 +601,8 @@ export async function setupPipelineContext(t: TestContext): Promise<PipelineTest
     instance_url: 'https://github.com',
     name: 'GitHub',
     status: 'active',
-    auth_kind: 'github_cli',
+    auth_kind: 'github_app_installation',
+    external_identity: '1',
     created_by_user_id: strangerActor.userId,
   })
   await app.db.insert(gitRepository).values({

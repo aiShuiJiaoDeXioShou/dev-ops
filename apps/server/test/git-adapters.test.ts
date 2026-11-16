@@ -1,110 +1,15 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createGitHubCliAdapter } from '../src/adapters/git/github-cli.adapter.ts'
 import { createGitHubAppAdapter, type GitHubAppClient } from '../src/adapters/git/github.adapter.ts'
 import { createGiteaAdapter, type GiteaFetch } from '../src/adapters/git/gitea.adapter.ts'
-import { createGitAdapter } from '../src/adapters/git/git.registry.ts'
 import { GitAdapterError, type GitAdapter } from '../src/adapters/git/git.types.ts'
-import { loadConfig } from '../src/platform/config/env.ts'
 
-const baseInput = { provider: 'github' as const, authKind: 'github_cli' as const, instanceUrl: 'https://github.com' }
+const baseInput = {
+  provider: 'github' as const,
+  authKind: 'github_app_installation' as const,
+  instanceUrl: 'https://github.com',
+}
 const allowed = ['aiShuiJiaoDeXioShou/dev-ops']
-
-test('GitHub CLI 适配器只接受 allowlist、固定只读命令并映射错误', async () => {
-  const calls: string[][] = []
-  const adapter = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: allowed,
-    exec: async (args) => {
-      calls.push(args)
-      const joined = args.join(' ')
-      if (joined === 'api user --jq .login') return { stdout: 'aiShuiJiaoDeXioShou\n', stderr: '' }
-      if (joined.startsWith('repo view'))
-        return {
-          stdout: JSON.stringify({
-            nameWithOwner: allowed[0],
-            url: 'https://github.com/aiShuiJiaoDeXioShou/dev-ops',
-            defaultBranchRef: { name: 'main' },
-          }),
-          stderr: '',
-        }
-      if (joined.startsWith('api repos/aiShuiJiaoDeXioShou/dev-ops/issues/12'))
-        return {
-          stdout: JSON.stringify({
-            title: '登录失败',
-            state: 'open',
-            html_url: 'https://github.com/aiShuiJiaoDeXioShou/dev-ops/issues/12',
-          }),
-          stderr: '',
-        }
-      if (joined.startsWith('api repos/aiShuiJiaoDeXioShou/dev-ops/commits/'))
-        return {
-          stdout: JSON.stringify({
-            html_url: 'https://github.com/aiShuiJiaoDeXioShou/dev-ops/commit/abc',
-            commit: { message: 'fix: login\n\nbody' },
-          }),
-          stderr: '',
-        }
-      return { stdout: JSON.stringify({ title: 'PR', state: 'open' }), stderr: '' }
-    },
-  })
-
-  assert.deepEqual(await adapter.checkConnection(), { identity: 'aiShuiJiaoDeXioShou' })
-  const repositories = await adapter.listRepositories()
-  assert.equal(repositories.length, 1)
-  assert.equal(repositories[0]?.namespace, 'aiShuiJiaoDeXioShou')
-  const issue = await adapter.getObject({
-    repository: { namespace: 'aiShuiJiaoDeXioShou', name: 'dev-ops' },
-    objectType: 'issue',
-    remoteId: '12',
-  })
-  assert.equal(issue.title, '登录失败')
-  const commit = await adapter.getObject({
-    repository: { namespace: 'aiShuiJiaoDeXioShou', name: 'dev-ops' },
-    objectType: 'commit',
-    remoteId: 'abcdef1',
-  })
-  assert.equal(commit.title, 'fix: login')
-  await assert.rejects(
-    adapter.getObject({ repository: { namespace: 'evil', name: 'repo' }, objectType: 'issue', remoteId: '1' }),
-    (error: unknown) => error instanceof GitAdapterError && error.code === 'unsupported',
-  )
-  await assert.rejects(
-    adapter.getObject({
-      repository: { namespace: 'aiShuiJiaoDeXioShou', name: 'dev-ops' },
-      objectType: 'issue',
-      remoteId: '../../admin',
-    }),
-    (error: unknown) => error instanceof GitAdapterError && error.code === 'unsupported',
-  )
-  assert.ok(calls.every((args) => !args.some((arg) => arg.includes('shell') || arg.includes('--method'))))
-})
-
-test('GitHub CLI 超时与授权错误分类', async () => {
-  const timeoutAdapter = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: allowed,
-    exec: async () => {
-      throw Object.assign(new Error('timeout'), { killed: true })
-    },
-  })
-  await assert.rejects(
-    timeoutAdapter.checkConnection(),
-    (error: unknown) => error instanceof GitAdapterError && error.code === 'timeout',
-  )
-
-  const authAdapter = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: allowed,
-    exec: async () => {
-      throw Object.assign(new Error('HTTP 401'), { stderr: 'HTTP 401: Bad credentials' })
-    },
-  })
-  await assert.rejects(
-    authAdapter.checkConnection(),
-    (error: unknown) => error instanceof GitAdapterError && error.code === 'auth_failed',
-  )
-})
 
 test('GitHub App 适配器使用安装身份、过滤 allowlist 并映射错误', async () => {
   const routes: string[] = []
@@ -135,7 +40,6 @@ test('GitHub App 适配器使用安装身份、过滤 allowlist 并映射错误'
   }
   const adapter = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     allowedRepositories: allowed,
     appId: '1',
     privateKey: 'key',
@@ -155,7 +59,6 @@ test('GitHub App 适配器使用安装身份、过滤 allowlist 并映射错误'
   }
   const failedAdapter = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     appId: '1',
     privateKey: 'key',
     installationId: 2,
@@ -217,45 +120,6 @@ test('Gitea 适配器分页、Token 头与状态错误映射', async () => {
     notFound.checkConnection(),
     (error: unknown) => error instanceof GitAdapterError && error.code === 'not_found',
   )
-})
-
-test('注册表根据 GITHUB_AUTH_MODE 选择适配器', async () => {
-  const config = loadConfig({
-    NODE_ENV: 'test',
-    LOG_LEVEL: 'silent',
-    DATABASE_URL: 'postgresql://test@127.0.0.1:1/test',
-    AUTH_SECRET: 'test-auth-secret-at-least-32-characters',
-    GITHUB_AUTH_MODE: 'cli',
-    GITHUB_ALLOWED_REPOS: allowed[0],
-  })
-  const cli = createGitAdapter(config, baseInput, {
-    githubCli: () => ({
-      checkConnection: async () => ({ identity: 'cli' }),
-      listRepositories: async () => [],
-      getObject: async () => ({ objectType: 'issue', remoteId: '1', title: '', state: 'open', url: null }),
-    }),
-  })
-  assert.equal((await cli.checkConnection()).identity, 'cli')
-
-  const appConfig = loadConfig({
-    NODE_ENV: 'test',
-    LOG_LEVEL: 'silent',
-    DATABASE_URL: 'postgresql://test@127.0.0.1:1/test',
-    AUTH_SECRET: 'test-auth-secret-at-least-32-characters',
-    GITHUB_AUTH_MODE: 'app',
-    GITHUB_ALLOWED_REPOS: allowed[0],
-    GITHUB_APP_ID: '1',
-    GITHUB_APP_PRIVATE_KEY_PATH: '/tmp/key.pem',
-    GITHUB_APP_SLUG: 'dev-ops',
-  })
-  const app = createGitAdapter(appConfig, baseInput, {
-    githubApp: () => ({
-      checkConnection: async () => ({ identity: 'app' }),
-      listRepositories: async () => [],
-      getObject: async () => ({ objectType: 'issue', remoteId: '1', title: '', state: 'open', url: null }),
-    }),
-  })
-  assert.equal((await app.checkConnection()).identity, 'app')
 })
 
 /** 读取端口可选方法齐全的测试断言；避免在调用处使用非空断言。 */
@@ -343,7 +207,6 @@ test('GitHub 晴雨表只接受祖先一致且完整的快进提交', async () =
   }
   const adapter = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     allowedRepositories: readAllowed,
     appId: '1',
     privateKey: 'key',
@@ -390,7 +253,6 @@ test('GitHub App 适配器读取提交、PR、变更文件与差异并标记截�
   }
   const adapter = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     allowedRepositories: readAllowed,
     appId: '1',
     privateKey: 'key',
@@ -485,7 +347,6 @@ test('GitHub App 读取错误映射：授权、限流、不存在、超时与非
   function adapterWithError(createError: () => unknown) {
     return createGitHubAppAdapter({
       ...baseInput,
-      authKind: 'github_app_installation',
       allowedRepositories: readAllowed,
       appId: '1',
       privateKey: 'key',
@@ -524,7 +385,6 @@ test('GitHub App 读取错误映射：授权、限流、不存在、超时与非
 
   const malformed = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     allowedRepositories: readAllowed,
     appId: '1',
     privateKey: 'key',
@@ -546,105 +406,6 @@ test('GitHub App 读取错误映射：授权、限流、不存在、超时与非
   )
 })
 
-test('GitHub CLI 适配器读取提交、PR、变更文件与差异并映射失败', async () => {
-  const calls: string[][] = []
-  const adapter = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: readAllowed,
-    exec: async (args) => {
-      calls.push(args)
-      const joined = args.join(' ')
-      if (joined.startsWith('api repos/acme/app/commits?'))
-        return { stdout: JSON.stringify([githubCommit]), stderr: '' }
-      if (joined.startsWith('api repos/acme/app/commits/')) return { stdout: JSON.stringify(githubCommit), stderr: '' }
-      if (joined.startsWith('api repos/acme/app/pulls?'))
-        return { stdout: JSON.stringify([githubPullRequest, githubPullRequestOther]), stderr: '' }
-      if (joined.includes('/reviews?')) return { stdout: JSON.stringify(githubReviews), stderr: '' }
-      if (joined.includes('/files?')) return { stdout: JSON.stringify(githubFiles), stderr: '' }
-      if (joined.includes('--header Accept: application/vnd.github.v3.diff'))
-        return { stdout: oversizedDiff, stderr: '' }
-      if (joined === 'api repos/acme/app/pulls/8') return { stdout: JSON.stringify(githubPullRequest), stderr: '' }
-      throw new Error(`unexpected gh args: ${joined}`)
-    },
-  })
-  assert.ok(hasReadMethods(adapter))
-
-  const commits = await adapter.listCommits({ repository: readRepository, ref: 'main', page: 2, pageSize: 20 })
-  assert.equal(commits[0]?.sha, githubCommit.sha)
-  const commitListArgs = calls.find((args) => args.join(' ').startsWith('api repos/acme/app/commits?'))
-  assert.ok(commitListArgs?.some((arg) => arg.includes('per_page=20')))
-  assert.ok(commitListArgs?.some((arg) => arg.includes('page=2')))
-  assert.ok(commitListArgs?.some((arg) => arg.includes('sha=main')))
-  assert.equal((await adapter.getCommit({ repository: readRepository, ref: 'main' })).title, 'feat: 登录')
-
-  const pullRequests = await adapter.listPullRequests({
-    repository: readRepository,
-    state: 'all',
-    page: 1,
-    pageSize: 20,
-  })
-  assert.equal(pullRequests[0]?.state, 'merged')
-  const pullListArgs = calls.find((args) => args.join(' ').startsWith('api repos/acme/app/pulls?'))
-  assert.ok(pullListArgs?.some((arg) => arg.includes('state=all')))
-
-  const pullRequest = await adapter.getPullRequest({ repository: readRepository, number: 8 })
-  assert.equal(pullRequest.reviewStatus, 'changes_requested')
-  assert.equal(pullRequest.files[2]?.truncated, true)
-  const diff = await adapter.getPullRequestDiff({ repository: readRepository, number: 8 })
-  assert.equal(diff.truncated, true)
-  assert.ok(calls.some((args) => args.some((arg) => arg === '--header')))
-  assert.ok(calls.every((args) => !args.some((arg) => arg.includes('--method'))))
-
-  const failing = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: readAllowed,
-    exec: async () => {
-      throw Object.assign(new Error('HTTP 401'), { stderr: 'HTTP 401: Bad credentials' })
-    },
-  })
-  assert.ok(hasReadMethods(failing))
-  await assert.rejects(
-    failing.listCommits({ repository: readRepository, page: 1, pageSize: 20 }),
-    rejectsWithCode('auth_failed'),
-  )
-
-  const notFound = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: readAllowed,
-    exec: async () => {
-      throw Object.assign(new Error('HTTP 404'), { stderr: 'HTTP 404: Not Found' })
-    },
-  })
-  assert.ok(hasReadMethods(notFound))
-  await assert.rejects(notFound.getCommit({ repository: readRepository, ref: 'main' }), rejectsWithCode('not_found'))
-
-  const timedOut = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: readAllowed,
-    exec: async () => {
-      throw Object.assign(new Error('timeout'), { killed: true })
-    },
-  })
-  assert.ok(hasReadMethods(timedOut))
-  await assert.rejects(
-    timedOut.listPullRequests({ repository: readRepository, page: 1, pageSize: 20 }),
-    rejectsWithCode('timeout'),
-  )
-
-  const unavailable = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: readAllowed,
-    exec: async () => {
-      throw Object.assign(new Error('HTTP 500'), { stderr: 'HTTP 500: Internal Server Error' })
-    },
-  })
-  assert.ok(hasReadMethods(unavailable))
-  await assert.rejects(
-    unavailable.getPullRequest({ repository: readRepository, number: 8 }),
-    rejectsWithCode('unavailable'),
-  )
-})
-
 test('PR 变更文件达到 100 个上限时保留前 100 个并标记截断', async () => {
   const manyFiles = Array.from({ length: 101 }, (_, index) => ({
     filename: `file-${index}.txt`,
@@ -662,7 +423,6 @@ test('PR 变更文件达到 100 个上限时保留前 100 个并标记截断', a
   }
   const adapter = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     allowedRepositories: readAllowed,
     appId: '1',
     privateKey: 'key',
@@ -912,7 +672,6 @@ test('提交详情来源缺少 files 时标记不支持，超过上限时标记�
   const commitWithoutFiles = { ...githubCommit, files: undefined }
   const appAdapter = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     allowedRepositories: readAllowed,
     appId: '1',
     privateKey: 'key',
@@ -929,20 +688,6 @@ test('提交详情来源缺少 files 时标记不支持，超过上限时标记�
   assert.deepEqual(unsupportedDetail.files, [])
   assert.equal(unsupportedDetail.filesUnsupported, true)
   assert.equal(unsupportedDetail.filesTruncated, false)
-
-  const cliAdapter = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: readAllowed,
-    exec: async (args) => {
-      const joined = args.join(' ')
-      if (joined.startsWith('api repos/acme/app/commits/'))
-        return { stdout: JSON.stringify(commitWithoutFiles), stderr: '' }
-      throw new Error(`unexpected gh args: ${joined}`)
-    },
-  })
-  assert.ok(hasReadMethods(cliAdapter))
-  const cliDetail = await cliAdapter.getCommit({ repository: readRepository, ref: 'main' })
-  assert.equal(cliDetail.filesUnsupported, true)
 
   const giteaAdapter = createGiteaAdapter({
     provider: 'gitea',
@@ -966,7 +711,6 @@ test('提交详情来源缺少 files 时标记不支持，超过上限时标记�
   }))
   const truncatingAdapter = createGitHubAppAdapter({
     ...baseInput,
-    authKind: 'github_app_installation',
     allowedRepositories: readAllowed,
     appId: '1',
     privateKey: 'key',
@@ -1015,17 +759,9 @@ test('GitHub App 按目录读取，宽目录沿指定分支逐层读取非递归
   assert.ok(calls.every(({ params }) => !Object.hasOwn(params ?? {}, 'recursive')))
 })
 
-test('GitHub CLI 与 Gitea 仅读取已展开目录并保留仓库相对路径', async () => {
+test('Gitea 仅读取已展开目录并保留仓库相对路径', async () => {
   const calls: string[] = []
   const entries = [{ path: 'src/a b/child', type: 'dir' }]
-  const cli = createGitHubCliAdapter({
-    ...baseInput,
-    allowedRepositories: allowed,
-    exec: async (args) => {
-      calls.push(args.join(' '))
-      return { stdout: JSON.stringify(entries), stderr: '' }
-    },
-  })
   const gitea = createGiteaAdapter({
     provider: 'gitea',
     authKind: 'gitea_token',
@@ -1036,11 +772,10 @@ test('GitHub CLI 与 Gitea 仅读取已展开目录并保留仓库相对路径',
       return Response.json(entries)
     },
   })
-  assert.ok(cli.listDirectory && gitea.listDirectory)
+  assert.ok(gitea.listDirectory)
   const repository = { namespace: 'aiShuiJiaoDeXioShou', name: 'dev-ops' }
   const input = { repository, ref: 'feature/code', path: 'src/a b' }
   const expected = [{ path: 'src/a b/child', type: 'directory', size: null }]
-  assert.deepEqual(await cli.listDirectory(input), expected)
   assert.deepEqual(await gitea.listDirectory(input), expected)
   assert.ok(calls.every((call) => call.includes('/contents/src/a%20b?ref=feature%2Fcode')))
   assert.ok(calls.every((call) => !call.includes('recursive')))

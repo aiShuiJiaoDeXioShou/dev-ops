@@ -154,7 +154,8 @@ test('项目仓库关联、代码引用创建/刷新/移除、权限、唯一与
     instance_url: 'https://github.com',
     name: 'GitHub',
     status: 'active',
-    auth_kind: 'github_cli',
+    auth_kind: 'github_app_installation',
+    external_identity: '1',
     created_by_user_id: adminUser.userId,
   })
   const repositoryId = randomUUID()

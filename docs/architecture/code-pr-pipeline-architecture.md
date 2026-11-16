@@ -49,9 +49,8 @@ flowchart TB
     end
 
     subgraph adapters["Git 只读适配器"]
-        registry["git.registry<br>按连接选择实现"]
+        registry["create-git-connection-adapter<br>按连接选择实现"]
         githubApp["github.adapter<br>GitHub App"]
-        githubCli["github-cli.adapter<br>GitHub CLI"]
         gitea["gitea.adapter<br>Gitea Token"]
     end
 
@@ -80,7 +79,6 @@ flowchart TB
     integrationService --> repositoryTable
     integrationService --> configuration
     registry --> githubApp --> github
-    registry --> githubCli --> github
     registry --> gitea --> giteaApi
     codeRepository --> repositoryTable
     codeRepository --> projectRepositoryTable
@@ -113,7 +111,7 @@ sequenceDiagram
     participant API as API /api/v1
     participant CS as code.service
     participant DB as PostgreSQL
-    participant REG as git.registry
+    participant REG as 连接适配器工厂
     participant AD as Git 适配器
     participant G as GitHub / Gitea
 
@@ -122,7 +120,7 @@ sequenceDiagram
     CS->>DB: 读取项目已关联仓库与连接
     DB-->>CS: 仓库、连接、认证方式、凭据引用
     CS->>REG: 按连接选择适配器
-    REG-->>CS: GitHub App / GitHub CLI / Gitea 适配器
+    REG-->>CS: GitHub App 或 Gitea 适配器
     CS->>AD: listPullRequests / getPullRequest / getPullRequestDiff
     AD->>G: 只读 REST API（超时、分页与大小上限）
     G-->>AD: PR、评审、变更文件、diff

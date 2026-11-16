@@ -1,5 +1,5 @@
 export type GitProvider = 'github' | 'gitea'
-export type GitAuthKind = 'github_cli' | 'github_app_installation' | 'gitea_token'
+export type GitAuthKind = 'github_app_installation' | 'gitea_token'
 export type GitObjectType = 'commit' | 'issue' | 'change_request'
 
 export type GitErrorCode = 'timeout' | 'auth_failed' | 'not_found' | 'unavailable' | 'unsupported' | 'invalid_response'

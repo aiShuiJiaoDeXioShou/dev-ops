@@ -177,7 +177,6 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
       GITHUB_APP_CLIENT_SECRET: clientSecret,
     } = config
     if (
-      config.GITHUB_AUTH_MODE !== 'app' ||
       !config.GITHUB_APP_ID ||
       !config.GITHUB_APP_PRIVATE_KEY_PATH ||
       !secret ||
@@ -204,6 +203,9 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
     const connection = await findGitConnectionById(db, connectionId)
     if (!connection) throw new ApiError(ERROR_CODES.NOT_FOUND, 'Git 连接不存在')
     await requireTeamMember(db, actor.id, connection.team_id, ['admin'])
+    if (connection.auth_kind === 'github_cli') {
+      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '旧 GitHub CLI 连接已停用，请通过 GitHub App 添加连接')
+    }
     return connection
   }
 
@@ -256,30 +258,13 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
     await requireTeamMember(db, actor.id, teamId, ['admin'])
     const name = normalizeName(input.name)
     if (input.providerKey === 'github') {
-      if (config.GITHUB_AUTH_MODE === 'app') {
-        const { slug, secret } = githubAuthorizationConfig()
-        const exp = Math.floor(Date.now() / 1000) + 600
-        const state = signState({ teamId, userId: actor.id, exp, nonce: randomUUID() }, secret)
-        return {
-          authorizationUrl: `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(state)}`,
-          expiresAt: new Date(exp * 1000).toISOString(),
-        }
+      const { slug, secret } = githubAuthorizationConfig()
+      const exp = Math.floor(Date.now() / 1000) + 600
+      const state = signState({ teamId, userId: actor.id, exp, nonce: randomUUID() }, secret)
+      return {
+        authorizationUrl: `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(state)}`,
+        expiresAt: new Date(exp * 1000).toISOString(),
       }
-      const row = await insertGitConnection(db, {
-        id: randomUUID(),
-        teamId,
-        providerKey: 'github',
-        instanceUrl: 'https://github.com',
-        name,
-        authKind: 'github_cli',
-        secretId: null,
-        externalIdentity: null,
-        createdByUserId: actor.id,
-      })
-      if (!row) throw new Error('Git 连接创建失败')
-      await checkAndSync(row)
-      const refreshed = await findGitConnectionById(db, row.id)
-      return view(refreshed ?? row)
     }
     if (input.providerKey !== 'gitea') throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '不支持的 Git 提供方')
     if (!input.instanceUrl || !/^https?:\/\//.test(input.instanceUrl))
@@ -513,7 +498,7 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
         {
           providerKey: 'github',
           name: 'GitHub',
-          authModes: config.GITHUB_AUTH_MODE === 'app' ? ['github_app_installation'] : ['github_cli'],
+          authModes: ['github_app_installation'],
         },
         { providerKey: 'gitea', name: 'Gitea', authModes: ['gitea_token'] },
       ]

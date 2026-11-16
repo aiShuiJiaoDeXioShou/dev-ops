@@ -78,7 +78,6 @@ test('V0.1 认证、邮件与 GitHub 配置校验', () => {
   const base = readConfig({})
   assert.equal(base.APP_ORIGIN, 'http://localhost:5173')
   assert.deepEqual(base.AUTH_TRUSTED_ORIGINS, ['http://localhost:5173'])
-  assert.equal(base.GITHUB_AUTH_MODE, 'cli')
   assert.deepEqual(base.GITHUB_ALLOWED_REPOS, [])
   assert.equal(base.SMTP_URL, undefined)
   assert.equal(base.MAIL_FROM, undefined)
@@ -120,8 +119,6 @@ test('V0.1 认证、邮件与 GitHub 配置校验', () => {
     assert.throws(() => readConfig({ GIT_CREDENTIAL_ENCRYPTION_KEY }), /GIT_CREDENTIAL_ENCRYPTION_KEY/)
   }
 
-  assert.equal(readConfig({ GITHUB_AUTH_MODE: 'app' }).GITHUB_AUTH_MODE, 'app')
-  assert.throws(() => readConfig({ GITHUB_AUTH_MODE: 'oauth' }))
   assert.deepEqual(readConfig({ GITHUB_ALLOWED_REPOS: 'owner/repo, other/repo-2' }).GITHUB_ALLOWED_REPOS, [
     'owner/repo',
     'other/repo-2',

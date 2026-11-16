@@ -364,7 +364,8 @@ test('V0.4a e2e（真实 Docker）：触发→调度→真实 Agent 执行→日
     instance_url: 'https://github.com',
     name: 'GitHub',
     status: 'active',
-    auth_kind: 'github_cli',
+    auth_kind: 'github_app_installation',
+    external_identity: '1',
     created_by_user_id: userId,
   })
   const repositoryId = randomUUID()

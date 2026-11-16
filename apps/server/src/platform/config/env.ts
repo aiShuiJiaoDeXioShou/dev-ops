@@ -34,7 +34,6 @@ const environmentSchema = Type.Object({
   SMTP_URL: Type.Optional(Type.String({ minLength: 1 })),
   MAIL_FROM: Type.Optional(Type.String({ minLength: 3, maxLength: 320 })),
   GIT_CREDENTIAL_ENCRYPTION_KEY: Type.Optional(Type.String({ minLength: 1 })),
-  GITHUB_AUTH_MODE: Type.Union([Type.Literal('cli'), Type.Literal('app')], { default: 'cli' }),
   GITHUB_ALLOWED_REPOS: Type.Optional(Type.String()),
   GITHUB_APP_ID: Type.Optional(Type.String({ pattern: '^[0-9]+$' })),
   GITHUB_APP_PRIVATE_KEY_PATH: Type.Optional(Type.String({ minLength: 1 })),
