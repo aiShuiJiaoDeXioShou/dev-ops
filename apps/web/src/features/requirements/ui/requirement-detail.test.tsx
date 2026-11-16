@@ -31,7 +31,7 @@ const requirement = {
   attachments: [],
   latestTestSubmission: null,
   linkedBugs: [linkedBug],
-  needsReview: true,
+  needsReview: false,
   linkedCodeReferences: [],
   createdAt: '2026-11-10T00:00:00.000Z',
   createdByUserId: 'user-1',
@@ -53,10 +53,19 @@ function renderDetail() {
 }
 
 describe('RequirementDetailPane', () => {
-  it('按编号关联未解决的 Bug 后刷新测试通过条件', async () => {
+  it('按编号关联未解决的 Bug 后，测试通过弹窗提示且可以确认', async () => {
     let isLinked = false
+    let isPassed = false
     const searches: string[] = []
     const linkRequests: unknown[] = []
+    const passRequests: unknown[] = []
+    const closedBug = { id: 'bug-closed', number: 1, title: '已关闭的 Bug', status: 'closed' }
+    const currentRequirement = () => ({
+      ...requirement,
+      status: isPassed ? 'passed' : 'in_testing',
+      linkedBugs: isLinked ? [linkedBug, closedBug] : [closedBug],
+      needsReview: isPassed && isLinked,
+    })
     const bug = {
       ...linkedBug,
       projectId: requirement.projectId,
@@ -67,12 +76,12 @@ describe('RequirementDetailPane', () => {
     }
     server.use(
       http.get('*/api/v1/me/teams', () => ok({ teams: [{ ...teamFixture, role: 'admin' }], isPlatformAdmin: false })),
-      http.get('*/api/v1/requirements/req-1', () =>
-        ok({ ...requirement, linkedBugs: isLinked ? [linkedBug] : [], needsReview: isLinked }),
-      ),
-      http.get('*/api/v1/requirements/req-1/test-pass-eligibility', () =>
-        ok({ eligible: !isLinked, blockers: isLinked ? [linkedBug] : [] }),
-      ),
+      http.get('*/api/v1/requirements/req-1', () => ok(currentRequirement())),
+      http.post('*/api/v1/requirements/req-1/pass-test', async ({ request }) => {
+        passRequests.push(await request.json())
+        isPassed = true
+        return ok(currentRequirement())
+      }),
       http.get('*/api/v1/projects/project-1/bugs', ({ request }) => {
         const search = new URL(request.url).searchParams.get('search') ?? ''
         searches.push(search)
@@ -124,7 +133,11 @@ describe('RequirementDetailPane', () => {
       http.get('*/api/v1/requirements/req-1/activities', () => ok({ items: [], page: 1, pageSize: 50, total: 0 })),
     )
     renderDetail()
-    expect(await screen.findByRole('button', { name: '测试通过' })).toBeEnabled()
+    const pass = await screen.findByRole('button', { name: '测试通过' })
+    await userEvent.click(pass)
+    const firstDialog = await screen.findByRole('dialog', { name: '测试通过' })
+    expect(within(firstDialog).queryByText(/关联 Bug 未解决/)).not.toBeInTheDocument()
+    await userEvent.click(within(firstDialog).getByRole('button', { name: '取消' }))
     expect(searches).toEqual([])
     await userEvent.click(screen.getByRole('button', { name: '关联已有 Bug' }))
     await userEvent.type(screen.getByRole('searchbox', { name: '搜索 Bug' }), 'BUG-2')
@@ -134,8 +147,16 @@ describe('RequirementDetailPane', () => {
     const linked = await screen.findByRole('link', { name: /BUG-2 未解决 Bug/ })
     expect(linked).toHaveAttribute('href', '/projects/project-1/bugs?openId=bug-1')
     expect(within(linked).getByText('待处理')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByRole('button', { name: '测试通过' })).toBeDisabled())
-    expect(screen.getByText('存在未解决 Bug，需复核')).toBeInTheDocument()
+    expect(screen.queryByText(/关联 Bug 未解决/)).not.toBeInTheDocument()
+    expect(pass).toBeEnabled()
+    await userEvent.click(pass)
+    const dialog = await screen.findByRole('dialog', { name: '测试通过' })
+    expect(dialog).toHaveAccessibleDescription(/还有 1 个关联 Bug 未解决/)
+    await userEvent.type(within(dialog).getByRole('textbox', { name: '测试结论' }), '主流程通过')
+    await userEvent.click(within(dialog).getByRole('button', { name: '确认通过' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '测试通过' })).not.toBeInTheDocument())
+    expect(passRequests).toEqual([{ version: 3, conclusion: '主流程通过' }])
+    expect(screen.getByText('已通过')).toBeInTheDocument()
   })
 })
 

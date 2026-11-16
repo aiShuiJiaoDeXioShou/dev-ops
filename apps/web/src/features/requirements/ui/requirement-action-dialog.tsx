@@ -4,7 +4,14 @@ import { createIdempotencyKey, isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { useToast } from '@/shared/ui/toast'
 import { Button } from '@/shared/ui/controls/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
@@ -111,6 +118,11 @@ export function RequirementActionDialog({
   })
   if (!action) return null
   const memberList = members.data?.data ?? []
+  const unresolvedBugCount =
+    action === 'pass-test'
+      ? requirement.linkedBugs.filter((bug) => bug.status !== 'resolved' && bug.status !== 'closed').length
+      : 0
+  const confirmLabel = action === 'pass-test' ? '确认通过' : '确认'
   const submit = () => {
     setError('')
     if (action === 'submit-test') {
@@ -127,6 +139,11 @@ export function RequirementActionDialog({
           <DialogTitle>{TITLES[action]}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
+          {unresolvedBugCount > 0 && (
+            <DialogDescription className="rounded-lg bg-warning/10 p-3 text-foreground">
+              还有 {unresolvedBugCount} 个关联 Bug 未解决。确认后，需求将标记为已通过。
+            </DialogDescription>
+          )}
           {action === 'submit-test' ? (
             <>
               <label className="block space-y-1.5 text-sm font-medium">
@@ -175,9 +192,6 @@ export function RequirementActionDialog({
               <Textarea value={reason} onChange={(event) => setReason(event.target.value)} />
             </label>
           )}
-          {requirement.needsReview && (
-            <p className="rounded-lg bg-warning/10 p-3 text-sm text-warning">该需求通过后存在未解决 Bug，需要复核。</p>
-          )}
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -189,7 +203,7 @@ export function RequirementActionDialog({
             取消
           </Button>
           <Button type="button" disabled={mutation.isPending} onClick={submit}>
-            {mutation.isPending ? '提交中…' : '确认'}
+            {mutation.isPending ? '提交中…' : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

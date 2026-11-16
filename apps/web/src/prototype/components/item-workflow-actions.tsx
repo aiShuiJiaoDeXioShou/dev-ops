@@ -90,7 +90,7 @@ function actionsFor(item: DemoItem): WorkflowAction[] {
                 label: '测试结论',
                 type: 'textarea',
                 required: true,
-                placeholder: '记录本次测试结论；关联 Bug 必须均已解决或关闭',
+                placeholder: '记录本次测试结论',
               },
             ],
           },
@@ -180,17 +180,22 @@ function actionsFor(item: DemoItem): WorkflowAction[] {
 /**
  * 渲染 V0.1 事项业务动作按钮与表单弹窗。
  * @param props.item 当前需求或 Bug；props.readOnly 浏览者只读。
- * @returns 按状态机生成的动作按钮；测试通过前校验关联 Bug 阻碍项。
+ * @returns 按状态机生成的动作按钮，测试通过弹窗会提示未解决的关联 Bug。
  */
 export function ItemWorkflowActions({ item, readOnly }: { item: DemoItem; readOnly: boolean }) {
   const { data, updateItem, showToast } = usePrototype()
   const [active, setActive] = useState<WorkflowAction | null>(null)
   const [values, setValues] = useState<Record<string, string>>({})
-  const [blockers, setBlockers] = useState<DemoItem[] | null>(null)
-  const linkedBugs =
-    item.kind === '需求'
-      ? data.items.filter((candidate) => candidate.kind === 'Bug' && candidate.requirementId === item.id)
-      : []
+  const unresolvedBugCount =
+    active?.id === 'pass-test'
+      ? data.items.filter(
+          (candidate) =>
+            candidate.kind === 'Bug' &&
+            candidate.requirementId === item.id &&
+            candidate.status !== '已解决' &&
+            candidate.status !== '已关闭',
+        ).length
+      : 0
   const actions = actionsFor(item)
 
   const finish = (action: WorkflowAction, actionValues: Record<string, string>) => {
@@ -215,13 +220,6 @@ export function ItemWorkflowActions({ item, readOnly }: { item: DemoItem; readOn
 
   const trigger = (action: WorkflowAction) => {
     if (readOnly) return
-    if (action.id === 'pass-test') {
-      const unresolved = linkedBugs.filter((bug) => bug.status !== '已解决' && bug.status !== '已关闭')
-      if (unresolved.length > 0) {
-        setBlockers(unresolved)
-        return
-      }
-    }
     if (action.fields.length === 0) {
       finish(action, {})
       return
@@ -243,17 +241,15 @@ export function ItemWorkflowActions({ item, readOnly }: { item: DemoItem; readOn
             {action.label}
           </ProtoButton>
         ))}
-        {item.kind === '需求' && linkedBugs.length > 0 && (
-          <span className="small quiet">
-            关联 Bug {linkedBugs.filter((bug) => bug.status !== '已解决' && bug.status !== '已关闭').length} 个未解决
-          </span>
-        )}
       </div>
 
       <PrototypeDialog open={active !== null} title={active?.label ?? '事项动作'} onClose={() => setActive(null)}>
         {active && (
           <>
             <p className="info-box">只更新本地业务状态并记录活动，不触发构建、部署、流水线或外部消息。</p>
+            {unresolvedBugCount > 0 && (
+              <p className="info-box">还有 {unresolvedBugCount} 个关联 Bug 未解决。确认后，需求将标记为已通过。</p>
+            )}
             <div className="form-grid">
               {active.fields.map((field) => (
                 <ProtoField key={field.name} label={field.label} full={field.type === 'textarea'}>
@@ -293,27 +289,6 @@ export function ItemWorkflowActions({ item, readOnly }: { item: DemoItem; readOn
         )}
       </PrototypeDialog>
 
-      <PrototypeDialog open={blockers !== null} title="存在阻碍项" onClose={() => setBlockers(null)}>
-        <p>需求测试通过前，关联 Bug 必须全部为已解决或已关闭。</p>
-        <div className="work-checks">
-          {blockers?.map((bug) => (
-            <div key={bug.id} className="row">
-              <span className="badge">{bug.id}</span>
-              <span>{bug.title}</span>
-              <span className="spacer" />
-              <span className="status">
-                <span className="dot amber" />
-                {bug.status}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="form-actions">
-          <ProtoButton variant="primary" onClick={() => setBlockers(null)}>
-            知道了
-          </ProtoButton>
-        </div>
-      </PrototypeDialog>
     </>
   )
 }

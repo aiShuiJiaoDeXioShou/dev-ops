@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { WorkItemDetailSheet } from '@/shared/ui/controls/work-item-detail-sheet'
@@ -25,7 +24,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { Markdown } from '@/shared/lib/markdown'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
-import { eligibilityQueryOptions, requirementQueryOptions, submissionQueryOptions } from '../api/queries'
+import { requirementQueryOptions, submissionQueryOptions } from '../api/queries'
 import { canWriteRequirements, isEditable, requirementMutations } from '../api/mutations'
 import { avatarToneClassName } from '@/shared/lib/avatar-tone'
 import { cn } from '@/shared/lib/utils'
@@ -76,10 +75,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
     enabled: Boolean(query.data?.data.projectId),
   })
   const submissions = useQuery(submissionQueryOptions(requirementId))
-  const eligibility = useQuery({
-    ...eligibilityQueryOptions(requirementId),
-    enabled: query.data?.data.status === 'in_testing',
-  })
   const [action, setAction] = useState<RequirementAction | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [error, setError] = useState('')
@@ -145,7 +140,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   const canDeleteAttachment = (attachment: AttachmentSummary) =>
     role !== 'viewer' &&
     (role === 'admin' || attachment.uploadedBy.userId === user.id || project.data?.data.owner.userId === user.id)
-  const blockers = eligibility.data?.data.blockers ?? []
   return (
     <WorkItemDetailSheet
       label="需求详情"
@@ -160,26 +154,12 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
                 {REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}
               </StatusBadge>
               <span>更新 {formatDateTime(detail.updatedAt)}</span>
-              {detail.needsReview && <Tag variant="red">存在未解决 Bug，需复核</Tag>}
             </div>
           </div>
         </header>
       }
     >
       <div className="space-y-5">
-        {detail.status === 'in_testing' && (
-          <div
-            className={
-              blockers.length ? 'rounded-lg bg-destructive/10 p-3 text-sm' : 'rounded-lg bg-success/10 p-3 text-sm'
-            }
-          >
-            {blockers.length ? (
-              <>未解决 Bug：{blockers.map((bug) => `#${bug.number} ${bug.title}`).join('；')}</>
-            ) : (
-              '关联 Bug 均已解决或关闭，可以测试通过。'
-            )}
-          </div>
-        )}
         <div className="detail-actions">
           {canWrite && detail.status === 'pending' && (
             <Button size="sm" onClick={() => direct.mutate('start-development')} disabled={direct.isPending}>
@@ -207,7 +187,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
             </Button>
           )}
           {canWrite && detail.status === 'in_testing' && (
-            <Button size="sm" onClick={() => setAction('pass-test')} disabled={blockers.length > 0}>
+            <Button size="sm" onClick={() => setAction('pass-test')}>
               测试通过
             </Button>
           )}

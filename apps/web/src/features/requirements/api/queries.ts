@@ -29,15 +29,6 @@ export function requirementQueryOptions(requirementId: string) {
   })
 }
 
-/** 测试通过资格与阻碍项。 */
-export function eligibilityQueryOptions(requirementId: string) {
-  return queryOptions({
-    queryKey: ['requirements', 'eligibility', requirementId],
-    queryFn: ({ signal }) => apiClient.getRequirementTestPassEligibility(requirementId, { signal }),
-    enabled: Boolean(requirementId),
-  })
-}
-
 /** 提测历史。 */
 export function submissionQueryOptions(requirementId: string) {
   return queryOptions({

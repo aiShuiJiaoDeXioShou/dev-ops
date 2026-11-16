@@ -5,7 +5,7 @@ import { ChevronRight, Link2 } from 'lucide-react'
 import { Link } from 'react-router'
 import { bugQueryOptions } from '@/features/bugs/api/queries'
 import { BUG_STATUS_LABELS, bugStatusTone } from '@/features/bugs/model/labels'
-import { eligibilityQueryOptions, requirementQueryOptions } from '@/features/requirements/api/queries'
+import { requirementQueryOptions } from '@/features/requirements/api/queries'
 import { REQUIREMENT_STATUS_LABELS, requirementStatusTone } from '@/features/requirements/model/labels'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
@@ -100,7 +100,6 @@ function LinkWorkItemDialog({
   const refreshRequirement = (requirementId: string) =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: requirementQueryOptions(requirementId).queryKey }),
-      queryClient.invalidateQueries({ queryKey: eligibilityQueryOptions(requirementId).queryKey }),
       queryClient.invalidateQueries({ queryKey: ['requirements', 'list', projectId] }),
     ])
   const link = useMutation({
