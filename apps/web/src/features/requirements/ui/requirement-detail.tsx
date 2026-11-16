@@ -11,6 +11,7 @@ import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline } from '@/features/collaboration/ui/activity-timeline'
 import { CommentForm } from '@/features/collaboration/ui/comment-form'
 import { CommentList } from '@/features/collaboration/ui/comment-list'
+import { WorkItemLinks } from '@/features/collaboration/ui/work-item-links'
 import { CodeReferenceCard } from '@/features/code/ui/code-reference-card'
 import { CodeReferenceDialog } from '@/features/code/ui/code-reference-dialog'
 import { BugForm } from '@/features/bugs/ui/bug-form'
@@ -256,15 +257,12 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               <CollaboratorTags members={detail.collaborators} />
             </dd>
           </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">关联 Bug</dt>
-            <dd className="mt-1">
-              {detail.linkedBugs.length
-                ? detail.linkedBugs.map((bug) => `#${bug.number} ${bug.title}`).join('；')
-                : '无'}
-            </dd>
-          </div>
         </dl>
+        <WorkItemLinks
+          source={{ kind: 'requirement', id: detail.id, projectId: detail.projectId }}
+          items={detail.linkedBugs}
+          canWrite={canWrite}
+        />
         <section className="space-y-2">
           <h3 className="text-sm font-semibold">内容</h3>
           {detail.contentMode === 'markdown' ? (

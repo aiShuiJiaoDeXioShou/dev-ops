@@ -1,6 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
 import { SessionProvider } from '@/features/identity/model/session'
@@ -43,7 +44,7 @@ const bug: BugDetail = {
       downloadUrl: '/api/v1/attachments/att-1/download',
     },
   ],
-  linkedRequirements: [],
+  linkedRequirements: [{ id: 'req-1', number: 14, title: '附件管理', status: 'in_development' }],
   linkedCodeReferences: [],
   regressions: [],
 }
@@ -71,8 +72,8 @@ function useDetailHandlers(role: 'admin' | 'viewer') {
         updatedAt: '2026-11-10T00:00:00.000Z',
       }),
     ),
-    http.get('*/api/v1/projects/project-1/requirements', () => ok({ items: [], page: 1, pageSize: 100, total: 0 })),
     http.get('*/api/v1/projects/project-1/repositories', () => ok([])),
+    http.get('*/api/v1/projects/project-1/tools/capabilities', () => ok({ capabilities: [], canManageGrants: false })),
     http.get('*/api/v1/bugs/bug-1/comments', () => ok({ items: [], page: 1, pageSize: 50, total: 0 })),
     http.get('*/api/v1/bugs/bug-1/activities', () => ok({ items: [], page: 1, pageSize: 50, total: 0 })),
   )
@@ -80,11 +81,13 @@ function useDetailHandlers(role: 'admin' | 'viewer') {
 
 function renderDetail() {
   return render(
-    <QueryClientProvider client={createQueryClient()}>
-      <SessionProvider initialUser={{ id: 'user-1', name: '管理员', email: 'admin@example.test' }}>
-        <BugDetailPane bugId="bug-1" onClose={() => undefined} />
-      </SessionProvider>
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={createQueryClient()}>
+        <SessionProvider initialUser={{ id: 'user-1', name: '管理员', email: 'admin@example.test' }}>
+          <BugDetailPane bugId="bug-1" onClose={() => undefined} />
+        </SessionProvider>
+      </QueryClientProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -109,7 +112,7 @@ describe('BugDetailPane 协作人与附件', () => {
     expect(within(attachmentSection).getByRole('button', { name: '删除附件 复现截图.png' })).toBeInTheDocument()
   })
 
-  it('浏览者只读：仍可下载但不展示删除入口', async () => {
+  it('浏览者可下载附件并查看关联需求，写操作入口隐藏', async () => {
     useDetailHandlers('viewer')
     renderDetail()
     const attachmentSection = await screen.findByRole('region', { name: '附件' })
@@ -118,5 +121,10 @@ describe('BugDetailPane 协作人与附件', () => {
     await waitFor(() =>
       expect(within(attachmentSection).queryByRole('button', { name: /删除附件/ })).not.toBeInTheDocument(),
     )
+    const related = screen.getByRole('region', { name: '关联需求' })
+    const linked = within(related).getByRole('link', { name: /#14 附件管理/ })
+    expect(linked).toHaveAttribute('href', '/projects/project-1/requirements?openId=req-1')
+    expect(within(linked).getByText('开发中')).toBeInTheDocument()
+    expect(within(related).queryByRole('button', { name: '关联已有需求' })).not.toBeInTheDocument()
   })
 })

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
@@ -11,6 +11,7 @@ import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline } from '@/features/collaboration/ui/activity-timeline'
 import { CommentForm } from '@/features/collaboration/ui/comment-form'
 import { CommentList } from '@/features/collaboration/ui/comment-list'
+import { WorkItemLinks } from '@/features/collaboration/ui/work-item-links'
 import { CodeReferenceDialog } from '@/features/code/ui/code-reference-dialog'
 import { RemoteBugActions } from '@/features/tools/ui/remote-bug-actions'
 import { useSession } from '@/features/identity/model/session'
@@ -30,7 +31,6 @@ import { cn } from '@/shared/lib/utils'
 import type { BugDetail } from '../model/types'
 import { BugActionDialog, type BugAction } from './bug-action-dialog'
 import { BugForm } from './bug-form'
-import { Select } from '@/shared/ui/controls/select'
 
 /** 缺陷协作人员展示标签；失效成员保留并标注。 */
 function CollaboratorTags({ members }: { members: BugDetail['collaborators'] }) {
@@ -75,7 +75,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
   })
   const [action, setAction] = useState<BugAction | null>(null)
   const [editOpen, setEditOpen] = useState(false)
-  const [linkRequirementId, setLinkRequirementId] = useState('')
   const [error, setError] = useState('')
   const [attachmentError, setAttachmentError] = useState('')
   const [codeOpen, setCodeOpen] = useState(false)
@@ -88,23 +87,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
     mutationFn: (codeReferenceId: string) => apiClient.refreshCodeReference(codeReferenceId),
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['bugs', 'detail', bugId] }),
     onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '代码引用刷新失败。'),
-  })
-  const requirements = useQuery(
-    queryOptions({
-      queryKey: ['bugs', 'link-requirements', query.data?.data.projectId],
-      queryFn: ({ signal }) =>
-        apiClient.listRequirements(query.data?.data.projectId ?? '', { pageSize: 100 }, { signal }),
-      enabled: Boolean(query.data?.data.projectId),
-    }),
-  )
-  const link = useMutation({
-    mutationFn: () =>
-      apiClient.linkBugRequirement(bugId, { version: query.data?.data.version ?? 0, requirementId: linkRequirementId }),
-    onSuccess: async () => {
-      setLinkRequirementId('')
-      await queryClient.invalidateQueries({ queryKey: ['bugs', 'detail', bugId] })
-    },
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '关联需求失败。'),
   })
   const removeAttachmentMutation = useMutation({
     mutationFn: (attachment: AttachmentSummary) => removeAttachment(attachment.id),
@@ -226,14 +208,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-muted-foreground">关联需求</dt>
-            <dd className="mt-1">
-              {bug.linkedRequirements.length
-                ? bug.linkedRequirements.map((item) => `#${item.number} ${item.title}`).join('；')
-                : '无'}
-            </dd>
-          </div>
-          <div>
             <dt className="text-xs text-muted-foreground">代码引用</dt>
             <dd className="mt-1">
               {bug.linkedCodeReferences.length
@@ -255,33 +229,11 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
             )}
           </div>
         </dl>
-        {canWrite && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              className="min-w-56"
-              aria-label="关联需求"
-              value={linkRequirementId}
-              onChange={(event) => setLinkRequirementId(event.target.value)}
-            >
-              <option value="">选择同项目需求</option>
-              {(requirements.data?.data.items ?? [])
-                .filter((item) => !bug.linkedRequirements.some((linked) => linked.id === item.id))
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    #{item.number} {item.title}
-                  </option>
-                ))}
-            </Select>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!linkRequirementId || link.isPending}
-              onClick={() => link.mutate()}
-            >
-              关联需求
-            </Button>
-          </div>
-        )}
+        <WorkItemLinks
+          source={{ kind: 'bug', id: bug.id, projectId: bug.projectId, version: bug.version }}
+          items={bug.linkedRequirements}
+          canWrite={canWrite}
+        />
         <section className="space-y-2 text-sm">
           <h3 className="font-semibold">现象与预期</h3>
           <p className="whitespace-pre-wrap">{bug.phenomenon}</p>
