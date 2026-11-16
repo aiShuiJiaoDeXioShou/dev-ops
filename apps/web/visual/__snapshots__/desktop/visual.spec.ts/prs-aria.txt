@@ -13,6 +13,7 @@
   - textbox "搜索 PR"
   - link "在 GitHub 打开":
     - /url: https://github.com/example/dev-ops/pulls
+  - button "创建 PR"
   - group "PR 状态筛选":
     - button "全部 1" [pressed]
     - button "打开 0"

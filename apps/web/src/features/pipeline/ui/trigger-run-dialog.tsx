@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/controls/alert'
 import { Button } from '@/shared/ui/controls/button'
@@ -32,6 +32,8 @@ interface TriggerRunDialogProps {
   isSubmitting: boolean
   /** 上次提交失败的可读说明；非空时展示在表单顶部。 */
   errorMessage: string | null
+  /** 可选的失败恢复操作，例如开启个人 GitHub 授权。 */
+  errorAction?: ReactNode
 }
 
 const INPUTS_HELPER = '可选。按 workflow 声明的 inputs 填写 JSON 对象，例如 {"target":"web"}；留空表示使用默认值。'
@@ -80,6 +82,7 @@ export function TriggerRunDialog({
   onSubmit,
   isSubmitting,
   errorMessage,
+  errorAction,
 }: TriggerRunDialogProps) {
   const fieldId = useId()
   const [workflowPath, setWorkflowPath] = useState(initialWorkflowPath)
@@ -145,6 +148,7 @@ export function TriggerRunDialog({
               <AlertDescription>{errorMessage}</AlertDescription>
             </Alert>
           )}
+          {errorAction}
 
           <label className="block space-y-1.5 text-sm font-medium" htmlFor={`${fieldId}-workflow`}>
             工作流

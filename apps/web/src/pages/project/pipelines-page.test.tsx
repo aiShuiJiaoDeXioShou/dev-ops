@@ -234,4 +234,25 @@ describe('pipelines-page', () => {
     await waitFor(() => expect(triggerBody).toMatchObject({ workflowPath: '.devops/workflows/ci.yml', ref: 'main' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
+
+  it('缺少 GitHub 授权时提供绑定入口，读权限不足时提示向仓库管理员申请', async () => {
+    mockWorkflows()
+    mockRuns([])
+    let code = 'GITHUB_ACCOUNT_REQUIRED'
+    server.use(
+      http.post('*/api/v1/projects/project-1/pipeline-runs', () =>
+        HttpResponse.json({ success: false, code, message: '仓库权限校验失败', requestId: 'test-request' }),
+      ),
+    )
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: '触发运行' }))
+    const dialog = within(await screen.findByRole('dialog'))
+    await userEvent.click(dialog.getByRole('button', { name: '触发运行' }))
+    expect(await dialog.findByRole('button', { name: '绑定 GitHub 账号' })).toBeEnabled()
+
+    code = 'GITHUB_REPOSITORY_FORBIDDEN'
+    await userEvent.click(dialog.getByRole('button', { name: '触发运行' }))
+    expect(await dialog.findByText(/向仓库管理员申请读取权限/)).toBeVisible()
+    expect(dialog.queryByRole('button', { name: '绑定 GitHub 账号' })).not.toBeInTheDocument()
+  })
 })

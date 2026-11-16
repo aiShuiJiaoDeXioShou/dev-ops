@@ -14,6 +14,8 @@ const BUSINESS_MESSAGES: Record<string, string> = {
   PASSWORD_INVALID: '登录密码错误，请重试。',
   RATE_LIMITED: '操作过于频繁，请稍后再试。',
   CREDENTIAL_UNAVAILABLE: '凭据已撤销或已过期。',
+  GITHUB_ACCOUNT_REQUIRED: '请绑定或重新授权你的 GitHub 账号。',
+  GITHUB_REPOSITORY_FORBIDDEN: '你的 GitHub 账号缺少此仓库所需的权限。',
 }
 
 /** 将请求错误转成安全、可展示的说明与请求标识。 */

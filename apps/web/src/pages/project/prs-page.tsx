@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router'
 import { GitMerge, GitPullRequest, GitPullRequestClosed, X } from 'lucide-react'
 import { projectRepositoriesQueryOptions } from '@/features/code/api/queries'
+import { GitHubWriteAction } from '@/features/code/ui/github-write-action'
 import {
   pullRequestDiffQueryOptions,
   pullRequestQueryOptions,
@@ -200,6 +201,18 @@ export function Component() {
             在 {providerLabel} 打开
           </a>
         )}
+        <GitHubWriteAction
+          projectId={projectId}
+          intent={
+            repository?.providerKey === 'github'
+              ? {
+                  repositoryId: repository.id,
+                  label: `${repository.namespace}/${repository.name}`,
+                  action: { action: 'create_pull_request' },
+                }
+              : null
+          }
+        />
       </div>
       <div className="prs-filters">
         <div className="pr-state-tabs" role="group" aria-label="PR 状态筛选">

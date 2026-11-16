@@ -331,6 +331,7 @@ test.describe('[desktop] 核心页面', () => {
     for (const [name, path, heading] of pages) {
       await prepare(page, path)
       await expect(page.getByText(heading, { exact: false }).first()).toBeVisible()
+      if (name === 'profile') await expect(page.getByRole('button', { name: '绑定 GitHub 账号' })).toBeEnabled()
       await expectPageSnapshot(page, testInfo, name)
     }
   })

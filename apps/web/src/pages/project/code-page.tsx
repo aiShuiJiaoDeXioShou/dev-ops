@@ -17,6 +17,7 @@ import { projectQueryOptions } from '@/features/projects/api/queries'
 import { CodeChangeSection } from '@/features/tools/ui/code-change-section'
 import { CodeInvocationLogSheet } from '@/features/tools/ui/code-invocation-log'
 import { CommitHistoryDialog } from '@/features/code/ui/commit-history-dialog'
+import { GitHubWriteAction } from '@/features/code/ui/github-write-action'
 import { pickDefaultPreviewPath } from '@/features/code/lib/default-preview'
 import {
   projectRepositoriesQueryOptions,
@@ -389,6 +390,18 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
                 )}
               </span>
               <span className="row">
+                <GitHubWriteAction
+                  projectId={projectId}
+                  intent={
+                    repository.providerKey === 'github' && file.isSuccess && currentBranch && activePath
+                      ? {
+                          repositoryId: repository.id,
+                          label: `${repository.namespace}/${repository.name}`,
+                          action: { action: 'edit_file', branch: currentBranch, path: activePath },
+                        }
+                      : null
+                  }
+                />
                 <button type="button" className="text-btn" disabled={!file.data} onClick={() => void copyContent()}>
                   复制内容
                 </button>

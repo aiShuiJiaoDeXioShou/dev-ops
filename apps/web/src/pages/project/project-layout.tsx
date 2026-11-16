@@ -93,7 +93,7 @@ export function Component() {
         </div>
       </header>
       <div className="content">
-        <Outlet />
+        <Outlet context={detail.teamId} />
       </div>
       <ProjectSettingsDialog
         projectId={projectId}

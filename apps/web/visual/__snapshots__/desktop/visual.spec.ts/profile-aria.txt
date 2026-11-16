@@ -13,3 +13,6 @@
       - definition: DevOps 研发团队
       - text: 登录密码
       - button "修改密码"
+      - paragraph: GitHub 账号
+      - paragraph: 未绑定
+      - button "绑定 GitHub 账号"

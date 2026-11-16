@@ -10,6 +10,13 @@ export const VISUAL_IDS = {
 } as const
 
 export const apiFixtures: Record<string, unknown> = {
+  '/api/v1/me/github-account': {
+    success: true,
+    code: 'OK',
+    message: 'ok',
+    requestId: 'visual-github-account',
+    data: { login: null, enabled: true },
+  },
   '/api/v1/auth/get-session': {
     session: {
       expiresAt: '2026-11-18T03:46:46.524Z',

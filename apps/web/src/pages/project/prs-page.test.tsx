@@ -3,10 +3,12 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
 import { server, success } from '@/test/server'
 import { Component as PrsPage } from './prs-page'
+
+vi.mock('@/features/identity/model/session', () => ({ useSession: () => ({ role: 'developer' }) }))
 
 const repository = {
   id: 'repo-1',

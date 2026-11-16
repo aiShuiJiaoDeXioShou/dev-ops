@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { isBusinessError } from '@dev-ops/api-client'
 import { useParams, useSearchParams } from 'react-router'
 import { RefreshCw } from 'lucide-react'
 import { describeRequestError } from '@/shared/api/errors'
-import { useSession } from '@/features/identity/model/session'
 import { RunHistory } from '@/features/pipeline/ui/run-history'
 import { TriggerRunDialog } from '@/features/pipeline/ui/trigger-run-dialog'
 import { WorkflowList } from '@/features/pipeline/ui/workflow-list'
@@ -15,6 +15,9 @@ import type { PipelineWorkflowSummary, TriggerRunInput } from '@/features/pipeli
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { useGitHubAccountFeedback } from '@/features/identity/model/use-github-account-feedback'
+import { GitHubAccountButton } from '@/features/identity/ui/github-account'
+import { useProjectRole } from '@/features/projects/model/use-project-role'
 import { useToast } from '@/shared/ui/toast'
 
 /** 运行历史每页条数；与服务端默认值保持接近，便于分页浏览。 */
@@ -76,9 +79,10 @@ function toRunListQuery(filters: ReturnType<typeof parseRunFilters>, page: numbe
  * 筛选条件写入 URL，刷新与返回可恢复；解析失败与仓库不可用分别展示，不互相冒充。
  */
 export function Component() {
+  useGitHubAccountFeedback()
   const { projectId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { role } = useSession()
+  const role = useProjectRole()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const [triggerPath, setTriggerPath] = useState<string | null>(null)
@@ -104,8 +108,22 @@ export function Component() {
       ])
       showToast(`运行已创建：${result.run.runId.slice(0, 8)}`, 'success')
     },
-    onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
+    onError: (error: unknown) => {
+      if (
+        !isBusinessError(error, 'GITHUB_ACCOUNT_REQUIRED') &&
+        !isBusinessError(error, 'GITHUB_REPOSITORY_FORBIDDEN')
+      ) {
+        showToast(describeRequestError(error).description, 'error')
+      }
+    },
   })
+  const requiresGitHubAccount = isBusinessError(trigger.error, 'GITHUB_ACCOUNT_REQUIRED')
+  const lacksGitHubReadAccess = isBusinessError(trigger.error, 'GITHUB_REPOSITORY_FORBIDDEN')
+  const triggerError = lacksGitHubReadAccess
+    ? '请向仓库管理员申请读取权限，授权后重新触发流水线。'
+    : trigger.isError
+      ? describeRequestError(trigger.error).description
+      : null
 
   const changeTab = (next: string) => {
     if (next !== 'workflows' && next !== 'runs') return
@@ -193,9 +211,10 @@ export function Component() {
                 workflows={workflows.data.items}
                 canTrigger={canTrigger}
                 projectBasePath={`/projects/${projectId}`}
-                onTrigger={(workflow, trigger) => {
-                  triggerFocus.capture(trigger)
+                onTrigger={(workflow, triggerElement) => {
+                  triggerFocus.capture(triggerElement)
                   setTriggerPath(workflow.path)
+                  trigger.reset()
                 }}
                 onRefresh={() => void workflows.refetch()}
                 isRefreshing={workflows.isFetching}
@@ -234,7 +253,8 @@ export function Component() {
         defaultRef={workflows.data?.ref ?? ''}
         onSubmit={(input) => trigger.mutate(input)}
         isSubmitting={trigger.isPending}
-        errorMessage={trigger.isError ? describeRequestError(trigger.error).description : null}
+        errorMessage={triggerError}
+        errorAction={requiresGitHubAccount ? <GitHubAccountButton label="绑定 GitHub 账号" /> : undefined}
       />
     </div>
   )

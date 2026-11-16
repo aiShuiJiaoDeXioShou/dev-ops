@@ -1,8 +1,10 @@
 import { useSearchParams } from 'react-router'
 import { useSession } from '@/features/identity/model/session'
+import { useGitHubAccountFeedback } from '@/features/identity/model/use-github-account-feedback'
 import { ApiTokenSection } from '@/features/identity/ui/api-token-section'
 import { ChangePasswordDialog } from '@/features/identity/ui/change-password-dialog'
 import { EditProfileDialog } from '@/features/identity/ui/edit-profile-dialog'
+import { GitHubAccountSection } from '@/features/identity/ui/github-account'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 
@@ -11,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/t
  * @returns 个人页面，默认显示登录账号的资料。
  */
 export function Component() {
+  useGitHubAccountFeedback()
   const { user, currentTeam } = useSession()
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = searchParams.get('tab') === 'tokens' ? 'tokens' : 'profile'
@@ -59,6 +62,7 @@ export function Component() {
               <span className="text-sm font-medium">登录密码</span>
               <ChangePasswordDialog />
             </div>
+            <GitHubAccountSection />
           </section>
         </TabsContent>
         <TabsContent value="tokens">{tab === 'tokens' && <ApiTokenSection />}</TabsContent>
