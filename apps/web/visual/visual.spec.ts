@@ -168,7 +168,8 @@ test('[desktop] [mobile] 需求测试操作在当前节点卡片内，确认关�
   await page.locator('.item-title').first().click()
   const detail = page.getByRole('dialog', { name: '需求详情' })
   const flow = detail.getByRole('region', { name: '需求流程' })
-  await expect(flow.getByRole('button', { name: '测试，进行中' })).toHaveAttribute('aria-current', 'step')
+  const currentStep = flow.getByRole('button', { name: '测试，进行中' })
+  await expect(currentStep).toHaveAttribute('aria-current', 'step')
   const pass = flow.getByRole('button', { name: '测试通过' })
   const node = flow.getByRole('heading', { name: '测试', exact: true })
   const [buttonBox, headingBox] = await Promise.all([pass.boundingBox(), node.boundingBox()])
@@ -179,7 +180,22 @@ test('[desktop] [mobile] 需求测试操作在当前节点卡片内，确认关�
   expect(buttonBox.y).toBeLessThanOrEqual(headingBox.y)
   expect(buttonBox.y + buttonBox.height).toBeGreaterThanOrEqual(headingBox.y + headingBox.height)
   if (testInfo.project.name === 'mobile') expect(buttonBox.height).toBeGreaterThanOrEqual(44)
-  await page.screenshot({ path: testInfo.outputPath('requirement-workflow.png') })
+  await page.screenshot({ path: testInfo.outputPath('requirement-workflow.png'), animations: 'disabled' })
+  await page.evaluate(() => document.documentElement.classList.add('dark'))
+  const detailColors = await detail.evaluate((element) => {
+    const sample = document.createElement('span')
+    sample.style.color = 'var(--foreground)'
+    sample.style.backgroundColor = 'var(--background)'
+    element.append(sample)
+    const style = getComputedStyle(sample)
+    const colors = { color: style.color, background: style.backgroundColor }
+    sample.remove()
+    return colors
+  })
+  await expect(detail.locator('.detail-markdown .md-body')).toHaveCSS('color', detailColors.color)
+  await expect(currentStep).toHaveCSS('background-color', detailColors.background)
+  await page.screenshot({ path: testInfo.outputPath('requirement-workflow-dark.png'), animations: 'disabled' })
+  await page.evaluate(() => document.documentElement.classList.remove('dark'))
 
   if (testInfo.project.name === 'mobile') await pass.tap()
   else await pass.press('Enter')

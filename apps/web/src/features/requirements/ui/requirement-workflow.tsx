@@ -95,7 +95,7 @@ export function RequirementWorkflow({
                   aria-pressed={index === selectedIndex}
                   aria-label={`${STEP_LABELS[step]}，${progress.label}`}
                   className={cn(
-                    'relative z-10 gap-1 rounded-full px-1.5 text-xs sm:gap-1.5 sm:px-3 sm:text-sm',
+                    'relative z-10 gap-1 rounded-full px-1.5 text-xs sm:gap-1.5 sm:px-3 sm:text-sm dark:bg-background dark:hover:bg-muted',
                     index === selectedIndex && 'border-primary text-primary',
                     progress.tone === 'neutral' && index !== selectedIndex && 'text-muted-foreground',
                   )}

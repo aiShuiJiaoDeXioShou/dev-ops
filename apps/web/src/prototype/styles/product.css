@@ -1,3 +1,15 @@
+/* 详情在浮层门户中渲染，正文和评论使用当前主题的颜色。 */
+.requirement-detail-content .md-body {
+  --md-ink: var(--foreground);
+  --md-secondary: var(--muted-foreground);
+  --md-caption: var(--muted-foreground);
+  --md-line-1: var(--border);
+  --md-line-2: var(--border);
+  --md-line-3: var(--border);
+  --md-soft: var(--muted);
+  --md-inline: var(--muted);
+  --md-blue: var(--primary);
+}
 /* 连接相邻节点的中心。连线保留在按钮下方，首尾节点外侧不延伸。 */
 .requirement-flow-steps {
   display: grid;

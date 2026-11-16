@@ -201,7 +201,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
         </header>
       }
     >
-      <div className="space-y-5">
+      <div className="requirement-detail-content space-y-5">
         <RequirementWorkflow
           requirement={detail}
           canWrite={canWrite}
