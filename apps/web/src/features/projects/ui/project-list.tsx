@@ -8,50 +8,48 @@ import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { EmptyState } from '@/shared/ui/page-state'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
-import { Combobox } from '@/shared/ui/controls/combobox'
 import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { projectActivityQueryOptions, projectListQueryOptions } from '../api/queries'
 import {
-  projectActivityQueryOptions,
-  projectListQueryOptions,
-  projectRepositoryOptionsQueryOptions,
-} from '../api/queries'
-import { parseProjectFilters, PROJECT_STATUS_LABELS, projectFilterParams, updateProjectFilters } from '../model/filters'
+  countProjectCriteria,
+  parseProjectFilters,
+  PROJECT_STATUS_LABELS,
+  projectFilterParams,
+  toProjectQueryFilters,
+  updateProjectFilters,
+} from '../model/filters'
+import { ProjectFilter } from './project-filter'
 import { ProjectForm } from './project-form'
 import { ProjectSettingsDialog } from './project-settings-dialog'
 import { ActivityBarometer } from './activity-barometer'
 
-/** 项目首页，显示晴雨表、项目卡片及仓库和状态筛选。 */
+/**
+ * 显示团队项目列表和晴雨表，搜索及组合筛选同步写入 URL。
+ * @returns 项目卡片、筛选工具栏及创建与设置入口。
+ */
 export function ProjectList() {
   const navigate = useNavigate()
-  const { currentTeam, role } = useSession()
+  const { currentTeam, role, user } = useSession()
   const [params, setParams] = useSearchParams()
   const filters = parseProjectFilters(params)
-  const status =
-    filters.status === 'active' || filters.status === 'paused' || filters.status === 'ended'
-      ? filters.status
-      : undefined
-  const repositoryId = filters.repositoryId || undefined
+  const queryFilters = toProjectQueryFilters(filters)
+  const { status, repository, ownerId, ownerUnavailable } = filters
+  const criteria = { status, repository, ownerId, ownerUnavailable }
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null)
   const [activitySource, setActivitySource] = useState<'all' | 'activity' | 'code' | 'pull_request'>('all')
   const [searchInput, setSearchInput] = useState(filters.search)
   const query = useQuery(
     projectListQueryOptions(currentTeam?.id ?? '', {
-      search: filters.search || undefined,
-      status,
-      repositoryId,
+      ...queryFilters,
       page: filters.page,
       pageSize: filters.pageSize,
     }),
   )
-  const repositories = useQuery(projectRepositoryOptionsQueryOptions(currentTeam?.id ?? ''))
   const activity = useQuery(
     projectActivityQueryOptions(currentTeam?.id ?? '', {
-      search: filters.search || undefined,
-      status,
-      repositoryId,
+      ...queryFilters,
       source: activitySource,
     }),
   )
@@ -104,24 +102,7 @@ export function ProjectList() {
     )
   }
   const projects = query.data.data.items
-  const hasFilters = Boolean(filters.search || filters.status || filters.repositoryId)
-  const repositoryOptions = [
-    { value: '', label: repositories.isPending ? '仓库加载中…' : '全部仓库' },
-    ...(repositories.data ?? []).map((repository) => ({
-      value: repository.id,
-      label: `${repository.namespace}/${repository.name} · ${repository.connectionName ?? repository.providerKey}`,
-    })),
-  ]
-  if (repositoryId && !repositoryOptions.some((option) => option.value === repositoryId)) {
-    repositoryOptions.push({
-      value: repositoryId,
-      label: repositories.isPending || repositories.isError ? '所选仓库' : '所选仓库不可用',
-    })
-  }
-  const statusOptions = [
-    { value: '', label: '全部' },
-    ...Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => ({ value, label })),
-  ]
+  const hasFilters = Boolean(filters.search || countProjectCriteria(criteria))
   return (
     <>
       <header className="page-head">
@@ -144,30 +125,7 @@ export function ProjectList() {
           onSourceChange={setActivitySource}
         />
         <div className="filters">
-          <Select
-            className="filter-select"
-            aria-label="项目状态"
-            value={filters.status}
-            onChange={(event) => update({ status: event.target.value })}
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.value ? option.label : '全部状态'}
-              </option>
-            ))}
-          </Select>
-          <div className="project-repository-filter">
-            <Combobox
-              aria-label="按仓库筛选"
-              options={repositoryOptions}
-              value={filters.repositoryId}
-              onValueChange={(value) => update({ repositoryId: value })}
-              searchPlaceholder="搜索仓库"
-              emptyMessage="没有匹配的仓库"
-              disabled={repositories.isPending && !repositoryId}
-              className="project-repository-filter-trigger"
-            />
-          </div>
+          <ProjectFilter teamId={currentTeam.id} currentUserId={user.id} value={criteria} onApply={update} />
           <label className="search">
             <Search className="size-4" aria-hidden="true" />
             <Input
@@ -178,14 +136,6 @@ export function ProjectList() {
               onChange={(event) => setSearchInput(event.target.value)}
             />
           </label>
-          {repositories.isError && (
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" role="alert">
-              仓库选项加载失败
-              <Button type="button" size="sm" variant="ghost" onClick={() => void repositories.refetch()}>
-                重试
-              </Button>
-            </div>
-          )}
         </div>
         {projects.length === 0 ? (
           <EmptyState

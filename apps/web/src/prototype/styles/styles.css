@@ -3197,12 +3197,18 @@ select.btn:hover:not(:disabled) {
   gap: 12px;
   margin-bottom: 16px;
 }
-.project-repository-filter {
-  flex: 0 1 192px;
-  min-width: 0;
-}
-.project-repository-filter .project-repository-filter-trigger {
+.project-filter-trigger {
   min-height: 34px;
+}
+.project-filter-panel {
+  box-sizing: border-box;
+  width: min(344px, calc(100vw - 24px));
+  max-height: var(--radix-popover-content-available-height);
+  overflow-y: auto;
+  padding: 16px;
+}
+.project-owner-filter-option {
+  min-height: 32px;
 }
 .project-home .search {
   min-height: 34px;
@@ -3298,9 +3304,16 @@ select.btn:hover:not(:disabled) {
 }
 @media (pointer: coarse) {
   .project-card-head .project-settings-button,
-  .project-repository-filter .project-repository-filter-trigger {
+  .project-filter-trigger {
     min-height: 44px;
     min-width: 44px;
+  }
+  .project-home .search,
+  .project-filter-panel [data-slot='select'],
+  .project-filter-panel [role='combobox'],
+  .project-filter-panel [type='submit'],
+  .project-owner-filter-option {
+    min-height: 44px;
   }
 }
 @media (max-width: 550px) {
@@ -3317,13 +3330,10 @@ select.btn:hover:not(:disabled) {
   .activity-breakdown {
     grid-template-columns: repeat(2, 1fr);
   }
-  .project-home .project-repository-filter {
-    flex: 1 1 0;
-  }
   .project-home .search {
     min-width: 0;
     max-width: none;
-    flex: 1 0 100%;
+    flex: 1 1 0;
   }
   .document-toolbar {
     gap: 6px;

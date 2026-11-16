@@ -1,14 +1,9 @@
 import { queryOptions } from '@tanstack/react-query'
+import type { ApiQuery } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { readAllPages } from '@/shared/api/read-all-pages'
 
-export interface ProjectListFilters {
-  search?: string
-  status?: 'active' | 'paused' | 'ended'
-  repositoryId?: string
-  page?: number
-  pageSize?: number
-}
+type ProjectListFilters = ApiQuery<'/api/v1/teams/{teamId}/projects', 'get'>
 
 /**
  * 读取已关联到团队项目的仓库名称，供首页选择器查找。
@@ -66,17 +61,12 @@ const PROJECT_ACTIVITY_REFRESH_MS = 60_000
 /**
  * 读取项目晴雨表和项目摘要，在页面打开期间定期读取 Worker 已发布的本地统计。
  * @param teamId 当前团队标识。
- * @param filters 活动来源、项目名称、状态和仓库筛选。
+ * @param filters 活动来源、项目名称、状态、负责人和仓库筛选。
  * @returns 按团队和筛选缓存的查询配置；同团队切换筛选时保留上一份结果。
  */
 export function projectActivityQueryOptions(
   teamId: string,
-  filters: {
-    search?: string
-    status?: 'active' | 'paused' | 'ended'
-    repositoryId?: string
-    source?: 'all' | 'activity' | 'code' | 'pull_request'
-  },
+  filters: ApiQuery<'/api/v1/teams/{teamId}/project-activity', 'get'>,
 ) {
   return queryOptions({
     queryKey: ['projects', 'activity', teamId, filters],

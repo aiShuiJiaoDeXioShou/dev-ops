@@ -381,12 +381,7 @@
       - gridcell "2026-11-10 · 63 次活动"
       - gridcell "2026-11-11 · 132 次活动"
     - text: 少 多
-  - combobox "项目状态":
-    - option "全部状态" [selected]
-    - option "进行中"
-    - option "暂停"
-    - option "已结束"
-  - combobox "按仓库筛选": 全部仓库
+  - button "筛选"
   - textbox "搜索项目"
   - article:
     - link "[audit] 权限测试项目":
