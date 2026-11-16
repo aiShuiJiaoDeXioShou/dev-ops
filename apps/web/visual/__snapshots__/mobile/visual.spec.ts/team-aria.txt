@@ -11,7 +11,8 @@
   - tabpanel "连接与节点":
     - heading "Git 连接" [level=3]
     - button "添加 GitHub 连接"
-    - paragraph: GitHub App 安装授权是团队级共享授权，成员无需各自绑定 GitHub 账号。连接、检查和同步仓库仅管理员可操作。
+    - button "添加 Gitea 连接"
+    - paragraph: 管理员可以添加多个 GitHub 个人账号或组织、Gitea 账号。项目从团队已同步的仓库中选择。
     - strong: GitHub App 180579996
     - text: 正常
     - paragraph: GitHub · GitHub App 安装 · https://github.com
@@ -19,7 +20,6 @@
     - button "检查"
     - button "同步仓库"
     - button "撤销"
-    - group: 添加 Gitea 连接
     - region "执行节点":
       - heading "执行节点" [level=3]
       - link "管理执行节点":
