@@ -5,7 +5,7 @@ import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
-import { getProjectContext } from '../projects/projects.access.ts'
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
 import { findProjectById } from '../projects/projects.repository.ts'
 import {
   assertNotSelfApproval,
@@ -202,7 +202,9 @@ export function createOperationsService(deps: {
 
   async function loadPlanOrThrow(planId: string) {
     const row = await findChangePlanById(db, planId)
-    if (!row) throw new ApiError(ERROR_CODES.CHANGE_PLAN_NOT_FOUND, '变更计划不存在')
+    if (!row || !(await getProjectContext(db, row.project_id))) {
+      throw new ApiError(ERROR_CODES.CHANGE_PLAN_NOT_FOUND, '变更计划不存在')
+    }
     return row
   }
 
@@ -286,6 +288,7 @@ export function createOperationsService(deps: {
     const fields = validateInput(input)
     const planId = randomUUID()
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       await insertChangePlan(tx, {
         id: planId,
         teamId,
@@ -380,6 +383,7 @@ export function createOperationsService(deps: {
       },
     }
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, row.project_id)
       const updated = await updateChangePlanContent(tx, planId, input.expectedVersion, updateFields)
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '计划已被其他操作修改，请刷新后重试')
       if (wasApproved) {
@@ -445,6 +449,7 @@ export function createOperationsService(deps: {
     const approvedAt = new Date()
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, row.project_id)
         const updated = await transitionChangePlan(tx, planId, row.version, ['pending'], {
           status: 'approved',
           approved_by_user_id: actor.id,
@@ -511,6 +516,7 @@ export function createOperationsService(deps: {
       }
     }
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, row.project_id)
       const updated = await transitionChangePlan(tx, planId, row.version, ['pending', 'approved', 'executing'], {
         status: 'cancelled',
         completed_at: new Date(),

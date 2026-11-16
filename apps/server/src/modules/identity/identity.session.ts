@@ -75,7 +75,12 @@ export async function requirePlatformAdmin(db: Database, userId: string): Promis
  * @returns 成员关系。
  * @throws 非正常成员或角色不符时抛出 FORBIDDEN。
  */
-export async function requireTeamMember(db: Database, userId: string, teamId: string, roles?: TeamRole[]) {
+export async function requireTeamMember(
+  db: Pick<Database, 'select'>,
+  userId: string,
+  teamId: string,
+  roles?: TeamRole[],
+) {
   const conditions = [eq(teamMember.team_id, teamId), eq(teamMember.user_id, userId), eq(teamMember.status, 'active')]
   if (roles && roles.length > 0) {
     conditions.push(inArray(teamMember.role, roles))

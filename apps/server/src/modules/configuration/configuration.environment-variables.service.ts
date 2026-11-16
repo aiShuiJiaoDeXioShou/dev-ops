@@ -6,7 +6,7 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
-import { getProjectContext } from '../projects/projects.access.ts'
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
 import { findCredentialById, findGrant, insertCredentialUsage } from './configuration.credentials.repository.ts'
 import {
   deleteEnvVar,
@@ -239,6 +239,7 @@ export function createEnvironmentVariablesService(deps: EnvironmentVariablesServ
     const variableId = randomUUID()
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, projectId)
         await insertEnvVar(tx, {
           id: variableId,
           teamId: access.teamId,
@@ -315,6 +316,7 @@ export function createEnvironmentVariablesService(deps: EnvironmentVariablesServ
       assertPlainValueNotSensitive(nextName, existing.value_text ?? '')
     }
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, existing.project_id)
       const row = await updateEnvVar(tx, variableId, input.version, {
         ...(input.name === undefined ? {} : { name: nextName }),
         ...(nextValueText === undefined ? {} : { valueText: nextValueText }),
@@ -362,6 +364,7 @@ export function createEnvironmentVariablesService(deps: EnvironmentVariablesServ
     const access = await requireProject(actor, existing.project_id, true)
     const reason = validateReason(input.reason)
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, existing.project_id)
       const row = await deleteEnvVar(tx, variableId)
       if (!row) throw new ApiError(ERROR_CODES.NOT_FOUND, '环境变量不存在')
       await appendActivity(tx, {

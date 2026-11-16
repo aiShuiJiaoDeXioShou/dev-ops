@@ -1,3 +1,4 @@
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
 import { randomUUID } from 'node:crypto'
 import type { PipelineInputValue } from '@dev-ops/pipeline-protocol'
 import type { Database } from '../../platform/database/client.ts'
@@ -145,7 +146,9 @@ export function createOperationsExecutionUseCases(deps: {
 
   async function loadPlan(planId: string) {
     const row = await findChangePlanById(db, planId)
-    if (!row) throw new ApiError(ERROR_CODES.CHANGE_PLAN_NOT_FOUND, '变更计划不存在')
+    if (!row || !(await getProjectContext(db, row.project_id))) {
+      throw new ApiError(ERROR_CODES.CHANGE_PLAN_NOT_FOUND, '变更计划不存在')
+    }
     return row
   }
 
@@ -229,6 +232,7 @@ export function createOperationsExecutionUseCases(deps: {
       throw new ApiError(ERROR_CODES.CHANGE_EXECUTION_CONFLICT, '执行已成功，请进入验证而不是重试')
     }
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, plan.project_id)
       const updated = await transitionChangePlan(tx, planId, plan.version, ['failed'], {
         status: 'approved',
         active_execution_id: null,
@@ -290,6 +294,7 @@ export function createOperationsExecutionUseCases(deps: {
     const attempt = executions.length + 1
     const executionId = randomUUID()
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, plan.project_id)
       await insertChangeExecution(tx, {
         id: executionId,
         teamId: plan.team_id,
@@ -420,6 +425,7 @@ export function createOperationsExecutionUseCases(deps: {
     }
     const verifiedAt = new Date()
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, plan.project_id)
       const updated = await updateChangeExecution(tx, execution.id, ['succeeded'], {
         verification_status: 'passed',
         health_status: 'ok',

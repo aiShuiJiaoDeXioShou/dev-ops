@@ -1,3 +1,4 @@
+import { lockProjectForWrite } from '../projects/projects.access.ts'
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
@@ -113,6 +114,7 @@ export function createReviewUseCases(deps: ReviewUseCaseDeps) {
         : await requireActiveProjectService(db, projectId, input.serviceId)
     const reviewId = randomUUID()
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       await insertExternalReview(tx, {
         id: reviewId,
         teamId: context.teamId,
@@ -178,6 +180,7 @@ export function createReviewUseCases(deps: ReviewUseCaseDeps) {
           ? null
           : validateTimestamp(input.reviewedAt, '审核时间')
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, existing.project_id)
       const updated = await updateExternalReview(tx, reviewId, input.version, {
         reviewStatus: nextStatus,
         reviewReason,

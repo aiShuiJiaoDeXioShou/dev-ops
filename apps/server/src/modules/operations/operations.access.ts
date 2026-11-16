@@ -32,9 +32,10 @@ export async function requirePlanMemberContext(
 ): Promise<PlanActorContext> {
   const member = await requireTeamMember(db, user.id, plan.team_id)
   const projectRow = await findProjectById(db, plan.project_id)
+  if (!projectRow) throw new ApiError(ERROR_CODES.NOT_FOUND, '项目不存在')
   return {
     role: member.role as TeamRole,
-    isProjectOwner: projectRow?.owner_user_id === user.id,
+    isProjectOwner: projectRow.owner_user_id === user.id,
   }
 }
 

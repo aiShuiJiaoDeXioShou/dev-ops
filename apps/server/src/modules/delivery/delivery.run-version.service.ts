@@ -1,3 +1,4 @@
+import { lockProjectForWrite } from '../projects/projects.access.ts'
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
 import { isUniqueViolation } from '../../platform/database/errors.ts'
@@ -154,6 +155,7 @@ export function createRunVersionUseCases(deps: RunVersionUseCaseDeps) {
     const recordId = existing?.id ?? randomUUID()
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, projectId)
         if (existing) {
           const updated = await updateRunVersion(tx, existing.id, expectedVersion, {
             versionLabel,

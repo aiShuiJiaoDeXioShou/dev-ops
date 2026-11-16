@@ -333,6 +333,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       changes.fixOwner = [current.fix_owner_user_id, input.fixOwnerUserId]
 
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockBug(tx, bugId)
       const updated = await updateBug(tx, bugId, input.version, {
         title,
@@ -417,6 +418,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '修复负责人不是正常团队成员')
     }
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockBug(tx, bugId)
       const updated = await updateBug(tx, bugId, input.version, { status: 'in_fix', fixOwnerUserId: ownerId })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
@@ -447,6 +449,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '回归负责人不是正常团队成员')
     }
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockBug(tx, bugId)
       const attempt = await nextRegressionAttempt(tx, bugId)
       const regression = await insertRegression(tx, {
@@ -492,6 +495,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有待回归 Bug 可以撤回回归')
     const reason = reasonText(input.reason, '撤回原因')
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockBug(tx, bugId)
       const pending = await findPendingRegression(tx, bugId)
       if (!pending) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '没有待处理的回归记录')
@@ -525,6 +529,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '回归结果不合法')
     const note = reasonText(input.note, '回归结论')
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockBug(tx, bugId)
       const pending = await findPendingRegression(tx, bugId)
       if (!pending) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '没有待处理的回归记录')
@@ -571,6 +576,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       }
     }
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockBug(tx, bugId)
       const pending = await findPendingRegression(tx, bugId)
       if (pending)
@@ -603,6 +609,7 @@ export function createBugsService(deps: BugsServiceDeps) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有已解决或已关闭 Bug 可以重开')
     const reason = reasonText(input.reason, '重开原因')
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockBug(tx, bugId)
       const updated = await updateBug(tx, bugId, input.version, { status: 'pending' })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, 'Bug 已被更新，请刷新后重试')
@@ -631,6 +638,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     if (await findBugLink(db, bugId, requirementId)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '需求已关联')
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, project.id)
         await insertBugLink(tx, { teamId: project.teamId, bugId, requirementId, createdByUserId: actor.id })
         await appendActivity(tx, {
           teamId: project.teamId,
@@ -666,6 +674,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     if (!(await findBugLink(db, bugId, requirementId))) throw new ApiError(ERROR_CODES.NOT_FOUND, '关联不存在')
     const note = reasonText(reason, '移除原因')
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await deleteBugLink(tx, bugId, requirementId)
       await appendActivity(tx, {
         teamId: project.teamId,
@@ -686,13 +695,16 @@ export function createBugsService(deps: BugsServiceDeps) {
   async function addBugComment(actor: SessionUser, bugId: string, bodyMarkdown: string) {
     const { project } = await requireBug(actor, bugId)
     await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
-    return addComment(db, {
-      teamId: project.teamId,
-      projectId: project.id,
-      entityType: 'bug',
-      entityId: bugId,
-      authorUserId: actor.id,
-      bodyMarkdown,
+    return db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
+      return addComment(tx, {
+        teamId: project.teamId,
+        projectId: project.id,
+        entityType: 'bug',
+        entityId: bugId,
+        authorUserId: actor.id,
+        bodyMarkdown,
+      })
     })
   }
 

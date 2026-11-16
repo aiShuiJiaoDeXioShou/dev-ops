@@ -1,3 +1,4 @@
+import { lockProjectForWrite } from '../projects/projects.access.ts'
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
@@ -87,6 +88,7 @@ export function createReleaseUseCases(deps: ReleaseUseCaseDeps) {
     }
     const releaseId = randomUUID()
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       const row = await insertReleaseResult(tx, {
         id: releaseId,
         teamId: context.teamId,

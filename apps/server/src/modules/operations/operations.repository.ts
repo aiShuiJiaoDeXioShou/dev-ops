@@ -1,4 +1,5 @@
-import { and, count, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { and, count, desc, eq, exists, gte, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { project } from '../projects/projects.tables.ts'
 import type { Database } from '../../platform/database/client.ts'
 import { changeExecution, changePlan, changePlanApproval, changePlanEvent } from './operations.tables.ts'
 
@@ -153,7 +154,15 @@ export async function findChangePlans(
   filters: ChangePlanListFilters,
   page: { offset: number; limit: number },
 ) {
-  const conditions = [eq(changePlan.team_id, teamId)]
+  const conditions = [
+    eq(changePlan.team_id, teamId),
+    exists(
+      db
+        .select({ id: project.id })
+        .from(project)
+        .where(and(eq(project.id, changePlan.project_id), isNull(project.deleted_at))),
+    ),
+  ]
   if (filters.projectId) conditions.push(eq(changePlan.project_id, filters.projectId))
   if (filters.environment) conditions.push(eq(changePlan.environment, filters.environment))
   if (filters.status) conditions.push(eq(changePlan.status, filters.status))

@@ -336,6 +336,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       changes.testOwner = [current.test_owner_user_id, input.testOwnerUserId]
 
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockRequirement(tx, requirementId)
       const updated = await updateRequirement(tx, requirementId, input.version, {
         title,
@@ -408,13 +409,16 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   async function addRequirementComment(actor: SessionUser, requirementId: string, bodyMarkdown: string) {
     const { project } = await requireRequirement(actor, requirementId)
     await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
-    return addComment(db, {
-      teamId: project.teamId,
-      projectId: project.id,
-      entityType: 'requirement',
-      entityId: requirementId,
-      authorUserId: actor.id,
-      bodyMarkdown,
+    return db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
+      return addComment(tx, {
+        teamId: project.teamId,
+        projectId: project.id,
+        entityType: 'requirement',
+        entityId: requirementId,
+        authorUserId: actor.id,
+        bodyMarkdown,
+      })
     })
   }
 
@@ -472,6 +476,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
   ) {
     const { project } = await requireRequirement(actor, requirementId)
     const row = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockRequirement(tx, requirementId)
       const updated = await updateRequirementState(tx, requirementId, input.version, {
         status: input.status,
@@ -548,6 +553,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     }
     const submissionId = randomUUID()
     const result = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       await lockRequirement(tx, requirementId)
       if (input.idempotencyKey) {
         await recordIdempotency(tx, {

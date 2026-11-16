@@ -141,6 +141,7 @@ export const pipelineArtifact = appSchema.table(
     size_bytes: bigint('size_bytes', { mode: 'number' }).notNull(),
     sha256: text('sha256').notNull(),
     status: text('status').notNull(),
+    purged_at: timestamp('purged_at', { withTimezone: true, mode: 'date' }),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
@@ -151,6 +152,9 @@ export const pipelineArtifact = appSchema.table(
     check('ck_pipeline_artifact_sha256', sql`char_length(${table.sha256}) = 64`),
     check('ck_pipeline_artifact_size', sql`${table.size_bytes} >= 0`),
     index('idx_pipeline_artifact_run').on(table.run_id, table.created_at, table.id),
+    index('idx_pipeline_artifact_project_purge')
+      .on(table.project_id, table.id)
+      .where(sql`${table.purged_at} is null`),
   ],
 )
 

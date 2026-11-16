@@ -8,6 +8,7 @@ import { createSecretCipher } from '../modules/configuration/configuration.crypt
 import { createAttachmentCleanup } from '../modules/attachments/attachments.cleanup.ts'
 import { reconcileCodeChangeFromRun, reconcilePendingCodeChanges } from '../modules/tools/tools.code-change.service.ts'
 import { reconcileChangeExecutionFromRun } from '../modules/operations/operations.execution.service.ts'
+import { runProjectFileCleanup } from '../modules/projects/projects.file-cleanup.ts'
 import { createProjectDashboardSync } from '../modules/projects/projects.dashboard-sync.ts'
 import { createGitConnectionAdapterFactory } from './create-git-connection-adapter.ts'
 
@@ -63,19 +64,21 @@ export function createWorker(
     maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
     maxArtifactBytes: config.PIPELINE_ARTIFACT_MAX_BYTES,
   })
+  const storage = createStorageService({
+    db: database.db,
+    cipher: secretCipher,
+    config: { localDir: config.ATTACHMENT_STORAGE_DIR, probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS },
+  })
   const attachmentCleanup = createAttachmentCleanup({
     db: database.db,
-    storage: createStorageService({
-      db: database.db,
-      cipher: secretCipher,
-      config: { localDir: config.ATTACHMENT_STORAGE_DIR, probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS },
-    }),
+    storage,
     policy: { tempRetentionHours: config.ATTACHMENT_TEMP_TTL_HOURS },
     log: (message, context) => log('warn', message, context),
   })
   let timer: NodeJS.Timeout | null = null
   let cleanupTimer: NodeJS.Timeout | null = null
   let dashboardTimer: NodeJS.Timeout | null = null
+  let projectCleanupCycle: Promise<void> | null = null
   let dashboardCycle: Promise<void> | null = null
   let cycleRunning = false
   let cleanupRunning = false
@@ -122,6 +125,23 @@ export function createWorker(
     }
   }
 
+  function scheduleProjectFileCleanup(): void {
+    if (projectCleanupCycle || closing) return
+    projectCleanupCycle = runProjectFileCleanup({
+      db: database.db,
+      storage,
+      pipelineStorage,
+      log: (message, context) => log('warn', message, context),
+    })
+      .then(() => undefined)
+      .catch((error: unknown) => {
+        log('error', '项目文件清理周期失败', { errorType: error instanceof Error ? error.name : typeof error })
+      })
+      .finally(() => {
+        projectCleanupCycle = null
+      })
+  }
+
   function scheduleDashboardSync(): void {
     if (dashboardCycle || closing) return
     dashboardCycle = dashboardSync(dashboardShutdown.signal)
@@ -143,7 +163,9 @@ export function createWorker(
       await runCycleOnce()
       await runAttachmentCleanupOnce()
       if (closing) return
+      scheduleProjectFileCleanup()
       timer = setInterval(() => {
+        scheduleProjectFileCleanup()
         void runCycleOnce()
       }, SCHEDULE_INTERVAL_MS)
       cleanupTimer = setInterval(() => {
@@ -177,7 +199,7 @@ export function createWorker(
       }
       if (dashboardTimer) clearInterval(dashboardTimer)
       dashboardShutdown.abort()
-      await dashboardCycle
+      await Promise.all([dashboardCycle, projectCleanupCycle])
       await database.close()
     },
   }

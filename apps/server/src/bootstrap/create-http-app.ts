@@ -11,6 +11,7 @@ import type { IdentityAuth } from '../modules/identity/identity.auth.ts'
 import { identityAuthRoutes } from '../modules/identity/identity.routes.ts'
 import { identityTeamRoutes } from '../modules/identity/identity.team.routes.ts'
 import { identityTokenRoutes } from '../modules/identity/identity.tokens.routes.ts'
+import { projectLifecycleRoutes } from '../modules/projects/projects.lifecycle.routes.ts'
 import { projectRoutes } from '../modules/projects/projects.routes.ts'
 import { projectDashboardRoutes } from '../modules/projects/projects.dashboard.routes.ts'
 import { requirementRoutes } from '../modules/requirements/requirements.routes.ts'
@@ -122,6 +123,7 @@ export function createHttpApp(
   app.register(identityAuthRoutes, { prefix: '/api/v1', auth: services.auth, origin: config.APP_ORIGIN })
   app.register(identityTeamRoutes, { prefix: '/api/v1', auth: services.auth, service: services.identity })
   app.register(identityTokenRoutes, { prefix: '/api/v1', tokenService: services.tokens, service: services.identity })
+  app.register(projectLifecycleRoutes, { prefix: '/api/v1', service: services.projectLifecycle })
   app.register(projectRoutes, { prefix: '/api/v1', auth: services.auth, service: services.projects })
   app.register(projectDashboardRoutes, { prefix: '/api/v1', service: services.projectDashboard })
   app.register(requirementRoutes, { prefix: '/api/v1', auth: services.auth, service: services.requirements })

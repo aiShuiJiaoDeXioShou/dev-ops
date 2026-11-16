@@ -54,15 +54,16 @@ export async function requireActor(request: FastifyRequest): Promise<SessionUser
 }
 
 /**
- * 要求当前请求来自登录会话，禁止 API Token 管理 Token。
+ * 要求当前请求来自登录会话，用于需要登录会话的敏感操作。
  * @param request Fastify 请求。
+ * @param action 需要登录会话的操作名称，省略时用于管理 API Token。
  * @returns 当前登录用户。
  * @throws 使用 API Token 时抛出 FORBIDDEN；无会话时抛出 UNAUTHENTICATED。
  */
-export async function requireSessionActor(request: FastifyRequest): Promise<SessionUser> {
+export async function requireSessionActor(request: FastifyRequest, action?: string): Promise<SessionUser> {
   const token = bearerToken(request.headers)
   if (token !== null) {
-    throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, 'API Token 不能管理 API Token')
+    throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, action ? `请使用登录会话${action}` : 'API Token 不能管理 API Token')
   }
   const user = await getSessionUser(request.server.auth, request.headers)
   if (!user) throw new ApiErrorClass(ERROR_CODES.UNAUTHENTICATED, '请先登录')

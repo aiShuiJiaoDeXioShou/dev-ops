@@ -13,7 +13,7 @@ import type { StorageAdapter } from '../storage/adapters/local.adapter.ts'
 import type { StorageBucketRow, StorageService } from '../storage/storage.service.ts'
 import type { SessionUser } from '../identity/identity.session.ts'
 import { requireTeamMember } from '../identity/identity.session.ts'
-import { getProjectContext } from '../projects/projects.access.ts'
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import {
   normalizeAttachmentFileName,
@@ -220,6 +220,7 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
       let row: AttachmentRow
       try {
         row = await db.transaction(async (tx) => {
+          await lockProjectForWrite(tx, project.id)
           const inserted = await insertAttachment(tx, {
             id: attachmentId,
             teamId: project.teamId,
@@ -261,7 +262,7 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
     if (!project) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     // 下载权限只要求项目成员（含浏览者）；跨团队与非成员一律拒绝。
     await requireTeamMember(db, actor.id, project.teamId)
-    if (!isAttachmentStatus(row.status) || row.status === 'removed') {
+    if (!isAttachmentStatus(row.status) || row.status === 'removed' || row.purged_at !== null) {
       throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     }
     // 未绑定的临时附件只有上传者本人可见，其他成员按不存在处理，避免泄露文件名与内容。
@@ -306,13 +307,14 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
     if (!authority.canDeleteAny && !isUploader) {
       throw new ApiError(ERROR_CODES.FORBIDDEN, '无权删除他人上传的附件')
     }
-    if (!isAttachmentStatus(row.status) || row.status === 'removed') {
+    if (!isAttachmentStatus(row.status) || row.status === 'removed' || row.purged_at !== null) {
       throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     }
 
     // 未绑定的临时附件没有业务目标，数据库约束不允许置为 removed，只能直接删除记录。
     const isTempAttachment = row.status === 'temp'
     const removedRow = await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, project.id)
       const removed = isTempAttachment
         ? await deleteTempAttachmentRecord(tx, row.id)
         : await markAttachmentRemoved(tx, row.id)

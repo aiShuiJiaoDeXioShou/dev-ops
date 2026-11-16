@@ -3,6 +3,7 @@ import { createDatabase } from '../platform/database/client.ts'
 import { createIdentityAuth } from '../modules/identity/identity.auth.ts'
 import { createIdentityService } from '../modules/identity/identity.service.ts'
 import { createTokenService } from '../modules/identity/identity.tokens.ts'
+import { createProjectLifecycleService } from '../modules/projects/projects.lifecycle.service.ts'
 import { createProjectsService } from '../modules/projects/projects.service.ts'
 import { createKnowledgeService } from '../modules/knowledge/knowledge.service.ts'
 import { createRequirementsService } from '../modules/requirements/requirements.service.ts'
@@ -239,6 +240,9 @@ export function createServices(
     pipelineAgent,
     projectDashboard,
     projects,
+    projectLifecycle: createProjectLifecycleService(database.db, (headers, password) =>
+      verifySessionPassword(auth, headers, password),
+    ),
     async close() {
       await database.close()
     },

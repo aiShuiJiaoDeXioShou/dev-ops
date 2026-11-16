@@ -7,7 +7,7 @@ import { ApiError } from '../../platform/http/errors.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
 import { loadUserRefs, userNameOf } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
-import { getProjectContext } from '../projects/projects.access.ts'
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
 import { appendPipelineActivity } from './pipeline.activity.ts'
 import type { PipelineCredentialProvider } from './pipeline.credentials.ts'
 import { maskErrorMessage, maskInputValue, maskSensitiveText } from './pipeline.mask.ts'
@@ -644,6 +644,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     )
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, projectId)
         await insertPipelineRun(tx, {
           id: runId,
           teamId: project.teamId,
@@ -888,6 +889,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       })),
     )
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       await insertPipelineRun(tx, {
         id: runId,
         teamId: input.teamId,
@@ -971,6 +973,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     )
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, input.projectId)
         await insertPipelineRun(tx, {
           id: runId,
           teamId: input.teamId,

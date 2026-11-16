@@ -1,3 +1,4 @@
+import { lockProjectForWrite } from '../projects/projects.access.ts'
 import { createHash, randomUUID } from 'node:crypto'
 import { and, desc, eq } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
@@ -106,25 +107,28 @@ function stableStringify(value: unknown): string {
  * @remarks 插入与冲突查询分开执行，命中冲突后按指纹判定是否可复用。
  */
 export async function beginInvocation(db: Database, input: BeginInvocationInput): Promise<BeginInvocationResult> {
-  const id = randomUUID()
-  const inserted = await db
-    .insert(toolInvocation)
-    .values({
-      id,
-      team_id: input.teamId,
-      project_id: input.projectId,
-      capability: input.capability,
-      channel: input.channel,
-      status: 'queued',
-      idempotency_key: input.idempotencyKey,
-      request_fingerprint: input.requestFingerprint,
-      repository_id: input.repositoryId ?? null,
-      target_ref: input.targetRef ?? null,
-      input_summary: input.inputSummary,
-      created_by_user_id: input.createdByUserId,
-    })
-    .onConflictDoNothing({ target: [toolInvocation.project_id, toolInvocation.idempotency_key] })
-    .returning()
+  const inserted = await db.transaction(async (tx) => {
+    await lockProjectForWrite(tx, input.projectId)
+    const id = randomUUID()
+    return tx
+      .insert(toolInvocation)
+      .values({
+        id,
+        team_id: input.teamId,
+        project_id: input.projectId,
+        capability: input.capability,
+        channel: input.channel,
+        status: 'queued',
+        idempotency_key: input.idempotencyKey,
+        request_fingerprint: input.requestFingerprint,
+        repository_id: input.repositoryId ?? null,
+        target_ref: input.targetRef ?? null,
+        input_summary: input.inputSummary,
+        created_by_user_id: input.createdByUserId,
+      })
+      .onConflictDoNothing({ target: [toolInvocation.project_id, toolInvocation.idempotency_key] })
+      .returning()
+  })
   const row = inserted[0]
   if (row) return { invocationId: row.id, replayed: false, status: 'queued' }
 

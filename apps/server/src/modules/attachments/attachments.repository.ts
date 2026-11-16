@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lt, ne } from 'drizzle-orm'
+import { and, asc, count, eq, exists, inArray, isNull, lt, ne } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { project } from '../projects/projects.tables.ts'
 import { attachment, type AttachmentTargetType } from './attachments.tables.ts'
@@ -107,7 +107,7 @@ export async function bindAttachment(
       bound_at: now,
       updated_at: now,
     })
-    .where(and(eq(attachment.id, input.attachmentId), eq(attachment.status, 'temp')))
+    .where(and(eq(attachment.id, input.attachmentId), eq(attachment.status, 'temp'), isNull(attachment.purged_at)))
     .returning()
   return row
 }
@@ -145,7 +145,7 @@ export async function deleteTempAttachmentRecord(
 ): Promise<AttachmentRow | undefined> {
   const [row] = await executor
     .delete(attachment)
-    .where(and(eq(attachment.id, attachmentId), eq(attachment.status, 'temp')))
+    .where(and(eq(attachment.id, attachmentId), eq(attachment.status, 'temp'), isNull(attachment.purged_at)))
     .returning()
   return row
 }
@@ -218,7 +218,18 @@ export async function findExpiredTempAttachments(
   return executor
     .select({ id: attachment.id, bucket_id: attachment.bucket_id, storage_key: attachment.storage_key })
     .from(attachment)
-    .where(and(eq(attachment.status, 'temp'), lt(attachment.created_at, cutoff)))
+    .where(
+      and(
+        isNull(attachment.purged_at),
+        exists(
+          executor
+            .select({ id: project.id })
+            .from(project)
+            .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+        ),
+        and(eq(attachment.status, 'temp'), lt(attachment.created_at, cutoff)),
+      ),
+    )
     .orderBy(asc(attachment.created_at), asc(attachment.id))
     .limit(limit)
 }
@@ -238,9 +249,19 @@ export async function deleteExpiredTempAttachment(
     .delete(attachment)
     .where(
       and(
-        eq(attachment.id, input.attachmentId),
-        eq(attachment.status, 'temp'),
-        lt(attachment.created_at, input.cutoff),
+        isNull(attachment.purged_at),
+        exists(
+          executor
+            .select({ id: project.id })
+            .from(project)
+            .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+        ),
+
+        and(
+          eq(attachment.id, input.attachmentId),
+          eq(attachment.status, 'temp'),
+          lt(attachment.created_at, input.cutoff),
+        ),
       ),
     )
     .returning({ id: attachment.id })
@@ -260,7 +281,18 @@ export async function findRemovedAttachments(
   return executor
     .select({ id: attachment.id, bucket_id: attachment.bucket_id, storage_key: attachment.storage_key })
     .from(attachment)
-    .where(eq(attachment.status, 'removed'))
+    .where(
+      and(
+        isNull(attachment.purged_at),
+        exists(
+          executor
+            .select({ id: project.id })
+            .from(project)
+            .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+        ),
+        eq(attachment.status, 'removed'),
+      ),
+    )
     .orderBy(asc(attachment.updated_at), asc(attachment.id))
     .limit(limit)
 }
@@ -274,7 +306,18 @@ export async function findRemovedAttachments(
 export async function deleteRemovedAttachment(executor: AttachmentExecutor, attachmentId: string): Promise<boolean> {
   const rows = await executor
     .delete(attachment)
-    .where(and(eq(attachment.id, attachmentId), eq(attachment.status, 'removed')))
+    .where(
+      and(
+        isNull(attachment.purged_at),
+        exists(
+          executor
+            .select({ id: project.id })
+            .from(project)
+            .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+        ),
+        and(eq(attachment.id, attachmentId), eq(attachment.status, 'removed')),
+      ),
+    )
     .returning({ id: attachment.id })
   return rows.length > 0
 }
@@ -292,7 +335,7 @@ export async function findProjectOwnerUserId(
   const [row] = await executor
     .select({ ownerUserId: project.owner_user_id })
     .from(project)
-    .where(eq(project.id, projectId))
+    .where(and(eq(project.id, projectId), isNull(project.deleted_at)))
     .limit(1)
   return row?.ownerUserId
 }

@@ -22,6 +22,7 @@ export const attachment = appSchema.table(
     target_type: text('target_type'),
     target_id: uuid('target_id'),
     uploaded_by_user_id: uuid('uploaded_by_user_id').notNull(),
+    purged_at: timestamp('purged_at', { withTimezone: true, mode: 'date' }),
     bound_at: timestamp('bound_at', { withTimezone: true, mode: 'date' }),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),

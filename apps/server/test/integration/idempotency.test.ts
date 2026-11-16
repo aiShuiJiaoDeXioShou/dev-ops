@@ -102,7 +102,7 @@ test('通用 POST 幂等钩子：重复键拒绝、业务失败清理后可重�
   const failed = await app.inject({
     method: 'POST',
     url: `/api/v1/teams/${teamId}/projects`,
-    payload: { name: '幂等项目' },
+    payload: { name: '幂等项目', ownerUserId: randomUUID() },
     headers: { cookie: user.cookie, 'idempotency-key': 'project-create-2' },
   })
   assert.equal(failed.json().code, 'PRECONDITION_FAILED')

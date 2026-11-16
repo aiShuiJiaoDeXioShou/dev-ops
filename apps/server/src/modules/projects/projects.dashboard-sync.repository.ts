@@ -53,7 +53,14 @@ export async function claimDashboardRepository(db: Database, now: Date) {
     const linkedProject = tx
       .select({ id: projectRepository.id })
       .from(projectRepository)
-      .innerJoin(project, and(eq(project.id, projectRepository.project_id), eq(project.team_id, repository.team_id)))
+      .innerJoin(
+        project,
+        and(
+          eq(project.id, projectRepository.project_id),
+          eq(project.team_id, repository.team_id),
+          isNull(project.deleted_at),
+        ),
+      )
       .where(and(eq(projectRepository.repository_id, repository.id), eq(projectRepository.team_id, repository.team_id)))
     const [candidate] = await tx
       .select({

@@ -7,7 +7,7 @@ import { validatePage } from '../../platform/http/pagination.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import { findBugSummaryById } from '../bugs/bugs.repository.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
-import { getProjectContext } from '../projects/projects.access.ts'
+import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
 import { findRequirementSummaryById } from '../requirements/requirements.repository.ts'
 import {
   countCodeReferencesForTarget,
@@ -638,6 +638,7 @@ export function createCodeService(deps: CodeServiceDeps) {
       throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '仓库已关联')
     }
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       await insertProjectRepository(tx, {
         id: randomUUID(),
         teamId: project.teamId,
@@ -665,6 +666,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     if (!(await findProjectRepositoryLink(db, projectId, repositoryId)))
       throw new ApiError(ERROR_CODES.NOT_FOUND, '项目仓库关联不存在')
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       await deleteProjectRepository(tx, projectId, repositoryId)
       await appendActivity(tx, {
         teamId: project.teamId,
@@ -736,19 +738,22 @@ export function createCodeService(deps: CodeServiceDeps) {
     }
     let row
     try {
-      row = await insertCodeReference(db, {
-        id: randomUUID(),
-        teamId: project.teamId,
-        projectId,
-        repositoryId: input.repositoryId,
-        targetType: input.targetType,
-        targetId: input.targetId,
-        objectType,
-        remoteId: input.remoteId,
-        title: snapshot.title,
-        state: snapshot.state,
-        url: snapshot.url,
-        createdByUserId: actor.id,
+      row = await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, projectId)
+        return insertCodeReference(tx, {
+          id: randomUUID(),
+          teamId: project.teamId,
+          projectId,
+          repositoryId: input.repositoryId,
+          targetType: input.targetType,
+          targetId: input.targetId,
+          objectType,
+          remoteId: input.remoteId,
+          title: snapshot.title,
+          state: snapshot.state,
+          url: snapshot.url,
+          createdByUserId: actor.id,
+        })
       })
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -766,50 +771,53 @@ export function createCodeService(deps: CodeServiceDeps) {
     await requireProject(actor, current.project_id)
     const repository = await findRepositoryById(db, current.repository_id)
     if (!repository) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库不可用')
+    const persistCheck = async (check: Parameters<typeof updateCodeReferenceCheck>[2]) => {
+      const updated = await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, current.project_id)
+        return updateCodeReferenceCheck(tx, codeReferenceId, check)
+      })
+      return referenceView(updated ?? current)
+    }
     let adapter: GitReadPort
     try {
       adapter = await deps.resolveAdapter(repository.connection_id)
     } catch {
-      return referenceView(
-        (await updateCodeReferenceCheck(db, codeReferenceId, {
-          status: 'unavailable',
-          errorCode: 'unavailable',
-          title: null,
-          state: null,
-          url: null,
-          checkedAt: new Date(),
-        })) ?? current,
-      )
+      return persistCheck({
+        status: 'unavailable',
+        errorCode: 'unavailable',
+        title: null,
+        state: null,
+        url: null,
+        checkedAt: new Date(),
+      })
     }
+    let check: Parameters<typeof updateCodeReferenceCheck>[2]
     try {
       const snapshot = await adapter.getObject({
         repository: { namespace: repository.namespace, name: repository.name },
         objectType: toGitObjectType(current.object_type),
         remoteId: current.remote_id,
       })
-      return referenceView(
-        (await updateCodeReferenceCheck(db, codeReferenceId, {
-          status: 'ok',
-          errorCode: null,
-          title: snapshot.title,
-          state: snapshot.state,
-          url: snapshot.url,
-          checkedAt: new Date(),
-        })) ?? current,
-      )
+      check = {
+        status: 'ok',
+        errorCode: null,
+        title: snapshot.title,
+        state: snapshot.state,
+        url: snapshot.url,
+        checkedAt: new Date(),
+      }
     } catch (error) {
       const mapped = gitErrorToCheckStatus(error)
-      return referenceView(
-        (await updateCodeReferenceCheck(db, codeReferenceId, {
-          status: mapped.status,
-          errorCode: mapped.errorCode,
-          title: null,
-          state: null,
-          url: null,
-          checkedAt: new Date(),
-        })) ?? current,
-      )
+      check = {
+        status: mapped.status,
+        errorCode: mapped.errorCode,
+        title: null,
+        state: null,
+        url: null,
+        checkedAt: new Date(),
+      }
     }
+    return persistCheck(check)
   }
 
   async function removeReference(actor: SessionUser, codeReferenceId: string, reason: string) {
@@ -819,6 +827,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     const note = reason.trim()
     if (note.length === 0 || note.length > 2000) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '移除原因长度不合法')
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, current.project_id)
       await deleteCodeReference(tx, codeReferenceId)
       await appendActivity(tx, {
         teamId: project.teamId,

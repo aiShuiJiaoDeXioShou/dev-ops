@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, ilike, notExists, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, ilike, isNull, notExists, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { project, projectService, projectServiceRepository } from './projects.tables.ts'
 import { teamMember } from '../identity/identity.tables.ts'
@@ -21,7 +21,11 @@ export interface ProjectListFilters {
 
 /** 按标识查找项目。 */
 export async function findProjectById(db: Database, projectId: string) {
-  const [row] = await db.select().from(project).where(eq(project.id, projectId)).limit(1)
+  const [row] = await db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, projectId), isNull(project.deleted_at)))
+    .limit(1)
   return row
 }
 
@@ -35,24 +39,18 @@ export async function findProjectContext(executor: ProjectExecutor, projectId: s
   const [row] = await executor
     .select({ id: project.id, teamId: project.team_id })
     .from(project)
-    .where(eq(project.id, projectId))
+    .where(and(eq(project.id, projectId), isNull(project.deleted_at)))
     .limit(1)
   return row
 }
 
 /** 在事务中锁定项目行。 */
 export async function lockProject(tx: TransactionDatabase, projectId: string) {
-  const [row] = await tx.select().from(project).where(eq(project.id, projectId)).for('update')
-  return row
-}
-
-/** 查找团队内同名项目。 */
-export async function findProjectByName(db: Database, teamId: string, name: string) {
-  const [row] = await db
-    .select({ id: project.id })
+  const [row] = await tx
+    .select()
     .from(project)
-    .where(and(eq(project.team_id, teamId), eq(project.name, name)))
-    .limit(1)
+    .where(and(eq(project.id, projectId), isNull(project.deleted_at)))
+    .for('update')
   return row
 }
 
@@ -64,7 +62,7 @@ export async function findProjectByName(db: Database, teamId: string, name: stri
  * @returns 项目行与总数。
  */
 export async function findProjects(db: Database, teamId: string, filters: ProjectListFilters) {
-  const conditions = [eq(project.team_id, teamId)]
+  const conditions = [eq(project.team_id, teamId), isNull(project.deleted_at)]
   if (filters.search) {
     const term = `%${filters.search}%`
     const searchCondition = or(ilike(project.name, term), ilike(project.description, term))
@@ -154,6 +152,7 @@ export async function findProjectRepositoryOptions(
             eq(projectRepository.repository_id, gitRepository.id),
             eq(projectRepository.team_id, teamId),
             eq(project.team_id, teamId),
+            isNull(project.deleted_at),
           ),
         ),
     ),
@@ -237,7 +236,7 @@ export async function updateProject(
       version: sql`${project.version} + 1`,
       updated_at: new Date(),
     })
-    .where(and(eq(project.id, projectId), eq(project.version, expectedVersion)))
+    .where(and(eq(project.id, projectId), eq(project.version, expectedVersion), isNull(project.deleted_at)))
     .returning()
   return row
 }

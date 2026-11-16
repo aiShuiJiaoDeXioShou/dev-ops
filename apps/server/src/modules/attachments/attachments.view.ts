@@ -41,6 +41,7 @@ export interface AttachmentSummary {
   uploadedBy: OwnerRef
   createdAt: string
   downloadUrl: string
+  contentAvailable?: false
 }
 
 /**
@@ -89,5 +90,6 @@ export function toAttachmentSummary(row: AttachmentRow, uploadedBy: OwnerRef): A
     uploadedBy,
     createdAt: row.created_at.toISOString(),
     downloadUrl: attachmentDownloadUrl(row.id),
+    ...(row.purged_at ? { contentAvailable: false } : {}),
   }
 }

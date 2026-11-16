@@ -260,6 +260,7 @@ export async function listGrantsForCredentials(db: Database, credentialIds: stri
       created_at: credentialProjectGrant.created_at,
     })
     .from(credentialProjectGrant)
+    .innerJoin(project, and(eq(project.id, credentialProjectGrant.project_id), isNull(project.deleted_at)))
     .where(inArray(credentialProjectGrant.credential_id, credentialIds))
     .orderBy(credentialProjectGrant.created_at, credentialProjectGrant.id)
 }
@@ -336,7 +337,7 @@ export async function findProjectRefById(db: Database, projectId: string) {
   const [row] = await db
     .select({ id: project.id, name: project.name, teamId: project.team_id })
     .from(project)
-    .where(eq(project.id, projectId))
+    .where(and(eq(project.id, projectId), isNull(project.deleted_at)))
     .limit(1)
   return row
 }
@@ -347,7 +348,7 @@ export async function findProjectRefsByIds(db: Database, projectIds: string[]) {
   return db
     .select({ id: project.id, name: project.name, teamId: project.team_id })
     .from(project)
-    .where(inArray(project.id, projectIds))
+    .where(and(inArray(project.id, projectIds), isNull(project.deleted_at)))
 }
 
 /** 插入使用/管理动作审计记录；调用方保证不传入密钥值。 */

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { Readable } from 'node:stream'
 import { test } from 'node:test'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Client } from 'pg'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
@@ -9,6 +13,14 @@ import { migrateDatabase } from '../../src/platform/database/migrate.ts'
 import { team, teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { gitRepository, projectRepository } from '../../src/modules/code/code.tables.ts'
 import { gitConnection } from '../../src/modules/integrations/integrations.tables.ts'
+import { runProjectFileCleanup } from '../../src/modules/projects/projects.file-cleanup.ts'
+import { projectFileCleanup } from '../../src/modules/projects/projects.lifecycle.tables.ts'
+import { attachment } from '../../src/modules/attachments/attachments.tables.ts'
+import { pipelineArtifact, pipelineRun } from '../../src/modules/pipeline/pipeline.tables.ts'
+import { createPipelineStorage } from '../../src/modules/pipeline/pipeline.storage.ts'
+import { createStorageService } from '../../src/modules/storage/storage.service.ts'
+import { storageBucket } from '../../src/modules/storage/storage.tables.ts'
+import { beginInvocation, completeInvocation, markInvocationRunning } from '../../src/modules/tools/tools.service.ts'
 import { createAuthenticatedUser } from '../support/auth.ts'
 import { FakeMailer } from '../support/fake-mailer.ts'
 
@@ -60,6 +72,8 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
   migrationUrl.pathname = `/${databaseName}`
   await migrateDatabase(migrationUrl.href)
 
+  const files = await mkdtemp(join(tmpdir(), 'project-recycle-'))
+  cleanup.push(() => rm(files, { recursive: true, force: true }))
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
@@ -69,6 +83,8 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
     AUTH_TRUSTED_ORIGINS: 'http://localhost:5173',
     DB_STATEMENT_TIMEOUT_MS: '1000',
     DB_LOCK_TIMEOUT_MS: '100',
+    ATTACHMENT_STORAGE_DIR: join(files, 'attachments'),
+    PIPELINE_STORAGE_DIR: join(files, 'pipeline'),
   })
   const app = createHttpApp(config, { mailer: new FakeMailer() })
   cleanup.push(async () => {
@@ -105,14 +121,6 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
   assert.equal(project.version, 1)
   assert.equal(project.owner.userId, adminUser.userId)
   assert.deepEqual(project.counts, { openRequirements: 0, openBugs: 0 })
-
-  const duplicate = await app.inject({
-    method: 'POST',
-    url: `/api/v1/teams/${teamId}/projects`,
-    payload: { name: '内部平台' },
-    headers: { cookie: adminUser.cookie },
-  })
-  assert.equal(duplicate.json().code, 'PRECONDITION_FAILED')
 
   const list = await app.inject({
     method: 'GET',
@@ -298,4 +306,259 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
     sql`SELECT count(*)::int AS count FROM app.activity WHERE entity_id = ${project.id}`,
   )
   assert.ok((activities.rows[0]?.count ?? 0) >= 2)
+
+  await t.test('回收站按 ID 管理同名项目，清理失败可重试且保留记录', async () => {
+    const sibling = await app.inject({
+      method: 'POST',
+      url: `/api/v1/teams/${teamId}/projects`,
+      payload: { name: '内部平台 v2' },
+      headers: { cookie: adminUser.cookie },
+    })
+    assert.equal(sibling.json().success, true, sibling.body)
+    const siblingId: string = sibling.json().data.id
+    assert.notEqual(siblingId, project.id)
+    const renameSibling = await app.inject({
+      method: 'POST',
+      url: `/api/v1/projects/${siblingId}/update`,
+      payload: { version: 1, name: '内部平台' },
+      headers: { cookie: adminUser.cookie },
+    })
+    assert.equal(renameSibling.json().success, true, renameSibling.body)
+    const targetId: string = project.id
+    const adminHeaders = { cookie: adminUser.cookie, origin: config.APP_ORIGIN }
+    const devHeaders = { cookie: devUser.cookie, origin: config.APP_ORIGIN }
+    const viewHeaders = { cookie: viewerUser.cookie }
+    const post = (action: string, payload: object, headers = adminHeaders) =>
+      app.inject({ method: 'POST', url: `/api/v1/projects/${targetId}/${action}`, headers, payload })
+    const password = adminUser.password
+    const recyclePath = `/api/v1/teams/${teamId}/project-recycle-bin`
+    const readTarget = (path = '') => app.inject({ url: `/api/v1/projects/${targetId}${path}`, headers: viewHeaders })
+    const readRecycle = (headers = adminHeaders) => app.inject({ url: recyclePath, headers })
+    const rename = await post('update', { version: 2, name: '内部平台', ownerUserId: devUser.userId })
+    assert.equal(rename.json().success, true, rename.body)
+    const version: number = rename.json().data.version
+
+    assert.equal(
+      (await post('remove', { version, password }, { ...adminHeaders, cookie: viewerUser.cookie })).json().code,
+      'FORBIDDEN',
+    )
+    assert.equal(
+      (await post('remove', { version, password }, { ...adminHeaders, cookie: otherUser.cookie })).json().code,
+      'FORBIDDEN',
+    )
+    assert.equal((await post('remove', { version, password: '错误密码' }, devHeaders)).json().code, 'PASSWORD_INVALID')
+    assert.equal((await readRecycle(devHeaders)).json().code, 'FORBIDDEN')
+
+    const child = await app.inject({
+      method: 'POST',
+      url: `/api/v1/projects/${targetId}/requirements`,
+      headers: devHeaders,
+      payload: { title: '回收站保留的需求', contentMode: 'markdown', contentMarkdown: '项目删除后保留' },
+    })
+    assert.equal(child.json().success, true, child.body)
+    const childId: string = child.json().data.id
+
+    const runId = randomUUID()
+    const digest = 'a'.repeat(64)
+    await app.db.insert(pipelineRun).values({
+      id: runId,
+      team_id: teamId,
+      project_id: targetId,
+      repository_id: randomUUID(),
+      workflow_path: '.devops/workflows/verify.yaml',
+      git_ref: 'main',
+      commit_sha: 'a'.repeat(40),
+      run_plan: {},
+      workflow_snapshot: '',
+      workflow_hash: digest,
+      status: 'queued',
+      trigger_source: 'manual',
+      initiator_channel: 'web',
+      triggered_by_user_id: devUser.userId,
+      idempotency_key: randomUUID(),
+      timeout_seconds: 60,
+    })
+    const blocked = await post('remove', { version, password: devUser.password }, devHeaders)
+    assert.equal(blocked.json().code, 'PRECONDITION_FAILED')
+    assert.deepEqual(blocked.json().data.blockers, ['流水线运行'])
+    await app.db.update(pipelineRun).set({ status: 'succeeded' }).where(eq(pipelineRun.id, runId))
+    const invocation = await beginInvocation(app.db, {
+      teamId,
+      projectId: targetId,
+      capability: 'create_issue',
+      channel: 'cli',
+      idempotencyKey: randomUUID(),
+      requestFingerprint: digest,
+      inputSummary: {},
+      createdByUserId: adminUser.userId,
+    })
+    assert.equal((await post('remove', { version, password })).json().code, 'PRECONDITION_FAILED')
+    await markInvocationRunning(app.db, invocation.invocationId)
+    await completeInvocation(app.db, invocation.invocationId, { status: 'failed' })
+
+    const pipelineStorage = createPipelineStorage({
+      rootDir: config.PIPELINE_STORAGE_DIR,
+      maxArtifactBytes: config.PIPELINE_ARTIFACT_MAX_BYTES,
+      maxLogChunkBytes: config.PIPELINE_LOG_CHUNK_MAX_BYTES,
+    })
+    const storage = createStorageService({
+      db: app.db,
+      cipher: null,
+      config: { localDir: config.ATTACHMENT_STORAGE_DIR, probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS },
+    })
+    const [bucket] = await app.db.select({ id: storageBucket.id }).from(storageBucket).limit(1)
+    assert.ok(bucket)
+    const body = Buffer.from('保留元数据的文件')
+    const hash = createHash('sha256').update(body).digest('hex')
+    const attachmentId = randomUUID()
+    const siblingAttachmentId = randomUUID()
+    for (const { id, projectId } of [
+      { id: attachmentId, projectId: targetId },
+      { id: siblingAttachmentId, projectId: siblingId },
+    ]) {
+      const key = `attachments/${teamId}/${projectId}/${id}`
+      const path = join(config.ATTACHMENT_STORAGE_DIR, key)
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(path, body)
+      await app.db.insert(attachment).values({
+        id,
+        team_id: teamId,
+        project_id: projectId,
+        bucket_id: bucket.id,
+        storage_key: key,
+        file_name: '说明.txt',
+        size_bytes: body.length,
+        content_type: 'text/plain',
+        sha256: hash,
+        uploaded_by_user_id: devUser.userId,
+        ...(projectId === targetId
+          ? { status: 'bound', target_type: 'requirement', target_id: childId, bound_at: new Date() }
+          : {}),
+      })
+    }
+    const artifactId = randomUUID()
+    const artifact = await pipelineStorage.writeArtifactStream(runId, artifactId, Readable.from([body]), hash)
+    await app.db.insert(pipelineArtifact).values({
+      id: artifactId,
+      team_id: teamId,
+      project_id: targetId,
+      run_id: runId,
+      step_index: 0,
+      name: 'test',
+      storage_key: artifact.storageKey,
+      size_bytes: body.length,
+      sha256: hash,
+      status: 'available',
+    })
+    const log = await pipelineStorage.writeLogChunk(runId, 0, 0, '保留运行日志')
+
+    const [removeResult, invocationResult] = await Promise.allSettled([
+      post('remove', { version, password: devUser.password }, devHeaders),
+      beginInvocation(app.db, {
+        teamId,
+        projectId: targetId,
+        capability: 'create_issue',
+        channel: 'cli',
+        idempotencyKey: randomUUID(),
+        requestFingerprint: digest,
+        inputSummary: {},
+        createdByUserId: devUser.userId,
+      }),
+    ])
+    assert.equal(removeResult.status, 'fulfilled')
+    if (invocationResult.status === 'fulfilled') {
+      assert.equal(removeResult.value.json().code, 'PRECONDITION_FAILED', removeResult.value.body)
+      await markInvocationRunning(app.db, invocationResult.value.invocationId)
+      await completeInvocation(app.db, invocationResult.value.invocationId, { status: 'failed' })
+      const removed = await post('remove', { version, password: devUser.password }, devHeaders)
+      assert.equal(removed.json().success, true, removed.body)
+    } else {
+      assert.equal(removeResult.value.json().success, true, removeResult.value.body)
+      assert.equal(invocationResult.reason?.code, 'NOT_FOUND')
+    }
+    const deletedVersion = version + 1
+    assert.equal((await readTarget()).json().code, 'NOT_FOUND')
+    assert.equal((await readTarget('/requirements')).json().code, 'NOT_FOUND')
+    assert.equal(
+      (await app.inject({ url: `/api/v1/requirements/${childId}`, headers: viewHeaders })).json().code,
+      'NOT_FOUND',
+    )
+    assert.equal(
+      (await app.inject({ url: `/api/v1/projects/${siblingId}`, headers: viewHeaders })).json().success,
+      true,
+    )
+    const hidden = await app.inject({
+      url: `/api/v1/teams/${teamId}/projects?search=${encodeURIComponent('内部平台')}`,
+      headers: viewHeaders,
+    })
+    assert.ok(!hidden.json().data.items.some((item: { id: string }) => item.id === targetId))
+    const recycle = (await readRecycle()).json().data.items
+    assert.deepEqual(
+      recycle.map((item: { id: string }) => item.id),
+      [targetId],
+    )
+    assert.equal(recycle[0].cleanupStatus, 'none')
+    assert.equal((await post('restore', { version: deletedVersion }, devHeaders)).json().code, 'FORBIDDEN')
+    assert.equal(
+      (await post('cleanup-files', { version: deletedVersion, password: '错误密码' })).json().code,
+      'PASSWORD_INVALID',
+    )
+    assert.deepEqual(await pipelineStorage.readArtifact(artifact.storageKey), body)
+
+    const requested = await post('cleanup-files', { version: deletedVersion, password })
+    assert.equal(requested.json().data.cleanupStatus, 'queued')
+    const repeated = await post('cleanup-files', { version: deletedVersion, password })
+    assert.equal(repeated.json().data.id, requested.json().data.id)
+    assert.equal((await post('restore', { version: deletedVersion })).json().code, 'PRECONDITION_FAILED')
+    const jobId: string = requested.json().data.id
+    await app.db
+      .update(projectFileCleanup)
+      .set({ status: 'running', lease_token: randomUUID(), lease_until: new Date(0) })
+      .where(eq(projectFileCleanup.id, jobId))
+    const worker = { db: app.db, storage, pipelineStorage, log: () => undefined }
+    await runProjectFileCleanup({
+      ...worker,
+      pipelineStorage: {
+        removeArtifact: async () => {
+          throw new Error('模拟产物删除失败')
+        },
+      },
+    })
+    assert.equal((await readRecycle()).json().data.items[0].cleanupStatus, 'failed')
+    const filePath = join(config.ATTACHMENT_STORAGE_DIR, 'attachments', teamId, targetId, attachmentId)
+    await assert.rejects(readFile(filePath), { code: 'ENOENT' })
+    assert.equal((await post('cleanup-files', { version: deletedVersion, password })).json().data.id, jobId)
+    await runProjectFileCleanup(worker)
+    assert.equal((await readRecycle()).json().data.items[0].cleanupStatus, 'succeeded')
+    await assert.rejects(pipelineStorage.readArtifact(artifact.storageKey))
+    assert.equal(await pipelineStorage.readLogChunk(log.storageKey), '保留运行日志')
+    assert.deepEqual(
+      await readFile(join(config.ATTACHMENT_STORAGE_DIR, 'attachments', teamId, siblingId, siblingAttachmentId)),
+      body,
+    )
+
+    assert.equal((await post('restore', { version: deletedVersion })).json().success, true)
+    assert.equal((await readTarget()).json().data.name, '内部平台')
+    assert.equal((await readTarget()).json().data.status, 'paused')
+    const restoredChild = await app.inject({ url: `/api/v1/requirements/${childId}`, headers: viewHeaders })
+    assert.equal(restoredChild.json().data.attachments[0].contentAvailable, false)
+    assert.equal(restoredChild.json().data.attachments[0].id, attachmentId)
+    const download = await app.inject({ url: `/api/v1/attachments/${attachmentId}/download`, headers: viewHeaders })
+    assert.equal(download.json().code, 'ATTACHMENT_NOT_FOUND')
+    const [artifactRow] = await app.db
+      .select({ status: pipelineArtifact.status })
+      .from(pipelineArtifact)
+      .where(eq(pipelineArtifact.id, artifactId))
+    assert.equal(artifactRow?.status, 'missing')
+
+    // 同一账号在两种密码操作间切换也不能绕过配额。
+    let result
+    for (let index = 0; index < 10; index += 1) {
+      result = await post(index % 2 ? 'remove' : 'cleanup-files', {
+        version: deletedVersion + 1,
+        password: '错误密码',
+      })
+    }
+    assert.equal(result?.json().code, 'RATE_LIMITED')
+  })
 })

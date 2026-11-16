@@ -1,3 +1,4 @@
+import { lockProjectForWrite } from '../projects/projects.access.ts'
 import { randomUUID } from 'node:crypto'
 import type { Database } from '../../platform/database/client.ts'
 import { isUniqueViolation } from '../../platform/database/errors.ts'
@@ -322,6 +323,7 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
     const buildId = randomUUID()
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, projectId)
         const row = await insertBuild(tx, {
           id: buildId,
           teamId: context.teamId,
@@ -423,6 +425,7 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
     if (Object.keys(fields).length === 0) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '没有需要更正的字段')
 
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, existing.project_id)
       const row = await lockBuildForUpdate(tx, buildId)
       if (!row) throw new ApiError(ERROR_CODES.NOT_FOUND, '构建记录不存在')
       if (row.version !== input.version) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '构建记录已被其他操作修改')
@@ -469,6 +472,7 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
       note: optionalText(input.note, '产物说明', 2000),
     }
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, existing.project_id)
       await insertArtifact(tx, {
         id: randomUUID(),
         teamId: context.teamId,
@@ -505,6 +509,7 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '关联事项不属于当前项目')
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, existing.project_id)
         await insertTarget(tx, {
           id: randomUUID(),
           teamId: context.teamId,
@@ -545,6 +550,7 @@ export function createDeliveryService(deps: DeliveryServiceDeps) {
     if (!bugLink) throw new ApiError(ERROR_CODES.NOT_FOUND, '关联不存在')
     const trimmedReason = validateReason(reason)
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, existing.project_id)
       await deleteTarget(tx, buildId, targetId)
       await appendActivity(tx, {
         teamId: context.teamId,

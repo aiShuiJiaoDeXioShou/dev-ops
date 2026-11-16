@@ -27,6 +27,7 @@ const attachmentSummarySchema = Type.Object({
   uploadedBy: ownerSchema,
   createdAt: Type.String(),
   downloadUrl: Type.String(),
+  contentAvailable: Type.Optional(Type.Literal(false)),
 })
 const bugItemSchema = Type.Object({
   id: uuidSchema,

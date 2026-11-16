@@ -1,4 +1,5 @@
-import { and, asc, count, desc, eq, gte, inArray, lt, lte, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm'
+import { project } from '../projects/projects.tables.ts'
 import type { Database } from '../../platform/database/client.ts'
 import type { RunPlanTemplate } from './pipeline.planner.ts'
 import { pipelineArtifact, pipelineRun, pipelineRunLog, pipelineRunStep } from './pipeline.tables.ts'
@@ -186,7 +187,18 @@ export async function findExpiredPipelineArtifacts(db: Database, cutoff: Date, l
   return db
     .select()
     .from(pipelineArtifact)
-    .where(and(eq(pipelineArtifact.status, 'available'), lt(pipelineArtifact.created_at, cutoff)))
+    .where(
+      and(
+        eq(pipelineArtifact.status, 'available'),
+        lt(pipelineArtifact.created_at, cutoff),
+        exists(
+          db
+            .select({ id: project.id })
+            .from(project)
+            .where(and(eq(project.id, pipelineArtifact.project_id), isNull(project.deleted_at))),
+        ),
+      ),
+    )
     .orderBy(pipelineArtifact.created_at)
     .limit(limit)
 }

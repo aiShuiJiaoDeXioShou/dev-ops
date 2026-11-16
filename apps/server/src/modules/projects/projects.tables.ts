@@ -13,13 +13,18 @@ export const project = appSchema.table(
     owner_user_id: uuid('owner_user_id').notNull(),
     status: text('status').notNull().default('active'),
     version: integer('version').notNull().default(1),
+    deleted_at: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
+    deleted_by_user_id: uuid('deleted_by_user_id'),
     created_by_user_id: uuid('created_by_user_id').notNull(),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
   (table) => [
     primaryKey({ name: 'pk_project_id', columns: [table.id] }),
-    unique('uk_project_team_name').on(table.team_id, table.name),
+    index('idx_project_recycle_bin')
+      .on(table.team_id, table.deleted_at, table.id)
+      .where(sql`${table.deleted_at} is not null`),
+    check('ck_project_deleted_actor', sql`(${table.deleted_at} is null) = (${table.deleted_by_user_id} is null)`),
     check('ck_project_status', sql`${table.status} in ('active', 'paused', 'ended')`),
     index('idx_project_team_status').on(table.team_id, table.status, table.updated_at, table.id),
     index('idx_project_team_updated').on(table.team_id, table.updated_at, table.id),

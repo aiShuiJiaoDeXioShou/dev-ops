@@ -1,3 +1,4 @@
+import { lockProjectForWrite } from '../projects/projects.access.ts'
 import { randomUUID } from 'node:crypto'
 import type { IncomingHttpHeaders } from 'node:http'
 import type { Database } from '../../platform/database/client.ts'
@@ -421,6 +422,7 @@ export function createCredentialsService(deps: CredentialsServiceDeps) {
     if (!projectRef) throw new ApiError(ERROR_CODES.NOT_FOUND, '项目不存在')
     if (projectRef.teamId !== record.team_id) throw new ApiError(ERROR_CODES.FORBIDDEN, '只能授权本团队项目')
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectRef.id)
       const locked = await lockCredentialForUpdate(tx, credentialId)
       if (!locked) throw new ApiError(ERROR_CODES.NOT_FOUND, '凭据不存在')
       if (locked.status !== 'active') throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '凭据已撤销，不能授权')
@@ -469,6 +471,7 @@ export function createCredentialsService(deps: CredentialsServiceDeps) {
     await requireAdmin(actor, record.team_id)
     const reason = validateReason(input.reason)
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       const locked = await lockCredentialForUpdate(tx, credentialId)
       if (!locked) throw new ApiError(ERROR_CODES.NOT_FOUND, '凭据不存在')
       const row = await revokeGrant(tx, credentialId, projectId)

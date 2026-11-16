@@ -15,6 +15,7 @@ export { comment, activity } from '../modules/collaboration/collaboration.tables
 export { storageBucket, storageBucketEvent } from '../modules/storage/storage.tables.ts'
 export { attachment } from '../modules/attachments/attachments.tables.ts'
 export { project, projectService, projectServiceRepository } from '../modules/projects/projects.tables.ts'
+export { projectFileCleanup, projectPasswordLimit } from '../modules/projects/projects.lifecycle.tables.ts'
 export {
   projectDashboardDay,
   projectDashboardPullRequest,

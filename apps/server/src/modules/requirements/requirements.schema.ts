@@ -66,6 +66,7 @@ const attachmentSummarySchema = Type.Object({
   uploadedBy: ownerSchema,
   createdAt: Type.String(),
   downloadUrl: Type.String(),
+  contentAvailable: Type.Optional(Type.Literal(false)),
 })
 const requirementDetailSchema = Type.Object({
   ...requirementItemSchema.properties,

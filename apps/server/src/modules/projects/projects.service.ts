@@ -13,7 +13,6 @@ import { lockProjectForWrite } from './projects.access.ts'
 import {
   deleteServiceRepository,
   findProjectById,
-  findProjectByName,
   findProjectRepositoryOptions,
   findProjectServiceById,
   findProjectServiceByName,
@@ -269,9 +268,6 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     if (!(await isActiveTeamMember(db, teamId, ownerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '项目负责人不是正常团队成员')
     }
-    if (await findProjectByName(db, teamId, name)) {
-      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '同团队已存在同名项目')
-    }
     const projectId = randomUUID()
     const row = await db.transaction(async (tx) => {
       const created = await insertProject(tx, {
@@ -327,9 +323,6 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     }
     if (input.ownerUserId !== undefined && !(await isActiveTeamMember(db, current.team_id, input.ownerUserId))) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '项目负责人不是正常团队成员')
-    }
-    if (name !== undefined && name !== current.name && (await findProjectByName(db, current.team_id, name))) {
-      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '同团队已存在同名项目')
     }
 
     const changes: Record<string, unknown> = {}
@@ -480,6 +473,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     const repositoryIds = await validateServiceRepositories(projectId, input.repositoryIds)
     const serviceId = randomUUID()
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, projectId)
       await insertProjectService(tx, {
         id: serviceId,
         teamId: project.team_id,
@@ -538,6 +532,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       changes.description = [service.description, description]
     if (status !== undefined && status !== service.status) changes.status = [service.status, status]
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, service.project_id)
       const updated = await updateProjectService(tx, serviceId, input.version, { name, description, status })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '服务已被更新，请刷新后重试')
       if (Object.keys(changes).length > 0) {
@@ -566,6 +561,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     }
     try {
       await db.transaction(async (tx) => {
+        await lockProjectForWrite(tx, service.project_id)
         await insertServiceRepository(tx, {
           id: randomUUID(),
           teamId: service.team_id,
@@ -603,6 +599,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '原因长度必须在 1-1000 个字符之间')
     }
     await db.transaction(async (tx) => {
+      await lockProjectForWrite(tx, service.project_id)
       const removed = await deleteServiceRepository(tx, serviceId, repositoryId)
       if (removed === 0) throw new ApiError(ERROR_CODES.NOT_FOUND, '服务仓库映射不存在')
       await appendActivity(tx, {
