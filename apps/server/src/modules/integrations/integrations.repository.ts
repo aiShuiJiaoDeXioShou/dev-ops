@@ -2,9 +2,11 @@ import { and, desc, eq } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { gitConnection } from './integrations.tables.ts'
 
+type ConnectionExecutor = Database | Parameters<Parameters<Database['transaction']>[0]>[0]
+
 /** 插入 Git 连接。 */
 export async function insertGitConnection(
-  db: Database,
+  db: ConnectionExecutor,
   input: {
     id: string
     teamId: string
@@ -40,6 +42,28 @@ export async function findGitConnectionById(db: Database, connectionId: string) 
   return row
 }
 
+/**
+ * 查找团队已登记的 GitHub App 安装，涵盖撤销后重新授权的连接。
+ * @param db 数据库或已锁定团队的事务。
+ * @param teamId 团队标识。
+ * @param installationId GitHub 安装标识。
+ * @returns 已存在的连接，或 undefined。
+ */
+export async function findGitHubInstallation(db: ConnectionExecutor, teamId: string, installationId: string) {
+  const [row] = await db
+    .select()
+    .from(gitConnection)
+    .where(
+      and(
+        eq(gitConnection.team_id, teamId),
+        eq(gitConnection.auth_kind, 'github_app_installation'),
+        eq(gitConnection.external_identity, installationId),
+      ),
+    )
+    .limit(1)
+  return row
+}
+
 /** 列出团队连接。 */
 export async function findGitConnections(db: Database, teamId: string) {
   return db
@@ -60,7 +84,7 @@ export async function findActiveConnectionIds(db: Database, teamId: string) {
 
 /** 更新连接状态与检查信息。 */
 export async function updateGitConnection(
-  db: Database,
+  db: ConnectionExecutor,
   connectionId: string,
   values: {
     status?: string

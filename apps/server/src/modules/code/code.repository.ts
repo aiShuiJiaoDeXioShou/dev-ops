@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, count, desc, eq, ilike, inArray, notInArray, or } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, inArray, notInArray, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { codeReference, gitRepository, projectRepository } from './code.tables.ts'
 
@@ -275,7 +275,7 @@ export async function updateCodeReferenceCheck(
  * @returns 无返回值。
  */
 export async function upsertGitRepositories(
-  db: Database,
+  db: CodeExecutor,
   input: {
     teamId: string
     connectionId: string
@@ -289,36 +289,41 @@ export async function upsertGitRepositories(
     }>
   },
 ): Promise<void> {
-  for (const repository of input.repositories) {
+  const repositories = [...new Map(input.repositories.map((repository) => [repository.remoteId, repository])).values()]
+  const now = new Date()
+  const batchSize = 100
+  for (let offset = 0; offset < repositories.length; offset += batchSize) {
     await db
       .insert(gitRepository)
-      .values({
-        id: randomUUID(),
-        team_id: input.teamId,
-        connection_id: input.connectionId,
-        provider_key: input.providerKey,
-        remote_repository_id: repository.remoteId,
-        namespace: repository.namespace,
-        name: repository.name,
-        web_url: repository.webUrl,
-        default_branch: repository.defaultBranch,
-        status: 'available',
-        last_synced_at: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [gitRepository.connection_id, gitRepository.remote_repository_id],
-        set: {
+      .values(
+        repositories.slice(offset, offset + batchSize).map((repository) => ({
+          id: randomUUID(),
+          team_id: input.teamId,
+          connection_id: input.connectionId,
+          provider_key: input.providerKey,
+          remote_repository_id: repository.remoteId,
           namespace: repository.namespace,
           name: repository.name,
           web_url: repository.webUrl,
           default_branch: repository.defaultBranch,
           status: 'available',
-          last_synced_at: new Date(),
-          updated_at: new Date(),
+          last_synced_at: now,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [gitRepository.connection_id, gitRepository.remote_repository_id],
+        set: {
+          namespace: sql`excluded.namespace`,
+          name: sql`excluded.name`,
+          web_url: sql`excluded.web_url`,
+          default_branch: sql`excluded.default_branch`,
+          status: 'available',
+          last_synced_at: now,
+          updated_at: now,
         },
       })
   }
-  const remoteIds = input.repositories.map((item) => item.remoteId)
+  const remoteIds = repositories.map((item) => item.remoteId)
   const condition =
     remoteIds.length === 0
       ? eq(gitRepository.connection_id, input.connectionId)
@@ -326,7 +331,7 @@ export async function upsertGitRepositories(
           eq(gitRepository.connection_id, input.connectionId),
           notInArray(gitRepository.remote_repository_id, remoteIds),
         )
-  await db.update(gitRepository).set({ status: 'removed', updated_at: new Date() }).where(condition)
+  await db.update(gitRepository).set({ status: 'removed', updated_at: now }).where(condition)
 }
 
 /** 将连接下仓库标记为不可用（撤权/失效）。 */

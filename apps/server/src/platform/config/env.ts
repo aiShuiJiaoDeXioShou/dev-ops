@@ -38,6 +38,8 @@ const environmentSchema = Type.Object({
   GITHUB_ALLOWED_REPOS: Type.Optional(Type.String()),
   GITHUB_APP_ID: Type.Optional(Type.String({ pattern: '^[0-9]+$' })),
   GITHUB_APP_PRIVATE_KEY_PATH: Type.Optional(Type.String({ minLength: 1 })),
+  GITHUB_APP_CLIENT_ID: Type.Optional(Type.String({ pattern: '^[A-Za-z0-9_]+$' })),
+  GITHUB_APP_CLIENT_SECRET: Type.Optional(Type.String({ minLength: 1 })),
   GITHUB_APP_SLUG: Type.Optional(Type.String({ pattern: '^[A-Za-z0-9-]+$' })),
   PIPELINE_STORAGE_DIR: Type.String({ minLength: 1, default: './pipeline-data' }),
   PIPELINE_RUN_TIMEOUT_SECONDS: Type.Integer({ minimum: 60, maximum: 86_400, default: 3_600 }),

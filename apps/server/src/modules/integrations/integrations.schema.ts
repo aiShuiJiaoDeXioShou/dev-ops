@@ -79,7 +79,8 @@ export const revokeConnectionBodySchema = Type.Object(
 export const revokeConnectionResponseSchema = apiResponseSchema(connectionSchema)
 export const callbackParamsSchema = Type.Object({ providerKey: Type.String() })
 export const callbackQuerySchema = Type.Object({
-  state: Type.String({ minLength: 1, maxLength: 4096 }),
-  installation_id: Type.String({ pattern: '^[0-9]+$' }),
+  state: Type.Optional(Type.String({ minLength: 1, maxLength: 4096 })),
+  installation_id: Type.Optional(Type.String({ pattern: '^[0-9]+$' })),
+  code: Type.Optional(Type.String({ minLength: 1, maxLength: 512 })),
   setup_action: Type.Optional(Type.String()),
 })

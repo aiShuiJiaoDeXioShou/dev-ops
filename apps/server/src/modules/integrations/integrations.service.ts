@@ -1,8 +1,9 @@
-import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import type { AppConfig } from '../../platform/config/env.ts'
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import { findMembership, lockTeam } from '../identity/identity.repository.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import type { ConfigurationService } from '../configuration/configuration.service.ts'
 import {
@@ -14,6 +15,7 @@ import {
   findActiveConnectionIds,
   findGitConnectionById,
   findGitConnections,
+  findGitHubInstallation,
   insertGitConnection,
   updateGitConnection,
 } from './integrations.repository.ts'
@@ -50,9 +52,25 @@ export interface GitReadAdapter {
     Array<{ remoteId: string; namespace: string; name: string; webUrl: string; defaultBranch: string | null }>
   >
 }
+type GitConnectionRow = NonNullable<Awaited<ReturnType<typeof findGitConnectionById>>>
 export type GitAdapterFactory = (
-  connection: Awaited<ReturnType<typeof findGitConnectionById>> & object,
+  connection: Pick<
+    GitConnectionRow,
+    'id' | 'team_id' | 'provider_key' | 'instance_url' | 'auth_kind' | 'secret_id' | 'external_identity'
+  >,
 ) => Promise<GitReadAdapter>
+
+type GitHubInstallationVerifier = (input: {
+  clientId: string
+  clientSecret: string
+  redirectUri: string
+  code: string
+  codeVerifier: string
+  installationId: number
+}) => Promise<{ login: string; repositoryIds: ReadonlySet<string> }>
+
+type AuthorizationState = { teamId: string; userId: string; exp: number; nonce: string; installationId?: number }
+const GITHUB_CALLBACK_PATH = '/api/v1/git-authorizations/github/callback'
 
 function gitErrorCode(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string')
@@ -65,6 +83,7 @@ export interface IntegrationsServiceDeps {
   config: AppConfig
   configuration: ConfigurationService | null
   adapterFactory?: GitAdapterFactory
+  verifyGitHubInstallation?: GitHubInstallationVerifier
 }
 
 function normalizeName(name: string): string {
@@ -91,13 +110,13 @@ function view(row: NonNullable<Awaited<ReturnType<typeof insertGitConnection>>>)
   }
 }
 
-function signState(payload: { teamId: string; userId: string; exp: number }, secret: string): string {
+function signState(payload: AuthorizationState, secret: string): string {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
   const signature = createHmac('sha256', secret).update(body).digest('base64url')
   return `${body}.${signature}`
 }
 
-function verifyState(state: string, secret: string): { teamId: string; userId: string; exp: number } {
+function verifyState(state: string, secret: string): AuthorizationState {
   const [body, signature] = state.split('.')
   if (!body || !signature) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '授权 state 不合法')
   const expected = createHmac('sha256', secret).update(body).digest('base64url')
@@ -106,17 +125,40 @@ function verifyState(state: string, secret: string): { teamId: string; userId: s
   if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
     throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '授权 state 不合法')
   }
-  let payload: { teamId?: unknown; userId?: unknown; exp?: unknown }
+  let payload: unknown
   try {
-    payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as typeof payload
+    payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'))
   } catch {
     throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '授权 state 不合法')
   }
-  if (typeof payload.teamId !== 'string' || typeof payload.userId !== 'string' || typeof payload.exp !== 'number') {
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !('teamId' in payload) ||
+    typeof payload.teamId !== 'string' ||
+    !('userId' in payload) ||
+    typeof payload.userId !== 'string' ||
+    !('exp' in payload) ||
+    typeof payload.exp !== 'number' ||
+    !('nonce' in payload) ||
+    typeof payload.nonce !== 'string'
+  ) {
     throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '授权 state 不合法')
   }
   if (payload.exp * 1000 <= Date.now()) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '授权 state 已过期')
-  return { teamId: payload.teamId, userId: payload.userId, exp: payload.exp }
+  const installationId = 'installationId' in payload ? payload.installationId : undefined
+  if (
+    installationId !== undefined &&
+    (typeof installationId !== 'number' || !Number.isSafeInteger(installationId) || installationId <= 0)
+  ) {
+    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'GitHub 安装标识不合法')
+  }
+  return { teamId: payload.teamId, userId: payload.userId, exp: payload.exp, nonce: payload.nonce, installationId }
+}
+
+function githubCodeVerifier(state: string, secret: string): string {
+  // 从已签名的授权上下文派生 PKCE verifier，浏览器只收到 challenge。
+  return createHmac('sha256', secret).update(`github-installation-pkce:${state}`).digest('base64url')
 }
 
 /**
@@ -127,14 +169,33 @@ function verifyState(state: string, secret: string): { teamId: string; userId: s
 export function createIntegrationsService(deps: IntegrationsServiceDeps) {
   const { db, config } = deps
 
+  function githubAuthorizationConfig() {
+    const {
+      AUTH_SECRET: secret,
+      GITHUB_APP_SLUG: slug,
+      GITHUB_APP_CLIENT_ID: clientId,
+      GITHUB_APP_CLIENT_SECRET: clientSecret,
+    } = config
+    if (
+      config.GITHUB_AUTH_MODE !== 'app' ||
+      !config.GITHUB_APP_ID ||
+      !config.GITHUB_APP_PRIVATE_KEY_PATH ||
+      !secret ||
+      !slug ||
+      !clientId ||
+      !clientSecret
+    ) {
+      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'GitHub App 安装或用户授权配置不完整')
+    }
+    return { secret, slug, clientId, clientSecret, redirectUri: new URL(GITHUB_CALLBACK_PATH, config.APP_ORIGIN).href }
+  }
+
   function requireConfiguration(): ConfigurationService {
     if (!deps.configuration) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '凭据加密尚未配置')
     return deps.configuration
   }
 
-  function adapterFor(
-    connection: NonNullable<Awaited<ReturnType<typeof findGitConnectionById>>>,
-  ): Promise<GitReadAdapter> {
+  function adapterFor(connection: Parameters<GitAdapterFactory>[0]): Promise<GitReadAdapter> {
     if (!deps.adapterFactory) return Promise.reject(new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'Git 适配器未装配'))
     return deps.adapterFactory(connection)
   }
@@ -196,12 +257,11 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
     const name = normalizeName(input.name)
     if (input.providerKey === 'github') {
       if (config.GITHUB_AUTH_MODE === 'app') {
-        if (!config.GITHUB_APP_SLUG) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'GitHub App 未配置')
-        if (!config.AUTH_SECRET) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'AUTH_SECRET 未配置')
+        const { slug, secret } = githubAuthorizationConfig()
         const exp = Math.floor(Date.now() / 1000) + 600
-        const state = signState({ teamId, userId: actor.id, exp }, config.AUTH_SECRET)
+        const state = signState({ teamId, userId: actor.id, exp, nonce: randomUUID() }, secret)
         return {
-          authorizationUrl: `https://github.com/apps/${config.GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`,
+          authorizationUrl: `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(state)}`,
           expiresAt: new Date(exp * 1000).toISOString(),
         }
       }
@@ -247,34 +307,108 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
     return view(refreshed ?? row)
   }
 
+  /**
+   * 安装后发起 GitHub 用户授权，并确认安装范围可由当前管理员绑定到团队。
+   * @param actor 当前登录用户。
+   * @param providerKey 回调提供方。
+   * @param input 已签名的界面状态、安装标识与可选 OAuth 授权码。
+   * @returns 后续授权地址或已经同步的连接；重复授权保留原连接与项目关联。
+   * @throws 身份不匹配、安装无权访问或无法核对仓库范围时拒绝绑定。
+   */
   async function completeAuthorization(
     actor: SessionUser,
     providerKey: string,
-    state: string,
-    installationId: number,
-  ): Promise<GitConnectionView> {
+    input: { state: string; installationId?: number; code?: string },
+  ): Promise<CreateConnectionResult> {
     if (providerKey !== 'github') throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '不支持的 Git 提供方')
-    if (!config.AUTH_SECRET) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'AUTH_SECRET 未配置')
-    const payload = verifyState(state, config.AUTH_SECRET)
+    const { secret, clientId, clientSecret, redirectUri } = githubAuthorizationConfig()
+    const payload = verifyState(input.state, secret)
     if (payload.userId !== actor.id) throw new ApiError(ERROR_CODES.FORBIDDEN, '授权发起人不匹配')
     await requireTeamMember(db, actor.id, payload.teamId, ['admin'])
-    if (!Number.isSafeInteger(installationId) || installationId <= 0)
-      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '安装 ID 不合法')
-    const row = await insertGitConnection(db, {
-      id: randomUUID(),
-      teamId: payload.teamId,
-      providerKey: 'github',
-      instanceUrl: 'https://github.com',
-      name: `GitHub App ${installationId}`,
-      authKind: 'github_app_installation',
-      secretId: null,
-      externalIdentity: String(installationId),
-      createdByUserId: actor.id,
+    if (!input.code) {
+      const installationId = input.installationId
+      if (!installationId || !Number.isSafeInteger(installationId) || installationId <= 0 || payload.installationId) {
+        throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'GitHub 安装尚未完成')
+      }
+      const state = signState({ ...payload, installationId }, secret)
+      const codeChallenge = createHash('sha256').update(githubCodeVerifier(state, secret)).digest('base64url')
+      const url = new URL('https://github.com/login/oauth/authorize')
+      url.search = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        prompt: 'select_account',
+      }).toString()
+      return { authorizationUrl: url.href, expiresAt: new Date(payload.exp * 1000).toISOString() }
+    }
+    const installationId = payload.installationId
+    if (!installationId || !deps.verifyGitHubInstallation) {
+      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '缺少待验证的 GitHub 安装')
+    }
+    const verified = await deps.verifyGitHubInstallation({
+      clientId,
+      clientSecret,
+      redirectUri,
+      installationId,
+      code: input.code,
+      codeVerifier: githubCodeVerifier(input.state, secret),
     })
-    if (!row) throw new Error('Git 连接创建失败')
-    await checkAndSync(row)
-    const refreshed = await findGitConnectionById(db, row.id)
-    return view(refreshed ?? row)
+    const candidate = {
+      id: randomUUID(),
+      team_id: payload.teamId,
+      provider_key: 'github',
+      instance_url: 'https://github.com',
+      auth_kind: 'github_app_installation',
+      secret_id: null,
+      external_identity: String(installationId),
+    }
+    const adapter = await adapterFor(candidate)
+    const repositories = await adapter.listRepositories()
+    if (repositories.some((repository) => !verified.repositoryIds.has(repository.remoteId))) {
+      throw new ApiError(ERROR_CODES.FORBIDDEN, '当前 GitHub 用户无法查看安装已授权的全部仓库')
+    }
+    const checkedAt = new Date()
+    const name = normalizeName(`GitHub ${verified.login} (#${installationId})`)
+    return db.transaction(async (tx) => {
+      // 同团队重复授权保留连接和仓库标识，项目关联仍指向同一安装。
+      await lockTeam(tx, payload.teamId)
+      const membership = await findMembership(tx, payload.teamId, actor.id)
+      if (membership?.status !== 'active' || membership.role !== 'admin') {
+        throw new ApiError(ERROR_CODES.FORBIDDEN, '需要团队管理员权限')
+      }
+      const previous = await findGitHubInstallation(tx, payload.teamId, candidate.external_identity)
+      const connection =
+        previous ??
+        (await insertGitConnection(tx, {
+          id: candidate.id,
+          teamId: payload.teamId,
+          providerKey: candidate.provider_key,
+          instanceUrl: candidate.instance_url,
+          name,
+          authKind: candidate.auth_kind,
+          secretId: null,
+          externalIdentity: candidate.external_identity,
+          createdByUserId: actor.id,
+        }))
+      if (!connection) throw new Error('GitHub 连接保存失败')
+      await upsertGitRepositories(tx, {
+        teamId: payload.teamId,
+        connectionId: connection.id,
+        providerKey: candidate.provider_key,
+        repositories,
+      })
+      const updated = await updateGitConnection(tx, connection.id, {
+        name,
+        status: 'active',
+        lastCheckedAt: checkedAt,
+        lastErrorCode: null,
+        repositoryScopeSyncedAt: checkedAt,
+      })
+      if (!updated) throw new Error('GitHub 连接更新失败')
+      return view(updated)
+    })
   }
 
   async function checkConnection(actor: SessionUser, connectionId: string) {

@@ -9,6 +9,7 @@ import { createRequirementsService } from '../modules/requirements/requirements.
 import { createBugsService } from '../modules/bugs/bugs.service.ts'
 import { createCodeService } from '../modules/code/code.service.ts'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
+import { verifyGitHubInstallation } from '../adapters/git/github-authorization.ts'
 import { findGitConnectionById } from '../modules/integrations/integrations.repository.ts'
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
 import { verifySessionPassword } from '../modules/identity/identity.password.ts'
@@ -84,6 +85,7 @@ export function createServices(
     config,
     configuration,
     adapterFactory: gitAdapterFactory,
+    verifyGitHubInstallation,
   })
   const code = createCodeService({
     db: database.db,

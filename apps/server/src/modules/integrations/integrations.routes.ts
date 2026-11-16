@@ -66,21 +66,31 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/git-authorizations/:providerKey/callback',
     {
+      // GitHub OAuth 授权码通过查询串返回，避免写入请求日志或 Referer。
+      logLevel: 'silent',
       schema: { params: callbackParamsSchema, querystring: callbackQuerySchema },
     },
     async (request, reply) => {
+      reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer')
+      const redirect = new URL('/settings/team?tab=connections&git=failed', options.webOrigin)
       try {
-        const user = await requireActor(request)
-        await options.service.completeAuthorization(
-          user,
-          request.params.providerKey,
-          request.query.state,
-          Number(request.query.installation_id),
-        )
-        return reply.redirect(`${options.webOrigin}/settings/team?git=connected`, 302)
+        const { state, installation_id: installationId, code } = request.query
+        if (state) {
+          const user = await requireActor(request)
+          const result = await options.service.completeAuthorization(user, request.params.providerKey, {
+            state,
+            installationId: installationId === undefined ? undefined : Number(installationId),
+            code,
+          })
+          if ('authorizationUrl' in result) return reply.redirect(result.authorizationUrl, 302)
+          redirect.searchParams.set('git', 'connected')
+          return reply.redirect(redirect.href, 302)
+        }
       } catch {
-        return reply.redirect(`${options.webOrigin}/settings/team?git=failed`, 302)
+        // 对用户统一收口，避免把授权码和来源响应带回页面。
+        return reply.redirect(redirect.href, 302)
       }
+      return reply.redirect(redirect.href, 302)
     },
   )
 

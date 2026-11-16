@@ -311,7 +311,7 @@ PostgreSQL 持久作业记录领取租约、尝试次数和安全错误，中断
 | --- | --- | --- |
 | 可用提供方 | `/api/v1/git-providers` | 返回已注册提供方及能力描述；首批仅返回 GitHub、Gitea，预留来源不能伪装为可接入 |
 | 团队连接 | `/api/v1/teams/:teamId/git-connections` | 接受已支持的 providerKey、实例及对应授权方式；管理员创建、检查和开放范围 |
-| 授权回调 | `/api/v1/git-authorizations/:providerKey/callback` | 校验一次性 state、发起人、团队、实例及真实来源归属，拒绝未知提供方 |
+| 授权回调 | `/api/v1/git-authorizations/:providerKey/callback` | 校验有时限的签名 state、发起人及团队角色，使用一次性 OAuth 授权码核对安装归属及仓库范围 |
 | 项目仓库 | `/api/v1/projects/:projectId/repositories` | 只允许选择开放且来源仍授权的仓库，按项目返回有效能力 |
 | 可选本人绑定 | `/api/v1/me/git-accounts` | 后续本人来源模式，当前用户只能绑定自己 |
 | 任务代码操作 | 任务运行下的代码准备与推送操作 | 由后端任务范围确定身份、仓库、分支和凭据，不信任客户端自报执行身份 |
@@ -349,3 +349,11 @@ V0.1 已落地只读关联链路：GitHub App / GitHub CLI / Gitea 适配器、�
 - GitHub App 写入需要 `contents: write`、`pull_requests: write`、`issues: write`；GitHub CLI 模式沿用本机登录身份（仅开发/stg）；Gitea Token 需要仓库写与 Issue 写权限。
 - 创建 PR/Issue/评论以项目内幂等键 + 请求指纹锚定；来源返回 409/422 时归类为重复，由调用方回读已有记录，不创建第二个。
 - 写调用保持仓库 allowlist 与团队隔离；跨实例同名仓库仍以连接与实例标识区分。
+
+## 团队连接与项目仓库操作
+
+团队管理员可以连接多个 GitHub 个人账号或组织的 App 安装，以及多个 Gitea 账号。Gitea 每条连接使用对应账号签发的 Token，连接名称在团队内唯一。同一个 GitHub 安装在同一团队重新授权时复用原连接和仓库标识。开发环境的 GitHub CLI 模式使用 API 和 Worker 所在主机的登录身份。
+
+GitHub App 模式配置 `GITHUB_AUTH_MODE=app`、`GITHUB_APP_ID`、`GITHUB_APP_PRIVATE_KEY_PATH`、`GITHUB_APP_SLUG`、`GITHUB_APP_CLIENT_ID` 和 `GITHUB_APP_CLIENT_SECRET`。在 GitHub App 设置中，把 Setup URL 和用户 Callback URL 都设为 `<APP_ORIGIN>/api/v1/git-authorizations/github/callback`，关闭「安装期间请求用户授权」，由 Setup 回调确认 DevOps 会话后发起带 PKCE 的用户授权。要连接其他个人账号或组织，应允许 GitHub App 安装到其他账号。
+
+安装时在 GitHub 选择授权的仓库。DevOps 使用临时用户令牌核对安装归属和仓库范围，后续使用短期安装令牌读取仓库。有编辑权限的团队成员可在「项目设置 → 代码仓库 → 添加仓库」选择来源连接和仓库。GitHub 授权范围变更后，可在「团队管理 → 连接与节点」同步仓库。
