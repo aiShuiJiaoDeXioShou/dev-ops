@@ -7,6 +7,22 @@ import { ERROR_CODES } from './error-codes.ts'
 import { idempotencyRecord } from '../database/idempotency.tables.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
+const MAX_KEY_LENGTH = 128
+
+/**
+ * 读取并校验可选的 Idempotency-Key 请求头，保留原始键以兼容已登记的记录。
+ * @param header 请求头原值；收到数组时取首项。
+ * @returns 幂等键，未提供或为空字符串时返回 undefined。
+ * @throws 幂等键超过长度上限或仅包含空白时抛出 VALIDATION_ERROR。
+ */
+export function readOptionalIdempotencyKey(header: string | string[] | undefined): string | undefined {
+  const key = Array.isArray(header) ? header[0] : header
+  if (!key) return undefined
+  if (key.length > MAX_KEY_LENGTH || key.trim().length === 0) {
+    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'Idempotency-Key 长度必须在 1-128 个字符之间')
+  }
+  return key
+}
 
 /** 计算请求体规范化哈希；调用方负责传入已校验输入。 */
 export function requestHash(input: unknown): string {

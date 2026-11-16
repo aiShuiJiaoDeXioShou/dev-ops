@@ -7,11 +7,10 @@ import { isUniqueViolation } from '../database/errors.ts'
 import { idempotencyRecord } from '../database/idempotency.tables.ts'
 import { ERROR_CODES } from './error-codes.ts'
 import { ApiError } from './errors.ts'
-import { requestHash } from './idempotency.ts'
+import { readOptionalIdempotencyKey, requestHash } from './idempotency.ts'
 
 const NIL_TEAM_ID = '00000000-0000-0000-0000-000000000000'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MAX_KEY_LENGTH = 128
 const AUTH_PREFIX = '/api/v1/auth/'
 
 interface IdempotencyHookOptions {
@@ -62,14 +61,9 @@ export function createIdempotencyHooks(options: IdempotencyHookOptions) {
 
   async function preHandler(request: FastifyRequest) {
     if (request.method !== 'POST' || request.url.startsWith(AUTH_PREFIX)) return
-    // 原始流上传路由显式关闭：流式请求体无法稳定哈希，冲突时也不会 drain 请求体。
     if (request.routeOptions.config?.idempotency === false) return
-    const header = request.headers['idempotency-key']
-    const key = Array.isArray(header) ? header[0] : header
+    const key = readOptionalIdempotencyKey(request.headers['idempotency-key'])
     if (!key) return
-    if (key.length > MAX_KEY_LENGTH || key.trim().length === 0) {
-      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'Idempotency-Key 长度必须在 1-128 个字符之间')
-    }
     const userId = await options.getUserId(request.headers)
     if (!userId) return
     const { scope, teamId } = idempotencyScopeFor({ url: request.url, params: request.params })

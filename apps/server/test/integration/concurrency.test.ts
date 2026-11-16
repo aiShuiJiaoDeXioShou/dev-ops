@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { Client } from 'pg'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
+import { idempotencyRecord } from '../../src/platform/database/idempotency.tables.ts'
 import { migrateDatabase } from '../../src/platform/database/migrate.ts'
 import { team, teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { project } from '../../src/modules/projects/projects.tables.ts'
@@ -172,20 +173,22 @@ test('并发项目更新、最后管理员竞态与重复幂等键', { timeout: 
     scopeNote: '范围',
     selfTestResult: 'passed',
   }
-  const [submitA, submitB] = await Promise.all([
+  const idempotencyKey = 'concurrent-submit'
+  const submit = (version = submitPayload.version, key = idempotencyKey) =>
     app.inject({
       method: 'POST',
       url: `/api/v1/requirements/${requirementId}/submit-test`,
-      payload: submitPayload,
-      headers: { cookie: devUser.cookie, 'idempotency-key': 'concurrent-submit' },
-    }),
-    app.inject({
-      method: 'POST',
-      url: `/api/v1/requirements/${requirementId}/submit-test`,
-      payload: submitPayload,
-      headers: { cookie: devUser.cookie, 'idempotency-key': 'concurrent-submit' },
-    }),
-  ])
+      payload: { ...submitPayload, version },
+      headers: { cookie: devUser.cookie, 'idempotency-key': key },
+    })
+
+  const invalidKey = await submit(submitPayload.version, 'a'.repeat(129))
+  assert.equal(invalidKey.json().code, 'VALIDATION_ERROR')
+  const stale = await submit(1)
+  assert.equal(stale.json().code, 'VERSION_CONFLICT')
+
+  // 版本冲突回滚后，同一个键仍可重试；两次并发重试只登记一次。
+  const [submitA, submitB] = await Promise.all([submit(), submit()])
   const submitBodies = [submitA.json(), submitB.json()]
   assert.equal(submitBodies.filter((body) => body.success === true).length, 1)
   assert.equal(submitBodies.filter((body) => body.code === 'IDEMPOTENCY_CONFLICT').length, 1)
@@ -194,4 +197,11 @@ test('并发项目更新、最后管理员竞态与重复幂等键', { timeout: 
     .from(requirementTestSubmission)
     .where(sql`${requirementTestSubmission.requirement_id} = ${requirementId}`)
   assert.equal(submissions.length, 1)
+  const records = await app.db
+    .select({ scope: idempotencyRecord.scope, responseEntityId: idempotencyRecord.response_entity_id })
+    .from(idempotencyRecord)
+    .where(
+      and(eq(idempotencyRecord.actor_user_id, devUser.userId), eq(idempotencyRecord.idempotency_key, idempotencyKey)),
+    )
+  assert.deepEqual(records, [{ scope: 'requirement.submit-test', responseEntityId: submissions[0]?.id }])
 })

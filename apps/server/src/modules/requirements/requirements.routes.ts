@@ -1,4 +1,5 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
+import { readOptionalIdempotencyKey } from '../../platform/http/idempotency.ts'
 import { success } from '../../platform/http/response.ts'
 import { requireActor } from '../identity/identity.actor.ts'
 import type { IdentityAuth } from '../identity/identity.auth.ts'
@@ -156,6 +157,8 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/requirements/:requirementId/submit-test',
     {
+      // 幂等记录与提测提交共用业务事务，失败时允许用原键重试。
+      config: { idempotency: false },
       schema: {
         params: requirementParamsSchema,
         body: submitTestBodySchema,
@@ -163,9 +166,8 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
+      const idempotencyKey = readOptionalIdempotencyKey(request.headers['idempotency-key'])
       const user = await requireActor(request)
-      const idempotencyKey =
-        typeof request.headers['idempotency-key'] === 'string' ? request.headers['idempotency-key'] : undefined
       return success(
         await options.service.submitTest(user, request.params.requirementId, { ...request.body, idempotencyKey }),
         request.id,
