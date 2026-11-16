@@ -585,6 +585,82 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /**
+     * 分页读取团队回收站。
+     * @param teamId 团队标识。
+     * @param query 分页参数。
+     * @param options 请求取消等调用选项。
+     * @returns 结果信封；请求失败时抛出对应业务错误。
+     */
+    async listProjectRecycleBin(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/project-recycle-bin', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/project-recycle-bin', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/project-recycle-bin`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /**
+     * 验证密码后将项目移入回收站。
+     * @param projectId 项目标识。
+     * @param body 项目版本和当前账号密码。
+     * @param options 请求取消等调用选项。
+     * @returns 结果信封；请求失败时抛出对应业务错误。
+     */
+    async removeProject(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/remove', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/remove', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/remove`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 将回收站中的项目恢复到正常列表。
+     * @param projectId 项目标识。
+     * @param body 项目版本。
+     * @param options 请求取消等调用选项。
+     * @returns 结果信封；请求失败时抛出对应业务错误。
+     */
+    async restoreProject(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/restore', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/restore', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/restore`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 验证密码后提交或重试文件清理。
+     * @param projectId 项目标识。
+     * @param body 项目版本和当前账号密码。
+     * @param options 请求取消等调用选项。
+     * @returns 结果信封；请求失败时抛出对应业务错误。
+     */
+    async cleanupProjectFiles(
+      projectId: string,
+      body: ApiBody<'/api/v1/projects/{projectId}/cleanup-files', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/cleanup-files', 'post'>>(
+        `/api/v1/projects/${segment(projectId)}/cleanup-files`,
+        'POST',
+        body,
+        options,
+      )
+    },
     /** 读取项目统计。 */
     async getProjectStats(projectId: string, options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/stats', 'get'>>(
