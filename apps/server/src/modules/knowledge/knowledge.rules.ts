@@ -16,16 +16,6 @@ export const SKILL_IDENTIFIER_MAX_LENGTH = 40
 export const SKILL_SUMMARY_MAX_LENGTH = 100
 /** 技能指令正文长度上限。 */
 export const SKILL_CONTENT_MAX_LENGTH = 50_000
-/** 模板名称长度上限。 */
-export const TEMPLATE_NAME_MAX_LENGTH = 40
-/** 模板分类标签长度上限。 */
-export const TEMPLATE_TAG_MAX_LENGTH = 30
-/** 模板说明长度上限。 */
-export const TEMPLATE_DESCRIPTION_MAX_LENGTH = 200
-/** 模板正文长度上限。 */
-export const TEMPLATE_CONTENT_MAX_LENGTH = 20000
-/** 快照令牌字符长度。 */
-export const SNAPSHOT_TOKEN_LENGTH = 43
 /** 单个技能最多资源文件数量。 */
 export const SKILL_FILE_MAX_COUNT = 50
 /** 单个 UTF-8 资源文件最大字符数。 */
@@ -63,24 +53,6 @@ export function requiredText(value: string, name: string, maxLength: number): st
   const trimmed = value.trim()
   if (trimmed.length === 0 || trimmed.length > maxLength) {
     throw new ApiError(ERROR_CODES.VALIDATION_ERROR, `${name}长度必须在 1-${maxLength} 个字符之间`)
-  }
-  return trimmed
-}
-
-/**
- * 去除首尾空白并校验可选文本长度。
- * @param value 原始文本或 null/undefined。
- * @param name 字段中文名称。
- * @param maxLength 最大字符数。
- * @returns 裁剪后的文本；空文本返回 null。
- * @throws 超长时抛出 VALIDATION_ERROR。
- */
-export function optionalText(value: string | null | undefined, name: string, maxLength: number): string | null {
-  if (value === undefined || value === null) return null
-  const trimmed = value.trim()
-  if (trimmed.length === 0) return null
-  if (trimmed.length > maxLength) {
-    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, `${name}不能超过 ${maxLength} 个字符`)
   }
   return trimmed
 }
@@ -136,27 +108,6 @@ export function validateSkillContent(value: string): string {
   const content = requiredText(value, 'SKILL.md 指令', SKILL_CONTENT_MAX_LENGTH)
   assertNoSensitiveContent(content)
   return content
-}
-
-/**
- * 校验模板正文并拒绝疑似凭据内容。
- * @param value 原始正文。
- * @returns 裁剪后的正文。
- * @throws 为空、超长或疑似含凭据时抛出 VALIDATION_ERROR。
- */
-export function validateTemplateContent(value: string): string {
-  const content = requiredText(value, 'AGENTS.md 正文', TEMPLATE_CONTENT_MAX_LENGTH)
-  assertNoSensitiveContent(content)
-  return content
-}
-
-/**
- * 计算模板名称的比较键：去首尾空白后转小写。
- * @param name 模板名称。
- * @returns 用于团队内唯一比较的规范化名称。
- */
-export function templateNameKey(name: string): string {
-  return name.trim().toLowerCase()
 }
 
 /**

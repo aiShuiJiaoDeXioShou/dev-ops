@@ -79,7 +79,7 @@ export const skillVersion = appSchema.table(
 )
 
 /**
- * AGENTS.md 模板：当前元数据，正文保存在 `agent_template_version`。
+ * 已下线的模板元数据，仅供迁移保留历史数据，正文保存在 `agent_template_version`。
  *
  * `name_normalized` 保存去首尾空白并转小写后的名称，用于团队内大小写不敏感唯一；
  * `version` 是乐观锁修订号，内容版本由 `agent_template_version.version` 表达。
@@ -131,7 +131,7 @@ export const agentTemplateVersion = appSchema.table(
 )
 
 /**
- * 项目当前选用的 AGENTS.md 模板；一个项目最多一行当前选用。
+ * 已下线的项目模板选用关系，仅保留历史数据。
  *
  * 选用、切换、取消的历史记录在 `collaboration.activity`，不在本表保存历史行。
  */

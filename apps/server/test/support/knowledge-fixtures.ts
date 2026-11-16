@@ -3,14 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { inArray } from 'drizzle-orm'
 import { team, teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { project } from '../../src/modules/projects/projects.tables.ts'
-import {
-  agentTemplate,
-  agentTemplateVersion,
-  projectTemplateSelection,
-  skill,
-  skillVersion,
-  templateSnapshotLink,
-} from '../../src/modules/knowledge/knowledge.tables.ts'
+import { skill, skillVersion } from '../../src/modules/knowledge/knowledge.tables.ts'
 import { activity } from '../../src/modules/collaboration/collaboration.tables.ts'
 import { createAuthenticatedUser } from './auth.ts'
 
@@ -62,20 +55,9 @@ export async function seedKnowledgeFixture(app: FastifyInstance): Promise<Knowle
  */
 export async function cleanupKnowledgeFixture(app: FastifyInstance, fixture: KnowledgeFixture) {
   const teamIds = [fixture.teamId, fixture.otherTeamId]
-  const templates = await app.db
-    .select({ id: agentTemplate.id })
-    .from(agentTemplate)
-    .where(inArray(agentTemplate.team_id, teamIds))
   const skills = await app.db.select({ id: skill.id }).from(skill).where(inArray(skill.team_id, teamIds))
   await app.db.transaction(async (tx) => {
     await tx.delete(activity).where(inArray(activity.team_id, teamIds))
-    if (templates.length > 0) {
-      const templateIds = templates.map((row) => row.id)
-      await tx.delete(templateSnapshotLink).where(inArray(templateSnapshotLink.template_id, templateIds))
-      await tx.delete(projectTemplateSelection).where(inArray(projectTemplateSelection.template_id, templateIds))
-      await tx.delete(agentTemplateVersion).where(inArray(agentTemplateVersion.template_id, templateIds))
-      await tx.delete(agentTemplate).where(inArray(agentTemplate.id, templateIds))
-    }
     if (skills.length > 0) {
       const skillIds = skills.map((row) => row.id)
       await tx.delete(skillVersion).where(inArray(skillVersion.skill_id, skillIds))

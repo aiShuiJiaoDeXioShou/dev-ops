@@ -12,7 +12,7 @@ import { FakeMailer } from '../support/fake-mailer.ts'
 
 type Cookie = { cookie: string }
 
-test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 90_000 }, async (t) => {
+test('技能管理与运行时解析', { timeout: 90_000 }, async (t) => {
   const cleanup: Array<() => Promise<unknown>> = []
   t.after(async () => {
     const errors: unknown[] = []
@@ -75,7 +75,7 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
     await app.close()
   })
 
-  const { adminUser, devUser, viewerUser, otherUser, teamId, otherTeamId } = await seedKnowledgeFixture(app)
+  const { devUser, viewerUser, otherUser, teamId } = await seedKnowledgeFixture(app)
 
   async function inject(method: 'GET' | 'POST', url: string, cookie: Cookie, payload?: unknown) {
     return app.inject({
@@ -85,12 +85,6 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
       ...(payload === undefined ? {} : { payload: payload as object }),
     })
   }
-
-  const projectResponse = await inject('POST', `/api/v1/teams/${teamId}/projects`, adminUser, {
-    name: '知识资产项目',
-  })
-  assert.equal(projectResponse.json().success, true, projectResponse.body)
-  const projectId = projectResponse.json().data.id as string
 
   // 技能发布、检索、编辑与启停
   const skillCreated = await inject('POST', `/api/v1/teams/${teamId}/skills`, devUser, {
@@ -203,142 +197,13 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
   const crossTeamSkill = await inject('GET', `/api/v1/skills/${skill.id}`, otherUser)
   assert.equal(crossTeamSkill.json().code, 'NOT_FOUND')
 
-  // 模板新建、名称大小写唯一、编辑、副本
-  const templateCreated = await inject('POST', `/api/v1/teams/${teamId}/agent-templates`, devUser, {
-    name: '默认协作约定',
-    tag: '团队',
-    description: '默认约定',
-    content: '# AGENTS.md\n\n## 协作约定\n- 先阅读需求',
-  })
-  assert.equal(templateCreated.json().success, true, templateCreated.body)
-  const template = templateCreated.json().data
-  assert.equal(template.contentVersion, 1)
-
-  const duplicateName = await inject('POST', `/api/v1/teams/${teamId}/agent-templates`, adminUser, {
-    name: '默认协作约定',
-    tag: '团队',
-    content: '重复名称',
-  })
-  assert.equal(duplicateName.json().code, 'VALIDATION_ERROR')
-
-  const caseTemplate = await inject('POST', `/api/v1/teams/${teamId}/agent-templates`, adminUser, {
-    name: 'DEFAULT',
-    tag: '团队',
-    content: '大小写不同',
-  })
-  assert.equal(caseTemplate.json().success, true)
-  const caseDuplicateName = await inject('POST', `/api/v1/teams/${teamId}/agent-templates`, adminUser, {
-    name: 'default',
-    tag: '团队',
-    content: '仅大小写不同',
-  })
-  assert.equal(caseDuplicateName.json().code, 'VALIDATION_ERROR')
-
-  const templateEdited = await inject('POST', `/api/v1/agent-templates/${template.id}/update`, devUser, {
-    version: 1,
-    name: '默认协作约定',
-    tag: '团队',
-    description: '默认约定 v2',
-    content: '# AGENTS.md\n\n## 协作约定\n- 先阅读需求\n- 记录验证',
-  })
-  assert.equal(templateEdited.json().success, true, templateEdited.body)
-  assert.equal(templateEdited.json().data.contentVersion, 2)
-
-  const templateVersions = await inject('GET', `/api/v1/agent-templates/${template.id}/versions`, viewerUser)
-  assert.equal(templateVersions.json().data.total, 2)
-
-  const duplicated = await inject('POST', `/api/v1/agent-templates/${template.id}/duplicate`, devUser, {
-    name: '默认协作约定 副本',
-  })
-  assert.equal(duplicated.json().success, true, duplicated.body)
-  assert.equal(duplicated.json().data.contentVersion, 1)
-  const copiedTemplate = duplicated.json().data
-
-  // 项目选用与切换
-  const applied = await inject('POST', `/api/v1/projects/${projectId}/agent-template/apply`, devUser, {
-    templateId: template.id,
-    version: 0,
-  })
-  assert.equal(applied.json().success, true, applied.body)
-  assert.equal(applied.json().data.selection.templateName, '默认协作约定')
-  assert.equal(applied.json().data.selection.contentVersion, 2)
-
-  const switched = await inject('POST', `/api/v1/projects/${projectId}/agent-template/apply`, devUser, {
-    templateId: copiedTemplate.id,
-    version: 1,
-  })
-  assert.equal(switched.json().success, true, switched.body)
-  assert.equal(switched.json().data.selection.templateId, copiedTemplate.id)
-
-  const selection = await inject('GET', `/api/v1/projects/${projectId}/agent-template`, viewerUser)
-  assert.equal(selection.json().data.selection.templateId, copiedTemplate.id)
-
-  const templatesWithSelection = await inject('GET', `/api/v1/teams/${teamId}/agent-templates`, viewerUser)
-  const selectedTemplateItem = templatesWithSelection
-    .json()
-    .data.items.find((item: { id: string }) => item.id === copiedTemplate.id)
-  assert.equal(selectedTemplateItem.selectedProjectCount, 1)
-  const unselectedTemplateItem = templatesWithSelection
-    .json()
-    .data.items.find((item: { id: string }) => item.id === template.id)
-  assert.equal(unselectedTemplateItem.selectedProjectCount, 0)
-  const copiedDetail = await inject('GET', `/api/v1/agent-templates/${copiedTemplate.id}`, viewerUser)
-  assert.equal(copiedDetail.json().data.selectedProjectCount, 1)
-
-  const cleared = await inject('POST', `/api/v1/projects/${projectId}/agent-template/clear`, devUser, { version: 2 })
-  assert.equal(cleared.json().data.selection, null)
-  assert.equal(cleared.json().data.version, 0)
-
-  // 跨团队模板不能选用
-  const otherTemplate = await inject('POST', `/api/v1/teams/${otherTeamId}/agent-templates`, otherUser, {
-    name: '其他团队模板',
-    tag: '团队',
-    content: '# AGENTS.md\n其他团队',
-  })
-  const crossTeamApply = await inject('POST', `/api/v1/projects/${projectId}/agent-template/apply`, adminUser, {
-    templateId: otherTemplate.json().data.id,
-    version: 0,
-  })
-  assert.equal(crossTeamApply.json().code, 'PRECONDITION_FAILED')
-
-  // 快照固定版本与团队隔离
-  await inject('POST', `/api/v1/projects/${projectId}/agent-template/apply`, devUser, {
-    templateId: template.id,
-    version: 0,
-  })
-  const link = await inject('POST', `/api/v1/agent-templates/${template.id}/snapshot-links`, devUser)
-  assert.equal(link.json().success, true, link.body)
-  const token = link.json().data.token as string
-  assert.equal(link.json().data.contentVersion, 2)
-
-  const snapshot = await inject('GET', `/api/v1/template-snapshot-links/${token}`, viewerUser)
-  assert.equal(snapshot.json().success, true, snapshot.body)
-  assert.equal(snapshot.json().data.contentVersion, 2)
-
-  await inject('POST', `/api/v1/agent-templates/${template.id}/update`, devUser, {
-    version: 2,
-    name: '默认协作约定',
-    tag: '团队',
-    description: '默认约定 v3',
-    content: '# AGENTS.md\n\n## 协作约定\n- 先阅读需求\n- 记录验证\n- 提交证据',
-  })
-  const snapshotAfterEdit = await inject('GET', `/api/v1/template-snapshot-links/${token}`, viewerUser)
-  assert.equal(snapshotAfterEdit.json().data.contentVersion, 2)
-  assert.match(snapshotAfterEdit.json().data.content, /记录验证/)
-
-  assert.equal((await inject('GET', `/api/v1/template-snapshot-links/${token}`, otherUser)).json().code, 'NOT_FOUND')
-  assert.equal(
-    (await inject('GET', '/api/v1/template-snapshot-links/not-a-real-token', viewerUser)).json().code,
-    'NOT_FOUND',
-  )
-
   // 阶段 B 解析函数
   const knowledge = createKnowledgeService({ db: app.db })
   const enabledSkill = await inject('POST', `/api/v1/skills/${skill.id}/enable`, devUser, { version: 3 })
   assert.equal(enabledSkill.json().data.enabled, true)
   const resolved = await knowledge.resolveSkillsForRun({
     teamId,
-    skillIds: [skill.id, randomUUID(), otherTemplate.json().data.id],
+    skillIds: [skill.id, randomUUID()],
   })
   assert.equal(resolved.skills.length, 1)
   assert.equal(resolved.skills[0]?.identifier, 'code-review')
@@ -346,20 +211,8 @@ test('知识资产管理、项目选用、快照与阶段 B 解析', { timeout: 
   assert.ok(resolved.missing.every((item) => item.reason === 'not_found'))
   const assignable = await knowledge.listAssignableSkillsForBotConfig(teamId)
   assert.equal(assignable.length, 1)
-  const projectTemplate = await knowledge.resolveProjectTemplateForRun({ teamId, projectId })
-  assert.equal(projectTemplate.status, 'selected')
-  if (projectTemplate.status === 'selected') {
-    assert.equal(projectTemplate.template.templateId, template.id)
-    assert.equal(projectTemplate.template.contentVersion, 3)
-  }
-  assert.equal((await knowledge.resolveProjectTemplateForRun({ teamId: otherTeamId, projectId })).status, 'unavailable')
-
   const activities = await app.db.execute<{ count: number }>(
-    sql`SELECT count(*)::int AS count FROM app.activity WHERE entity_id IN (${skill.id}, ${template.id}, ${projectId})`,
+    sql`SELECT count(*)::int AS count FROM app.activity WHERE entity_id = ${skill.id}`,
   )
-  assert.ok((activities.rows[0]?.count ?? 0) >= 8)
-  const tokenInActivity = await app.db.execute<{ count: number }>(
-    sql`SELECT count(*)::int AS count FROM app.activity WHERE changes::text LIKE ${`%${token}%`}`,
-  )
-  assert.equal(tokenInActivity.rows[0]?.count, 0)
+  assert.ok((activities.rows[0]?.count ?? 0) >= 4)
 })

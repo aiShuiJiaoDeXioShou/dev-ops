@@ -24,7 +24,6 @@ export type ActivityEntityType =
   | 'credential_grant'
   | 'project_env_var'
   | 'skill'
-  | 'agent_template'
   | 'attachment'
 
 export interface NewComment {

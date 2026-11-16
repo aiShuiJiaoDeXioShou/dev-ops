@@ -33,7 +33,6 @@ const ACTIVITY_ENTITY_TYPES: ReadonlySet<string> = new Set([
   'credential_grant',
   'project_env_var',
   'skill',
-  'agent_template',
   'attachment',
 ])
 
@@ -43,8 +42,8 @@ export interface CommentView {
   projectId: string | null
   entityType: CommentEntityType
   entityId: string
-  authorName: string
   authorUserId: string
+  authorName: string
   bodyMarkdown: string
   createdAt: string
 }
@@ -117,8 +116,8 @@ function mapComment(row: Awaited<ReturnType<typeof insertComment>>, authors: Map
     projectId: row.project_id,
     entityType: toCommentEntityType(row.entity_type),
     entityId: row.entity_id,
-    authorName: userNameOf(row.author_user_id, authors),
     authorUserId: row.author_user_id,
+    authorName: userNameOf(row.author_user_id, authors),
     bodyMarkdown: row.body_markdown,
     createdAt: row.created_at.toISOString(),
   }
@@ -199,8 +198,8 @@ export async function addComment(
   },
 ): Promise<CommentView> {
   const entityType = validateCommentEntityType(input.entityType)
-  const authors = await loadUserRefs(executor, [input.authorUserId])
   const bodyMarkdown = requireNonEmpty(input.bodyMarkdown, '评论', 20_000)
+  const authors = await loadUserRefs(executor, [input.authorUserId])
   const row = await insertComment(executor, {
     id: randomUUID(),
     teamId: input.teamId,
@@ -232,11 +231,11 @@ export async function listComments(
 ): Promise<PageResult<CommentView>> {
   validatePage(page, pageSize)
   const type = validateCommentEntityType(entityType)
+  const { rows, total } = await findComments(executor, type, entityId, page, pageSize)
   const authors = await loadUserRefs(
     executor,
     rows.map((row) => row.author_user_id),
   )
-  const { rows, total } = await findComments(executor, type, entityId, page, pageSize)
   return {
     items: rows.map((row) => mapComment(row, authors)),
     page,

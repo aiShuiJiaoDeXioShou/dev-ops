@@ -80,7 +80,7 @@ flowchart LR
     operations --- changes["变更：具体计划、人工放行、执行与验证"]
 
     capabilities --- bots["Bot：职责、负责人、模型、环境与项目授权"]
-    capabilities --- knowledge["知识：Skills、AGENTS.md 模板、记忆与交接摘要"]
+    capabilities --- knowledge["知识：Skills、记忆与交接摘要"]
     capabilities --- connectors["接入：连接、执行节点、项目工具与调用结果"]
 
     vault --- secrets["凭据：API 密钥、账号密码、SSH 密钥"]

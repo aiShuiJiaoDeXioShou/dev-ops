@@ -87,7 +87,8 @@ V0.2 在无外键前提下新增以下业务表，关联一致性由 service 事
 | `project_env_var` | configuration | 项目三环境变量与凭据引用 |
 | `project_service`、`project_service_repository` | projects | 服务目录与仓库映射 |
 | `team.icon_text`、`team.description`、`team.version` | identity | 团队资料与乐观锁版本 |
-| `skill`、`skill_version`、`agent_template`、`agent_template_version`、`project_template_selection`、`template_snapshot_link` | knowledge | V0.3 知识资产：技能/模板当前元数据与内容版本、项目选用、快照链接；`activity` 实体类型扩展为 `skill`/`agent_template`，错误码复用现有业务码 |
+| `skill`、`skill_version` | knowledge | 团队技能元数据和内容版本 |
+| `agent_template`、`agent_template_version`、`project_template_selection`、`template_snapshot_link` | knowledge | 已下线功能的历史数据 |
 
 凭据明文只在创建/轮换请求体出现，使用 AES-256-GCM 加密后写入 `credential_version`，响应只返回元数据与固定掩码；环境变量引用凭据时只保存整数标识，撤销或授权缩小时同事务将引用变量置为失效。上述表均通过版本化迁移生成，迁移编号以 `apps/server/drizzle/meta/_journal.json` 为准。
 

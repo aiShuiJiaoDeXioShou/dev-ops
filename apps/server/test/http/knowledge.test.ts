@@ -21,10 +21,6 @@ test('知识资产接口未登录时返回统一 UNAUTHENTICATED 信封', { time
       },
     },
     { method: 'GET', url: '/api/v1/skills/00000000-0000-0000-0000-000000000002' },
-    { method: 'GET', url: `/api/v1/teams/${teamId}/agent-templates` },
-    { method: 'GET', url: '/api/v1/agent-templates/00000000-0000-0000-0000-000000000003' },
-    { method: 'GET', url: '/api/v1/template-snapshot-links/not-a-real-token' },
-    { method: 'GET', url: '/api/v1/projects/00000000-0000-0000-0000-000000000004/agent-template' },
   ]
   const responses = await Promise.all(requests.map((request) => app.inject(request)))
   for (const response of responses) {
@@ -33,5 +29,20 @@ test('知识资产接口未登录时返回统一 UNAUTHENTICATED 信封', { time
     assert.equal(body.success, false)
     assert.equal(body.code, 'UNAUTHENTICATED')
     assert.ok(typeof body.requestId === 'string' && body.requestId.length > 0)
+  }
+})
+
+test('已下线的模板目录、项目选用与快照接口返回 NOT_FOUND', { timeout: 30_000 }, async (t) => {
+  const app = createTestApp()
+  t.after(() => app.close())
+  const id = '00000000-0000-0000-0000-000000000001'
+  const responses = await Promise.all([
+    app.inject({ method: 'GET', url: `/api/v1/teams/${id}/agent-templates` }),
+    app.inject({ method: 'GET', url: `/api/v1/projects/${id}/agent-template` }),
+    app.inject({ method: 'GET', url: '/api/v1/template-snapshot-links/old-link' }),
+  ])
+  for (const response of responses) {
+    assert.equal(response.statusCode, 200, response.body)
+    assert.equal(response.json().code, 'NOT_FOUND')
   }
 })

@@ -52,18 +52,3 @@ export interface AssignableSkillRef {
   category: SkillCategory
   contentVersion: string
 }
-
-/** 阶段 B：项目当前选用模板的解析结果。 */
-export interface ResolvedProjectTemplate {
-  templateId: string
-  templateName: string
-  templateVersionId: string
-  contentVersion: number
-  content: string
-}
-
-/** 阶段 B：项目模板解析的三态结果。 */
-export type ResolveProjectTemplateForRunResult =
-  | { status: 'selected'; template: ResolvedProjectTemplate }
-  | { status: 'not_selected' }
-  | { status: 'unavailable'; reason: 'project_not_found' | 'project_other_team' | 'template_unavailable' }
