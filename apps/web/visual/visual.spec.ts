@@ -266,6 +266,43 @@ test.describe('[desktop] 核心页面', () => {
   })
 })
 
+test('[desktop] [mobile] 团队邀请空态与 Bot 错误页', async ({ page }, testInfo) => {
+  await installApiMocks(page)
+  await page.route(
+    (url) => url.pathname === `/api/v1/teams/${VISUAL_IDS.teamId}/invitations`,
+    (route) =>
+      route.fulfill({ json: { success: true, code: 'OK', message: 'OK', requestId: 'visual-invitations', data: [] } }),
+  )
+  await page.goto('/settings/team')
+  const empty = page.locator('.empty-state').filter({ hasText: '暂无待接受邀请' })
+  await expect(empty).toBeVisible()
+  await expect(empty.locator('img[src$="bot-orbit-live.svg"]')).toBeVisible()
+  await empty.screenshot({ path: testInfo.outputPath('invitation-empty.png') })
+
+  await page.goto('/unknown-route')
+  await expect(page.getByRole('heading', { name: '页面不存在', level: 1 })).toBeVisible()
+  await expect(page.locator('.empty-state img[src$="bot-aperture-live.svg"]')).toBeVisible()
+  await expect(page.getByRole('link', { name: '返回项目列表' })).toHaveAttribute('href', '/projects')
+  await page.screenshot({ path: testInfo.outputPath('not-found.png') })
+
+  let unavailable = true
+  await page.route('**/api/v1/platform/storage-buckets', (route) =>
+    unavailable
+      ? route.fulfill({ status: 502, contentType: 'text/html', body: '<h1>Bad Gateway</h1>' })
+      : route.fallback(),
+  )
+  await page.goto('/platform')
+  const failure = page.getByRole('alert').filter({ hasText: '储存桶列表加载失败' })
+  await expect(failure).toContainText('HTTP 502')
+  await expect(failure.locator('img[src$="bot-signal-live.svg"]')).toBeVisible()
+  await expect(failure.getByRole('button', { name: '重新检查' })).toBeVisible()
+  await failure.screenshot({ path: testInfo.outputPath('service-error.png') })
+  unavailable = false
+  await failure.getByRole('button', { name: '重新检查' }).click()
+  await expect(page.getByRole('region', { name: '储存桶列表' }).getByRole('table')).toBeVisible()
+  await expect(failure).toHaveCount(0)
+})
+
 test('[desktop] [mobile] 平台管理储存桶与新建弹窗', async ({ page }, testInfo) => {
   await prepare(page, '/platform')
   await expect(page.getByRole('heading', { name: '平台管理', level: 1 })).toBeVisible()

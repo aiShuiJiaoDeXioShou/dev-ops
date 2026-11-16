@@ -1,28 +1,13 @@
-import { Link } from 'react-router'
-import { EmptyState } from '@/shared/ui/page-state'
+import { PageFailure } from '@/shared/ui/page-failure'
 
 /**
- * 展示未匹配路径的恢复入口。
- * @returns 保留应用导航的页面不存在提示。
+ * 展示未匹配路径，并保留应用导航与返回项目的入口。
+ * @returns 平台 Bot 404 页面。
  */
 export function NotFoundPage() {
   return (
     <div className="catalog">
-      <EmptyState
-        mascot="aperture"
-        title="页面不存在"
-        description="这个地址没有对应的页面。你可以检查链接，或回到项目列表继续工作。"
-        action={
-          <Link className="btn primary" to="/projects">
-            返回项目列表
-          </Link>
-        }
-        secondaryAction={
-          <Link className="btn" to="/settings/team">
-            团队管理
-          </Link>
-        }
-      />
+      <PageFailure status={404} />
     </div>
   )
 }

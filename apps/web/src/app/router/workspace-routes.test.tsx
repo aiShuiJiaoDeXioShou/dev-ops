@@ -6,7 +6,7 @@ import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createQueryClient } from '@/shared/api/query-client'
-import { server, success, teamFixture } from '@/test/server'
+import { server, sessionFixture, success, teamFixture } from '@/test/server'
 import { localBucketFixture } from '@/test/storage-handlers'
 import { createAppRoutes } from './routes'
 
@@ -107,6 +107,16 @@ describe('工作区路由与数据状态', () => {
     server.use(http.get('*/api/v1/auth/get-session', () => HttpResponse.json(null)))
     renderApplication('/projects')
     expect(await screen.findByRole('heading', { name: '登录研发工作台', level: 1 })).toBeVisible()
+  })
+
+  it('认证服务返回 502 时保留当前地址，重试后继续进入项目页', async () => {
+    server.use(http.get('*/api/v1/auth/get-session', () => new HttpResponse('Bad Gateway', { status: 502 })))
+    const router = renderApplication('/projects')
+    expect(await screen.findByRole('heading', { name: '暂时无法连接服务', level: 1 })).toBeVisible()
+    expect(router.state.location.pathname).toBe('/projects')
+    server.use(http.get('*/api/v1/auth/get-session', () => HttpResponse.json(sessionFixture)))
+    await userEvent.click(screen.getByRole('button', { name: '重新加载' }))
+    expect(await screen.findByRole('heading', { name: '项目', level: 1 })).toBeVisible()
   })
 
   it.each(['/platform', '/settings/storage-buckets'])('团队管理员直接访问 %s 时看不到平台管理', async (path) => {

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select } from '@/shared/ui/controls/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { teamInvitationsQueryOptions, teamMembersQueryOptions } from '../api/team-queries'
 import { useSession, type TeamRole } from '../model/session'
@@ -115,7 +115,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
-  const invitations = useQuery(teamInvitationsQueryOptions(teamId))
+  const invitations = useQuery(teamInvitationsQueryOptions(canManage ? teamId : ''))
   const [manageTarget, setManageTarget] = useState<TeamMember | null>(null)
   const [error, setError] = useState('')
   const update = useMutation({
@@ -157,6 +157,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
     return (
       <PageError
         title="成员加载失败"
+        error={members.error}
         description={described.description}
         requestId={described.requestId}
         onRetry={() => void members.refetch()}
@@ -231,51 +232,61 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
           </Table>
         </div>
       </section>
-      <section>
-        <div className="section-heading">
-          <h2>待接受邀请</h2>
-        </div>
-        {invitations.isPending ? (
-          <DelayedLoading pending>
-            <PageLoading message="邀请加载中…" />
-          </DelayedLoading>
-        ) : invitations.data?.data.length ? (
-          <div className="table-wrap">
-            <Table className="table">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>邮箱</TableHead>
-                  <TableHead>角色</TableHead>
-                  <TableHead>过期时间</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invitations.data.data.map((invitation) => (
-                  <TableRow key={invitation.id}>
-                    <TableCell>{invitation.email}</TableCell>
-                    <TableCell>{ROLE_LABELS[invitation.role]}</TableCell>
-                    <TableCell className="text-muted-foreground">{formatDateTime(invitation.expiresAt)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={!canManage || revoke.isPending}
-                        onClick={() => revoke.mutate(invitation.id)}
-                      >
-                        撤销
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+      {canManage && (
+        <section>
+          <div className="section-heading">
+            <h2>待接受邀请</h2>
           </div>
-        ) : (
-          <p className="section-note">暂无待接受邀请。</p>
-        )}
-      </section>
+          {invitations.isPending ? (
+            <DelayedLoading pending>
+              <PageLoading message="邀请加载中…" />
+            </DelayedLoading>
+          ) : invitations.isError ? (
+            <PageError
+              title="邀请加载失败"
+              {...describeRequestError(invitations.error)}
+              error={invitations.error}
+              retrying={invitations.isFetching}
+              onRetry={() => void invitations.refetch()}
+            />
+          ) : invitations.data?.data.length ? (
+            <div className="table-wrap">
+              <Table className="table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>邮箱</TableHead>
+                    <TableHead>角色</TableHead>
+                    <TableHead>过期时间</TableHead>
+                    <TableHead className="text-right">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invitations.data.data.map((invitation) => (
+                    <TableRow key={invitation.id}>
+                      <TableCell>{invitation.email}</TableCell>
+                      <TableCell>{ROLE_LABELS[invitation.role]}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatDateTime(invitation.expiresAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!canManage || revoke.isPending}
+                          onClick={() => revoke.mutate(invitation.id)}
+                        >
+                          撤销
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <EmptyState mascot="group" title="暂无待接受邀请" description="已发出、等待对方接受的邀请会显示在这里。" />
+          )}
+        </section>
+      )}
       <ManageMemberDialog
         member={manageTarget}
         open={manageTarget !== null}

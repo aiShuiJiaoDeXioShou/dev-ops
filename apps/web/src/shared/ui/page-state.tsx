@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { RequestError } from '@dev-ops/api-client'
 import { AlertCircle, Inbox } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/controls/alert'
@@ -24,6 +25,8 @@ export function PageLoading({ message = '页面加载中…' }: { message?: stri
 interface PageErrorProps {
   title: string
   description: string
+  /** 原始请求错误仅参与显示方式判断，页面继续使用安全文案。 */
+  error?: unknown
   requestId?: string | null
   retrying?: boolean
   retryLabel?: string
@@ -33,17 +36,34 @@ interface PageErrorProps {
 
 /**
  * 展示可恢复的页面或查询错误，不暴露内部异常。
- * @param props 错误标题、安全说明、可选请求标识及重试状态和回调。
+ * @param props 错误标题、安全说明、可选原始请求错误与请求标识，以及重试状态和回调。
  * @returns 错误提示和可选重试入口；点击重试时调用提供的回调。
  */
 export function PageError({
   title,
   description,
+  error,
   requestId,
   retrying = false,
   retryLabel = '重新检查',
   onRetry,
 }: PageErrorProps) {
+  const retry = onRetry && (
+    <Button variant="outline" onClick={onRetry} disabled={retrying}>
+      {retrying ? '检查中…' : retryLabel}
+    </Button>
+  )
+  const isServiceFailure =
+    error instanceof RequestError &&
+    ((error.status !== null && error.status >= 500) || error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT')
+  if (isServiceFailure) {
+    return (
+      <div role="alert">
+        <EmptyState mascot="signal" title={title} description={description} action={retry} />
+        {requestId && <p className="text-center text-xs break-all text-muted-foreground">请求标识：{requestId}</p>}
+      </div>
+    )
+  }
   return (
     <div className="space-y-4">
       <Alert variant="destructive">
@@ -54,11 +74,7 @@ export function PageError({
           {requestId && <p className="break-all text-xs">请求标识：{requestId}</p>}
         </AlertDescription>
       </Alert>
-      {onRetry && (
-        <Button variant="outline" onClick={onRetry} disabled={retrying}>
-          {retrying ? '检查中…' : retryLabel}
-        </Button>
-      )}
+      {retry}
     </div>
   )
 }
@@ -68,6 +84,8 @@ export type EmptyStateMascot = 'orbit' | 'prism' | 'signal' | 'aperture' | 'grou
 interface EmptyStateProps {
   /** 标题，说明当前空状态的原因。 */
   title: string
+  /** 标题层级；默认用于页面内部空状态。 */
+  headingLevel?: 1 | 2 | 3
   /** 引导说明，告诉用户下一步可以做什么；不需要额外说明时可省略。 */
   description?: string
   /** 团队/项目类场景使用的 Bot 吉祥物；与 icon 二选一。 */
@@ -87,7 +105,17 @@ interface EmptyStateProps {
  * @param props 标题、说明、可选 Bot 吉祥物或图标、操作入口。
  * @returns 统一风格的空状态区域；吉祥物带轻微动效，图标用于功能性空结果。
  */
-export function EmptyState({ title, description, mascot, icon, action, secondaryAction, className }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  headingLevel = 3,
+  description,
+  mascot,
+  icon,
+  action,
+  secondaryAction,
+  className,
+}: EmptyStateProps) {
+  const Heading = headingLevel === 1 ? 'h1' : headingLevel === 2 ? 'h2' : 'h3'
   return (
     <div className={cn('empty empty-state', className)}>
       {mascot === 'group' ? (
@@ -128,7 +156,7 @@ export function EmptyState({ title, description, mascot, icon, action, secondary
           <span className="empty-mark">{icon ?? <Inbox />}</span>
         </div>
       )}
-      <h3>{title}</h3>
+      <Heading className={headingLevel === 3 ? undefined : 'text-xl font-semibold text-foreground'}>{title}</Heading>
       {description ? <p>{description}</p> : null}
       {(action || secondaryAction) && (
         <div className="empty-actions">

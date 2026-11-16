@@ -1,39 +1,22 @@
-import { isRouteErrorResponse, Link, useRouteError } from 'react-router'
-import { PageError } from '@/shared/ui/page-state'
-import { Button } from '@/shared/ui/controls/button'
-import { Card, CardContent } from '@/shared/ui/controls/card'
+import { RequestError } from '@dev-ops/api-client'
+import { isRouteErrorResponse, useRouteError } from 'react-router'
+import { PageFailure } from '@/shared/ui/page-failure'
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (isRouteErrorResponse(error)) return error.status
+  if (!(error instanceof RequestError)) return undefined
+  if (error.serverCode === 'UNAUTHENTICATED') return 401
+  if (error.serverCode === 'FORBIDDEN') return 403
+  if (error.serverCode === 'NOT_FOUND') return 404
+  if (error.serverCode === 'RATE_LIMITED') return 429
+  return error.status !== null && error.status >= 400 ? error.status : undefined
+}
 
 /**
- * 显示路由加载或渲染失败的兜底界面，不向用户输出堆栈。
- * @returns 可重新加载当前地址或返回项目列表的错误页。
+ * 用平台 Bot 错误页呈现路由加载或渲染失败。
+ * @returns 根据状态码提供重新加载、重新登录或返回项目列表的界面。
  */
 export function RouteErrorPage() {
-  const error = useRouteError()
-  const notFound = isRouteErrorResponse(error) && error.status === 404
-
-  /**
-   * 重新加载当前地址，让路由模块与数据重新初始化。
-   * @returns 无返回值；触发浏览器整页加载。
-   */
-  function reloadPage() {
-    window.location.reload()
-  }
-
-  return (
-    <main className="flex min-h-svh items-center justify-center bg-background p-6">
-      <Card className="w-full max-w-lg">
-        <CardContent className="space-y-6 pt-6">
-          <PageError
-            title={notFound ? '页面不存在' : '页面暂时无法加载'}
-            description={notFound ? '请检查地址，或返回项目列表。' : '页面加载或运行时遇到问题，请重新加载后再试。'}
-            onRetry={reloadPage}
-            retryLabel="重新加载"
-          />
-          <Button variant="ghost" asChild>
-            <Link to="/projects">返回项目列表</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </main>
-  )
+  const status = getErrorStatus(useRouteError())
+  return <PageFailure status={status} onRetry={() => window.location.reload()} fullPage />
 }

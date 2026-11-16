@@ -1,6 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
+import { PageFailure } from '@/shared/ui/page-failure'
 import { DelayedAppShellSkeleton } from '@/shared/ui/page-skeleton'
+import { AuthRequestError } from '../api/auth-client'
 import { sessionQueryOptions } from '../api/queries'
 import { SessionProvider } from '../model/session'
 
@@ -9,7 +11,8 @@ import { SessionProvider } from '../model/session'
  *
  * 登录成功返回后，缓存的会话可能仍是登录前的 null 且正在重新获取；
  * 此时先展示骨架而不是立即重定向，避免把刚登录的用户弹回登录页。
- * @returns 受保护子路由或加载/跳转状态。
+ * 认证服务出错时在当前地址提供重试，只有会话明确失效时才跳转登录。
+ * @returns 受保护子路由、加载状态、登录跳转或服务错误页。
  */
 export function RequireAuth() {
   const location = useLocation()
@@ -17,6 +20,16 @@ export function RequireAuth() {
   const isCheckingSession = session.isPending || (session.data === null && session.isFetching)
   if (isCheckingSession) return <DelayedAppShellSkeleton />
   if (!session.data) {
+    const status = session.error instanceof AuthRequestError ? session.error.status : undefined
+    if (session.isError && status !== 401) {
+      return (
+        <PageFailure
+          status={status && status >= 400 ? status : undefined}
+          onRetry={() => void session.refetch()}
+          fullPage
+        />
+      )
+    }
     const redirect = `${location.pathname}${location.search}`
     return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />
   }

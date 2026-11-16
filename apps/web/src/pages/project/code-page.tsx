@@ -334,6 +334,7 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
       {tree.isError ? (
         <PageError
           title="代码文件读取失败"
+          error={tree.error}
           description={describeRequestError(tree.error).description}
           requestId={describeRequestError(tree.error).requestId}
           onRetry={() => void tree.refetch()}

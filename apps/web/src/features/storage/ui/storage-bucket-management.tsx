@@ -123,6 +123,7 @@ export function StorageBucketManagement() {
         {listError ? (
           <PageError
             title="储存桶列表加载失败"
+            error={buckets.error}
             description={listError.description}
             requestId={listError.requestId}
             retrying={buckets.isFetching}
