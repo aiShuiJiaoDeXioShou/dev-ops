@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { check, index, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { check, index, integer, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 import { appSchema } from '../../platform/database/namespace.ts'
 
 /** 团队 Git 连接；授权凭据只保存 secret 引用。 */
@@ -32,5 +32,28 @@ export const gitConnection = appSchema.table(
       sql`${table.auth_kind} in ('github_app_installation', 'github_cli', 'gitea_token')`,
     ),
     index('idx_git_connection_team_status').on(table.team_id, table.status),
+  ],
+)
+
+/** 个人 GitHub 身份及加密的用户授权，独立于团队 GitHub App 安装。 */
+export const gitHubUserAuthorization = appSchema.table(
+  'github_user_authorization',
+  {
+    id: uuid('id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    github_user_id: text('github_user_id').notNull(),
+    login: text('login').notNull(),
+    ciphertext: text('ciphertext').notNull(),
+    iv: text('iv').notNull(),
+    auth_tag: text('auth_tag').notNull(),
+    key_version: integer('key_version').notNull(),
+    expires_at: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+    created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: 'pk_github_user_authorization_id', columns: [table.id] }),
+    unique('uk_github_user_authorization_user').on(table.user_id),
+    unique('uk_github_user_authorization_github_user').on(table.github_user_id),
   ],
 )

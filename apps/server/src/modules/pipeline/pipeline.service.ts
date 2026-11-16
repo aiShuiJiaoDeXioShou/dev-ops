@@ -68,6 +68,8 @@ export interface PipelineServiceConfig {
 
 /** code 模块公开用例的最小端口；使用结构类型避免 pipeline 依赖 HTTP 层。 */
 export interface PipelineCodePort {
+  /** 检查已关联仓库的当前读取权限，重放已存在的运行也要校验。 */
+  checkRepositoryAccess(actor: SessionUser, projectId: string, repositoryId: string): Promise<void>
   listProjectRepositories(
     actor: SessionUser,
     projectId: string,
@@ -607,8 +609,12 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '幂等键长度必须在 1-128 个字符之间')
     }
     const existing = await findPipelineRunByIdempotency(db, projectId, idempotencyKey)
-    if (existing) return { run: await loadRunDetail(existing.id), created: false }
+    if (existing) {
+      await code.checkRepositoryAccess(actor, projectId, existing.repository_id)
+      return { run: await loadRunDetail(existing.id), created: false }
+    }
     const source = await resolveWorkflowSource(actor, projectId, workflowPath, input.ref)
+    await code.checkRepositoryAccess(actor, projectId, source.repositoryId)
     const workflow = ensureParsed(source)
     const runId = randomUUID()
     let template: RunPlanTemplate
@@ -687,6 +693,9 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       if (!isUniqueViolation(error)) throw error
       const duplicated = await findPipelineRunByIdempotency(db, projectId, idempotencyKey)
       if (!duplicated) throw error
+      if (duplicated.repository_id !== source.repositoryId) {
+        await code.checkRepositoryAccess(actor, projectId, duplicated.repository_id)
+      }
       return { run: await loadRunDetail(duplicated.id), created: false }
     }
     return { run: await loadRunDetail(runId), created: true }
@@ -831,6 +840,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     const repositories = await code.listProjectRepositories(actor, projectId)
     const repository = repositories.find((item) => item.id === input.repositoryId)
     if (!repository) throw new ApiError(ERROR_CODES.NOT_FOUND, '仓库不存在或未关联到项目')
+    await code.checkRepositoryAccess(actor, projectId, input.repositoryId)
     if (!isPipelineWorkflowPath(input.validationWorkflowPath)) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '校验工作流必须位于 .devops/workflows/')
     }

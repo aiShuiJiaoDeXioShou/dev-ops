@@ -131,6 +131,9 @@ test(
     const fakeGit = {
       files: new Map([['.devops/workflows/ci.yml', WORKFLOW]]),
       adapter: {
+        async isRepositoryPublic() {
+          return true
+        },
         async checkConnection() {
           return { identity: 'e2e' }
         },

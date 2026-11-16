@@ -87,13 +87,16 @@ function isRateLimited(error: unknown): boolean {
   return headers['x-ratelimit-remaining'] === '0'
 }
 
-function createClient(options: GitHubAppAdapterOptions): GitHubAppClient {
+function createClient(options: GitHubAppAdapterOptions, userToken?: string): GitHubAppClient {
   if (options.client) return options.client
-  const octokit = new Octokit({
-    authStrategy: createAppAuth,
-    auth: { appId: options.appId, privateKey: options.privateKey, installationId: options.installationId },
-    request: { timeout: TIMEOUT_MS },
-  })
+  const request = { timeout: TIMEOUT_MS }
+  const octokit = userToken
+    ? new Octokit({ auth: userToken, request })
+    : new Octokit({
+        authStrategy: createAppAuth,
+        auth: { appId: options.appId, privateKey: options.privateKey, installationId: options.installationId },
+        request,
+      })
   return {
     async request(route: string, params?: Record<string, unknown>) {
       return octokit.request(route as never, params as never)
@@ -268,9 +271,9 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
   }
 
   /** 发起 GitHub 写请求；把 409/422 归类为重复，便于调用方回读已有记录。 */
-  async function requestWrite(route: string, params?: Record<string, unknown>): Promise<unknown> {
+  async function requestWrite(route: string, params: Record<string, unknown>, writer = client): Promise<unknown> {
     try {
-      return (await client.request(route, params)).data
+      return (await writer.request(route, params)).data
     } catch (error) {
       if (error instanceof GitWriteError) throw error
       const status = typeof error === 'object' && error !== null && 'status' in error ? Number(error.status) : 0
@@ -449,16 +452,31 @@ export function createGitHubAppAdapter(options: GitHubAppAdapterOptions): GitAda
     listPullRequests,
     getPullRequest,
     getPullRequestDiff,
-    async createPullRequest(input: GitCreatePullRequestInput): Promise<GitPullRequestRef> {
+    async isRepositoryPublic(repository) {
+      const data = await requestData('GET /repos/{owner}/{repo}', requireAllowed({ repository }))
+      return (
+        typeof data === 'object' &&
+        data !== null &&
+        'visibility' in data &&
+        data.visibility === 'public' &&
+        'private' in data &&
+        data.private === false
+      )
+    },
+    async createPullRequest(input: GitCreatePullRequestInput, userToken?: string): Promise<GitPullRequestRef> {
       const { owner, repo } = requireAllowed(input)
-      const data = (await requestWrite('POST /repos/{owner}/{repo}/pulls', {
-        owner,
-        repo,
-        title: input.title,
-        body: input.body,
-        head: input.sourceBranch,
-        base: input.targetBranch,
-      })) as Record<string, unknown>
+      const data = (await requestWrite(
+        'POST /repos/{owner}/{repo}/pulls',
+        {
+          owner,
+          repo,
+          title: input.title,
+          body: input.body,
+          head: input.sourceBranch,
+          base: input.targetBranch,
+        },
+        userToken ? createClient(options, userToken) : client,
+      )) as Record<string, unknown>
       const number = Number(data?.number)
       if (!Number.isSafeInteger(number) || number <= 0) {
         throw new GitWriteError('invalid_response', 'GitHub 未返回 PR 编号')

@@ -133,6 +133,8 @@ export interface GitPullRequestDiffPort {
   truncated: boolean
 }
 export interface GitReadPort {
+  /** 查询仓库是否公开，受保护或未知的可见性不能通过公开读取校验。 */
+  isRepositoryPublic?(repository: { namespace: string; name: string }): Promise<boolean>
   getObject(input: {
     repository: { namespace: string; name: string }
     objectType: GitObjectType
@@ -184,13 +186,16 @@ export interface GitReadPort {
     repository: { namespace: string; name: string }
     number: number
   }): Promise<GitPullRequestDiffPort>
-  createPullRequest?(input: {
-    repository: { namespace: string; name: string }
-    title: string
-    body: string
-    sourceBranch: string
-    targetBranch: string
-  }): Promise<{ number: number; url: string | null; sourceBranch: string; targetBranch: string }>
+  createPullRequest?(
+    input: {
+      repository: { namespace: string; name: string }
+      title: string
+      body: string
+      sourceBranch: string
+      targetBranch: string
+    },
+    userToken?: string,
+  ): Promise<{ number: number; url: string | null; sourceBranch: string; targetBranch: string }>
   createIssue?(input: {
     repository: { namespace: string; name: string }
     title: string
@@ -292,6 +297,13 @@ export interface CodeServiceDeps {
   db: Database
   resolveAdapter: GitAdapterResolver
   listActiveConnectionIds: ActiveConnectionReader
+  authorizeGitHubRepository: (input: {
+    userId: string
+    namespace: string
+    name: string
+    operation: 'read' | 'write' | 'create_pull_request'
+    isPublic: () => Promise<boolean>
+  }) => Promise<string | undefined>
 }
 
 function repositoryView(row: Awaited<ReturnType<typeof findRepositoryById>> & object): RepositoryView {
@@ -480,8 +492,34 @@ export function createCodeService(deps: CodeServiceDeps) {
     return project
   }
 
-  async function requireLinkedRepository(actor: SessionUser, projectId: string, repositoryId: string) {
-    const project = await requireProject(actor, projectId)
+  async function authorizeRepository(
+    actor: SessionUser,
+    repository: {
+      provider_key: string
+      namespace: string
+      name: string
+    },
+    adapter: GitReadPort,
+    operation: 'read' | 'write' | 'create_pull_request',
+  ) {
+    if (repository.provider_key !== 'github') return undefined
+    return deps.authorizeGitHubRepository({
+      userId: actor.id,
+      ...repositoryRef(repository),
+      operation,
+      isPublic: () => adapter.isRepositoryPublic?.(repositoryRef(repository)) ?? Promise.resolve(false),
+    })
+  }
+
+  async function requireLinkedRepository(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    access: 'read' | 'write' = 'read',
+  ) {
+    const project = await (access === 'write'
+      ? requireProjectWrite(actor, projectId)
+      : requireProject(actor, projectId))
     const repository = await findLinkedRepository(db, projectId, repositoryId)
     if (!repository || repository.team_id !== project.teamId) {
       throw new ApiError(ERROR_CODES.NOT_FOUND, '项目仓库关联不存在')
@@ -491,6 +529,54 @@ export function createCodeService(deps: CodeServiceDeps) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, 'Git 连接不可用')
     }
     return { project, repository, adapter: await deps.resolveAdapter(repository.connection_id) }
+  }
+
+  /**
+   * 校验项目成员对已关联仓库的读取权限，供复用历史流水线结果等入口调用。
+   * @param actor 当前用户。
+   * @param projectId 项目标识。
+   * @param repositoryId 仓库标识。
+   * @throws 项目、连接或 GitHub 权限校验失败时拒绝访问。
+   */
+  async function checkRepositoryAccess(actor: SessionUser, projectId: string, repositoryId: string): Promise<void> {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    await authorizeRepository(actor, repository, adapter, 'read')
+  }
+
+  /**
+   * 校验 DevOps 写权限与 GitHub 仓库权限，生成 GitHub 写操作入口。
+   * @param actor 当前用户，需要项目写权限。
+   * @param projectId 项目标识。
+   * @param repositoryId 已关联的 GitHub 仓库。
+   * @param input 创建 PR 或编辑指定分支文件的请求。
+   * @returns 固定指向 GitHub 的入口地址。分支保护及实际写操作由 GitHub 校验。
+   * @throws 项目、仓库、绑定或 GitHub 权限不足时抛出业务错误。
+   */
+  async function openGitHubAction(
+    actor: SessionUser,
+    projectId: string,
+    repositoryId: string,
+    input: { action: 'create_pull_request' } | { action: 'edit_file'; branch: string; path: string },
+  ) {
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId, 'write')
+    if (repository.provider_key !== 'github')
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '该仓库不支持 GitHub 操作')
+    const host = `https://github.com/${encodeURIComponent(repository.namespace)}/${encodeURIComponent(repository.name)}`
+    if (input.action === 'create_pull_request') {
+      await authorizeRepository(actor, repository, adapter, 'create_pull_request')
+      return { url: `${host}/compare` }
+    }
+    const branch = input.branch.trim()
+    const path = input.path.split('/')
+    if (
+      !branch ||
+      branch.split('/').some((part) => !part || part === '.' || part === '..') ||
+      path.some((part) => !part || part === '.' || part === '..' || part.includes('\\'))
+    ) {
+      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '编辑分支或文件路径不合法')
+    }
+    await authorizeRepository(actor, repository, adapter, 'write')
+    return { url: `${host}/edit/${encodeURIComponent(branch)}/${path.map(encodeURIComponent).join('/')}` }
   }
 
   /**
@@ -1070,20 +1156,27 @@ export function createCodeService(deps: CodeServiceDeps) {
     repositoryId: string,
     input: { title: string; body: string; sourceBranch: string; targetBranch: string },
   ): Promise<{ number: number; url: string | null; sourceBranch: string; targetBranch: string }> {
-    await requireProjectWrite(actor, projectId)
-    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId)
+    const { repository, adapter } = await requireLinkedRepository(actor, projectId, repositoryId, 'write')
     if (!adapter.createPullRequest) {
       throw new ApiError(ERROR_CODES.EXTERNAL_UNSUPPORTED, '当前 Git 适配器不支持创建 PR')
     }
+    // 平台直接创建的是同仓库 PR，源分支需要当前成员有写权限。
+    const userToken = await authorizeRepository(actor, repository, adapter, 'write')
     try {
-      return await adapter.createPullRequest({
-        repository: repositoryRef(repository),
-        title: input.title,
-        body: input.body,
-        sourceBranch: input.sourceBranch,
-        targetBranch: input.targetBranch,
-      })
+      return await adapter.createPullRequest(
+        {
+          repository: repositoryRef(repository),
+          title: input.title,
+          body: input.body,
+          sourceBranch: input.sourceBranch,
+          targetBranch: input.targetBranch,
+        },
+        userToken,
+      )
     } catch (error) {
+      if (repository.provider_key === 'github' && gitAdapterErrorCode(error) === 'auth_failed') {
+        throw new ApiError(ERROR_CODES.GITHUB_REPOSITORY_FORBIDDEN, 'GitHub 拒绝以当前账号创建 PR')
+      }
       mapGitWriteError(error, '创建 PR')
     }
   }
@@ -1156,6 +1249,8 @@ export function createCodeService(deps: CodeServiceDeps) {
     getRepositoryPullRequest,
     getRepositoryPullRequestDiff,
     createPullRequest,
+    checkRepositoryAccess,
+    openGitHubAction,
     createRemoteIssue,
     addRemoteComment,
   }

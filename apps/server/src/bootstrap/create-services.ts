@@ -10,7 +10,12 @@ import { createRequirementsService } from '../modules/requirements/requirements.
 import { createBugsService } from '../modules/bugs/bugs.service.ts'
 import { createCodeService } from '../modules/code/code.service.ts'
 import type { GitAdapter } from '../adapters/git/git.types.ts'
-import { verifyGitHubInstallation } from '../adapters/git/github-authorization.ts'
+import {
+  exchangeGitHubUserTokens,
+  getGitHubRepositoryPermissions,
+  getGitHubUser,
+  verifyGitHubInstallation,
+} from '../adapters/git/github-authorization.ts'
 import { findGitConnectionById } from '../modules/integrations/integrations.repository.ts'
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
 import { verifySessionPassword } from '../modules/identity/identity.password.ts'
@@ -35,6 +40,7 @@ import { createAttachmentsService } from '../modules/attachments/attachments.ser
 import { createAttachmentBinding } from '../modules/attachments/attachments.binding.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createIntegrationsService, type GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
+import { createGitHubAccountService } from '../modules/integrations/integrations.github-account.service.ts'
 import { createSmtpMailer } from '../adapters/mail/smtp-mailer.ts'
 import type { MailSender } from '../adapters/mail/mail.types.ts'
 import { createGitConnectionAdapterFactory } from './create-git-connection-adapter.ts'
@@ -53,6 +59,7 @@ export function createServices(
     gitAdapterResolver?: (connectionId: string) => Promise<GitAdapter>
     activeConnectionIds?: (teamId: string) => Promise<string[]>
     gitAdapterFactory?: (connection: Parameters<GitAdapterFactory>[0]) => Promise<GitAdapter>
+    githubUserFetcher?: typeof fetch
     /** 测试或部署可替换 Git 凭据来源；默认由 integrations/configuration 与 CLI/App 凭据签发。 */
     pipelineCredentials?: PipelineCredentialProvider
     /** 结构化告警日志；附件对象清理失败等无法转化为业务结果的问题写入此处。 */
@@ -88,6 +95,17 @@ export function createServices(
     adapterFactory: gitAdapterFactory,
     verifyGitHubInstallation,
   })
+  const githubAccount = createGitHubAccountService({
+    db: database.db,
+    config,
+    cipher: secretCipher,
+    github: {
+      exchangeTokens: (input) => exchangeGitHubUserTokens({ ...input, fetcher: options.githubUserFetcher }),
+      getUser: (accessToken) => getGitHubUser(accessToken, options.githubUserFetcher),
+      getRepositoryPermissions: (input) =>
+        getGitHubRepositoryPermissions({ ...input, fetcher: options.githubUserFetcher }),
+    },
+  })
   const code = createCodeService({
     db: database.db,
     resolveAdapter:
@@ -98,6 +116,7 @@ export function createServices(
         return gitAdapterFactory(connection)
       }),
     listActiveConnectionIds: options.activeConnectionIds ?? integrations.listActiveConnections,
+    authorizeGitHubRepository: githubAccount.authorizeRepository,
   })
   const projectDashboard = createProjectDashboardService({ db: database.db })
   // 附件数量与保留期策略先于业务服务装配，供需求与缺陷在各自事务内绑定/解绑。
@@ -226,6 +245,7 @@ export function createServices(
     bugs,
     configuration,
     integrations,
+    githubAccount,
     code,
     delivery,
     operations,

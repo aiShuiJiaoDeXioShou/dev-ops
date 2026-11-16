@@ -359,3 +359,20 @@ GitHub App 需要配置 `GITHUB_APP_ID`、`GITHUB_APP_PRIVATE_KEY_PATH`、`GITHU
 旧 GitHub CLI 连接升级后显示为已撤销，仓库及项目关联保留供追溯。需要继续使用的仓库由团队管理员通过 GitHub App 重新授权，再从新连接同步并关联到项目。部署配置可移除 `GITHUB_AUTH_MODE`。
 
 安装时在 GitHub 选择授权的仓库。DevOps 使用临时用户令牌核对安装归属和仓库范围，后续使用短期安装令牌读取仓库。有编辑权限的团队成员可在「项目设置 → 代码仓库 → 添加仓库」选择来源连接和仓库。GitHub 授权范围变更后，可在「团队管理 → 连接与节点」同步仓库。
+
+## GitHub 个人绑定与操作权限
+
+项目成员按团队角色浏览已接入仓库的代码和 PR，项目首页、需求和缺陷沿用现有权限。登录用户可以在「个人资料」绑定或更换自己的 GitHub 账号。个人绑定复用 GitHub App 的 Client ID、Client Secret 和回调地址，并通过 `GIT_CREDENTIAL_ENCRYPTION_KEY` 加密保存用户令牌。
+
+开发者和管理员点击「编辑代码」或「创建 PR」时，DevOps 校验个人 GitHub 权限，成功后返回 GitHub 对应页面。编辑文件需要在当前仓库写入的权限；创建 PR 可以使用同仓库写权限，或在仓库及组织允许时从 Fork 发起。GitHub 负责校验具体分支是否允许写入和创建 PR。平台工具直接创建同仓库 PR 时，使用成员的 GitHub 用户令牌执行。
+
+工作流可按团队角色浏览。触发流水线（包括同一幂等键重试）时，后端校验发起人对运行实际使用的 GitHub 仓库有读取权限。公开仓库可通过公开读取校验，私有和内部仓库需要个人授权。Gitea 沿用团队连接的权限。
+
+| 方法与路径 | 行为 |
+| --- | --- |
+| `GET /api/v1/me/github-account` | 浏览器会话查询绑定状态，只返回 GitHub 用户名与部署是否启用绑定 |
+| `POST /api/v1/me/github-account/authorize` | 浏览器会话携带 `returnTo` 发起 PKCE 授权，返回 GitHub 授权地址 |
+| `GET /api/v1/git-authorizations/github/callback` | 团队安装和个人绑定共用的浏览器回调，以 HTTP 302 完成跳转 |
+| `POST /api/v1/projects/:projectId/repositories/:repositoryId/github-action` | 请求 `{ action: "edit_file", branch, path }` 或 `{ action: "create_pull_request" }`，校验通过后返回 `{ url }` |
+
+`GITHUB_ACCOUNT_REQUIRED` 表示需要绑定或重新授权。`GITHUB_REPOSITORY_FORBIDDEN` 表示个人账号缺少所需仓库权限，可向仓库管理员申请后重新检查。上游权限查询失败时拒绝写入和触发运行。

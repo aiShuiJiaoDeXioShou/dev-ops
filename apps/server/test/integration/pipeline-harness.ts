@@ -166,6 +166,9 @@ export function createMutableFakeGit(): MutableFakeGit {
   }
   const commitDetail: GitCommitDetail = { ...commit, files: [], filesTruncated: false, filesUnsupported: true }
   const adapter: GitAdapter = {
+    async isRepositoryPublic() {
+      return true
+    },
     async checkConnection() {
       if (failure) throw failure
       return { identity: 'fake' }
@@ -425,7 +428,10 @@ export async function injectJson(
 }
 
 /** 创建一个项目级集成测试上下文；调用方负责在测试中通过 t.after 清理。 */
-export async function setupPipelineContext(t: TestContext): Promise<PipelineTestContext> {
+export async function setupPipelineContext(
+  t: TestContext,
+  options: { githubUserFetcher?: typeof fetch } = {},
+): Promise<PipelineTestContext> {
   const runtimeValue = process.env.DATABASE_URL
   const migrationValue = process.env.MIGRATION_DATABASE_URL
   const adminPassword = process.env.POSTGRES_PASSWORD
@@ -485,6 +491,13 @@ export async function setupPipelineContext(t: TestContext): Promise<PipelineTest
     PIPELINE_LEASE_TTL_SECONDS: '30',
     PIPELINE_HEARTBEAT_TIMEOUT_SECONDS: '15',
     PIPELINE_ARTIFACT_MAX_BYTES: '1048576',
+    ...(options.githubUserFetcher
+      ? {
+          GITHUB_APP_CLIENT_ID: 'Iv1_test',
+          GITHUB_APP_CLIENT_SECRET: 'github-test-client-secret',
+          GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+        }
+      : {}),
   })
   const git = createMutableFakeGit()
   const connectionId = randomUUID()
@@ -510,6 +523,7 @@ export async function setupPipelineContext(t: TestContext): Promise<PipelineTest
   }
   const app = createHttpApp(config, {
     mailer: new FakeMailer(),
+    githubUserFetcher: options.githubUserFetcher,
     gitAdapterResolver: async (id) => {
       assert.equal(id, connectionId, '流水线只允许通过已关联连接读取仓库')
       return git.adapter

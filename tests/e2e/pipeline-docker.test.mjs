@@ -221,6 +221,9 @@ test('V0.4a e2e（真实 Docker）：触发→调度→真实 Agent 执行→日
   await migrateDatabase(migrationUrl.href)
 
   const adapter = {
+    async isRepositoryPublic() {
+      return true
+    },
     async checkConnection() {
       return { identity: 'e2e' }
     },

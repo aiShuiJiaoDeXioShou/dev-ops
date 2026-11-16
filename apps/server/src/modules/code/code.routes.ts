@@ -12,6 +12,8 @@ import {
   commitRefParamsSchema,
   commitResponseSchema,
   createReferenceBodySchema,
+  gitHubActionBodySchema,
+  gitHubActionResponseSchema,
   linkRepositoryBodySchema,
   projectParamsSchema,
   projectRepositoryParamsSchema,
@@ -83,6 +85,23 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
         },
         request.id,
       )
+    },
+  )
+
+  app.post(
+    '/projects/:projectId/repositories/:repositoryId/github-action',
+    {
+      schema: {
+        description: '检查个人 GitHub 权限后返回文件编辑或创建 PR 的 GitHub 地址。',
+        params: projectRepositoryParamsSchema,
+        body: gitHubActionBodySchema,
+        response: { 200: gitHubActionResponseSchema },
+      },
+    },
+    async (request) => {
+      const actor = await requireActor(request)
+      const { projectId, repositoryId } = request.params
+      return success(await options.service.openGitHubAction(actor, projectId, repositoryId, request.body), request.id)
     },
   )
 

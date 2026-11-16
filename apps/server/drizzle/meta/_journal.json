@@ -204,6 +204,13 @@
       "when": 1794852232995,
       "tag": "0028_project_recycle_bin",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794852413448,
+      "tag": "0029_github_user_authorization",
+      "breakpoints": true
     }
   ]
 }

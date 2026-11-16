@@ -2,6 +2,8 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
 import { requireActor } from '../identity/identity.actor.ts'
 import type { IdentityAuth } from '../identity/identity.auth.ts'
+import { requireSessionUser } from '../identity/identity.session.ts'
+import { PERSONAL_GITHUB_STATE_PREFIX, type GitHubAccountService } from './integrations.github-account.service.ts'
 import type { IntegrationsService } from './integrations.service.ts'
 import {
   callbackParamsSchema,
@@ -24,6 +26,7 @@ import {
 export const integrationsRoutes: FastifyPluginAsyncTypebox<{
   auth: IdentityAuth
   service: IntegrationsService
+  githubAccount: GitHubAccountService
   webOrigin: string
 }> = async (app, options) => {
   app.get(
@@ -68,13 +71,30 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
     {
       // GitHub OAuth 授权码通过查询串返回，避免写入请求日志或 Referer。
       logLevel: 'silent',
-      schema: { params: callbackParamsSchema, querystring: callbackQuerySchema },
+      schema: {
+        description: 'GitHub App 团队安装与个人身份绑定共用回调，使用 HTTP 302 跳回平台或继续授权。',
+        params: callbackParamsSchema,
+        querystring: callbackQuerySchema,
+      },
     },
     async (request, reply) => {
       reply.header('cache-control', 'no-store').header('referrer-policy', 'no-referrer')
+      const { state, installation_id: installationId, code } = request.query
+      if (request.params.providerKey === 'github' && state?.startsWith(PERSONAL_GITHUB_STATE_PREFIX)) {
+        let target = new URL('/settings/profile?githubAccount=failed', options.webOrigin)
+        try {
+          const user = await requireSessionUser(options.auth, request.headers)
+          const result = await options.githubAccount.complete(user.id, state, code)
+          target = new URL(result.returnTo, options.webOrigin)
+          target.searchParams.set('githubAccount', result.result)
+        } catch {
+          // 回调含一次性授权码，失败统一回到个人页。
+          return reply.redirect(target.href, 302)
+        }
+        return reply.redirect(target.href, 302)
+      }
       const redirect = new URL('/settings/team?tab=connections&git=failed', options.webOrigin)
       try {
-        const { state, installation_id: installationId, code } = request.query
         if (state) {
           const user = await requireActor(request)
           const result = await options.service.completeAuthorization(user, request.params.providerKey, {

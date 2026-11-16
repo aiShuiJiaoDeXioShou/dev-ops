@@ -70,7 +70,8 @@ type GitHubInstallationVerifier = (input: {
 }) => Promise<{ login: string; repositoryIds: ReadonlySet<string> }>
 
 type AuthorizationState = { teamId: string; userId: string; exp: number; nonce: string; installationId?: number }
-const GITHUB_CALLBACK_PATH = '/api/v1/git-authorizations/github/callback'
+/** 团队安装和个人绑定共用 GitHub App 中登记的回调。 */
+export const GITHUB_CALLBACK_PATH = '/api/v1/git-authorizations/github/callback'
 
 function gitErrorCode(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string')

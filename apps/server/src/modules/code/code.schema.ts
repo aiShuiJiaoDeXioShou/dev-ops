@@ -1,6 +1,19 @@
 import { Type } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 
+export const gitHubActionBodySchema = Type.Union([
+  Type.Object({ action: Type.Literal('create_pull_request') }, { additionalProperties: false }),
+  Type.Object(
+    {
+      action: Type.Literal('edit_file'),
+      branch: Type.String({ minLength: 1, maxLength: 250 }),
+      path: Type.String({ minLength: 1, maxLength: 500 }),
+    },
+    { additionalProperties: false },
+  ),
+])
+export const gitHubActionResponseSchema = apiResponseSchema(Type.Object({ url: Type.String() }))
+
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const repositorySchema = Type.Object({
   id: uuidSchema,

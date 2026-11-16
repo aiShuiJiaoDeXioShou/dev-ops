@@ -281,7 +281,9 @@ export interface GitAdapter {
   /** 读取 PR 合并差异文本；来源不提供差异时抛 unsupported，不返回空文本冒充成功。 */
   getPullRequestDiff?(input: GitPullRequestInput): Promise<GitPullRequestDiff>
   /** 创建 PR／MR；来源不支持写能力时不实现，调用方映射 EXTERNAL_UNSUPPORTED。 */
-  createPullRequest?(input: GitCreatePullRequestInput): Promise<GitPullRequestRef>
+  createPullRequest?(input: GitCreatePullRequestInput, userToken?: string): Promise<GitPullRequestRef>
+  /** 查询仓库当前是否公开；内部仓库与未知可见性按受保护处理。 */
+  isRepositoryPublic?(repository: GitRepositoryRef): Promise<boolean>
   /** 创建远端 Issue；来源不支持写能力时不实现。 */
   createIssue?(input: GitCreateIssueInput): Promise<GitIssueRef>
   /** 为远端 Issue 或 PR 添加评论；来源不支持写能力时不实现。 */

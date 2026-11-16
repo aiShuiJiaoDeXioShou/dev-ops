@@ -29,6 +29,7 @@ import { pipelineAgentRoutes } from '../modules/pipeline/pipeline.agent.routes.t
 import { configurationRoutes } from '../modules/configuration/configuration.routes.ts'
 import { knowledgeRoutes } from '../modules/knowledge/knowledge.routes.ts'
 import { integrationsRoutes } from '../modules/integrations/integrations.routes.ts'
+import { gitHubAccountRoutes } from '../modules/integrations/integrations.github-account.routes.ts'
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
 import { resolveActor } from '../modules/identity/identity.actor.ts'
@@ -56,6 +57,7 @@ export function createHttpApp(
     gitAdapterResolver?: (connectionId: string) => Promise<GitAdapter>
     activeConnectionIds?: (teamId: string) => Promise<string[]>
     gitAdapterFactory?: (connection: Parameters<GitAdapterFactory>[0]) => Promise<GitAdapter>
+    githubUserFetcher?: typeof fetch
     /** 流水线 Git 凭据签发提供者；集成测试可注入替身，避免依赖本机 Git 登录态。 */
     pipelineCredentials?: PipelineCredentialProvider
   } = {},
@@ -168,7 +170,13 @@ export function createHttpApp(
     prefix: '/api/v1',
     auth: services.auth,
     service: services.integrations,
+    githubAccount: services.githubAccount,
     webOrigin: config.APP_ORIGIN,
+  })
+  app.register(gitHubAccountRoutes, {
+    prefix: '/api/v1',
+    auth: services.auth,
+    service: services.githubAccount,
   })
 
   // 启动时校验内置本地储存桶存在且满足不变量；缺失补建，被误改则阻止启动。
