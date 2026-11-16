@@ -1,5 +1,6 @@
 import { Type } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
+import { commentSchema } from '../collaboration/comment.schema.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const statusSchema = Type.Union([
@@ -86,12 +87,6 @@ const bugDetailSchema = Type.Object({
 })
 const pageMeta = { page: Type.Integer(), pageSize: Type.Integer(), total: Type.Integer() }
 const bugListSchema = Type.Object({ items: Type.Array(bugItemSchema), ...pageMeta })
-const commentSchema = Type.Object({
-  id: uuidSchema,
-  authorUserId: uuidSchema,
-  bodyMarkdown: Type.String(),
-  createdAt: Type.String(),
-})
 const activitySchema = Type.Object({
   id: uuidSchema,
   action: Type.String(),

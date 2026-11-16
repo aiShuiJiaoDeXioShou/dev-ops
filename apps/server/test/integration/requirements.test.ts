@@ -230,6 +230,9 @@ test('需求创建、内容校验、筛选、版本、评论、活动、项目�
     headers: { cookie: viewerUser.cookie },
   })
   assert.equal(comments.json().data.total, 1)
+  assert.equal(comments.json().data.items[0].authorUserId, devUser.userId)
+  assert.equal(comments.json().data.items[0].authorName, comment.json().data.authorName)
+  assert.equal(comments.json().data.items[0].authorName, '开发者')
 
   const activities = await app.inject({
     method: 'GET',

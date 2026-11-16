@@ -328,7 +328,10 @@ export async function findUserById(executor: IdentityExecutor, userId: string) {
  * @param userIds 用户标识集合；重复标识会被去重。
  * @returns 用户摘要数组；空数组直接返回空数组，不访问数据库。
  */
-export async function findUserSummariesByIds(executor: IdentityExecutor, userIds: string[]): Promise<UserSummary[]> {
+export async function findUserSummariesByIds(
+  executor: Pick<IdentityExecutor, 'select'>,
+  userIds: string[],
+): Promise<UserSummary[]> {
   if (userIds.length === 0) return []
   const uniqueUserIds = [...new Set(userIds)]
   return executor

@@ -14,7 +14,10 @@ export interface UserRef {
  * @param userIds 用户标识集合，重复项会由底层查询去重。
  * @returns 以用户标识为键的展示引用 Map。
  */
-export async function loadUserRefs(executor: IdentityExecutor, userIds: string[]): Promise<Map<string, UserRef>> {
+export async function loadUserRefs(
+  executor: Pick<IdentityExecutor, 'select'>,
+  userIds: string[],
+): Promise<Map<string, UserRef>> {
   const summaries = await findUserSummariesByIds(executor, userIds)
   return new Map(
     summaries.map((summary) => [summary.id, { userId: summary.id, name: summary.name ?? UNKNOWN_USER_NAME }]),

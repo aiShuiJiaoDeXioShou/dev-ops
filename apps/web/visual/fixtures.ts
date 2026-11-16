@@ -11064,6 +11064,7 @@ export const apiFixtures: Record<string, unknown> = {
           title: '变更计划部署版本缺少服务选择，创建必然失败',
           status: 'resolved',
         },
+          authorName: '管理员',
       ],
       linkedCodeReferences: [
         {
@@ -11071,6 +11072,7 @@ export const apiFixtures: Record<string, unknown> = {
           repositoryId: 'ee855a9d-032d-5c92-b022-dbffe6e71efd',
           targetType: 'requirement',
           targetId: '0d027f14-bcff-50dc-a0bc-6557527de7a9',
+          authorName: '管理员',
           objectType: 'change_request',
           remoteId: '1',
           title: 'feat: 平台体验审计与自举迭代（2026-11）',
@@ -11078,6 +11080,7 @@ export const apiFixtures: Record<string, unknown> = {
           url: 'https://github.com/example/dev-ops/pull/1',
           lastCheckStatus: 'ok',
           lastErrorCode: null,
+          authorName: '管理员',
           lastCheckedAt: '2026-11-11T04:31:54.675Z',
         },
         {

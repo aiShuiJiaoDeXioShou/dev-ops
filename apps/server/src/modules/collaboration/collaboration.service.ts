@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
+import { loadUserRefs, userNameOf, type UserRef } from '../identity/identity.display.ts'
 import {
   findActivities,
   findComments,
@@ -42,6 +43,7 @@ export interface CommentView {
   projectId: string | null
   entityType: CommentEntityType
   entityId: string
+  authorName: string
   authorUserId: string
   bodyMarkdown: string
   createdAt: string
@@ -108,13 +110,14 @@ function validateActivityEntityType(value: string): ActivityEntityType {
   return value
 }
 
-function mapComment(row: ReturnType<typeof insertComment> extends Promise<infer T> ? T : never): CommentView {
+function mapComment(row: Awaited<ReturnType<typeof insertComment>>, authors: Map<string, UserRef>): CommentView {
   return {
     id: row.id,
     teamId: row.team_id,
     projectId: row.project_id,
     entityType: toCommentEntityType(row.entity_type),
     entityId: row.entity_id,
+    authorName: userNameOf(row.author_user_id, authors),
     authorUserId: row.author_user_id,
     bodyMarkdown: row.body_markdown,
     createdAt: row.created_at.toISOString(),
@@ -196,6 +199,7 @@ export async function addComment(
   },
 ): Promise<CommentView> {
   const entityType = validateCommentEntityType(input.entityType)
+  const authors = await loadUserRefs(executor, [input.authorUserId])
   const bodyMarkdown = requireNonEmpty(input.bodyMarkdown, '评论', 20_000)
   const row = await insertComment(executor, {
     id: randomUUID(),
@@ -206,7 +210,7 @@ export async function addComment(
     authorUserId: input.authorUserId,
     bodyMarkdown,
   })
-  return mapComment(row)
+  return mapComment(row, authors)
 }
 
 /**
@@ -228,18 +232,13 @@ export async function listComments(
 ): Promise<PageResult<CommentView>> {
   validatePage(page, pageSize)
   const type = validateCommentEntityType(entityType)
+  const authors = await loadUserRefs(
+    executor,
+    rows.map((row) => row.author_user_id),
+  )
   const { rows, total } = await findComments(executor, type, entityId, page, pageSize)
   return {
-    items: rows.map((row) => ({
-      id: row.id,
-      teamId: row.team_id,
-      projectId: row.project_id,
-      entityType: toCommentEntityType(row.entity_type),
-      entityId: row.entity_id,
-      authorUserId: row.author_user_id,
-      bodyMarkdown: row.body_markdown,
-      createdAt: row.created_at.toISOString(),
-    })),
+    items: rows.map((row) => mapComment(row, authors)),
     page,
     pageSize,
     total,

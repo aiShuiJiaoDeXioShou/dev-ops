@@ -318,6 +318,8 @@ test('Bug 完整状态机、回归历史、关联、关闭重开、计数与权�
     headers: { cookie: devUser.cookie },
   })
   assert.equal(comments.json().success, true)
+  assert.equal(comments.json().data.authorUserId, devUser.userId)
+  assert.equal(comments.json().data.authorName, '开发者')
   const viewerComment = await app.inject({
     method: 'POST',
     url: `/api/v1/bugs/${bug.id}/comments`,
