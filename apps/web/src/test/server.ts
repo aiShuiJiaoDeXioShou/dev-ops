@@ -121,7 +121,7 @@ export const server = setupServer(
   ...storageHandlers,
   http.get('*/api/v1/git-providers', () =>
     success([
-      { providerKey: 'github', name: 'GitHub', authModes: ['github_cli'] },
+      { providerKey: 'github', name: 'GitHub', authModes: ['github_app_installation'] },
       { providerKey: 'gitea', name: 'Gitea', authModes: ['gitea_token'] },
     ]),
   ),
