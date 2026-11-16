@@ -157,11 +157,11 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
   })
   assert.equal(noReason.json().code, 'VALIDATION_ERROR')
 
-  await t.test('仓库选项去重，列表与晴雨表按仓库筛选后再分页', async () => {
+  await t.test('仓库选项去重，列表与晴雨表支持组合筛选', async () => {
     const second = await app.inject({
       method: 'POST',
       url: `/api/v1/teams/${teamId}/projects`,
-      payload: { name: '内部平台客户端' },
+      payload: { name: '内部平台客户端', ownerUserId: devUser.userId },
       headers: { cookie: adminUser.cookie },
     })
     assert.equal(second.json().success, true, second.body)
@@ -173,6 +173,7 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
       headers: { cookie: adminUser.cookie },
     })
     assert.equal(unrelated.json().success, true, unrelated.body)
+    const unrelatedId = unrelated.json<{ data: { id: string } }>().data.id
 
     const connectionId = randomUUID()
     const sharedId = randomUUID()
@@ -256,6 +257,27 @@ test('项目创建、筛选、版本冲突、权限、跨团队与活动记录',
     })
     const summary = dashboard.json<{ data: { projects: Array<{ projectId: string }> } }>().data.projects
     assert.deepEqual(new Set(summary.map((item) => item.projectId)), new Set(projectIds))
+
+    for (const [query, expected] of [
+      [`repositoryId=${sharedId}&status=active&ownerId=${devUser.userId}`, [secondId]],
+      ['hasRepository=true', [project.id, secondId]],
+      [`hasRepository=false&ownerId=${adminUser.userId}`, [unrelatedId]],
+      [`hasRepository=false&repositoryId=${sharedId}`, []],
+    ] as const) {
+      const list = await app.inject({
+        url: `/api/v1/teams/${teamId}/projects?${query}`,
+        headers: { cookie: viewerUser.cookie },
+      })
+      const activity = await app.inject({
+        url: `/api/v1/teams/${teamId}/project-activity?${query}&source=activity`,
+        headers: { cookie: viewerUser.cookie },
+      })
+      const listData = list.json<{ data: { total: number; items: Array<{ id: string }> } }>().data
+      const activityData = activity.json<{ data: { projects: Array<{ projectId: string }> } }>().data
+      assert.equal(listData.total, expected.length, query)
+      assert.deepEqual(new Set(listData.items.map((item) => item.id)), new Set(expected), query)
+      assert.deepEqual(new Set(activityData.projects.map((item) => item.projectId)), new Set(expected), query)
+    }
   })
 
   const stats = await app.inject({

@@ -44,7 +44,7 @@ pnpm --dir apps/server dev
 
 该代理仅用于 Vite 开发服务器。部署时需要在网关配置同源 `/api` 转发。接口文档通过后端地址访问。
 
-项目首页用 `GET /api/v1/teams/:teamId/project-repositories` 分页读取该团队项目已关联的仓库。同一仓库关联多个项目时只返回一个选项。`GET /api/v1/teams/:teamId/projects` 和 `GET /api/v1/teams/:teamId/project-activity` 都接受可选的 `repositoryId`，按关联仓库筛选项目，再分页或聚合统计。
+项目首页用 `GET /api/v1/teams/:teamId/project-repositories` 分页读取该团队项目已关联的仓库。同一仓库关联多个项目时只返回一个选项。`GET /api/v1/teams/:teamId/projects` 和 `GET /api/v1/teams/:teamId/project-activity` 共用 `status`、`search`、`ownerId`、`ownerUnavailable`、`repositoryId` 和 `hasRepository`。多个条件同时匹配后再分页或聚合。通过 `hasRepository=false` 查未关联仓库的项目，通过 `ownerUnavailable=true` 查负责人已失效的项目。
 
 ## 环境变量
 

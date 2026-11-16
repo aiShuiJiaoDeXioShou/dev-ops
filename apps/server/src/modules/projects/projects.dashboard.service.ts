@@ -3,7 +3,7 @@ import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { loadUserRefs, userRefOf } from '../identity/identity.display.ts'
-import { findProjects } from './projects.repository.ts'
+import { findProjects, type ProjectListFilters } from './projects.repository.ts'
 import { DASHBOARD_DAY_MS, DASHBOARD_WINDOW_DAYS } from './projects.dashboard.constants.ts'
 import {
   findDailyActivity,
@@ -13,11 +13,8 @@ import {
 
 export const DASHBOARD_SOURCES = ['all', 'activity', 'code', 'pull_request'] as const
 export type DashboardSource = (typeof DASHBOARD_SOURCES)[number]
-export interface DashboardQuery {
+export interface DashboardQuery extends Omit<ProjectListFilters, 'page' | 'pageSize'> {
   source?: string
-  search?: string
-  status?: string
-  repositoryId?: string
   from?: string
   to?: string
 }
@@ -115,6 +112,9 @@ export function createProjectDashboardService(deps: { db: Database }) {
       search: query.search?.trim() || undefined,
       status: query.status,
       repositoryId: query.repositoryId,
+      hasRepository: query.hasRepository,
+      ownerId: query.ownerId,
+      ownerUnavailable: query.ownerUnavailable,
       page: 1,
       pageSize: 100,
     })

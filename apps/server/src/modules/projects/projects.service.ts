@@ -26,6 +26,7 @@ import {
   insertServiceRepository,
   updateProject,
   updateProjectService,
+  type ProjectListFilters,
 } from './projects.repository.ts'
 import { findProjectRepositories, findProjectRepositoryLink } from '../code/code.repository.ts'
 
@@ -171,7 +172,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
   }
 
   function toView(
-    row: Awaited<ReturnType<typeof findProjectById>> & object,
+    row: Awaited<ReturnType<typeof findProjects>>['rows'][number],
     counts: ProjectCounts,
     owner: OwnerRef,
   ): ProjectView {
@@ -204,14 +205,7 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
   async function listProjects(
     actor: SessionUser,
     teamId: string,
-    filters: {
-      search?: string
-      status?: string
-      repositoryId?: string
-      ownerUnavailable?: boolean
-      page?: number
-      pageSize?: number
-    },
+    filters: Partial<ProjectListFilters>,
   ): Promise<ProjectListResult> {
     await requireTeamMember(db, actor.id, teamId)
     const page = filters.page ?? 1
@@ -219,10 +213,8 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     validatePage(page, pageSize)
     if (filters.status !== undefined) validateStatus(filters.status)
     const { rows, total } = await findProjects(db, teamId, {
+      ...filters,
       search: filters.search?.trim() || undefined,
-      status: filters.status,
-      repositoryId: filters.repositoryId,
-      ownerUnavailable: filters.ownerUnavailable,
       page,
       pageSize,
     })

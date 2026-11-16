@@ -12,6 +12,8 @@ export interface ProjectListFilters {
   search?: string
   status?: string
   repositoryId?: string
+  hasRepository?: boolean
+  ownerId?: string
   ownerUnavailable?: boolean
   page: number
   pageSize: number
@@ -58,7 +60,7 @@ export async function findProjectByName(db: Database, teamId: string, name: stri
  * 查询团队项目分页。
  * @param db 数据库连接。
  * @param teamId 团队标识。
- * @param filters 检索、状态、关联仓库及分页条件。
+ * @param filters 检索、状态、负责人、仓库及分页条件；各筛选条件同时生效。
  * @returns 项目行与总数。
  */
 export async function findProjects(db: Database, teamId: string, filters: ProjectListFilters) {
@@ -69,23 +71,24 @@ export async function findProjects(db: Database, teamId: string, filters: Projec
     if (searchCondition) conditions.push(searchCondition)
   }
   if (filters.status) conditions.push(eq(project.status, filters.status))
-  if (filters.repositoryId) {
-    conditions.push(
-      exists(
-        db
-          .select({ id: projectRepository.id })
-          .from(projectRepository)
-          .innerJoin(gitRepository, eq(gitRepository.id, projectRepository.repository_id))
-          .where(
-            and(
-              eq(projectRepository.project_id, project.id),
-              eq(projectRepository.team_id, teamId),
-              eq(gitRepository.team_id, teamId),
-              eq(projectRepository.repository_id, filters.repositoryId),
-            ),
+  if (filters.ownerId) conditions.push(eq(project.owner_user_id, filters.ownerId))
+  if (filters.repositoryId || filters.hasRepository !== undefined) {
+    const repositoryLinks = (repositoryId?: string) =>
+      db
+        .select({ id: projectRepository.id })
+        .from(projectRepository)
+        .innerJoin(gitRepository, eq(gitRepository.id, projectRepository.repository_id))
+        .where(
+          and(
+            eq(projectRepository.project_id, project.id),
+            eq(projectRepository.team_id, teamId),
+            eq(gitRepository.team_id, teamId),
+            repositoryId ? eq(projectRepository.repository_id, repositoryId) : undefined,
           ),
-      ),
-    )
+        )
+    if (filters.repositoryId) conditions.push(exists(repositoryLinks(filters.repositoryId)))
+    if (filters.hasRepository === true) conditions.push(exists(repositoryLinks()))
+    if (filters.hasRepository === false) conditions.push(notExists(repositoryLinks()))
   }
   if (filters.ownerUnavailable) {
     conditions.push(
@@ -106,7 +109,17 @@ export async function findProjects(db: Database, teamId: string, filters: Projec
   const where = and(...conditions)
   const [rows, [total]] = await Promise.all([
     db
-      .select()
+      .select({
+        id: project.id,
+        team_id: project.team_id,
+        name: project.name,
+        description: project.description,
+        owner_user_id: project.owner_user_id,
+        status: project.status,
+        version: project.version,
+        created_at: project.created_at,
+        updated_at: project.updated_at,
+      })
       .from(project)
       .where(where)
       .orderBy(desc(project.updated_at), desc(project.id))

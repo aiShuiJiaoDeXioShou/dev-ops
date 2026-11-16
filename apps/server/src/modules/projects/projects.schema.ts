@@ -29,12 +29,17 @@ const projectListSchema = Type.Object({
 })
 const statsSchema = Type.Object({ openRequirements: Type.Integer(), openBugs: Type.Integer() })
 
-export const projectRepositoryFilterSchema = Type.Optional(
-  Type.String({
-    pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-    description: '按当前团队已关联的仓库标识筛选项目。',
-  }),
-)
+const queryUuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+
+/** 项目列表和晴雨表共用的筛选字段。 */
+export const projectFilterProperties = {
+  search: Type.Optional(Type.String({ maxLength: 200 })),
+  status: Type.Optional(Type.Union([Type.Literal('active'), Type.Literal('paused'), Type.Literal('ended')])),
+  repositoryId: Type.Optional(Type.String({ pattern: queryUuidPattern, description: '按当前团队已关联的仓库筛选。' })),
+  hasRepository: Type.Optional(Type.Boolean({ description: '按是否关联团队仓库筛选。' })),
+  ownerId: Type.Optional(Type.String({ pattern: queryUuidPattern, description: '按项目负责人的用户标识筛选。' })),
+  ownerUnavailable: Type.Optional(Type.Boolean({ description: '为 true 时只返回负责人已失效的项目。' })),
+}
 export const projectRepositoryOptionsQuerySchema = Type.Object({
   page: Type.Optional(Type.Integer({ minimum: 1 })),
   pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
@@ -57,10 +62,7 @@ export const projectRepositoryOptionsResponseSchema = apiResponseSchema(
 )
 
 export const projectListQuerySchema = Type.Object({
-  search: Type.Optional(Type.String({ maxLength: 200 })),
-  status: Type.Optional(Type.Union([Type.Literal('active'), Type.Literal('paused'), Type.Literal('ended')])),
-  repositoryId: projectRepositoryFilterSchema,
-  ownerUnavailable: Type.Optional(Type.Boolean()),
+  ...projectFilterProperties,
   page: Type.Optional(Type.Integer({ minimum: 1 })),
   pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
 })
