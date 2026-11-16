@@ -531,6 +531,25 @@ export function createApiClient(options: ApiClientOptions) {
         { ...options, query },
       )
     },
+    /**
+     * 分页读取团队项目已关联的仓库选项。
+     * @param teamId 团队标识。
+     * @param query 页码与每页数量。
+     * @param options 请求取消与其他调用选项。
+     * @returns 当前页仓库选项和总数。
+     */
+    async listProjectRepositoryOptions(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/project-repositories', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/project-repositories', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/project-repositories`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
     /** 创建项目。 */
     async createProject(
       teamId: string,
