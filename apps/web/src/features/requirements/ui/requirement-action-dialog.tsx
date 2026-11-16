@@ -32,13 +32,18 @@ const TITLES: Record<RequirementAction, string> = {
   restore: '恢复需求',
 }
 
-/** 需求流程动作对话框。 */
+/**
+ * 收集需求流转所需的信息，并在通过测试前提醒尚未解决的关联 Bug。
+ * @param props 需求、动作、弹窗状态与关闭回调。onCloseAutoFocus 可将焦点归还给调用入口。
+ * @returns 流程动作表单；提交成功后刷新需求和项目，失败时保留输入。
+ */
 export function RequirementActionDialog({
   requirement,
   action,
   teamId,
   open,
   onOpenChange,
+  onCloseAutoFocus,
   onDone,
 }: {
   requirement: RequirementDetail
@@ -46,6 +51,7 @@ export function RequirementActionDialog({
   teamId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCloseAutoFocus?: (event: Event) => void
   onDone?: () => void
 }) {
   const queryClient = useQueryClient()
@@ -134,7 +140,7 @@ export function RequirementActionDialog({
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{TITLES[action]}</DialogTitle>
         </DialogHeader>

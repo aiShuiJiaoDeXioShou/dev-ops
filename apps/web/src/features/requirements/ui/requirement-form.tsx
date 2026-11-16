@@ -37,6 +37,7 @@ interface RequirementFormProps {
   currentUserId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCloseAutoFocus?: (event: Event) => void
   requirement?: RequirementDetail | null
   onSaved?: (requirementId: string) => void
 }
@@ -68,6 +69,7 @@ export function RequirementForm({
   currentUserId,
   open,
   onOpenChange,
+  onCloseAutoFocus,
   requirement,
   onSaved,
 }: RequirementFormProps) {
@@ -222,7 +224,7 @@ export function RequirementForm({
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent layout="form">
+      <DialogContent layout="form" onCloseAutoFocus={onCloseAutoFocus}>
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
           <DialogFormHeader>
             <DialogTitle className="text-xl">

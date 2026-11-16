@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page, type Request, type TestInfo } from '@playwright/test'
 import { installApiMocks } from './mock-api'
-import { VISUAL_IDS } from './fixtures'
+import { apiFixtures, VISUAL_IDS } from './fixtures'
 
 /** 页面布局不变量；只记录跨平台稳定的语义与布尔结果，不做像素对比。 */
 interface LayoutSnapshot {
@@ -144,6 +144,60 @@ test('[desktop] [mobile] 工作区与项目设置弹窗沿用明暗主题的弱�
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
   }
+})
+
+test('[desktop] [mobile] 需求测试操作在当前节点卡片内，确认关闭后归还焦点', async ({ page }, testInfo) => {
+  const path = `/api/v1/requirements/${VISUAL_IDS.requirementId}`
+  const fixture = apiFixtures[path]
+  if (
+    !fixture ||
+    typeof fixture !== 'object' ||
+    !('data' in fixture) ||
+    !fixture.data ||
+    typeof fixture.data !== 'object'
+  ) {
+    throw new Error('缺少需求详情测试数据')
+  }
+  const detailData = {
+    ...fixture.data,
+    status: 'in_testing',
+    linkedBugs: [{ id: '11111111-1111-4111-8111-111111111111', number: 9, title: '待修复的缺陷', status: 'pending' }],
+  }
+  await prepare(page, `/projects/${VISUAL_IDS.projectId}/requirements`)
+  await page.route(`**${path}`, (route) => route.fulfill({ json: { ...fixture, data: detailData } }))
+  await page.locator('.item-title').first().click()
+  const detail = page.getByRole('dialog', { name: '需求详情' })
+  const flow = detail.getByRole('region', { name: '需求流程' })
+  await expect(flow.getByRole('button', { name: '测试，进行中' })).toHaveAttribute('aria-current', 'step')
+  const pass = flow.getByRole('button', { name: '测试通过' })
+  const node = flow.getByRole('heading', { name: '测试', exact: true })
+  const [buttonBox, headingBox] = await Promise.all([pass.boundingBox(), node.boundingBox()])
+  expect(buttonBox).not.toBeNull()
+  expect(headingBox).not.toBeNull()
+  if (!buttonBox || !headingBox) throw new Error('未显示流程卡片的标题和操作')
+  expect(buttonBox.x).toBeGreaterThan(headingBox.x + headingBox.width)
+  expect(buttonBox.y).toBeLessThanOrEqual(headingBox.y)
+  expect(buttonBox.y + buttonBox.height).toBeGreaterThanOrEqual(headingBox.y + headingBox.height)
+  if (testInfo.project.name === 'mobile') expect(buttonBox.height).toBeGreaterThanOrEqual(44)
+  await page.screenshot({ path: testInfo.outputPath('requirement-workflow.png') })
+
+  if (testInfo.project.name === 'mobile') await pass.tap()
+  else await pass.press('Enter')
+  const confirm = page.getByRole('dialog', { name: '测试通过' })
+  await expect(confirm).toHaveAccessibleDescription(/还有 1 个关联 Bug 未解决/)
+  await expect(confirm.getByRole('button', { name: '确认通过' })).toBeEnabled()
+  await page.keyboard.press('Escape')
+  await expect(confirm).toBeHidden()
+  await expect(pass).toBeFocused()
+
+  const more = flow.getByRole('button', { name: '更多节点操作' })
+  await more.click()
+  await page.getByRole('menuitem', { name: '退回开发' }).click()
+  const returnDialog = page.getByRole('dialog', { name: '退回开发' })
+  await expect(returnDialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(returnDialog).toBeHidden()
+  await expect(more).toBeFocused()
 })
 
 test.describe('[desktop] 核心页面', () => {

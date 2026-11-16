@@ -1,3 +1,35 @@
+/* 连接相邻节点的中心。连线保留在按钮下方，首尾节点外侧不延伸。 */
+.requirement-flow-steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+.requirement-flow-steps > li {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.requirement-flow-steps > li:not(:last-child)::after {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: 100%;
+  border-block-start: 1px solid var(--border);
+  content: '';
+  pointer-events: none;
+}
+@media (pointer: coarse) {
+  .requirement-flow-steps [data-slot='button'],
+  .requirement-flow-actions [data-slot='button'],
+  .requirement-detail-tabs [data-slot='tabs-trigger'],
+  .requirement-more-button {
+    min-block-size: 44px;
+  }
+  .requirement-more-button {
+    min-inline-size: 44px;
+  }
+}
+
 /* 团队图标与管理页保持紧凑；权限提示不依赖颜色。 */
 .team-switcher {
   display: flex;

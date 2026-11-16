@@ -1,9 +1,17 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isBusinessError } from '@dev-ops/api-client'
+import { Ellipsis } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/ui/controls/dropdown-menu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { WorkItemDetailSheet } from '@/shared/ui/controls/work-item-detail-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
@@ -30,8 +38,21 @@ import { canWriteRequirements, isEditable, requirementMutations } from '../api/m
 import { REQUIREMENT_STATUS_LABELS, SELF_TEST_LABELS, requirementStatusTone } from '../model/labels'
 import { RequirementActionDialog, type RequirementAction } from './requirement-action-dialog'
 import { RequirementForm } from './requirement-form'
+import { RequirementWorkflow } from './requirement-workflow'
 
-/** 需求详情：范围字段、关联、流程动作、评论与活动。 */
+const DETAIL_TABS = [
+  ['info', '基本信息'],
+  ['submissions', '节点详情'],
+  ['bugs', '缺陷管理'],
+  ['comments', '评论'],
+  ['activities', '操作记录'],
+] as const
+
+/**
+ * 展示需求的状态、流程节点、基本信息和协作记录。
+ * @param props 需求 ID 及返回列表的回调。
+ * @returns 可展开的需求详情浮层，写操作按角色与状态显示。
+ */
 export function RequirementDetailPane({ requirementId, onClose }: { requirementId: string; onClose: () => void }) {
   const queryClient = useQueryClient()
   const { user, role } = useSession()
@@ -47,7 +68,21 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   const [attachmentError, setAttachmentError] = useState('')
   const [codeOpen, setCodeOpen] = useState(false)
   const [bugOpen, setBugOpen] = useState(false)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const detailMenu = useRef<HTMLButtonElement>(null)
+  const actionTrigger = useRef<HTMLButtonElement | null>(null)
   const canWrite = canWriteRequirements(role)
+  const openAction = (nextAction: RequirementAction, trigger: HTMLButtonElement | null) => {
+    actionTrigger.current = trigger
+    setAction(nextAction)
+  }
+  const restoreActionFocus = (event: Event) => {
+    const trigger = actionTrigger.current
+    const target = trigger?.isConnected ? trigger : heading.current
+    if (!target) return
+    event.preventDefault()
+    target.focus({ preventScroll: true })
+  }
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['requirements'] })
     await queryClient.invalidateQueries({ queryKey: ['projects'] })
@@ -73,7 +108,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
         : requirementMutations.startTest(requirementId, { version })
     },
     onSuccess: invalidate,
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '状态更新失败。'),
   })
   if (query.isPending)
     return (
@@ -112,9 +146,11 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
       onClose={onClose}
       heading={
         <header className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground">需求 #{detail.number}</p>
-            <h2 className="mt-1 text-lg font-semibold leading-6">{detail.title}</h2>
+            <h2 ref={heading} tabIndex={-1} className="mt-1 text-lg leading-6 font-semibold wrap-anywhere">
+              {detail.title}
+            </h2>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <StatusBadge tone={requirementStatusTone(detail.status)}>
                 {REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}
@@ -122,157 +158,163 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               <span>更新 {formatDateTime(detail.updatedAt)}</span>
             </div>
           </div>
+          {canWrite && (
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  ref={detailMenu}
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="requirement-more-button"
+                  aria-label="更多需求操作"
+                >
+                  <Ellipsis aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {editable && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      actionTrigger.current = detailMenu.current
+                      setEditOpen(true)
+                    }}
+                  >
+                    编辑需求
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={() => setBugOpen(true)}>创建 Bug</DropdownMenuItem>
+                {detail.status !== 'cancelled' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onSelect={() => openAction('cancel', detailMenu.current)}
+                    >
+                      取消需求
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </header>
       }
     >
       <div className="space-y-5">
-        <div className="detail-actions">
-          {canWrite && detail.status === 'pending' && (
-            <Button size="sm" onClick={() => direct.mutate('start-development')} disabled={direct.isPending}>
-              开始开发
-            </Button>
-          )}
-          {canWrite && detail.status === 'in_development' && (
-            <Button size="sm" onClick={() => setAction('submit-test')}>
-              提测
-            </Button>
-          )}
-          {canWrite && detail.status === 'submitted' && (
-            <Button size="sm" onClick={() => direct.mutate('start-test')} disabled={direct.isPending}>
-              开始测试
-            </Button>
-          )}
-          {canWrite && detail.status === 'submitted' && (
-            <Button size="sm" variant="outline" onClick={() => setAction('withdraw-test')}>
-              撤回测试
-            </Button>
-          )}
-          {canWrite && detail.status === 'in_testing' && (
-            <Button size="sm" onClick={() => setAction('return-to-development')}>
-              退回开发
-            </Button>
-          )}
-          {canWrite && detail.status === 'in_testing' && (
-            <Button size="sm" onClick={() => setAction('pass-test')}>
-              测试通过
-            </Button>
-          )}
-          {canWrite && detail.status === 'passed' && (
-            <Button size="sm" onClick={() => setAction('reopen-development')}>
-              重新开发
-            </Button>
-          )}
-          {canWrite && ['pending', 'in_development', 'submitted', 'in_testing', 'passed'].includes(detail.status) && (
-            <Button size="sm" variant="outline" onClick={() => setAction('cancel')}>
-              取消
-            </Button>
-          )}
-          {canWrite && detail.status === 'cancelled' && (
-            <Button size="sm" onClick={() => setAction('restore')}>
-              恢复
-            </Button>
-          )}
-          {editable && (
-            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-              编辑
-            </Button>
-          )}
-          {canWrite && (
-            <Button size="sm" variant="outline" onClick={() => setBugOpen(true)}>
-              创建 Bug
-            </Button>
-          )}
-        </div>
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        <dl className="detail-properties">
-          <div>
-            <dt className="text-xs text-muted-foreground">研发负责人</dt>
-            <dd className="mt-1">{detail.devOwner?.name ?? '未指定'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">测试负责人</dt>
-            <dd className="mt-1">{detail.testOwner?.name ?? '未指定'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">协作人员</dt>
-            <dd className="mt-1">
-              <CollaboratorTags members={detail.collaborators} />
-            </dd>
-          </div>
-        </dl>
-        <WorkItemLinks
-          source={{ kind: 'requirement', id: detail.id, projectId: detail.projectId }}
-          items={detail.linkedBugs}
+        <RequirementWorkflow
+          requirement={detail}
           canWrite={canWrite}
+          isStarting={direct.isPending}
+          startError={direct.isError ? describeRequestError(direct.error).description : ''}
+          onStart={(kind) => direct.mutate(kind)}
+          onAction={openAction}
         />
-        <section className="space-y-2">
-          <h3 className="text-sm font-semibold">内容</h3>
-          {detail.contentMode === 'markdown' ? (
-            <div className="detail-markdown text-sm">
-              <Markdown>{detail.contentMarkdown ?? ''}</Markdown>
-            </div>
-          ) : (
-            <a
-              className="text-sm text-primary hover:underline"
-              href={detail.externalUrl ?? '#'}
-              target="_blank"
-              rel="noreferrer"
-            >
-              打开外部文档
-            </a>
-          )}
-          {detail.externalSummary && <p className="text-sm text-muted-foreground">{detail.externalSummary}</p>}
-          {detail.acceptanceCriteria && (
-            <div className="text-sm">
-              <p className="text-xs text-muted-foreground">验收标准</p>
-              <p className="mt-1 whitespace-pre-wrap">{detail.acceptanceCriteria}</p>
-            </div>
-          )}
-        </section>
-        <section className="space-y-2" aria-label="附件">
-          <h3 className="text-sm font-semibold">附件</h3>
-          <AttachmentList
-            attachments={detail.attachments ?? []}
-            canDelete={canDeleteAttachment}
-            onDelete={(attachment) => removeAttachmentMutation.mutate(attachment)}
-            deletingId={removeAttachmentMutation.isPending ? (removeAttachmentMutation.variables?.id ?? null) : null}
-            deleteError={attachmentError}
-          />
-        </section>
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">代码引用</h3>
-            {canWrite && (
-              <Button size="sm" variant="outline" onClick={() => setCodeOpen(true)}>
-                添加引用
-              </Button>
-            )}
-          </div>
-          {detail.linkedCodeReferences.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无代码引用。</p>
-          ) : (
-            <ul className="space-y-2">
-              {detail.linkedCodeReferences.map((reference) => (
-                <CodeReferenceCard
-                  key={reference.id}
-                  reference={reference}
-                  onRefresh={() => refreshCode.mutate(reference.id)}
-                  refreshing={refreshCode.isPending}
-                />
-              ))}
-            </ul>
-          )}
-        </section>
-        <Tabs defaultValue="comments">
-          <TabsList>
-            <TabsTrigger value="comments">评论</TabsTrigger>
-            <TabsTrigger value="activities">活动</TabsTrigger>
-            <TabsTrigger value="submissions">提测历史</TabsTrigger>
+        <Tabs defaultValue="info">
+          <TabsList
+            aria-label="需求详情分区"
+            className="requirement-detail-tabs flex w-full justify-start gap-2 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 sm:gap-3"
+          >
+            {DETAIL_TABS.map(([value, label]) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="min-h-10 shrink-0 rounded-none border-b-2 border-transparent px-1.5 text-xs focus-visible:ring-inset aria-selected:border-primary aria-selected:bg-transparent! aria-selected:text-primary! aria-selected:shadow-none! sm:px-3 sm:text-sm"
+              >
+                {label}
+              </TabsTrigger>
+            ))}
           </TabsList>
+          <TabsContent value="info" className="space-y-5">
+            <dl className="detail-properties">
+              <div>
+                <dt className="text-xs text-muted-foreground">研发负责人</dt>
+                <dd className="mt-1">{detail.devOwner?.name ?? '未指定'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">测试负责人</dt>
+                <dd className="mt-1">{detail.testOwner?.name ?? '未指定'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">协作人员</dt>
+                <dd className="mt-1">
+                  <CollaboratorTags members={detail.collaborators} />
+                </dd>
+              </div>
+            </dl>
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold">需求描述</h3>
+              {detail.contentMode === 'markdown' ? (
+                <div className="detail-markdown text-sm">
+                  <Markdown>{detail.contentMarkdown ?? ''}</Markdown>
+                </div>
+              ) : (
+                <a
+                  className="text-sm text-primary hover:underline"
+                  href={detail.externalUrl ?? '#'}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  打开外部文档
+                </a>
+              )}
+              {detail.externalSummary && <p className="text-sm text-muted-foreground">{detail.externalSummary}</p>}
+              {detail.acceptanceCriteria && (
+                <div className="text-sm">
+                  <p className="text-xs text-muted-foreground">验收标准</p>
+                  <p className="mt-1 whitespace-pre-wrap">{detail.acceptanceCriteria}</p>
+                </div>
+              )}
+            </section>
+            <section className="space-y-2" aria-label="附件">
+              <h3 className="text-sm font-semibold">附件</h3>
+              <AttachmentList
+                attachments={detail.attachments ?? []}
+                canDelete={canDeleteAttachment}
+                onDelete={(attachment) => removeAttachmentMutation.mutate(attachment)}
+                deletingId={
+                  removeAttachmentMutation.isPending ? (removeAttachmentMutation.variables?.id ?? null) : null
+                }
+                deleteError={attachmentError}
+              />
+            </section>
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">代码引用</h3>
+                {canWrite && (
+                  <Button size="sm" variant="outline" onClick={() => setCodeOpen(true)}>
+                    添加引用
+                  </Button>
+                )}
+              </div>
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              {detail.linkedCodeReferences.length === 0 ? (
+                <p className="text-sm text-muted-foreground">暂无代码引用。</p>
+              ) : (
+                <ul className="space-y-2">
+                  {detail.linkedCodeReferences.map((reference) => (
+                    <CodeReferenceCard
+                      key={reference.id}
+                      reference={reference}
+                      onRefresh={() => refreshCode.mutate(reference.id)}
+                      refreshing={refreshCode.isPending}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          </TabsContent>
+          <TabsContent value="bugs">
+            <WorkItemLinks
+              source={{ kind: 'requirement', id: detail.id, projectId: detail.projectId }}
+              items={detail.linkedBugs}
+              canWrite={canWrite}
+            />
+          </TabsContent>
           <TabsContent value="comments" className="space-y-4">
             <CommentList target="requirement" targetId={detail.id} />
             <CommentForm target="requirement" targetId={detail.id} disabled={!canWrite} />
@@ -281,7 +323,18 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
             <ActivityTimeline target="requirement" targetId={detail.id} />
           </TabsContent>
           <TabsContent value="submissions">
-            {submissions.data?.data.items.length ? (
+            <h3 className="mb-3 text-sm font-semibold">提测历史</h3>
+            {submissions.isPending ? (
+              <DelayedLoading pending>
+                <PageLoading message="提测记录加载中…" />
+              </DelayedLoading>
+            ) : submissions.isError ? (
+              <PageError
+                title="提测记录加载失败"
+                description={describeRequestError(submissions.error).description}
+                onRetry={() => void submissions.refetch()}
+              />
+            ) : submissions.data.data.items.length ? (
               <ul className="space-y-3">
                 {submissions.data.data.items.map((item) => (
                   <li key={item.id} className="rounded-lg border p-3 text-sm">
@@ -323,6 +376,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
         onOpenChange={(open) => {
           if (!open) setAction(null)
         }}
+        onCloseAutoFocus={restoreActionFocus}
       />
       <RequirementForm
         projectId={detail.projectId}
@@ -332,6 +386,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
         onOpenChange={setEditOpen}
         requirement={detail}
         onSaved={onClose}
+        onCloseAutoFocus={restoreActionFocus}
       />
     </WorkItemDetailSheet>
   )
