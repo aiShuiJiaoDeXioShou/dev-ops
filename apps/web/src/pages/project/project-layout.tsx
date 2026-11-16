@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
+import { isBusinessError } from '@dev-ops/api-client'
 import { FolderGit2, Settings } from 'lucide-react'
 import { ProjectSettingsDialog } from '@/features/projects/ui/project-settings-dialog'
 import { projectQueryOptions } from '@/features/projects/api/queries'
@@ -28,7 +29,7 @@ export function Component() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const project = useQuery(projectQueryOptions(projectId))
   if (project.isPending) return <DelayedPageSkeleton />
-  if (!project.data) {
+  if (!project.data || isBusinessError(project.error, 'NOT_FOUND') || isBusinessError(project.error, 'FORBIDDEN')) {
     return (
       <PageError
         title="项目加载失败"
@@ -94,7 +95,12 @@ export function Component() {
       <div className="content">
         <Outlet />
       </div>
-      <ProjectSettingsDialog projectId={projectId} open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <ProjectSettingsDialog
+        projectId={projectId}
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onRemoved={() => navigate('/projects', { replace: true })}
+      />
     </>
   )
 }

@@ -1,5 +1,6 @@
 - main:
   - heading "项目" [level=1]
+  - button "回收站"
   - button "创建项目"
   - region "项目活动晴雨表":
     - strong: 项目晴雨表

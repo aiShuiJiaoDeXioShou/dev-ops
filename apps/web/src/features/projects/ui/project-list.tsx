@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { Folder, Plus, Search, Settings, Users } from 'lucide-react'
@@ -20,6 +20,7 @@ import {
 } from '../model/filters'
 import { ProjectFilter } from './project-filter'
 import { ProjectForm } from './project-form'
+import { ProjectRecycleBin } from './project-recycle-bin'
 import { ProjectSettingsDialog } from './project-settings-dialog'
 import { ActivityBarometer } from './activity-barometer'
 
@@ -29,6 +30,7 @@ import { ActivityBarometer } from './activity-barometer'
  */
 export function ProjectList() {
   const navigate = useNavigate()
+  const heading = useRef<HTMLHeadingElement>(null)
   const { currentTeam, role, user } = useSession()
   const [params, setParams] = useSearchParams()
   const filters = parseProjectFilters(params)
@@ -104,8 +106,11 @@ export function ProjectList() {
     <>
       <header className="page-head">
         <div className="row">
-          <h1>项目</h1>
+          <h1 ref={heading} tabIndex={-1}>
+            项目
+          </h1>
           <span className="spacer" />
+          {role === 'admin' && <ProjectRecycleBin key={currentTeam.id} teamId={currentTeam.id} />}
           <Button type="button" disabled={role === 'viewer'} onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" aria-hidden="true" />
             创建项目
@@ -272,6 +277,10 @@ export function ProjectList() {
       <ProjectSettingsDialog
         projectId={settingsProjectId ?? ''}
         open={Boolean(settingsProjectId)}
+        onRemoved={() => {
+          if (filters.page > 1 && projects.length === 1) update({ page: filters.page - 1 })
+          requestAnimationFrame(() => heading.current?.focus())
+        }}
         onOpenChange={(open) => {
           if (!open) setSettingsProjectId(null)
         }}

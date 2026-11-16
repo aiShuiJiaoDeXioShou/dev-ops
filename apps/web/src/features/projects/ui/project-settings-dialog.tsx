@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/model/session'
 import { LinkRepositoryDialog } from '@/features/code/ui/link-repository-dialog'
 import { RepositoryPicker } from '@/features/code/ui/repository-picker'
@@ -16,29 +16,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/t
 import { Button } from '@/shared/ui/controls/button'
 import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectQueryOptions } from '../api/queries'
+import { ProjectLifecycleAction } from './project-lifecycle-action'
 import { ProjectSettingsForm } from './project-settings-form'
 import { ServiceManagement } from './service-management'
 import { PageError } from '@/shared/ui/page-state'
 
 /**
  * 项目设置弹窗；项目头部齿轮入口使用，不再跳转独立页面。
- * @param props.projectId 项目标识；open 打开状态；onOpenChange 关闭回调。
+ * @param props.projectId 项目标识；open 打开状态；onOpenChange 关闭回调；onRemoved 删除成功后处理列表或导航。
  * @returns 项目资料表单弹窗；只读角色仅能查看。
  */
 export function ProjectSettingsDialog({
   projectId,
   open,
   onOpenChange,
+  onRemoved,
 }: {
   projectId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onRemoved: () => void
 }) {
-  const { role, currentTeam } = useSession()
+  const { role, currentTeam, user, teams } = useSession()
+  const client = useQueryClient()
   const project = useQuery(projectQueryOptions(projectId))
   const addRepositoryTrigger = useRef<HTMLButtonElement>(null)
   const [linkOpen, setLinkOpen] = useState(false)
   const canManage = role === 'admin' || role === 'developer'
+  const projectTeamRole = teams.find((team) => team.id === project.data?.data.teamId)?.role
+  const canRemove =
+    projectTeamRole === 'admin' || (projectTeamRole === 'developer' && project.data?.data.owner.userId === user.id)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -89,6 +96,20 @@ export function ProjectSettingsDialog({
                   onCancel={() => onOpenChange(false)}
                   onSaved={() => onOpenChange(false)}
                 />
+                {canRemove && (
+                  <div className="mt-6 border-t pt-4">
+                    <ProjectLifecycleAction
+                      project={project.data.data}
+                      action="remove"
+                      onDone={() => {
+                        onOpenChange(false)
+                        onRemoved()
+                        void client.invalidateQueries({ queryKey: ['projects'] })
+                        void client.invalidateQueries({ queryKey: ['operations'] })
+                      }}
+                    />
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="repositories">
                 <div className="settings-section-head">

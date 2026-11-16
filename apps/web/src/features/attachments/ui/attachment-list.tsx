@@ -103,25 +103,31 @@ export function AttachmentList({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <AttachmentPreviewButton file={attachment} />
-                <a
-                  href={attachment.downloadUrl}
-                  download={attachment.fileName}
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  下载
-                </a>
-                {canDelete(attachment) && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="xs"
-                    aria-label={`删除附件 ${attachment.fileName}`}
-                    disabled={isDeleting}
-                    onClick={() => setPendingDelete(attachment)}
-                  >
-                    {isDeleting ? '删除中…' : '删除'}
-                  </Button>
+                {attachment.contentAvailable === false ? (
+                  <span className="text-xs text-muted-foreground">文件已清理</span>
+                ) : (
+                  <>
+                    <AttachmentPreviewButton file={attachment} />
+                    <a
+                      href={attachment.downloadUrl}
+                      download={attachment.fileName}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      下载
+                    </a>
+                    {canDelete(attachment) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        aria-label={`删除附件 ${attachment.fileName}`}
+                        disabled={isDeleting}
+                        onClick={() => setPendingDelete(attachment)}
+                      >
+                        {isDeleting ? '删除中…' : '删除'}
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
             </li>
