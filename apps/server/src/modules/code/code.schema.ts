@@ -92,6 +92,12 @@ export const createReferenceBodySchema = Type.Object(
     repositoryId: uuidSchema,
     objectType: Type.Union([Type.Literal('commit'), Type.Literal('issue'), Type.Literal('change_request')]),
     remoteId: Type.String({ minLength: 1, maxLength: 200 }),
+    replaceReferenceId: Type.Optional(
+      Type.String({
+        pattern: '^[0-9a-fA-F-]{36}$',
+        description: '核对新目标后替换同一事项上的原引用。',
+      }),
+    ),
   },
   { additionalProperties: false },
 )

@@ -175,8 +175,13 @@ export async function insertCodeReference(
   return row
 }
 
-/** 按标识查询代码引用。 */
-export async function findCodeReferenceById(db: Database, codeReferenceId: string) {
+/**
+ * 按标识查询代码引用，支持在项目写锁内核对待替换的引用。
+ * @param db 数据库连接或事务。
+ * @param codeReferenceId 引用标识。
+ * @returns 引用行，找不到时返回 undefined。
+ */
+export async function findCodeReferenceById(db: CodeExecutor, codeReferenceId: string) {
   const [row] = await db.select().from(codeReference).where(eq(codeReference.id, codeReferenceId)).limit(1)
   return row
 }
@@ -225,8 +230,14 @@ export async function findChangeRequestRemoteIdsForTarget(
   return rows.map((row) => row.remoteId)
 }
 
-/** 统计事项代码引用数量。 */
-export async function countCodeReferencesForTarget(db: Database, targetType: string, targetId: string) {
+/**
+ * 统计一个事项的现有代码引用，写入时应在同一项目锁内调用。
+ * @param db 数据库连接或事务。
+ * @param targetType 事项类型。
+ * @param targetId 事项标识。
+ * @returns 引用数量。
+ */
+export async function countCodeReferencesForTarget(db: CodeExecutor, targetType: string, targetId: string) {
   const [row] = await db
     .select({ value: count() })
     .from(codeReference)
@@ -234,9 +245,18 @@ export async function countCodeReferencesForTarget(db: Database, targetType: str
   return row?.value ?? 0
 }
 
-/** 删除代码引用。 */
+/**
+ * 删除指定代码引用。
+ * @param db 数据库连接或事务。
+ * @param codeReferenceId 引用标识。
+ * @returns 是否实际删除了一条引用。
+ */
 export async function deleteCodeReference(db: CodeExecutor, codeReferenceId: string) {
-  await db.delete(codeReference).where(eq(codeReference.id, codeReferenceId))
+  const [removed] = await db
+    .delete(codeReference)
+    .where(eq(codeReference.id, codeReferenceId))
+    .returning({ id: codeReference.id })
+  return removed !== undefined
 }
 
 /** 更新引用核对结果。 */

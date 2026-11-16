@@ -15,7 +15,7 @@ import { GitAdapterError, type GitAdapter, type GitObjectSnapshot } from '../../
 import { createAuthenticatedUser } from '../support/auth.ts'
 import { FakeMailer } from '../support/fake-mailer.ts'
 
-test('项目仓库关联、代码引用创建/刷新/移除、权限、唯一与来源失败', { timeout: 90_000 }, async (t) => {
+test('项目仓库关联、代码引用添加/编辑/刷新/移除、权限与来源失败', { timeout: 90_000 }, async (t) => {
   const cleanup: Array<() => Promise<unknown>> = []
   t.after(async () => {
     const errors: unknown[] = []
@@ -260,9 +260,49 @@ test('项目仓库关联、代码引用创建/刷新/移除、权限、唯一与
   assert.equal(failed.json().data.lastErrorCode, 'auth_failed')
   assert.equal(failed.json().data.title, null)
 
+  const replacement = {
+    targetType: 'requirement',
+    targetId: requirementId,
+    repositoryId,
+    objectType: 'issue',
+    remoteId: '13',
+    replaceReferenceId: referenceId,
+  }
+  failNext = true
+  const failedReplace = await app.inject({
+    method: 'POST',
+    url: `/api/v1/projects/${projectId}/code-references`,
+    payload: replacement,
+    headers: { cookie: adminUser.cookie },
+  })
+  assert.equal(failedReplace.json().code, 'PRECONDITION_FAILED')
+  const retained = await app.inject({
+    url: `/api/v1/requirements/${requirementId}`,
+    headers: { cookie: viewerUser.cookie },
+  })
+  assert.equal(retained.json().data.linkedCodeReferences[0].id, referenceId)
+
+  failNext = false
+  const replaced = await app.inject({
+    method: 'POST',
+    url: `/api/v1/projects/${projectId}/code-references`,
+    payload: replacement,
+    headers: { cookie: adminUser.cookie },
+  })
+  assert.equal(replaced.json().success, true, replaced.body)
+  assert.equal(replaced.json().data.remoteId, '13')
+  const replacedDetail = await app.inject({
+    url: `/api/v1/requirements/${requirementId}`,
+    headers: { cookie: viewerUser.cookie },
+  })
+  assert.deepEqual(
+    replacedDetail.json().data.linkedCodeReferences.map((item: { remoteId: string }) => item.remoteId),
+    ['13'],
+  )
+
   const removed = await app.inject({
     method: 'POST',
-    url: `/api/v1/code-references/${referenceId}/remove`,
+    url: `/api/v1/code-references/${replaced.json().data.id}/remove`,
     payload: { reason: '关联错误' },
     headers: { cookie: adminUser.cookie },
   })

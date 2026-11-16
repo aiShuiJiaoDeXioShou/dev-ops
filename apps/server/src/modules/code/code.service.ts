@@ -789,6 +789,7 @@ export function createCodeService(deps: CodeServiceDeps) {
       repositoryId: string
       objectType: string
       remoteId: string
+      replaceReferenceId?: string
     },
   ) {
     if (!TARGET_TYPES.has(input.targetType)) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '关联事项类型不合法')
@@ -799,9 +800,6 @@ export function createCodeService(deps: CodeServiceDeps) {
     await validateTarget(projectId, input.targetType, input.targetId)
     const link = await findProjectRepositoryLink(db, projectId, input.repositoryId)
     if (!link) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库未关联到项目')
-    if ((await countCodeReferencesForTarget(db, input.targetType, input.targetId)) >= 20) {
-      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '单个事项最多关联 20 条代码引用')
-    }
     const repository = await findRepositoryById(db, input.repositoryId)
     if (!repository || repository.status !== 'available')
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '仓库不可用')
@@ -826,7 +824,23 @@ export function createCodeService(deps: CodeServiceDeps) {
     try {
       row = await db.transaction(async (tx) => {
         await lockProjectForWrite(tx, projectId)
-        return insertCodeReference(tx, {
+        const previous = input.replaceReferenceId
+          ? await findCodeReferenceById(tx, input.replaceReferenceId)
+          : undefined
+        if (input.replaceReferenceId) {
+          if (
+            !previous ||
+            previous.project_id !== projectId ||
+            previous.target_type !== input.targetType ||
+            previous.target_id !== input.targetId
+          ) {
+            throw new ApiError(ERROR_CODES.NOT_FOUND, '当前事项的原代码引用不存在')
+          }
+          await deleteCodeReference(tx, previous.id)
+        } else if ((await countCodeReferencesForTarget(tx, input.targetType, input.targetId)) >= 20) {
+          throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '单个事项最多关联 20 条代码引用')
+        }
+        const reference = await insertCodeReference(tx, {
           id: randomUUID(),
           teamId: project.teamId,
           projectId,
@@ -840,6 +854,21 @@ export function createCodeService(deps: CodeServiceDeps) {
           url: snapshot.url,
           createdByUserId: actor.id,
         })
+        await appendActivity(tx, {
+          projectId,
+          teamId: project.teamId,
+          entityType: input.targetType === 'requirement' ? 'requirement' : 'bug',
+          entityId: input.targetId,
+          actorUserId: actor.id,
+          action: previous ? 'code_reference_replaced' : 'code_reference_added',
+          changes: {
+            repositoryId: input.repositoryId,
+            objectType,
+            remoteId: input.remoteId,
+            ...(previous ? { previousRemoteId: previous.remote_id } : {}),
+          },
+        })
+        return reference
       })
     } catch (error) {
       if (isUniqueViolation(error)) {
@@ -914,7 +943,7 @@ export function createCodeService(deps: CodeServiceDeps) {
     if (note.length === 0 || note.length > 2000) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '移除原因长度不合法')
     await db.transaction(async (tx) => {
       await lockProjectForWrite(tx, current.project_id)
-      await deleteCodeReference(tx, codeReferenceId)
+      if (!(await deleteCodeReference(tx, codeReferenceId))) throw new ApiError(ERROR_CODES.NOT_FOUND, '代码引用不存在')
       await appendActivity(tx, {
         teamId: project.teamId,
         projectId: current.project_id,
