@@ -10,19 +10,27 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { projectRepositoriesQueryOptions } from '../api/queries'
 
-/** 为需求或 Bug 添加 Commit/Issue/PR 引用。 */
+/**
+ * 为需求或 Bug 核对、添加或替换 Commit、Issue 或 PR 引用。
+ * @param props 项目、目标事项及编辑弹窗的开关与焦点回调。
+ * @returns 编辑引用的局部表单，失败时保留填写内容。
+ */
 export function CodeReferenceDialog({
   projectId,
   targetType,
   targetId,
   open,
   onOpenChange,
+  onCloseAutoFocus,
+  reference,
 }: {
   projectId: string
   targetType: 'requirement' | 'bug'
   targetId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCloseAutoFocus?: (event: Event) => void
+  reference?: { id: string; repositoryId: string; objectType: string; remoteId: string }
 }) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
@@ -33,12 +41,13 @@ export function CodeReferenceDialog({
   const [error, setError] = useState('')
   useEffect(() => {
     if (open) {
-      setRepositoryId('')
-      setObjectType('issue')
-      setRemoteId('')
+      setRepositoryId(reference?.repositoryId ?? '')
+      const kind = reference?.objectType
+      setObjectType(kind === 'commit' || kind === 'change_request' ? kind : 'issue')
+      setRemoteId(reference?.remoteId ?? '')
       setError('')
     }
-  }, [open])
+  }, [open, reference])
   const mutation = useMutation({
     mutationFn: () =>
       apiClient.createCodeReference(projectId, {
@@ -47,11 +56,14 @@ export function CodeReferenceDialog({
         repositoryId,
         objectType,
         remoteId: remoteId.trim(),
+        ...(reference ? { replaceReferenceId: reference.id } : {}),
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: [targetType === 'requirement' ? 'requirements' : 'bugs', 'detail', targetId],
       })
+      await queryClient.invalidateQueries({ queryKey: ['collaboration', 'activities', targetType, targetId] })
+      showToast(reference ? '引用已更新。' : '引用已添加。', 'success')
       onOpenChange(false)
     },
     onError: (cause: unknown) => {
@@ -61,16 +73,20 @@ export function CodeReferenceDialog({
     },
   })
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
-          <DialogTitle>添加代码引用</DialogTitle>
+          <DialogTitle>{reference ? '编辑代码引用' : '添加代码引用'}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <label className="block space-y-1.5 text-sm font-medium">
             仓库
-            <Select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
-              <option value="">请选择项目仓库</option>
+            <Select
+              value={repositoryId}
+              disabled={repositories.isPending || mutation.isPending}
+              onChange={(event) => setRepositoryId(event.target.value)}
+            >
+              <option value="">{repositories.isPending ? '正在加载仓库…' : '请选择项目仓库'}</option>
               {(repositories.data?.data ?? []).map((repo) => (
                 <option key={repo.id} value={repo.id}>
                   {repo.namespace}/{repo.name}
@@ -78,9 +94,23 @@ export function CodeReferenceDialog({
               ))}
             </Select>
           </label>
+          {repositories.isError && (
+            <div className="flex items-center gap-2 text-sm text-destructive" role="alert">
+              仓库加载失败
+              <Button type="button" size="sm" variant="outline" onClick={() => void repositories.refetch()}>
+                重试
+              </Button>
+            </div>
+          )}
           <label className="block space-y-1.5 text-sm font-medium">
             对象类型
-            <Select value={objectType} onChange={(event) => setObjectType(event.target.value as typeof objectType)}>
+            <Select
+              value={objectType}
+              onChange={(event) => {
+                const value = event.target.value
+                if (value === 'commit' || value === 'issue' || value === 'change_request') setObjectType(value)
+              }}
+            >
               <option value="issue">Issue</option>
               <option value="change_request">Pull Request</option>
               <option value="commit">Commit</option>
@@ -97,7 +127,7 @@ export function CodeReferenceDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" type="button" disabled={mutation.isPending} onClick={() => onOpenChange(false)}>
             取消
           </Button>
           <Button
@@ -105,7 +135,7 @@ export function CodeReferenceDialog({
             disabled={mutation.isPending || !repositoryId || !remoteId.trim()}
             onClick={() => mutation.mutate()}
           >
-            {mutation.isPending ? '核对中…' : '核对并添加'}
+            {mutation.isPending ? '核对中…' : reference ? '核对并保存' : '核对并添加'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -26,6 +26,10 @@ import { describeAttachmentError } from '@/features/attachments/lib/errors'
 import { doneAttachmentIds, hasUnfinishedAttachments, toPendingAttachments } from '@/features/attachments/lib/pending'
 import type { PendingAttachment } from '@/features/attachments/model/types'
 import type { BugDetail } from '../model/types'
+import { isBugScopeEditable } from '../api/mutations'
+
+export type BugEditSection = 'title' | 'content' | 'people' | 'attachments'
+type UpdateBody = ApiBody<'/api/v1/bugs/{bugId}/update', 'post'>
 
 type CreateBody = ApiBody<'/api/v1/projects/{projectId}/bugs', 'post'>
 
@@ -57,6 +61,8 @@ export function BugForm({
   currentUserId,
   open,
   onOpenChange,
+  onCloseAutoFocus,
+  initialSection = 'title',
   bug,
   requirementId,
   onSaved,
@@ -66,6 +72,8 @@ export function BugForm({
   currentUserId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCloseAutoFocus?: (event: Event) => void
+  initialSection?: BugEditSection
   bug?: BugDetail | null
   requirementId?: string
   onSaved?: (bugId: string) => void
@@ -88,6 +96,9 @@ export function BugForm({
   const [error, setError] = useState('')
   const [formBody, setFormBody] = useState<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
+  const peopleRef = useRef<HTMLDivElement>(null)
+  const attachmentRef = useRef<HTMLDivElement>(null)
+  const scopeEditable = !bug || isBugScopeEditable(bug.status)
   const phenomenonRef = useRef<HTMLTextAreaElement>(null)
   const expectedBehaviorRef = useRef<HTMLTextAreaElement>(null)
   const reproductionRef = useRef<HTMLTextAreaElement>(null)
@@ -111,23 +122,45 @@ export function BugForm({
   }, [open, bug])
   const mutation = useMutation({
     mutationFn: async () => {
-      const base = {
-        title: title.trim(),
+      const scope = {
         phenomenon: phenomenon.trim(),
         expectedBehavior: expectedBehavior.trim(),
         reproduction: reproductionUnknown ? null : reproduction.trim(),
         reproductionUnknown,
         evidenceText: evidenceText.trim() || null,
         evidenceUrl: evidenceUrl.trim() || null,
-        fixOwnerUserId: fixOwnerUserId || null,
-        collaboratorUserIds,
-        attachmentIds: doneAttachmentIds(attachments),
       }
+      const base = { title: title.trim(), fixOwnerUserId: fixOwnerUserId || null, collaboratorUserIds }
+      const attachmentIds = doneAttachmentIds(attachments)
       if (bug) {
-        return apiClient.updateBug(bug.id, { ...base, version: bug.version })
+        const patch: UpdateBody = { version: bug.version, title: base.title }
+        if (base.fixOwnerUserId !== (bug.fixOwner?.userId ?? null)) patch.fixOwnerUserId = base.fixOwnerUserId
+        if (
+          base.collaboratorUserIds.length !== bug.collaborators.length ||
+          bug.collaborators.some((member) => !base.collaboratorUserIds.includes(member.userId))
+        ) {
+          patch.collaboratorUserIds = base.collaboratorUserIds
+        }
+        if (scopeEditable) {
+          if (scope.phenomenon !== bug.phenomenon) patch.phenomenon = scope.phenomenon
+          if (scope.expectedBehavior !== bug.expectedBehavior) patch.expectedBehavior = scope.expectedBehavior
+          if (scope.reproduction !== bug.reproduction) patch.reproduction = scope.reproduction
+          if (scope.reproductionUnknown !== bug.reproductionUnknown)
+            patch.reproductionUnknown = scope.reproductionUnknown
+          if (scope.evidenceText !== bug.evidenceText) patch.evidenceText = scope.evidenceText
+          if (scope.evidenceUrl !== bug.evidenceUrl) patch.evidenceUrl = scope.evidenceUrl
+          if (
+            attachmentIds.length !== bug.attachments.length ||
+            bug.attachments.some((attachment) => !attachmentIds.includes(attachment.id))
+          )
+            patch.attachmentIds = attachmentIds
+        }
+        return apiClient.updateBug(bug.id, patch)
       }
       const createBody: CreateBody = {
         ...base,
+        ...scope,
+        attachmentIds,
         ...(requirementId ? { requirementIds: [requirementId] } : {}),
       }
       return apiClient.createBug(projectId, createBody, { idempotencyKey: createIdempotencyKey() })
@@ -135,6 +168,8 @@ export function BugForm({
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['bugs'] })
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
+      await queryClient.invalidateQueries({ queryKey: ['collaboration', 'activities', 'bug', result.data.id] })
+      showToast(bug ? 'Bug 已保存。' : 'Bug 已创建。', 'success')
       onOpenChange(false)
       onSaved?.(result.data.id)
     },
@@ -158,15 +193,15 @@ export function BugForm({
       nextErrors.title = '请填写 Bug 标题。'
       firstTarget = titleRef.current
     }
-    if (!phenomenon.trim()) {
+    if (scopeEditable && !phenomenon.trim()) {
       nextErrors.phenomenon = '请填写现象。'
       firstTarget ??= phenomenonRef.current
     }
-    if (!expectedBehavior.trim()) {
+    if (scopeEditable && !expectedBehavior.trim()) {
       nextErrors.expectedBehavior = '请填写预期行为。'
       firstTarget ??= expectedBehaviorRef.current
     }
-    if (!reproductionUnknown && !reproduction.trim()) {
+    if (scopeEditable && !reproductionUnknown && !reproduction.trim()) {
       nextErrors.reproduction = '请填写复现信息或标注无法稳定复现。'
       firstTarget ??= reproductionRef.current
     }
@@ -214,8 +249,22 @@ export function BugForm({
     setAttachmentError('')
   }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent layout="form">
+    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
+      <DialogContent
+        layout="form"
+        onCloseAutoFocus={onCloseAutoFocus}
+        onOpenAutoFocus={(event) => {
+          const target = {
+            title: titleRef.current,
+            content: phenomenonRef.current,
+            people: peopleRef.current,
+            attachments: attachmentRef.current,
+          }[initialSection]
+          if (!target) return
+          event.preventDefault()
+          focusField(target)
+        }}
+      >
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
           <DialogFormHeader>
             <DialogTitle className="text-xl">{bug ? '编辑 Bug' : '创建 Bug'}</DialogTitle>
@@ -234,138 +283,149 @@ export function BugForm({
                     }}
                     aria-invalid={fieldErrors.title ? true : undefined}
                     maxLength={200}
-                    autoFocus
                   />
                 </FormField>
-                <FormField label="现象" htmlFor="bug-phenomenon" required error={fieldErrors.phenomenon}>
-                  <Textarea
-                    id="bug-phenomenon"
-                    ref={phenomenonRef}
-                    className="min-h-27"
-                    value={phenomenon}
-                    onChange={(event) => {
-                      setPhenomenon(event.target.value)
-                      clearFieldError('phenomenon')
-                    }}
-                    aria-invalid={fieldErrors.phenomenon ? true : undefined}
-                  />
-                </FormField>
-                <FormField label="预期行为" htmlFor="bug-expected" required error={fieldErrors.expectedBehavior}>
-                  <Textarea
-                    id="bug-expected"
-                    ref={expectedBehaviorRef}
-                    className="min-h-22"
-                    value={expectedBehavior}
-                    onChange={(event) => {
-                      setExpectedBehavior(event.target.value)
-                      clearFieldError('expectedBehavior')
-                    }}
-                    aria-invalid={fieldErrors.expectedBehavior ? true : undefined}
-                  />
-                </FormField>
-                <label className="form-inline-label flex flex-row items-center gap-2 text-sm font-medium">
-                  <Checkbox
-                    checked={reproductionUnknown}
-                    onCheckedChange={(checked) => {
-                      setReproductionUnknown(checked === true)
-                      clearFieldError('reproduction')
-                    }}
-                  />
-                  无法稳定复现，已记录现象
-                </label>
-                {!reproductionUnknown && (
-                  <FormField
-                    label="复现步骤"
-                    htmlFor="bug-reproduction"
-                    help="一行一步，便于他人按步骤复现。"
-                    error={fieldErrors.reproduction}
-                  >
-                    <Textarea
-                      id="bug-reproduction"
-                      ref={reproductionRef}
-                      className="min-h-22"
-                      value={reproduction}
-                      onChange={(event) => {
-                        setReproduction(event.target.value)
-                        clearFieldError('reproduction')
-                      }}
-                      aria-invalid={fieldErrors.reproduction ? true : undefined}
-                    />
-                  </FormField>
+                {scopeEditable ? (
+                  <>
+                    <FormField label="现象" htmlFor="bug-phenomenon" required error={fieldErrors.phenomenon}>
+                      <Textarea
+                        id="bug-phenomenon"
+                        ref={phenomenonRef}
+                        className="min-h-27"
+                        value={phenomenon}
+                        onChange={(event) => {
+                          setPhenomenon(event.target.value)
+                          clearFieldError('phenomenon')
+                        }}
+                        aria-invalid={fieldErrors.phenomenon ? true : undefined}
+                      />
+                    </FormField>
+                    <FormField label="预期行为" htmlFor="bug-expected" required error={fieldErrors.expectedBehavior}>
+                      <Textarea
+                        id="bug-expected"
+                        ref={expectedBehaviorRef}
+                        className="min-h-22"
+                        value={expectedBehavior}
+                        onChange={(event) => {
+                          setExpectedBehavior(event.target.value)
+                          clearFieldError('expectedBehavior')
+                        }}
+                        aria-invalid={fieldErrors.expectedBehavior ? true : undefined}
+                      />
+                    </FormField>
+                    <label className="form-inline-label flex flex-row items-center gap-2 text-sm font-medium">
+                      <Checkbox
+                        checked={reproductionUnknown}
+                        onCheckedChange={(checked) => {
+                          setReproductionUnknown(checked === true)
+                          clearFieldError('reproduction')
+                        }}
+                      />
+                      无法稳定复现，已记录现象
+                    </label>
+                    {!reproductionUnknown && (
+                      <FormField
+                        label="复现步骤"
+                        htmlFor="bug-reproduction"
+                        help="一行一步，便于他人按步骤复现。"
+                        error={fieldErrors.reproduction}
+                      >
+                        <Textarea
+                          id="bug-reproduction"
+                          ref={reproductionRef}
+                          className="min-h-22"
+                          value={reproduction}
+                          onChange={(event) => {
+                            setReproduction(event.target.value)
+                            clearFieldError('reproduction')
+                          }}
+                          aria-invalid={fieldErrors.reproduction ? true : undefined}
+                        />
+                      </FormField>
+                    )}
+                    <FormGrid>
+                      <FormField label="证据文本" htmlFor="bug-evidence-text">
+                        <Textarea
+                          id="bug-evidence-text"
+                          className="min-h-22"
+                          value={evidenceText}
+                          onChange={(event) => setEvidenceText(event.target.value)}
+                          placeholder="日志片段 / 请求 ID"
+                        />
+                      </FormField>
+                      <FormField label="证据链接" htmlFor="bug-evidence-url">
+                        <Input
+                          id="bug-evidence-url"
+                          value={evidenceUrl}
+                          onChange={(event) => setEvidenceUrl(event.target.value)}
+                          placeholder="https://…"
+                        />
+                      </FormField>
+                    </FormGrid>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">现象、复现、证据和附件清单随回归范围锁定。</p>
                 )}
-                <FormGrid>
-                  <FormField label="证据文本" htmlFor="bug-evidence-text">
-                    <Textarea
-                      id="bug-evidence-text"
-                      className="min-h-22"
-                      value={evidenceText}
-                      onChange={(event) => setEvidenceText(event.target.value)}
-                      placeholder="日志片段 / 请求 ID"
-                    />
-                  </FormField>
-                  <FormField label="证据链接" htmlFor="bug-evidence-url">
-                    <Input
-                      id="bug-evidence-url"
-                      value={evidenceUrl}
-                      onChange={(event) => setEvidenceUrl(event.target.value)}
-                      placeholder="https://…"
-                    />
-                  </FormField>
-                </FormGrid>
               </FormSection>
-              <FormSection title="负责人与协作人">
-                <FormField label="修复负责人" htmlFor="bug-fix-owner">
-                  <MemberSelect
-                    id="bug-fix-owner"
-                    value={fixOwnerUserId}
-                    onValueChange={setFixOwnerUserId}
-                    options={memberOptions}
-                    selectedDetail={
-                      teamMemberOptions.find((member) => member.userId === fixOwnerUserId) ?? bug?.fixOwner
-                    }
-                    currentUserId={currentUserId}
-                    loading={members.isPending || members.isFetching}
-                    error={membersError}
-                    onRetry={() => void members.refetch()}
-                    disabled={mutation.isPending}
-                    collisionBoundary={formBody}
-                  />
-                </FormField>
-                <FormField
-                  label="协作人员"
-                  labelId={collaboratorLabelId}
-                  messageId={collaboratorMessageId}
-                  help={`可搜索姓名或邮箱，最多选择 20 人。${
-                    collaboratorUserIds.length > 0 ? `已选 ${collaboratorUserIds.length} 人。` : ''
-                  }`}
-                >
-                  <MemberMultiSelect
-                    values={collaboratorUserIds}
-                    onValuesChange={setCollaboratorUserIds}
-                    options={memberOptions}
-                    selectedDetails={collaboratorDetails}
-                    maxSelected={20}
-                    loading={members.isPending}
-                    error={membersError}
-                    onRetry={() => void members.refetch()}
-                    disabled={mutation.isPending}
-                    placeholder="搜索姓名或邮箱"
+              <div ref={peopleRef} tabIndex={-1}>
+                <FormSection title="负责人与协作人">
+                  <FormField label="修复负责人" htmlFor="bug-fix-owner">
+                    <MemberSelect
+                      id="bug-fix-owner"
+                      value={fixOwnerUserId}
+                      onValueChange={setFixOwnerUserId}
+                      options={memberOptions}
+                      selectedDetail={
+                        teamMemberOptions.find((member) => member.userId === fixOwnerUserId) ?? bug?.fixOwner
+                      }
+                      currentUserId={currentUserId}
+                      loading={members.isPending || members.isFetching}
+                      error={membersError}
+                      onRetry={() => void members.refetch()}
+                      disabled={mutation.isPending}
+                      collisionBoundary={formBody}
+                    />
+                  </FormField>
+                  <FormField
+                    label="协作人员"
                     labelId={collaboratorLabelId}
-                    describedBy={collaboratorMessageId}
-                  />
-                </FormField>
-              </FormSection>
-              <FormSection title="附件">
-                <AttachmentField
-                  projectId={projectId}
-                  value={attachments}
-                  onChange={updateAttachments}
-                  disabled={mutation.isPending}
-                  label="附件文件"
-                  error={attachmentError}
-                  editing={Boolean(bug)}
-                />
-              </FormSection>
+                    messageId={collaboratorMessageId}
+                    help={`可搜索姓名或邮箱，最多选择 20 人。${
+                      collaboratorUserIds.length > 0 ? `已选 ${collaboratorUserIds.length} 人。` : ''
+                    }`}
+                  >
+                    <MemberMultiSelect
+                      values={collaboratorUserIds}
+                      onValuesChange={setCollaboratorUserIds}
+                      options={memberOptions}
+                      selectedDetails={collaboratorDetails}
+                      maxSelected={20}
+                      loading={members.isPending}
+                      error={membersError}
+                      onRetry={() => void members.refetch()}
+                      disabled={mutation.isPending}
+                      placeholder="搜索姓名或邮箱"
+                      labelId={collaboratorLabelId}
+                      describedBy={collaboratorMessageId}
+                    />
+                  </FormField>
+                </FormSection>
+              </div>
+              {scopeEditable && (
+                <div ref={attachmentRef} tabIndex={-1}>
+                  <FormSection title="附件">
+                    <AttachmentField
+                      projectId={projectId}
+                      value={attachments}
+                      onChange={updateAttachments}
+                      disabled={mutation.isPending}
+                      label="附件文件"
+                      error={attachmentError}
+                      editing={Boolean(bug)}
+                    />
+                  </FormSection>
+                </div>
+              )}
             </div>
           </DialogFormBody>
           {error && (
@@ -377,7 +437,7 @@ export function BugForm({
             <p className="px-4 pb-2 text-xs text-muted-foreground sm:px-6">请先完成附件上传或移除失败附件。</p>
           )}
           <DialogFormFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => onOpenChange(false)}>
               取消
             </Button>
             <Button type="submit" disabled={mutation.isPending || hasUnfinishedAttachmentsPending}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canWriteRequirements, isEditable } from './mutations'
+import { canWriteRequirements, isRequirementScopeEditable } from './mutations'
 
 describe('需求权限与可编辑状态', () => {
   it('仅管理员/开发者可写', () => {
@@ -8,9 +8,9 @@ describe('需求权限与可编辑状态', () => {
     expect(canWriteRequirements('viewer')).toBe(false)
   })
   it('仅待处理/开发中可编辑范围字段', () => {
-    expect(isEditable('pending')).toBe(true)
-    expect(isEditable('in_development')).toBe(true)
-    expect(isEditable('in_testing')).toBe(false)
-    expect(isEditable('passed')).toBe(false)
+    expect(isRequirementScopeEditable('pending')).toBe(true)
+    expect(isRequirementScopeEditable('in_development')).toBe(true)
+    expect(isRequirementScopeEditable('in_testing')).toBe(false)
+    expect(isRequirementScopeEditable('passed')).toBe(false)
   })
 })

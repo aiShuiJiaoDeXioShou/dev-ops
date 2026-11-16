@@ -87,7 +87,10 @@ test('[desktop] [mobile] 需求和 Bug 评论展示作者头像，缺失或损�
     await page.goto(`${projectPath}/${path}`)
     await page.locator('.item-title').first().click()
     const detail = page.getByRole('dialog', { name: title })
-    if (path === 'requirements') await detail.getByRole('tab', { name: '评论' }).click()
+    if (path === 'bugs') {
+      await expect(detail.getByRole('list', { name: '协作人员' }).locator('img')).toHaveAttribute('src', image)
+    }
+    await detail.getByRole('tab', { name: '评论' }).click()
     const comments = detail.getByRole('tabpanel', { name: '评论' })
     const withImage = comments.getByRole('listitem').filter({ hasText: '杨腾' })
     const uploaded = withImage.locator('[data-slot="user-avatar"] img')
@@ -99,9 +102,6 @@ test('[desktop] [mobile] 需求和 Bug 评论展示作者头像，缺失或损�
     await expect(
       comments.getByRole('listitem').filter({ hasText: '陈辰' }).locator('[data-slot="user-avatar"]'),
     ).toHaveText('陈')
-    if (path === 'bugs') {
-      await expect(detail.getByRole('list', { name: '协作人员' }).locator('img')).toHaveAttribute('src', image)
-    }
     await uploaded.scrollIntoViewIfNeeded()
     await page.screenshot({ path: testInfo.outputPath(`${path}-comment-avatars.png`) })
   }

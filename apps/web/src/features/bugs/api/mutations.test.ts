@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canWriteBugs, isEditableBug } from './mutations'
+import { canWriteBugs, isBugScopeEditable } from './mutations'
 
 describe('Bug 权限与可编辑状态', () => {
   it('仅管理员/开发者可写', () => {
@@ -8,9 +8,9 @@ describe('Bug 权限与可编辑状态', () => {
     expect(canWriteBugs('viewer')).toBe(false)
   })
   it('仅待处理/修复中可编辑核心字段', () => {
-    expect(isEditableBug('pending')).toBe(true)
-    expect(isEditableBug('in_fix')).toBe(true)
-    expect(isEditableBug('in_regression')).toBe(false)
-    expect(isEditableBug('closed')).toBe(false)
+    expect(isBugScopeEditable('pending')).toBe(true)
+    expect(isBugScopeEditable('in_fix')).toBe(true)
+    expect(isBugScopeEditable('in_regression')).toBe(false)
+    expect(isBugScopeEditable('closed')).toBe(false)
   })
 })

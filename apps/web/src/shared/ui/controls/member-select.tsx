@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { CheckIcon, ChevronDownIcon } from 'lucide-react'
+import { CheckIcon, ChevronDownIcon, Pencil } from 'lucide-react'
 import { Popover } from 'radix-ui'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { cn } from '@/shared/lib/utils'
@@ -9,6 +9,7 @@ import type { MemberOption, MemberSelectionDetail } from './member-multiselect'
 
 interface MemberSelectProps {
   id: string
+  appearance?: 'field' | 'inline'
   value: string
   /** 更新表单中的成员 ID，空字符串表示未指定。 */
   onValueChange: (value: string) => void
@@ -34,6 +35,7 @@ const optionClassName =
  */
 export function MemberSelect({
   id,
+  appearance = 'field',
   value,
   onValueChange,
   options,
@@ -62,6 +64,8 @@ export function MemberSelect({
   const selected =
     options.find((member) => member.userId === value) ?? (selectedDetail?.userId === value ? selectedDetail : null)
   const selectedName = selected?.name ?? '未知成员'
+  const selectedImage = selected?.image ?? (selectedDetail?.userId === value ? selectedDetail.image : undefined)
+  const isInline = appearance === 'inline'
   const unavailable = selected?.available === false
   const canClear = value !== '' && !keyword
   const optionCount = matches.length + Number(canClear)
@@ -90,6 +94,7 @@ export function MemberSelect({
   }
 
   const changeOpen = (next: boolean) => {
+    if (next && disabled) return
     setOpen(next)
     setQuery('')
     setHighlighted(null)
@@ -132,7 +137,7 @@ export function MemberSelect({
                 ref={searchRef}
                 role="combobox"
                 type="text"
-                className={cn('h-11', hasSearchAction && 'pr-24')}
+                className={cn('h-11', isInline && 'work-item-owner-trigger', hasSearchAction && 'pr-24')}
                 placeholder="搜索姓名或邮箱"
                 value={query}
                 autoFocus
@@ -167,11 +172,15 @@ export function MemberSelect({
               <Button
                 id={id}
                 type="button"
-                variant="outline"
+                variant={isInline ? 'ghost' : 'outline'}
                 aria-haspopup="listbox"
                 aria-describedby={valueId}
-                className="h-11 w-full min-w-0 justify-between border-input px-3 font-normal shadow-xs dark:bg-background"
-                disabled={disabled}
+                className={cn(
+                  'h-11 w-full min-w-0 justify-between font-normal',
+                  isInline ? 'work-item-owner-trigger px-1.5' : 'border-input px-3 shadow-xs dark:bg-background',
+                )}
+                disabled={disabled && !isInline}
+                aria-disabled={isInline && disabled ? true : undefined}
                 onKeyDown={(event) => {
                   if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
                   event.preventDefault()
@@ -181,7 +190,7 @@ export function MemberSelect({
                 <span id={valueId} className="min-w-0">
                   {value ? (
                     <span className="inline-flex max-w-full items-center gap-1 rounded-full border bg-secondary py-0.5 pr-2 pl-0.5">
-                      <UserAvatar name={selectedName} image={selected?.image} toneSeed={value} className="size-5" />
+                      <UserAvatar name={selectedName} image={selectedImage} toneSeed={value} className="size-5" />
                       <span className="truncate">{selectedName}</span>
                       {unavailable && <span className="shrink-0 text-xs text-destructive">已失效</span>}
                     </span>
@@ -189,7 +198,11 @@ export function MemberSelect({
                     <span className="text-muted-foreground">未指定</span>
                   )}
                 </span>
-                <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                {isInline ? (
+                  <Pencil className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                ) : (
+                  <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                )}
               </Button>
             </Popover.Trigger>
           )}

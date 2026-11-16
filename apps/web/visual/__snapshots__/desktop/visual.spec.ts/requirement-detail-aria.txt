@@ -6,6 +6,7 @@
     - paragraph: "需求 #1"
     - heading "平台体验迭代 2026-11：核心交互修复与流水线自举验收" [level=2]
     - text: 已通过 更新 2026/11/11 12:31
+    - button "编辑需求"
     - button "更多需求操作"
   - region "需求流程":
     - list "流程节点":
@@ -23,7 +24,8 @@
     - text: 已完成
     - button "更多节点操作"
     - term: 测试负责人
-    - definition: 管理员
+    - definition:
+      - button "测试负责人": 管理员
   - tablist "需求详情分区":
     - tab "基本信息" [selected]
     - tab "节点详情"
@@ -32,10 +34,14 @@
     - tab "操作记录"
   - tabpanel "基本信息":
     - term: 研发负责人
-    - definition: 开发同学
+    - definition:
+      - button "研发负责人": 开发同学
     - term: 测试负责人
-    - definition: 管理员
-    - term: 协作人员
+    - definition:
+      - button "测试负责人": 管理员
+    - term:
+      - text: 协作人员
+      - button "编辑协作人员"
     - definition:
       - list "协作人员":
         - listitem: 浏览同学
@@ -72,16 +78,21 @@
           - link "下载":
             - /url: /api/v1/attachments/f6d24a39-a4e6-53e7-bbc9-682c4da5ec3e/download
           - button "删除附件 attachment.txt": 删除
-    - heading "代码引用" [level=3]
-    - button "添加引用"
-    - list:
-      - listitem:
-        - 'link "feat: 平台体验审计与自举迭代（2026-11）"':
-          - /url: https://github.com/example/dev-ops/pull/1
-        - text: ok
-        - button "刷新"
-      - listitem:
-        - 'link "docs: 记录体验审计与自举迭代验收"':
-          - /url: https://github.com/example/dev-ops/commit/a85f1b79b231098798dc42c8b23867d4daf4f463
-        - text: ok
-        - button "刷新"
+    - region "代码引用":
+      - heading "代码引用" [level=3]
+      - button "添加引用"
+      - list:
+        - listitem:
+          - 'link "feat: 平台体验审计与自举迭代（2026-11）"':
+            - /url: https://github.com/example/dev-ops/pull/1
+          - text: 正常
+          - 'button "编辑引用 feat: 平台体验审计与自举迭代（2026-11）"'
+          - 'button "刷新引用 feat: 平台体验审计与自举迭代（2026-11）"'
+          - 'button "移除引用 feat: 平台体验审计与自举迭代（2026-11）"'
+        - listitem:
+          - 'link "docs: 记录体验审计与自举迭代验收"':
+            - /url: https://github.com/example/dev-ops/commit/a85f1b79b231098798dc42c8b23867d4daf4f463
+          - text: 正常
+          - 'button "编辑引用 docs: 记录体验审计与自举迭代验收"'
+          - 'button "刷新引用 docs: 记录体验审计与自举迭代验收"'
+          - 'button "移除引用 docs: 记录体验审计与自举迭代验收"'

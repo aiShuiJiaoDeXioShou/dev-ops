@@ -20,13 +20,18 @@ const TITLES: Record<BugAction, string> = {
   reopen: '重开 Bug',
 }
 
-/** Bug 状态动作对话框。 */
+/**
+ * 收集回归、关闭和重开 Bug 的流转信息。
+ * @param props Bug、执行动作、团队和关闭后焦点回调。
+ * @returns 保留失败输入的流转对话框，提交成功后刷新当前 Bug。
+ */
 export function BugActionDialog({
   bug,
   action,
   teamId,
   open,
   onOpenChange,
+  onCloseAutoFocus,
   onDone,
 }: {
   bug: BugDetail
@@ -34,6 +39,7 @@ export function BugActionDialog({
   teamId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCloseAutoFocus?: (event: Event) => void
   onDone?: () => void
 }) {
   const queryClient = useQueryClient()
@@ -110,7 +116,7 @@ export function BugActionDialog({
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{TITLES[action]}</DialogTitle>
         </DialogHeader>

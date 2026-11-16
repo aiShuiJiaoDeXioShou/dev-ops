@@ -6,8 +6,12 @@ export function canWriteRequirements(role: TeamRole): boolean {
   return role === 'admin' || role === 'developer'
 }
 
-/** 不需要提测的有效状态。 */
-export function isEditable(status: string): boolean {
+/**
+ * 判断需求是否可改正文、外部链接、验收标准和附件清单。
+ * @param status 当前需求状态。
+ * @returns 待处理或开发中时返回 true。
+ */
+export function isRequirementScopeEditable(status: string): boolean {
   return status === 'pending' || status === 'in_development'
 }
 

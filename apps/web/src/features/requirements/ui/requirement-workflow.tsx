@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
-import { Check, Ellipsis } from 'lucide-react'
-import { cn } from '@/shared/lib/utils'
+import { Ellipsis } from 'lucide-react'
 import { Button } from '@/shared/ui/controls/button'
 import {
   DropdownMenu,
@@ -9,19 +8,13 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/controls/dropdown-menu'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { UserAvatar } from '@/shared/ui/user-avatar'
+import { WorkItemOwnerField } from '@/features/collaboration/ui/work-item-owner-field'
+import { WorkItemStageRail } from '@/features/collaboration/ui/work-item-stage-rail'
+import { planNodes, WORK_ITEM_STAGES } from '@/features/collaboration/model/work-item-plan'
 import type { RequirementDetail } from '../model/types'
 import type { RequirementAction } from './requirement-action-dialog'
 
-const STEPS = ['pending', 'in_development', 'submitted', 'in_testing', 'passed'] as const
-const STEP_LABELS: Record<RequirementDetail['status'], string> = {
-  pending: '待处理',
-  in_development: '开发',
-  submitted: '待测试',
-  in_testing: '测试',
-  passed: '已通过',
-  cancelled: '已取消',
-}
+const STEPS = WORK_ITEM_STAGES.requirement.map(([id]) => id)
 
 type StartAction = 'start-development' | 'start-test'
 type WorkflowAction = { label: string; kind: RequirementAction | StartAction }
@@ -59,6 +52,7 @@ export function RequirementWorkflow({
   startError,
   onStart,
   onAction,
+  onOwnerChange,
 }: {
   requirement: RequirementDetail
   canWrite: boolean
@@ -66,6 +60,7 @@ export function RequirementWorkflow({
   startError: string
   onStart: (action: StartAction) => void
   onAction: (action: RequirementAction, trigger: HTMLButtonElement | null) => void
+  onOwnerChange: (field: 'devOwnerUserId' | 'testOwnerUserId', userId: string | null) => Promise<void>
 }) {
   const { status } = requirement
   const menu = useRef<HTMLButtonElement>(null)
@@ -73,6 +68,9 @@ export function RequirementWorkflow({
   const currentIndex = STEPS.findIndex((step) => step === status)
   const selectedIndex = preview?.current === status ? preview.index : currentIndex
   const selected = STEPS[selectedIndex] ?? status
+  const titles = planNodes('requirement', requirement.plan)
+    .slice(0, STEPS.length)
+    .map((node) => node.title)
   const isCurrent = selected === status
   const primary = canWrite && isCurrent ? PRIMARY_ACTIONS[status] : undefined
   const secondary = canWrite && isCurrent ? SECONDARY_ACTIONS[status] : undefined
@@ -82,51 +80,21 @@ export function RequirementWorkflow({
 
   return (
     <section className="space-y-4" aria-label="需求流程">
-      {currentIndex >= 0 && (
-        <ol aria-label="流程节点" className="requirement-flow-steps">
-          {STEPS.map((step, index) => {
-            const progress = stepState(index, currentIndex)
-            return (
-              <li key={step}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-current={step === status ? 'step' : undefined}
-                  aria-pressed={index === selectedIndex}
-                  aria-label={`${STEP_LABELS[step]}，${progress.label}`}
-                  className={cn(
-                    'relative z-10 gap-1 rounded-full px-1.5 text-xs sm:gap-1.5 sm:px-3 sm:text-sm dark:bg-background dark:hover:bg-muted',
-                    index === selectedIndex && 'border-primary text-primary',
-                    progress.tone === 'neutral' && index !== selectedIndex && 'text-muted-foreground',
-                  )}
-                  onClick={() => setPreview({ current: status, index })}
-                >
-                  {progress.tone === 'success' ? (
-                    <Check className="size-3 text-success" aria-hidden="true" />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        'size-2 shrink-0 rounded-full',
-                        progress.tone === 'warning' ? 'bg-warning' : 'bg-muted-foreground/40',
-                      )}
-                    />
-                  )}
-                  {STEP_LABELS[step]}
-                </Button>
-              </li>
-            )
-          })}
-        </ol>
-      )}
+      <WorkItemStageRail
+        titles={titles}
+        current={currentIndex}
+        selected={selectedIndex}
+        currentProgress={stepState(currentIndex, currentIndex).label}
+        onSelect={(index) => setPreview({ current: status, index })}
+      />
       <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold sm:text-base">{STEP_LABELS[selected]}</h3>
+            <h3 className="text-sm font-semibold sm:text-base">{titles[selectedIndex] ?? '已取消'}</h3>
             {state && <StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
           </div>
           {(primary || secondary) && (
-            <div className="requirement-flow-actions ml-auto flex items-center gap-2">
+            <div className="work-item-flow-actions ml-auto flex items-center gap-2">
               {primary && (
                 <Button
                   type="button"
@@ -150,7 +118,7 @@ export function RequirementWorkflow({
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="requirement-more-button"
+                      className="work-item-icon-button"
                       aria-label="更多节点操作"
                     >
                       <Ellipsis aria-hidden="true" />
@@ -168,11 +136,16 @@ export function RequirementWorkflow({
         </div>
         {status !== 'cancelled' && (
           <dl className="rounded-lg border border-border px-3 py-2.5">
-            <dt className="text-xs text-muted-foreground">{usesTestOwner ? '测试负责人' : '研发负责人'}</dt>
-            <dd className="mt-1 flex min-h-6 items-center gap-2 text-sm wrap-anywhere">
-              {owner && <UserAvatar name={owner.name} toneSeed={owner.userId} className="size-6" />}
-              {owner?.name ?? '未指定'}
-            </dd>
+            <WorkItemOwnerField
+              teamId={requirement.teamId}
+              label={usesTestOwner ? '测试负责人' : '研发负责人'}
+              owner={owner}
+              onSave={
+                canWrite && isCurrent
+                  ? (id) => onOwnerChange(usesTestOwner ? 'testOwnerUserId' : 'devOwnerUserId', id)
+                  : undefined
+              }
+            />
           </dl>
         )}
         {startError && (

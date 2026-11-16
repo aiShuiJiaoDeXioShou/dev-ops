@@ -232,10 +232,10 @@ describe('RequirementForm', () => {
     await waitFor(() =>
       expect(submittedBody).toMatchObject({
         devOwnerUserId: null,
-        testOwnerUserId: memberFixture.userId,
         version: editingRequirement.version,
       }),
     )
+    expect(submittedBody).not.toHaveProperty('testOwnerUserId')
   })
 
   it('成员列表加载失败后，能用键盘重试并继续选人', async () => {

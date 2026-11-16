@@ -30,6 +30,8 @@ const ACTION_LABELS: Record<string, string> = {
   bug_reopened: '重开 Bug',
   requirement_linked: '关联需求',
   requirement_unlinked: '移除需求关联',
+  code_reference_added: '添加代码引用',
+  code_reference_replaced: '编辑代码引用',
   code_reference_removed: '移除代码引用',
 }
 

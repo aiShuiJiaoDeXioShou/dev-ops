@@ -27,9 +27,12 @@ import { doneAttachmentIds, hasUnfinishedAttachments, toPendingAttachments } fro
 import type { PendingAttachment } from '@/features/attachments/model/types'
 import type { RequirementDetail } from '../model/types'
 import { REQUIREMENT_STATUS_LABELS } from '../model/labels'
+import { isRequirementScopeEditable } from '../api/mutations'
 
 type CreateBody = ApiBody<'/api/v1/projects/{projectId}/requirements', 'post'>
 type UpdateBody = ApiBody<'/api/v1/requirements/{requirementId}/update', 'post'>
+
+export type RequirementEditSection = 'title' | 'content' | 'people' | 'attachments'
 
 interface RequirementFormProps {
   projectId: string
@@ -38,6 +41,7 @@ interface RequirementFormProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCloseAutoFocus?: (event: Event) => void
+  initialSection?: RequirementEditSection
   requirement?: RequirementDetail | null
   onSaved?: (requirementId: string) => void
 }
@@ -70,6 +74,7 @@ export function RequirementForm({
   open,
   onOpenChange,
   onCloseAutoFocus,
+  initialSection = 'title',
   requirement,
   onSaved,
 }: RequirementFormProps) {
@@ -91,6 +96,9 @@ export function RequirementForm({
   const [error, setError] = useState('')
   const [formBody, setFormBody] = useState<HTMLDivElement | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
+  const peopleRef = useRef<HTMLDivElement>(null)
+  const attachmentRef = useRef<HTMLDivElement>(null)
+  const scopeEditable = !requirement || isRequirementScopeEditable(requirement.status)
   const contentRef = useRef<HTMLTextAreaElement>(null)
   const externalUrlRef = useRef<HTMLInputElement>(null)
   const collaboratorLabelId = useId()
@@ -115,14 +123,9 @@ export function RequirementForm({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const base = {
-        title: title.trim(),
+      const scope = {
         contentMode,
         acceptanceCriteria: acceptanceCriteria.trim() || null,
-        devOwnerUserId: devOwnerUserId || null,
-        testOwnerUserId: testOwnerUserId || null,
-        collaboratorUserIds,
-        attachmentIds: doneAttachmentIds(attachments),
         ...(contentMode === 'markdown'
           ? { contentMarkdown: contentMarkdown.trim(), externalUrl: null, externalSummary: null }
           : {
@@ -131,14 +134,50 @@ export function RequirementForm({
               contentMarkdown: null,
             }),
       }
-      if (requirement) {
-        return apiClient.updateRequirement(requirement.id, { ...base, version: requirement.version } as UpdateBody)
+      const base = {
+        title: title.trim(),
+        devOwnerUserId: devOwnerUserId || null,
+        testOwnerUserId: testOwnerUserId || null,
+        collaboratorUserIds,
       }
-      return apiClient.createRequirement(projectId, base as CreateBody, { idempotencyKey: createIdempotencyKey() })
+      const attachmentIds = doneAttachmentIds(attachments)
+      if (requirement) {
+        const patch: UpdateBody = { version: requirement.version, title: base.title }
+        if (base.devOwnerUserId !== (requirement.devOwner?.userId ?? null)) patch.devOwnerUserId = base.devOwnerUserId
+        if (base.testOwnerUserId !== (requirement.testOwner?.userId ?? null))
+          patch.testOwnerUserId = base.testOwnerUserId
+        if (
+          base.collaboratorUserIds.length !== requirement.collaborators.length ||
+          requirement.collaborators.some((member) => !base.collaboratorUserIds.includes(member.userId))
+        ) {
+          patch.collaboratorUserIds = base.collaboratorUserIds
+        }
+        if (scopeEditable) {
+          if (
+            scope.contentMode !== requirement.contentMode ||
+            scope.contentMarkdown !== requirement.contentMarkdown ||
+            scope.externalUrl !== requirement.externalUrl ||
+            scope.externalSummary !== requirement.externalSummary
+          )
+            Object.assign(patch, scope)
+          if (scope.acceptanceCriteria !== requirement.acceptanceCriteria)
+            patch.acceptanceCriteria = scope.acceptanceCriteria
+          if (
+            attachmentIds.length !== requirement.attachments.length ||
+            requirement.attachments.some((attachment) => !attachmentIds.includes(attachment.id))
+          )
+            patch.attachmentIds = attachmentIds
+        }
+        return apiClient.updateRequirement(requirement.id, patch)
+      }
+      const create: CreateBody = { ...base, ...scope, attachmentIds }
+      return apiClient.createRequirement(projectId, create, { idempotencyKey: createIdempotencyKey() })
     },
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['requirements'] })
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
+      await queryClient.invalidateQueries({ queryKey: ['collaboration', 'activities', 'requirement', result.data.id] })
+      showToast(requirement ? '需求已保存。' : '需求已创建。', 'success')
       onOpenChange(false)
       onSaved?.(result.data.id)
     },
@@ -162,11 +201,11 @@ export function RequirementForm({
       nextErrors.title = '请填写需求标题。'
       firstTarget = titleRef.current
     }
-    if (contentMode === 'markdown' && !contentMarkdown.trim()) {
+    if (scopeEditable && contentMode === 'markdown' && !contentMarkdown.trim()) {
       nextErrors.contentMarkdown = '请填写需求正文。'
       firstTarget ??= contentRef.current
     }
-    if (contentMode === 'external_link' && !/^https?:\/\//.test(externalUrl.trim())) {
+    if (scopeEditable && contentMode === 'external_link' && !/^https?:\/\//.test(externalUrl.trim())) {
       nextErrors.externalUrl = '外部链接必须是 HTTP/HTTPS 地址。'
       firstTarget ??= externalUrlRef.current
     }
@@ -223,8 +262,22 @@ export function RequirementForm({
     setAttachmentError('')
   }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent layout="form" onCloseAutoFocus={onCloseAutoFocus}>
+    <Dialog open={open} onOpenChange={(next) => !mutation.isPending && onOpenChange(next)}>
+      <DialogContent
+        layout="form"
+        onCloseAutoFocus={onCloseAutoFocus}
+        onOpenAutoFocus={(event) => {
+          const target = {
+            title: titleRef.current,
+            content: requirement?.contentMode === 'external_link' ? externalUrlRef.current : contentRef.current,
+            people: peopleRef.current,
+            attachments: attachmentRef.current,
+          }[initialSection]
+          if (!target) return
+          event.preventDefault()
+          focusField(target)
+        }}
+      >
         <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
           <DialogFormHeader>
             <DialogTitle className="text-xl">
@@ -247,139 +300,154 @@ export function RequirementForm({
                     }}
                     aria-invalid={fieldErrors.title ? true : undefined}
                     maxLength={200}
-                    autoFocus
                   />
                 </FormField>
-                <FormField label="内容方式" htmlFor="requirement-content-mode" required>
-                  <Select
-                    className="flex w-full"
-                    id="requirement-content-mode"
-                    value={contentMode}
-                    onChange={(event) => setContentMode(event.target.value as 'markdown' | 'external_link')}
-                  >
-                    <option value="markdown">内置 Markdown</option>
-                    <option value="external_link">外部文档链接</option>
-                  </Select>
-                </FormField>
-                {contentMode === 'markdown' ? (
-                  <FormField
-                    label="正文"
-                    htmlFor="requirement-content"
-                    required
-                    help="支持 Markdown，说明背景、目标与范围。"
-                    error={fieldErrors.contentMarkdown}
-                  >
-                    <Textarea
-                      id="requirement-content"
-                      ref={contentRef}
-                      className="min-h-27"
-                      value={contentMarkdown}
-                      onChange={(event) => {
-                        setContentMarkdown(event.target.value)
-                        clearFieldError('contentMarkdown')
-                      }}
-                      aria-invalid={fieldErrors.contentMarkdown ? true : undefined}
-                    />
-                  </FormField>
-                ) : (
+                {scopeEditable ? (
                   <>
-                    <FormField
-                      label="外部链接"
-                      htmlFor="requirement-external-url"
-                      required
-                      error={fieldErrors.externalUrl}
-                    >
-                      <Input
-                        id="requirement-external-url"
-                        ref={externalUrlRef}
-                        value={externalUrl}
+                    <FormField label="内容方式" htmlFor="requirement-content-mode" required>
+                      <Select
+                        className="flex w-full"
+                        id="requirement-content-mode"
+                        value={contentMode}
                         onChange={(event) => {
-                          setExternalUrl(event.target.value)
-                          clearFieldError('externalUrl')
+                          const value = event.target.value
+                          if (value === 'markdown' || value === 'external_link') setContentMode(value)
                         }}
-                        aria-invalid={fieldErrors.externalUrl ? true : undefined}
-                        placeholder="https://…"
-                      />
+                      >
+                        <option value="markdown">内置 Markdown</option>
+                        <option value="external_link">外部文档链接</option>
+                      </Select>
                     </FormField>
-                    <FormField label="本地摘要" htmlFor="requirement-external-summary">
+                    {contentMode === 'markdown' ? (
+                      <FormField
+                        label="正文"
+                        htmlFor="requirement-content"
+                        required
+                        help="支持 Markdown，说明背景、目标与范围。"
+                        error={fieldErrors.contentMarkdown}
+                      >
+                        <Textarea
+                          id="requirement-content"
+                          ref={contentRef}
+                          className="min-h-27"
+                          value={contentMarkdown}
+                          onChange={(event) => {
+                            setContentMarkdown(event.target.value)
+                            clearFieldError('contentMarkdown')
+                          }}
+                          aria-invalid={fieldErrors.contentMarkdown ? true : undefined}
+                        />
+                      </FormField>
+                    ) : (
+                      <>
+                        <FormField
+                          label="外部链接"
+                          htmlFor="requirement-external-url"
+                          required
+                          error={fieldErrors.externalUrl}
+                        >
+                          <Input
+                            id="requirement-external-url"
+                            ref={externalUrlRef}
+                            value={externalUrl}
+                            onChange={(event) => {
+                              setExternalUrl(event.target.value)
+                              clearFieldError('externalUrl')
+                            }}
+                            aria-invalid={fieldErrors.externalUrl ? true : undefined}
+                            placeholder="https://…"
+                          />
+                        </FormField>
+                        <FormField label="本地摘要" htmlFor="requirement-external-summary">
+                          <Textarea
+                            id="requirement-external-summary"
+                            className="min-h-22"
+                            value={externalSummary}
+                            onChange={(event) => setExternalSummary(event.target.value)}
+                          />
+                        </FormField>
+                      </>
+                    )}
+                    <FormField label="验收标准" htmlFor="requirement-acceptance">
                       <Textarea
-                        id="requirement-external-summary"
+                        id="requirement-acceptance"
                         className="min-h-22"
-                        value={externalSummary}
-                        onChange={(event) => setExternalSummary(event.target.value)}
+                        value={acceptanceCriteria}
+                        onChange={(event) => setAcceptanceCriteria(event.target.value)}
                       />
                     </FormField>
                   </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">正文、外部文档、验收标准和附件清单随测试范围锁定。</p>
                 )}
-                <FormField label="验收标准" htmlFor="requirement-acceptance">
-                  <Textarea
-                    id="requirement-acceptance"
-                    className="min-h-22"
-                    value={acceptanceCriteria}
-                    onChange={(event) => setAcceptanceCriteria(event.target.value)}
-                  />
-                </FormField>
               </FormSection>
-              <FormSection title="负责人与协作人">
-                <FormGrid>
-                  <FormField label="研发负责人" htmlFor="requirement-dev-owner">
-                    <MemberSelect
-                      {...ownerPickerProps}
-                      id="requirement-dev-owner"
-                      value={devOwnerUserId}
-                      onValueChange={setDevOwnerUserId}
-                      selectedDetail={
-                        teamMemberOptions.find((member) => member.userId === devOwnerUserId) ?? requirement?.devOwner
-                      }
-                    />
-                  </FormField>
-                  <FormField label="测试负责人" htmlFor="requirement-test-owner">
-                    <MemberSelect
-                      {...ownerPickerProps}
-                      id="requirement-test-owner"
-                      value={testOwnerUserId}
-                      onValueChange={setTestOwnerUserId}
-                      selectedDetail={
-                        teamMemberOptions.find((member) => member.userId === testOwnerUserId) ?? requirement?.testOwner
-                      }
-                    />
-                  </FormField>
-                </FormGrid>
-                <FormField
-                  label="协作人员"
-                  labelId={collaboratorLabelId}
-                  messageId={collaboratorMessageId}
-                  help={`可搜索姓名或邮箱，最多选择 20 人。${
-                    collaboratorUserIds.length > 0 ? `已选 ${collaboratorUserIds.length} 人。` : ''
-                  }`}
-                >
-                  <MemberMultiSelect
-                    values={collaboratorUserIds}
-                    onValuesChange={setCollaboratorUserIds}
-                    options={memberOptions}
-                    selectedDetails={collaboratorDetails}
-                    maxSelected={20}
-                    loading={members.isPending}
-                    error={membersError}
-                    onRetry={() => void members.refetch()}
-                    disabled={mutation.isPending}
-                    placeholder="搜索姓名或邮箱"
+              <div ref={peopleRef} tabIndex={-1}>
+                <FormSection title="负责人与协作人">
+                  <FormGrid>
+                    <FormField label="研发负责人" htmlFor="requirement-dev-owner">
+                      <MemberSelect
+                        {...ownerPickerProps}
+                        id="requirement-dev-owner"
+                        value={devOwnerUserId}
+                        onValueChange={setDevOwnerUserId}
+                        selectedDetail={
+                          teamMemberOptions.find((member) => member.userId === devOwnerUserId) ?? requirement?.devOwner
+                        }
+                      />
+                    </FormField>
+                    <FormField label="测试负责人" htmlFor="requirement-test-owner">
+                      <MemberSelect
+                        {...ownerPickerProps}
+                        id="requirement-test-owner"
+                        value={testOwnerUserId}
+                        onValueChange={setTestOwnerUserId}
+                        selectedDetail={
+                          teamMemberOptions.find((member) => member.userId === testOwnerUserId) ??
+                          requirement?.testOwner
+                        }
+                      />
+                    </FormField>
+                  </FormGrid>
+                  <FormField
+                    label="协作人员"
                     labelId={collaboratorLabelId}
-                    describedBy={collaboratorMessageId}
-                  />
-                </FormField>
-              </FormSection>
-              <FormSection title="附件">
-                <AttachmentField
-                  projectId={projectId}
-                  value={attachments}
-                  onChange={updateAttachments}
-                  disabled={mutation.isPending}
-                  label="附件文件"
-                  error={attachmentError}
-                  editing={Boolean(requirement)}
-                />
-              </FormSection>
+                    messageId={collaboratorMessageId}
+                    help={`可搜索姓名或邮箱，最多选择 20 人。${
+                      collaboratorUserIds.length > 0 ? `已选 ${collaboratorUserIds.length} 人。` : ''
+                    }`}
+                  >
+                    <MemberMultiSelect
+                      values={collaboratorUserIds}
+                      onValuesChange={setCollaboratorUserIds}
+                      options={memberOptions}
+                      selectedDetails={collaboratorDetails}
+                      maxSelected={20}
+                      loading={members.isPending}
+                      error={membersError}
+                      onRetry={() => void members.refetch()}
+                      disabled={mutation.isPending}
+                      placeholder="搜索姓名或邮箱"
+                      labelId={collaboratorLabelId}
+                      describedBy={collaboratorMessageId}
+                    />
+                  </FormField>
+                </FormSection>
+              </div>
+              {scopeEditable && (
+                <div ref={attachmentRef} tabIndex={-1}>
+                  <FormSection title="附件">
+                    <AttachmentField
+                      projectId={projectId}
+                      value={attachments}
+                      onChange={updateAttachments}
+                      disabled={mutation.isPending}
+                      label="附件文件"
+                      error={attachmentError}
+                      editing={Boolean(requirement)}
+                    />
+                  </FormSection>
+                </div>
+              )}
             </div>
           </DialogFormBody>
           {error && (
@@ -391,7 +459,7 @@ export function RequirementForm({
             <p className="px-4 pb-2 text-xs text-muted-foreground sm:px-6">请先完成附件上传或移除失败附件。</p>
           )}
           <DialogFormFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={mutation.isPending} onClick={() => onOpenChange(false)}>
               取消
             </Button>
             <Button type="submit" disabled={mutation.isPending || hasUnfinishedAttachmentsPending}>

@@ -1,8 +1,6 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { isBusinessError } from '@dev-ops/api-client'
-import { Ellipsis } from 'lucide-react'
-import { apiClient } from '@/shared/api/client'
+import { Ellipsis, Pencil, Plus } from 'lucide-react'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import {
@@ -12,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/ui/controls/dropdown-menu'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
+import { TabsContent } from '@/shared/ui/controls/tabs'
 import { WorkItemDetailSheet } from '@/shared/ui/controls/work-item-detail-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { ActivityTimeline } from '@/features/collaboration/ui/activity-timeline'
@@ -20,8 +18,12 @@ import { CommentForm } from '@/features/collaboration/ui/comment-form'
 import { CollaboratorTags } from '@/features/collaboration/ui/collaborator-tags'
 import { CommentList } from '@/features/collaboration/ui/comment-list'
 import { WorkItemLinks } from '@/features/collaboration/ui/work-item-links'
-import { CodeReferenceCard } from '@/features/code/ui/code-reference-card'
-import { CodeReferenceDialog } from '@/features/code/ui/code-reference-dialog'
+import { WorkItemCodeReferences } from '@/features/code/ui/code-reference-card'
+import { WorkItemOwnerField } from '@/features/collaboration/ui/work-item-owner-field'
+import { WorkItemDetailTabs } from '@/features/collaboration/ui/work-item-detail-tabs'
+import { WorkItemPlanning } from '@/features/collaboration/ui/work-item-planning'
+import { saveWorkItemUpdate } from '@/features/collaboration/api/work-item-update'
+import { workPlanRange } from '@/features/collaboration/model/work-item-plan'
 import { BugForm } from '@/features/bugs/ui/bug-form'
 import { AttachmentList } from '@/features/attachments/ui/attachment-list'
 import { describeAttachmentError } from '@/features/attachments/lib/errors'
@@ -34,10 +36,11 @@ import { formatDateTime } from '@/shared/lib/format'
 import { Markdown } from '@/shared/lib/markdown'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { requirementQueryOptions, submissionQueryOptions } from '../api/queries'
-import { canWriteRequirements, isEditable, requirementMutations } from '../api/mutations'
+import { canWriteRequirements, isRequirementScopeEditable, requirementMutations } from '../api/mutations'
 import { REQUIREMENT_STATUS_LABELS, SELF_TEST_LABELS, requirementStatusTone } from '../model/labels'
 import { RequirementActionDialog, type RequirementAction } from './requirement-action-dialog'
-import { RequirementForm } from './requirement-form'
+import { RequirementForm, type RequirementEditSection } from './requirement-form'
+import type { RequirementDetail } from '../model/types'
 import { RequirementWorkflow } from './requirement-workflow'
 
 const DETAIL_TABS = [
@@ -63,10 +66,8 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   })
   const submissions = useQuery(submissionQueryOptions(requirementId))
   const [action, setAction] = useState<RequirementAction | null>(null)
-  const [editOpen, setEditOpen] = useState(false)
-  const [error, setError] = useState('')
+  const [editor, setEditor] = useState<{ item: RequirementDetail; section: RequirementEditSection } | null>(null)
   const [attachmentError, setAttachmentError] = useState('')
-  const [codeOpen, setCodeOpen] = useState(false)
   const [bugOpen, setBugOpen] = useState(false)
   const heading = useRef<HTMLHeadingElement>(null)
   const detailMenu = useRef<HTMLButtonElement>(null)
@@ -87,11 +88,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
     await queryClient.invalidateQueries({ queryKey: ['requirements'] })
     await queryClient.invalidateQueries({ queryKey: ['projects'] })
   }
-  const refreshCode = useMutation({
-    mutationFn: (codeReferenceId: string) => apiClient.refreshCodeReference(codeReferenceId),
-    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['requirements', 'detail', requirementId] }),
-    onError: (cause: unknown) => setError(isBusinessError(cause) ? cause.message : '代码引用刷新失败。'),
-  })
   const removeAttachmentMutation = useMutation({
     mutationFn: (attachment: AttachmentSummary) => removeAttachment(attachment.id),
     onSuccess: async () => {
@@ -131,7 +127,18 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
     )
   }
   const detail = query.data.data
-  const editable = canWrite && isEditable(detail.status)
+  const scopeEditable = canWrite && isRequirementScopeEditable(detail.status)
+  const range = workPlanRange(detail.plan ?? [])
+  const openEdit = (section: RequirementEditSection, trigger: HTMLButtonElement) => {
+    actionTrigger.current = trigger
+    setEditor({ item: detail, section })
+  }
+  const saveOwner = (field: 'devOwnerUserId' | 'testOwnerUserId', userId: string | null) =>
+    saveWorkItemUpdate(queryClient, {
+      kind: 'requirement',
+      id: detail.id,
+      body: { version: detail.version, [field]: userId },
+    })
   /**
    * 附件删除权限：上传者本人、团队管理员或项目负责人；浏览者与无权限成员不展示删除入口。
    * @param attachment 待删除附件。
@@ -156,52 +163,55 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
                 {REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}
               </StatusBadge>
               <span>更新 {formatDateTime(detail.updatedAt)}</span>
+              {range && <span>计划 {range.days} 天</span>}
             </div>
           </div>
           {canWrite && (
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  ref={detailMenu}
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="requirement-more-button"
-                  aria-label="更多需求操作"
-                >
-                  <Ellipsis aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {editable && (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      actionTrigger.current = detailMenu.current
-                      setEditOpen(true)
-                    }}
+            <div className="flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="work-item-edit-button"
+                onClick={(event) => openEdit('title', event.currentTarget)}
+              >
+                <Pencil aria-hidden="true" />
+                编辑需求
+              </Button>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    ref={detailMenu}
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="work-item-icon-button"
+                    aria-label="更多需求操作"
                   >
-                    编辑需求
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem onSelect={() => setBugOpen(true)}>创建 Bug</DropdownMenuItem>
-                {detail.status !== 'cancelled' && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onSelect={() => openAction('cancel', detailMenu.current)}
-                    >
-                      取消需求
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    <Ellipsis aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setBugOpen(true)}>创建 Bug</DropdownMenuItem>
+                  {detail.status !== 'cancelled' && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onSelect={() => openAction('cancel', detailMenu.current)}
+                      >
+                        取消需求
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </header>
       }
     >
-      <div className="requirement-detail-content space-y-5">
+      <div className="work-item-detail-content space-y-5">
         <RequirementWorkflow
           requirement={detail}
           canWrite={canWrite}
@@ -209,41 +219,60 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
           startError={direct.isError ? describeRequestError(direct.error).description : ''}
           onStart={(kind) => direct.mutate(kind)}
           onAction={openAction}
+          onOwnerChange={saveOwner}
         />
-        <Tabs defaultValue="info">
-          <TabsList
-            aria-label="需求详情分区"
-            className="requirement-detail-tabs flex w-full justify-start gap-2 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 sm:gap-3"
-          >
-            {DETAIL_TABS.map(([value, label]) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="min-h-10 shrink-0 rounded-none border-b-2 border-transparent px-1.5 text-xs focus-visible:ring-inset aria-selected:border-primary aria-selected:bg-transparent! aria-selected:text-primary! aria-selected:shadow-none! sm:px-3 sm:text-sm"
-              >
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <WorkItemDetailTabs label="需求详情分区" tabs={DETAIL_TABS}>
           <TabsContent value="info" className="space-y-5">
             <dl className="detail-properties">
-              <div>
-                <dt className="text-xs text-muted-foreground">研发负责人</dt>
-                <dd className="mt-1">{detail.devOwner?.name ?? '未指定'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">测试负责人</dt>
-                <dd className="mt-1">{detail.testOwner?.name ?? '未指定'}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">协作人员</dt>
+              <WorkItemOwnerField
+                teamId={detail.teamId}
+                label="研发负责人"
+                owner={detail.devOwner}
+                onSave={canWrite ? (id) => saveOwner('devOwnerUserId', id) : undefined}
+              />
+              <WorkItemOwnerField
+                teamId={detail.teamId}
+                label="测试负责人"
+                owner={detail.testOwner}
+                onSave={canWrite ? (id) => saveOwner('testOwnerUserId', id) : undefined}
+              />
+              <div className="sm:col-span-2">
+                <dt className="flex items-center justify-between gap-2">
+                  <span>协作人员</span>
+                  {canWrite && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="work-item-edit-button"
+                      onClick={(event) => openEdit('people', event.currentTarget)}
+                    >
+                      <Pencil aria-hidden="true" />
+                      编辑协作人员
+                    </Button>
+                  )}
+                </dt>
                 <dd className="mt-1">
                   <CollaboratorTags members={detail.collaborators} />
                 </dd>
               </div>
             </dl>
             <section className="space-y-2">
-              <h3 className="text-sm font-semibold">需求描述</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">需求描述</h3>
+                {scopeEditable && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="work-item-edit-button"
+                    onClick={(event) => openEdit('content', event.currentTarget)}
+                  >
+                    <Pencil aria-hidden="true" />
+                    编辑描述
+                  </Button>
+                )}
+              </div>
               {detail.contentMode === 'markdown' ? (
                 <div className="detail-markdown text-sm">
                   <Markdown>{detail.contentMarkdown ?? ''}</Markdown>
@@ -267,7 +296,21 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               )}
             </section>
             <section className="space-y-2" aria-label="附件">
-              <h3 className="text-sm font-semibold">附件</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">附件</h3>
+                {scopeEditable && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="work-item-edit-button"
+                    onClick={(event) => openEdit('attachments', event.currentTarget)}
+                  >
+                    <Plus aria-hidden="true" />
+                    添加附件
+                  </Button>
+                )}
+              </div>
               <AttachmentList
                 attachments={detail.attachments ?? []}
                 canDelete={canDeleteAttachment}
@@ -278,35 +321,13 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
                 deleteError={attachmentError}
               />
             </section>
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">代码引用</h3>
-                {canWrite && (
-                  <Button size="sm" variant="outline" onClick={() => setCodeOpen(true)}>
-                    添加引用
-                  </Button>
-                )}
-              </div>
-              {error && (
-                <p role="alert" className="text-sm text-destructive">
-                  {error}
-                </p>
-              )}
-              {detail.linkedCodeReferences.length === 0 ? (
-                <p className="text-sm text-muted-foreground">暂无代码引用。</p>
-              ) : (
-                <ul className="space-y-2">
-                  {detail.linkedCodeReferences.map((reference) => (
-                    <CodeReferenceCard
-                      key={reference.id}
-                      reference={reference}
-                      onRefresh={() => refreshCode.mutate(reference.id)}
-                      refreshing={refreshCode.isPending}
-                    />
-                  ))}
-                </ul>
-              )}
-            </section>
+            <WorkItemCodeReferences
+              kind="requirement"
+              id={detail.id}
+              projectId={detail.projectId}
+              references={detail.linkedCodeReferences}
+              canWrite={canWrite}
+            />
           </TabsContent>
           <TabsContent value="bugs">
             <WorkItemLinks
@@ -322,7 +343,20 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
           <TabsContent value="activities">
             <ActivityTimeline target="requirement" targetId={detail.id} />
           </TabsContent>
-          <TabsContent value="submissions">
+          <TabsContent value="submissions" className="space-y-5">
+            <WorkItemPlanning
+              kind="requirement"
+              status={detail.status}
+              plan={detail.plan}
+              canWrite={canWrite}
+              onSave={(plan) =>
+                saveWorkItemUpdate(queryClient, {
+                  kind: 'requirement',
+                  id: detail.id,
+                  body: { version: detail.version, plan },
+                })
+              }
+            />
             <h3 className="mb-3 text-sm font-semibold">提测历史</h3>
             {submissions.isPending ? (
               <DelayedLoading pending>
@@ -350,7 +384,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
               <p className="text-sm text-muted-foreground">暂无提测记录。</p>
             )}
           </TabsContent>
-        </Tabs>
+        </WorkItemDetailTabs>
         <BugForm
           projectId={detail.projectId}
           teamId={detail.teamId}
@@ -359,13 +393,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
           open={bugOpen}
           onOpenChange={setBugOpen}
           onSaved={() => void query.refetch()}
-        />
-        <CodeReferenceDialog
-          projectId={detail.projectId}
-          targetType="requirement"
-          targetId={detail.id}
-          open={codeOpen}
-          onOpenChange={setCodeOpen}
         />
       </div>
       <RequirementActionDialog
@@ -378,16 +405,18 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
         }}
         onCloseAutoFocus={restoreActionFocus}
       />
-      <RequirementForm
-        projectId={detail.projectId}
-        teamId={detail.teamId}
-        currentUserId={user.id}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        requirement={detail}
-        onSaved={onClose}
-        onCloseAutoFocus={restoreActionFocus}
-      />
+      {editor && (
+        <RequirementForm
+          projectId={detail.projectId}
+          teamId={detail.teamId}
+          currentUserId={user.id}
+          open
+          onOpenChange={(open) => !open && setEditor(null)}
+          requirement={editor.item}
+          initialSection={editor.section}
+          onCloseAutoFocus={restoreActionFocus}
+        />
+      )}
     </WorkItemDetailSheet>
   )
 }

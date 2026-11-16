@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RequestError } from '@dev-ops/api-client'
-import { ChevronRight, Link2 } from 'lucide-react'
+import { ChevronRight, Link2, Unlink2 } from 'lucide-react'
 import { Link } from 'react-router'
 import { bugQueryOptions } from '@/features/bugs/api/queries'
 import { BUG_STATUS_LABELS, bugStatusTone } from '@/features/bugs/model/labels'
@@ -25,6 +25,7 @@ import { FormField } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { useToast } from '@/shared/ui/toast'
+import { RemoveWorkItemRelation } from './remove-work-item-relation'
 
 type WorkItemKind = 'bug' | 'requirement'
 type WorkItem = { id: string; number: number; title: string; status: string }
@@ -279,9 +280,9 @@ function LinkWorkItemDialog({
 }
 
 /**
- * 展示当前事项的关联列表，允许有写权限的成员从同一项目关联已有事项。
+ * 展示当前事项的关联列表，有写权限的成员可关联同项目已有事项并记录移除原因。
  * @param props 当前事项、对端摘要与写权限。
- * @returns 指向对端详情的链接和按需打开的搜索弹窗。
+ * @returns 指向对端详情的链接、搜索弹窗和移除确认。
  */
 export function WorkItemLinks({
   source,
@@ -293,6 +294,9 @@ export function WorkItemLinks({
   canWrite: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const [removal, setRemoval] = useState<{ item: WorkItem; trigger: HTMLButtonElement } | null>(null)
+  const client = useQueryClient()
+  const { showToast } = useToast()
   const trigger = useRef<HTMLButtonElement>(null)
   const titleId = useId()
   const kind = source.kind === 'bug' ? 'requirement' : 'bug'
@@ -327,20 +331,56 @@ export function WorkItemLinks({
       {items.length ? (
         <ul className="divide-y divide-border rounded-lg border border-border" aria-label={`关联${target}列表`}>
           {items.map((item) => (
-            <li key={item.id}>
+            <li key={item.id} className="flex min-w-0 items-center">
               <Link
                 to={`${path}?openId=${encodeURIComponent(item.id)}`}
                 aria-label={`${workItemNumber(kind, item.number)} ${item.title} ${workItemStatusLabel(kind, item.status)}`}
-                className="flex min-h-11 min-w-0 cursor-pointer items-center gap-2 rounded-md px-3 py-2 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-3 py-2 hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               >
                 <WorkItemLabel kind={kind} item={item} />
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
               </Link>
+              {canWrite && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="work-item-icon-button mr-1"
+                  aria-label={`移除关联 ${workItemNumber(kind, item.number)}`}
+                  onClick={(event) => setRemoval({ item, trigger: event.currentTarget })}
+                >
+                  <Unlink2 aria-hidden="true" />
+                </Button>
+              )}
             </li>
           ))}
         </ul>
       ) : (
         <p className="text-sm text-muted-foreground">暂无关联{target}。</p>
+      )}
+      {removal && (
+        <RemoveWorkItemRelation
+          title={`移除关联「${removal.item.title}」？`}
+          description="需求与 Bug 两边的关联列表会同时更新，移除原因会写入 Bug 操作记录。"
+          focusTarget={() => (removal.trigger.isConnected ? removal.trigger : trigger.current)}
+          onClose={() => setRemoval(null)}
+          onRemove={async (reason) => {
+            const bugId = source.kind === 'bug' ? source.id : removal.item.id
+            const requirementId = source.kind === 'requirement' ? source.id : removal.item.id
+            const bug = await apiClient.getBug(bugId)
+            const result = await apiClient.unlinkBugRequirement(bugId, requirementId, {
+              version: bug.data.version,
+              reason,
+            })
+            client.setQueryData(bugQueryOptions(bugId).queryKey, result)
+            await Promise.all([
+              client.invalidateQueries({ queryKey: requirementQueryOptions(requirementId).queryKey }),
+              client.invalidateQueries({ queryKey: ['requirements', 'list', source.projectId] }),
+              client.invalidateQueries({ queryKey: ['collaboration', 'activities', 'bug', bugId] }),
+            ])
+            showToast('关联已移除。', 'success')
+          }}
+        />
       )}
     </section>
   )

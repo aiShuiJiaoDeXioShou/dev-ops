@@ -1,5 +1,5 @@
 /* 详情在浮层门户中渲染，正文和评论使用当前主题的颜色。 */
-.requirement-detail-content .md-body {
+.work-item-detail-content .md-body {
   --md-ink: var(--foreground);
   --md-secondary: var(--muted-foreground);
   --md-caption: var(--muted-foreground);
@@ -11,17 +11,17 @@
   --md-blue: var(--primary);
 }
 /* 连接相邻节点的中心。连线保留在按钮下方，首尾节点外侧不延伸。 */
-.requirement-flow-steps {
+.work-item-flow-steps {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
 }
-.requirement-flow-steps > li {
+.work-item-flow-steps > li {
   position: relative;
   display: flex;
   justify-content: center;
 }
-.requirement-flow-steps > li:not(:last-child)::after {
+.work-item-flow-steps > li:not(:last-child)::after {
   position: absolute;
   inset-block-start: 50%;
   inset-inline-start: 50%;
@@ -31,13 +31,15 @@
   pointer-events: none;
 }
 @media (pointer: coarse) {
-  .requirement-flow-steps [data-slot='button'],
-  .requirement-flow-actions [data-slot='button'],
-  .requirement-detail-tabs [data-slot='tabs-trigger'],
-  .requirement-more-button {
+  .work-item-flow-steps [data-slot='button'],
+  .work-item-flow-actions [data-slot='button'],
+  .work-item-detail-tabs [data-slot='tabs-trigger'],
+  .work-item-edit-button,
+  .work-item-owner-trigger,
+  .work-item-icon-button {
     min-block-size: 44px;
   }
-  .requirement-more-button {
+  .work-item-icon-button {
     min-inline-size: 44px;
   }
 }

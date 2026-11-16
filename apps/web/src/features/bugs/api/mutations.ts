@@ -10,11 +10,11 @@ export function canWriteBugs(role: TeamRole): boolean {
   return role === 'admin' || role === 'developer'
 }
 /**
- * 判断缺陷是否允许编辑。
+ * 判断缺陷的现象、复现、证据和附件清单是否可以编辑。
  * @param status 当前缺陷状态。
  * @returns 待处理或修复中时返回 true。
  */
-export function isEditableBug(status: string): boolean {
+export function isBugScopeEditable(status: string): boolean {
   return status === 'pending' || status === 'in_fix'
 }
 export const bugMutations = {
