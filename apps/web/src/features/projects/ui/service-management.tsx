@@ -9,6 +9,7 @@ import { Input } from '@/shared/ui/controls/input'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
 import { projectServicesQueryOptions } from '../api/queries'
+import { PageError } from '@/shared/ui/page-state'
 
 /** 项目服务目录管理；管理员/开发者可创建与停用，浏览者只读。 */
 export function ServiceManagement({ projectId }: { projectId: string }) {
@@ -41,7 +42,16 @@ export function ServiceManagement({ projectId }: { projectId: string }) {
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
   if (services.isPending) return <p className="muted">服务加载中…</p>
-  if (services.isError) return <p className="muted">服务加载失败，请重试。</p>
+  if (services.isError && !services.data) {
+    return (
+      <PageError
+        title="项目服务加载失败"
+        error={services.error}
+        retrying={services.isFetching}
+        onRetry={() => void services.refetch()}
+      />
+    )
+  }
   return (
     <section aria-label="项目服务">
       <div className="row spread">

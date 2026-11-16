@@ -17,7 +17,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { EmptyState, PageLoading } from '@/shared/ui/page-state'
+import { EmptyState, PageLoading, PageError } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 
 const ENVIRONMENTS = [
@@ -113,17 +113,14 @@ export function Component() {
   })
 
   if (services.isPending) return <DelayedPageSkeleton />
-  if (services.isError) {
-    const described = describeRequestError(services.error)
+  if (services.isError && !services.data) {
     return (
-      <EmptyState
+      <PageError
         title="产物与版本加载失败"
-        description={described.description}
-        action={
-          <Button type="button" onClick={() => void services.refetch()}>
-            重新加载
-          </Button>
-        }
+        error={services.error}
+        retrying={services.isFetching}
+        retryLabel="重新加载"
+        onRetry={() => void services.refetch()}
       />
     )
   }
@@ -191,13 +188,14 @@ export function Component() {
                     <DelayedLoading pending>
                       <PageLoading />
                     </DelayedLoading>
-                  ) : runVersions.isError ? (
-                    <div className="run-versions-error" role="alert">
-                      <span>运行版本加载失败：{describeRequestError(runVersions.error).description}</span>
-                      <Button type="button" size="sm" variant="outline" onClick={() => void runVersions.refetch()}>
-                        重新加载
-                      </Button>
-                    </div>
+                  ) : runVersions.isError && !runVersions.data ? (
+                    <PageError
+                      title="运行版本加载失败"
+                      error={runVersions.error}
+                      retrying={runVersions.isFetching}
+                      retryLabel="重新加载"
+                      onRetry={() => void runVersions.refetch()}
+                    />
                   ) : (
                     <div className="run-version-list">
                       {runVersions.data.data.items.map((item) => {
@@ -263,8 +261,14 @@ export function Component() {
                   <DelayedLoading pending>
                     <PageLoading />
                   </DelayedLoading>
-                ) : artifacts.isError ? (
-                  <EmptyState title="产物加载失败" description={describeRequestError(artifacts.error).description} />
+                ) : artifacts.isError && !artifacts.data ? (
+                  <PageError
+                    title="产物加载失败"
+                    error={artifacts.error}
+                    retrying={artifacts.isFetching}
+                    retryLabel="重新加载"
+                    onRetry={() => void artifacts.refetch()}
+                  />
                 ) : artifacts.data.data.items.length === 0 ? (
                   <EmptyState
                     mascot="project"

@@ -148,12 +148,11 @@ export function Component() {
       </DelayedLoading>
     )
   }
-  if (plans.isError) {
+  if (plans.isError && !plans.data) {
     return (
       <PageError
         title="变更计划读取失败"
-        description={describeRequestError(plans.error).description}
-        requestId={describeRequestError(plans.error).requestId}
+        error={plans.error}
         retrying={plans.isFetching}
         onRetry={() => void plans.refetch()}
       />

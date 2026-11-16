@@ -13,6 +13,7 @@ import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { codeChangesQueryOptions, toolCapabilitiesQueryOptions } from '../api/queries'
+import { PageError } from '@/shared/ui/page-state'
 
 const CODE_CHANGE_STATUS_LABELS: Record<string, string> = {
   queued: '排队中',
@@ -159,13 +160,14 @@ export function CodeChangeSection({
       )}
       {changes.isPending ? (
         <p className="small quiet">代码变更加载中…</p>
-      ) : changes.isError ? (
-        <div className="inline-error" role="alert">
-          <span>代码变更读取失败：{describeRequestError(changes.error).description}</span>
-          <Button type="button" variant="outline" size="sm" onClick={() => void changes.refetch()}>
-            重新加载
-          </Button>
-        </div>
+      ) : changes.isError && !changes.data ? (
+        <PageError
+          title="代码变更读取失败"
+          error={changes.error}
+          retrying={changes.isFetching}
+          retryLabel="重新加载"
+          onRetry={() => void changes.refetch()}
+        />
       ) : items.length === 0 ? (
         <p className="small quiet">还没有代码变更。</p>
       ) : (

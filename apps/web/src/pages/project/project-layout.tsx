@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { FolderGit2, Settings, TriangleAlert } from 'lucide-react'
+import { FolderGit2, Settings } from 'lucide-react'
 import { ProjectSettingsDialog } from '@/features/projects/ui/project-settings-dialog'
 import { projectQueryOptions } from '@/features/projects/api/queries'
-import { describeRequestError } from '@/shared/api/errors'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { PageError } from '@/shared/ui/page-state'
 
 const STATUS_LABELS = { active: '进行中', paused: '暂停', ended: '已结束' } as const
 const tabs = [
@@ -28,17 +28,15 @@ export function Component() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const project = useQuery(projectQueryOptions(projectId))
   if (project.isPending) return <DelayedPageSkeleton />
-  if (project.isError || !project.data) {
-    const described = describeRequestError(project.error)
+  if (!project.data) {
     return (
-      <div className="empty">
-        <TriangleAlert className="size-5" aria-hidden="true" />
-        <h3>项目加载失败</h3>
-        <p>{described.description}</p>
-        <Button type="button" variant="outline" onClick={() => void project.refetch()}>
-          重新加载
-        </Button>
-      </div>
+      <PageError
+        title="项目加载失败"
+        error={project.error}
+        retrying={project.isFetching}
+        retryLabel="重新加载"
+        onRetry={() => void project.refetch()}
+      />
     )
   }
   const detail = project.data.data

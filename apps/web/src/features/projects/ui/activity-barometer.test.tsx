@@ -37,6 +37,8 @@ describe('ActivityBarometer', () => {
         isPending={false}
         isError={false}
         error={null}
+        isFetching={false}
+        onRetry={() => undefined}
         source="all"
         onSourceChange={() => undefined}
       />,
@@ -52,6 +54,8 @@ describe('ActivityBarometer', () => {
         isPending={false}
         isError
         error={new Error('超时')}
+        isFetching={false}
+        onRetry={() => undefined}
         source="all"
         onSourceChange={() => undefined}
       />,

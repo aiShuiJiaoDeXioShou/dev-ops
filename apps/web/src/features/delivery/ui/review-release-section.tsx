@@ -10,7 +10,7 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
-import { EmptyState, PageLoading } from '@/shared/ui/page-state'
+import { EmptyState, PageLoading, PageError } from '@/shared/ui/page-state'
 import { releasesQueryOptions, reviewsQueryOptions } from '../api/review-queries'
 
 const REVIEW_LABELS: Record<string, string> = {
@@ -155,8 +155,13 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <DelayedLoading pending>
                 <PageLoading />
               </DelayedLoading>
-            ) : reviews.isError ? (
-              <p className="muted">提审记录加载失败。</p>
+            ) : reviews.isError && !reviews.data ? (
+              <PageError
+                title="提审记录加载失败"
+                error={reviews.error}
+                retrying={reviews.isFetching}
+                onRetry={() => void reviews.refetch()}
+              />
             ) : reviewItems.length === 0 ? (
               <p className="muted">还没有提审记录。</p>
             ) : (
@@ -193,8 +198,13 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <DelayedLoading pending>
                 <PageLoading />
               </DelayedLoading>
-            ) : releases.isError ? (
-              <p className="muted">发布记录加载失败。</p>
+            ) : releases.isError && !releases.data ? (
+              <PageError
+                title="发布记录加载失败"
+                error={releases.error}
+                retrying={releases.isFetching}
+                onRetry={() => void releases.refetch()}
+              />
             ) : releaseItems.length === 0 ? (
               <p className="muted">还没有发布记录。</p>
             ) : (

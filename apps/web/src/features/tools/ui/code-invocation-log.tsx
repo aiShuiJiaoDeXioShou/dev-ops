@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
-import { Button } from '@/shared/ui/controls/button'
 import { LogSheet } from '@/shared/ui/log-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { toolInvocationsQueryOptions } from '../api/queries'
+import { PageError } from '@/shared/ui/page-state'
 
 /** 写能力调用状态到可读标签。 */
 const INVOCATION_STATUS_LABELS: Record<string, string> = {
@@ -57,13 +56,14 @@ export function CodeInvocationLogSheet({
     >
       {invocations.isPending ? (
         <p className="small quiet">调用记录加载中…</p>
-      ) : invocations.isError ? (
-        <div className="inline-error" role="alert">
-          <span>调用记录读取失败：{describeRequestError(invocations.error).description}</span>
-          <Button type="button" variant="outline" size="sm" onClick={() => void invocations.refetch()}>
-            重新加载
-          </Button>
-        </div>
+      ) : invocations.isError && !invocations.data ? (
+        <PageError
+          title="调用记录读取失败"
+          error={invocations.error}
+          retrying={invocations.isFetching}
+          retryLabel="重新加载"
+          onRetry={() => void invocations.refetch()}
+        />
       ) : (invocations.data?.data.items ?? []).length === 0 ? (
         <p className="small quiet">还没有写能力调用记录。</p>
       ) : (

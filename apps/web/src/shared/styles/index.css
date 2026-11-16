@@ -2092,14 +2092,6 @@ a.skill-title:hover {
 .run-versions-head p {
   font-size: 11.5px;
 }
-.run-versions-error {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 12.5px;
-  color: var(--muted-foreground);
-}
 .run-version-list {
   border: 1px solid var(--border);
   border-radius: 10px;

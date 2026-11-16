@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Folder, Plus, Search, Settings, TriangleAlert, Users } from 'lucide-react'
+import { Folder, Plus, Search, Settings, Users } from 'lucide-react'
 import { useSession } from '@/features/identity/model/session'
-import { describeRequestError } from '@/shared/api/errors'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
-import { EmptyState } from '@/shared/ui/page-state'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
@@ -88,17 +87,15 @@ export function ProjectList() {
       </div>
     )
   if (query.isPending) return <DelayedPageSkeleton />
-  if (query.isError) {
-    const described = describeRequestError(query.error)
+  if (query.isError && !query.data) {
     return (
-      <div className="empty">
-        <TriangleAlert className="size-5" aria-hidden="true" />
-        <h3>项目列表加载失败</h3>
-        <p>{described.description}</p>
-        <Button type="button" variant="outline" onClick={() => void query.refetch()}>
-          重新加载
-        </Button>
-      </div>
+      <PageError
+        title="项目列表加载失败"
+        error={query.error}
+        retrying={query.isFetching}
+        retryLabel="重新加载"
+        onRetry={() => void query.refetch()}
+      />
     )
   }
   const projects = query.data.data.items
@@ -121,6 +118,8 @@ export function ProjectList() {
           isPending={activity.isPending}
           isError={activity.isError}
           error={activity.error}
+          isFetching={activity.isFetching}
+          onRetry={() => void activity.refetch()}
           source={activitySource}
           onSourceChange={setActivitySource}
         />

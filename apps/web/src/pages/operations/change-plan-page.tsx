@@ -116,12 +116,11 @@ export function Component() {
       </DelayedLoading>
     )
   }
-  if (detail.isError) {
+  if (detail.isError && !detail.data) {
     return (
       <PageError
         title="变更计划读取失败"
-        description={describeRequestError(detail.error).description}
-        requestId={describeRequestError(detail.error).requestId}
+        error={detail.error}
         retrying={detail.isFetching}
         onRetry={() => void detail.refetch()}
       />

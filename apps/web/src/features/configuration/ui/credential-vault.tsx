@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, History, Lock, Plus, Search } from 'lucide-react'
+import { History, Lock, Plus, Search } from 'lucide-react'
 import type { ApiBody } from '@dev-ops/api-client'
 import { useSession } from '@/features/identity/model/session'
 import { projectListQueryOptions } from '@/features/projects/api/queries'
@@ -17,7 +17,7 @@ import { LogSheet } from '@/shared/ui/log-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
-import { EmptyState, PageLoading } from '@/shared/ui/page-state'
+import { EmptyState, PageLoading, PageError } from '@/shared/ui/page-state'
 import { credentialUsageQueryOptions, credentialsQueryOptions, type CredentialList } from '../api/queries'
 import { CredentialValueReveal } from './credential-value-dialog'
 
@@ -270,15 +270,12 @@ export function CredentialVault() {
 
         <section className="keychain-detail" aria-label="凭据详情">
           {list.isError ? (
-            <EmptyState
-              icon={<AlertCircle />}
+            <PageError
               title="凭据加载失败"
-              description={describeRequestError(list.error).description}
-              action={
-                <Button type="button" variant="outline" onClick={() => void list.refetch()}>
-                  重新加载
-                </Button>
-              }
+              error={list.error}
+              retrying={list.isFetching}
+              retryLabel="重新加载"
+              onRetry={() => void list.refetch()}
             />
           ) : selected ? (
             <>

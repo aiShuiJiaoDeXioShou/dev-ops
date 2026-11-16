@@ -1,12 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
-import { PageLoading } from '@/shared/ui/page-state'
+import { PageLoading, PageError } from '@/shared/ui/page-state'
 import { commitQueryOptions, commitsQueryOptions } from '../api/commit-queries'
 
 /** 代码页提交记录：列表与详情只读，含最近核对时间与变更文件。 */
@@ -43,8 +42,13 @@ export function CommitHistoryDialog({
             <DelayedLoading pending>
               <PageLoading />
             </DelayedLoading>
-          ) : list.isError ? (
-            <p role="alert">提交记录加载失败：{describeRequestError(list.error).description}</p>
+          ) : list.isError && !list.data ? (
+            <PageError
+              title="提交记录加载失败"
+              error={list.error}
+              retrying={list.isFetching}
+              onRetry={() => void list.refetch()}
+            />
           ) : list.data.data.items.length === 0 ? (
             <p className="muted">该分支没有提交记录。</p>
           ) : (
@@ -74,8 +78,13 @@ export function CommitHistoryDialog({
                 <DelayedLoading pending>
                   <PageLoading />
                 </DelayedLoading>
-              ) : detail.isError ? (
-                <p className="muted">提交详情加载失败。</p>
+              ) : detail.isError && !detail.data ? (
+                <PageError
+                  title="提交详情加载失败"
+                  error={detail.error}
+                  retrying={detail.isFetching}
+                  onRetry={() => void detail.refetch()}
+                />
               ) : (
                 <>
                   <h4>{detail.data.data.title}</h4>

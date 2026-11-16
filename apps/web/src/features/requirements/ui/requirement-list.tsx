@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { FileText, Plus, Search, TriangleAlert } from 'lucide-react'
-import { EmptyState } from '@/shared/ui/page-state'
+import { FileText, Plus, Search } from 'lucide-react'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
@@ -11,7 +11,6 @@ import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/model/session'
-import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { parseListState, toSearchParams, updateListState } from '@/shared/lib/list-state'
 import { projectQueryOptions } from '@/features/projects/api/queries'
@@ -39,17 +38,15 @@ export function RequirementList({ projectId }: { projectId: string }) {
   const canWrite = canWriteRequirements(role)
   const update = (patch: Partial<typeof state>) => setParams(toSearchParams(updateListState(state, patch)))
   if (query.isPending) return <DelayedPageSkeleton />
-  if (query.isError) {
-    const described = describeRequestError(query.error)
+  if (query.isError && !query.data) {
     return (
-      <div className="empty">
-        <TriangleAlert className="size-5" aria-hidden="true" />
-        <h3>需求列表加载失败</h3>
-        <p>{described.description}</p>
-        <Button type="button" variant="outline" onClick={() => void query.refetch()}>
-          重新加载
-        </Button>
-      </div>
+      <PageError
+        title="需求列表加载失败"
+        error={query.error}
+        retrying={query.isFetching}
+        retryLabel="重新加载"
+        onRetry={() => void query.refetch()}
+      />
     )
   }
   const items = query.data.data.items

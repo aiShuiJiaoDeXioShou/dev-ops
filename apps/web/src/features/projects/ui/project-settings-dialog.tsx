@@ -18,6 +18,7 @@ import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectQueryOptions } from '../api/queries'
 import { ProjectSettingsForm } from './project-settings-form'
 import { ServiceManagement } from './service-management'
+import { PageError } from '@/shared/ui/page-state'
 
 /**
  * 项目设置弹窗；项目头部齿轮入口使用，不再跳转独立页面。
@@ -61,14 +62,15 @@ export function ProjectSettingsDialog({
               <PageSkeleton />
             </DelayedLoading>
           </DialogFormBody>
-        ) : project.isError || !project.data ? (
+        ) : !project.data ? (
           <DialogFormBody>
-            <div className="empty">
-              <h3>项目设置加载失败</h3>
-              <Button type="button" variant="outline" onClick={() => void project.refetch()}>
-                重新加载
-              </Button>
-            </div>
+            <PageError
+              title="项目设置加载失败"
+              error={project.error}
+              retrying={project.isFetching}
+              retryLabel="重新加载"
+              onRetry={() => void project.refetch()}
+            />
           </DialogFormBody>
         ) : (
           <Tabs defaultValue="profile" className="project-settings-tabs flex min-h-0 flex-1 flex-col">

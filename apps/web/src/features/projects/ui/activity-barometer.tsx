@@ -3,9 +3,8 @@ import type { ApiSuccessData } from '@dev-ops/api-client'
 import { Select } from '@/shared/ui/controls/select'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
-import { describeRequestError } from '@/shared/api/errors'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageLoading } from '@/shared/ui/page-state'
+import { PageLoading, PageError } from '@/shared/ui/page-state'
 
 const SOURCES = [
   { value: 'all', label: '全部' },
@@ -46,6 +45,8 @@ interface ActivityBarometerProps {
   isPending: boolean
   isError: boolean
   error: unknown
+  isFetching: boolean
+  onRetry: () => void
   source: Source
   onSourceChange: (source: Source) => void
 }
@@ -61,6 +62,8 @@ export function ActivityBarometer({
   isPending,
   isError,
   error,
+  isFetching,
+  onRetry,
   source,
   onSourceChange,
 }: ActivityBarometerProps) {
@@ -81,9 +84,13 @@ export function ActivityBarometer({
     )
   if (!result && isError) {
     return (
-      <p className="section-note" role="alert">
-        项目晴雨表加载失败：{describeRequestError(error).description}
-      </p>
+      <PageError
+        title="项目晴雨表加载失败"
+        error={error}
+        retrying={isFetching}
+        retryLabel="重新加载"
+        onRetry={onRetry}
+      />
     )
   }
   if (!result) return null

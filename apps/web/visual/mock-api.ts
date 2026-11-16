@@ -108,6 +108,7 @@ export async function installApiMocks(page: Page): Promise<void> {
       return route.fulfill({ json: { ...fixture, data: { ...fixture.data, entries } } })
     }
     if (fixture) return route.fulfill({ json: fixture })
+    if (/^\/api\/v1\/projects\/[^/]+\/repositories$/.test(path)) return route.fulfill({ json: envelope([]) })
     return route.fulfill({ json: emptyPage() })
   })
 }

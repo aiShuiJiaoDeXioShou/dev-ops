@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react'
-import { RequestError } from '@dev-ops/api-client'
-import { AlertCircle, Inbox } from 'lucide-react'
+import { Inbox } from 'lucide-react'
+import { describeRequestError } from '@/shared/api/errors'
 import { cn } from '@/shared/lib/utils'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/controls/alert'
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
 
@@ -24,8 +23,9 @@ export function PageLoading({ message = '页面加载中…' }: { message?: stri
 
 interface PageErrorProps {
   title: string
-  description: string
-  /** 原始请求错误仅参与显示方式判断，页面继续使用安全文案。 */
+  /** 可选的业务说明，用于覆盖请求错误的默认文案。 */
+  description?: string
+  /** 请求错误用于生成可展示的说明和请求标识。 */
   error?: unknown
   requestId?: string | null
   retrying?: boolean
@@ -37,44 +37,38 @@ interface PageErrorProps {
 /**
  * 展示可恢复的页面或查询错误，不暴露内部异常。
  * @param props 错误标题、安全说明、可选原始请求错误与请求标识，以及重试状态和回调。
- * @returns 错误提示和可选重试入口；点击重试时调用提供的回调。
+ * @returns Bot 错误提示和可选重试入口；点击重试时调用提供的回调。
  */
 export function PageError({
   title,
   description,
   error,
-  requestId,
+  requestId: providedRequestId,
   retrying = false,
   retryLabel = '重新检查',
   onRetry,
 }: PageErrorProps) {
-  const retry = onRetry && (
-    <Button variant="outline" onClick={onRetry} disabled={retrying}>
-      {retrying ? '检查中…' : retryLabel}
-    </Button>
-  )
-  const isServiceFailure =
-    error instanceof RequestError &&
-    ((error.status !== null && error.status >= 500) || error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT')
-  if (isServiceFailure) {
-    return (
-      <div role="alert">
-        <EmptyState mascot="signal" title={title} description={description} action={retry} />
-        {requestId && <p className="text-center text-xs break-all text-muted-foreground">请求标识：{requestId}</p>}
-      </div>
-    )
-  }
+  const described = describeRequestError(error)
+  const requestId = providedRequestId ?? described.requestId
   return (
-    <div className="space-y-4">
-      <Alert variant="destructive">
-        <AlertCircle aria-hidden="true" />
-        <AlertTitle>{title}</AlertTitle>
-        <AlertDescription>
-          <p>{description}</p>
-          {requestId && <p className="break-all text-xs">请求标识：{requestId}</p>}
-        </AlertDescription>
-      </Alert>
-      {retry}
+    <div role="alert" aria-busy={retrying}>
+      <EmptyState
+        mascot="signal"
+        title={title}
+        description={
+          <>
+            {description ?? described.description}
+            {requestId && <small className="mt-2 block text-xs break-all">请求标识：{requestId}</small>}
+          </>
+        }
+        action={
+          onRetry && (
+            <Button type="button" className="min-h-11" onClick={onRetry} disabled={retrying}>
+              {retrying ? '正在重试…' : retryLabel}
+            </Button>
+          )
+        }
+      />
     </div>
   )
 }
@@ -87,7 +81,7 @@ interface EmptyStateProps {
   /** 标题层级；默认用于页面内部空状态。 */
   headingLevel?: 1 | 2 | 3
   /** 引导说明，告诉用户下一步可以做什么；不需要额外说明时可省略。 */
-  description?: string
+  description?: ReactNode
   /** 团队/项目类场景使用的 Bot 吉祥物；与 icon 二选一。 */
   mascot?: EmptyStateMascot
   /** 搜索结果、错误等场景使用的线性图标；与 mascot 二选一。 */

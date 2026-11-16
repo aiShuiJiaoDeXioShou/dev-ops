@@ -10,7 +10,7 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { useToast } from '@/shared/ui/toast'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { DelayedPageLoading, EmptyState } from '@/shared/ui/page-state'
+import { DelayedPageLoading, EmptyState, PageError } from '@/shared/ui/page-state'
 import { envVariablesQueryOptions, credentialsQueryOptions } from '../api/queries'
 
 const ENVIRONMENTS = [
@@ -122,16 +122,14 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
     save.mutate()
   }
   if (variables.isPending) return <DelayedPageLoading />
-  if (variables.isError) {
+  if (variables.isError && !variables.data) {
     return (
-      <EmptyState
+      <PageError
         title="环境变量加载失败"
-        description={describeRequestError(variables.error).description}
-        action={
-          <Button type="button" variant="outline" onClick={() => void variables.refetch()}>
-            重新加载
-          </Button>
-        }
+        error={variables.error}
+        retrying={variables.isFetching}
+        retryLabel="重新加载"
+        onRetry={() => void variables.refetch()}
       />
     )
   }

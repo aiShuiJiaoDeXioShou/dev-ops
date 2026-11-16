@@ -403,6 +403,7 @@ test.describe('[desktop] 关键弹窗', () => {
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('tab', { name: '基本资料' })).toBeVisible()
     await dialog.getByRole('tab', { name: '代码仓库' }).click()
+    await expect(dialog.getByText('还没有关联仓库。', { exact: false })).toBeVisible()
     await expectPageSnapshot(page, testInfo, 'dialog-project-settings')
     const footer = await dialog.locator('[data-slot="dialog-footer"], [data-slot="dialog-form-footer"]').count()
     expect(footer).toBeGreaterThanOrEqual(0)

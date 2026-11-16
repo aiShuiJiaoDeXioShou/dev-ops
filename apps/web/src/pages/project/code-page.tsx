@@ -409,10 +409,13 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
               <p className="section-note" style={{ padding: 16 }}>
                 正在读取文件…
               </p>
-            ) : file.isError ? (
-              <p className="section-note" style={{ padding: 16 }}>
-                {describeRequestError(file.error).description}
-              </p>
+            ) : file.isError && !file.data ? (
+              <PageError
+                title="文件读取失败"
+                error={file.error}
+                retrying={file.isFetching}
+                onRetry={() => void file.refetch()}
+              />
             ) : file.data ? (
               <>
                 {/\.(md|mdx)$/i.test(activePath) && viewMode === 'preview' ? (

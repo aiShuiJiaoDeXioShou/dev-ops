@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { describeRequestError } from '@/shared/api/errors'
-import { Button } from '@/shared/ui/controls/button'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { buildQueryOptions } from '../api/queries'
+import { PageError } from '@/shared/ui/page-state'
 
 const STATUS_LABELS: Record<string, string> = {
   succeeded: '成功',
@@ -19,16 +18,15 @@ const STATUS_LABELS: Record<string, string> = {
 export function BuildDetailPanel({ buildId }: { buildId: string }) {
   const query = useQuery(buildQueryOptions(buildId))
   if (query.isPending) return <DelayedPageSkeleton />
-  if (query.isError || !query.data) {
-    const described = describeRequestError(query.error)
+  if (!query.data) {
     return (
-      <div className="empty" role="alert">
-        <h3>构建详情加载失败</h3>
-        <p>{described.description}</p>
-        <Button type="button" onClick={() => void query.refetch()}>
-          重新加载
-        </Button>
-      </div>
+      <PageError
+        title="构建详情加载失败"
+        error={query.error}
+        retrying={query.isFetching}
+        retryLabel="重新加载"
+        onRetry={() => void query.refetch()}
+      />
     )
   }
   const build = query.data.data
