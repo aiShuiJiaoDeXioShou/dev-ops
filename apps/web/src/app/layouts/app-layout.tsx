@@ -5,6 +5,7 @@ import { Activity, Box, Folder, LayoutGrid, LogOut, Menu, Shield, Users, X as XI
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
+import { ProfileAvatar } from '@/features/identity/ui/profile-avatar'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import {
@@ -160,7 +161,7 @@ export function AppLayout() {
             onClick={() => setMenuOpen(false)}
           >
             <span className="avatar-slot">
-              <span className="avatar">{user.name.slice(0, 1)}</span>
+              <ProfileAvatar name={user.name} image={user.image} className="size-6 border bg-background text-xs" />
             </span>
             <span className="user-copy">
               <span className="user-name">{user.name}</span>

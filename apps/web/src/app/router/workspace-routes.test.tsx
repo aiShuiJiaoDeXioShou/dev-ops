@@ -202,24 +202,36 @@ describe('工作区路由与数据状态', () => {
     expect(trigger).toHaveFocus()
   })
 
-  it('点击头像进入个人页面并显示 API Token 区域', async () => {
+  it('从侧栏进入个人资料，可用键盘切换到独立的 API Token 页签', async () => {
+    const readTokens = vi.fn()
     server.use(
-      http.get('*/api/v1/me/tokens', () =>
-        HttpResponse.json({
+      http.get('*/api/v1/me/tokens', () => {
+        readTokens()
+        return HttpResponse.json({
           success: true,
           code: 'OK',
           message: 'ok',
           requestId: 'trace',
           data: { items: [] },
-        }),
-      ),
+        })
+      }),
     )
-    renderApplication('/projects')
+    const router = renderApplication('/projects')
     const user = userEvent.setup()
     const avatarLink = await screen.findByRole('link', { name: '打开测试用户的个人页面' })
     await user.click(avatarLink)
     expect(await screen.findByRole('heading', { name: '个人页面', level: 1 })).toBeVisible()
+    expect(screen.getByRole('button', { name: '编辑资料' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '修改密码' })).toBeVisible()
+    expect(readTokens).not.toHaveBeenCalled()
+    const profile = screen.getByRole('tab', { name: '个人资料' })
+    await user.click(profile)
+    await user.keyboard('{ArrowRight}')
     expect(await screen.findByText('还没有 API Token')).toBeVisible()
+    expect(router.state.location.search).toBe('?tab=tokens')
+    expect(screen.queryByRole('button', { name: '修改密码' })).not.toBeInTheDocument()
+    await act(() => router.navigate(-1))
+    expect(screen.getByRole('tab', { name: '个人资料' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('页面渲染异常进入路由边界，不显示内部异常文本', async () => {

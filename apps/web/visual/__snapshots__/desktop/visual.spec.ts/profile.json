@@ -6,13 +6,12 @@
   },
   "headings": [
     "个人页面",
-    "账号",
-    "资料维护",
-    "修改密码",
-    "API Token",
-    "还没有 API Token"
+    "管理员"
   ],
-  "tabs": [],
+  "tabs": [
+    "个人资料",
+    "API Token"
+  ],
   "rows": 0,
   "statusTexts": [],
   "documentOverflow": false,

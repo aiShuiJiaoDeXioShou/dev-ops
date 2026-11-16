@@ -110,24 +110,23 @@ export function ApiTokenSection() {
     )
   }
 
-  return (
-    <section className="min-w-0 space-y-4" aria-labelledby="api-token-title">
-      <div className="section-heading flex-wrap items-start gap-3">
-        <h2 id="api-token-title" className="text-lg font-semibold">
-          API Token
-        </h2>
-        <span className="spacer" />
-        <Button type="button" onClick={() => setCreateOpen(true)}>
-          新建 Token
-        </Button>
-      </div>
+  const { items } = tokens.data.data
 
-      {tokens.data.data.items.length === 0 ? (
+  return (
+    <section className="min-w-0 space-y-4" aria-label="API Token 列表">
+      {items.length > 0 && (
+        <div className="section-heading justify-end">
+          <Button type="button" className="min-h-11 sm:min-h-9" onClick={() => setCreateOpen(true)}>
+            新建 Token
+          </Button>
+        </div>
+      )}
+      {items.length === 0 ? (
         <EmptyState
           mascot="prism"
           title="还没有 API Token"
           action={
-            <Button type="button" onClick={() => setCreateOpen(true)}>
+            <Button type="button" className="min-h-11 sm:min-h-9" onClick={() => setCreateOpen(true)}>
               新建 Token
             </Button>
           }
@@ -147,7 +146,7 @@ export function ApiTokenSection() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tokens.data.data.items.map((token) => {
+              {items.map((token) => {
                 const status = STATUS_LABELS[token.status]
                 return (
                   <TableRow key={token.id}>
@@ -170,6 +169,7 @@ export function ApiTokenSection() {
                         type="button"
                         size="sm"
                         variant="destructive"
+                        className="min-h-11 md:min-h-0"
                         disabled={token.status === 'revoked' || revoke.isPending}
                         onClick={() => {
                           setRevokeError('')

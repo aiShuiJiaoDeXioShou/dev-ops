@@ -33,6 +33,7 @@ export interface AuthUser {
   id: string
   name: string
   email: string
+  image?: string | null
 }
 
 export interface AuthSession {
@@ -51,6 +52,7 @@ function isAuthSession(data: unknown): data is AuthSession {
     typeof user.id === 'string' &&
     typeof user.name === 'string' &&
     typeof user.email === 'string' &&
+    (user.image === undefined || user.image === null || typeof user.image === 'string') &&
     typeof session.id === 'string' &&
     typeof session.expiresAt === 'string'
   )
@@ -141,10 +143,23 @@ export async function changePassword(currentPassword: string, newPassword: strin
   await authRequest('/change-password', {
     method: 'POST',
     body: JSON.stringify({ currentPassword, newPassword, revokeOtherSessions: false }),
+    signal: AbortSignal.timeout(30_000),
   })
 }
 
-/** 修改当前账号显示名称。 */
-export async function updateUserName(name: string): Promise<void> {
-  await authRequest('/update-user', { method: 'POST', body: JSON.stringify({ name }) })
+/**
+ * 更新登录账号的资料，只提交有变化的字段。
+ * @param input.name 新的显示名称；image 为头像 JPEG 数据地址，null 表示移除。
+ * @returns 保存成功后完成。
+ * @throws 请求失败或认证响应无效时抛出 AuthRequestError。
+ */
+export async function updateProfile(input: { name?: string; image?: string | null }): Promise<void> {
+  const { data, status } = await authRequest('/update-user', {
+    method: 'POST',
+    body: JSON.stringify(input),
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!isRecord(data) || data.status !== true) {
+    throw new AuthRequestError('认证服务返回了无法解析的数据。', 'INVALID_RESPONSE', status)
+  }
 }

@@ -52,7 +52,7 @@ describe('ApiTokenSection', () => {
       ),
     )
     renderSection()
-    await userEvent.click((await screen.findAllByRole('button', { name: '新建 Token' }))[0] as HTMLElement)
+    await userEvent.click(await screen.findByRole('button', { name: '新建 Token' }))
     await userEvent.type(screen.getByLabelText('Token 名称'), 'local-cli')
     await userEvent.click(screen.getByRole('button', { name: '创建 Token' }))
     expect(await screen.findByDisplayValue('devops_pat_secret_once')).toBeVisible()
