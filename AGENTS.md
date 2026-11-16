@@ -71,13 +71,20 @@
 - 改请求、表单或操作状态时，读[加载、空内容与操作反馈](docs/ui-guidelines.md#feedback)。
 - 改对话、输入框或流式回复时，读[对话与流式输出](docs/ui-guidelines.md#conversation)。
 
-### 实现与验收
+### 实现
 
 1. 可交互控件优先复用 `apps/web/src/shared/ui/controls/`。布局结构使用 `prototype` 层基础类。新增代码禁止裸写 `<button>`、`<input>`、`<select>`、`<textarea>`、`<table>`，禁止新增 `@/prototype/*` 依赖。
 2. 颜色、圆角、状态色必须来自 `design/tokens.json` 和 `apps/web/src/shared/styles/index.css`。禁止裸色值和任意 Tailwind 值（`w-[...]`、`text-[...]` 等）。样式分层顺序固定为 `theme, base, prototype, components, utilities`。`apps/web/src/main.tsx` 必须先导入 `@/prototype/styles/layered.css`，再导入 `shared/styles/index.css`。
 3. 数据界面必须覆盖 loading、empty、no-match、error、read-only、提交中与重试状态。交互必须支持键盘、焦点可见、Esc 关闭和关闭后焦点归还。
-4. UI 完成后必须运行 `pnpm ui:check`。`tooling/design/ui-baseline.json` 记录存量债务，只能减少。禁止用 `pnpm ui:baseline` 放行新增违规。
-5. 交付前在 1440×1000 与 390×844 下截图，对照参考原型或设计稿核对。交付说明列出未验证的视觉与交互项。
+
+### UI 验收
+
+每次 UI 改动都要运行 `pnpm ui:check`，并按[格式化、静态检查与提交](#格式化静态检查与提交)完成适用的静态检查。`tooling/design/ui-baseline.json` 记录存量债务，只能减少。禁止用 `pnpm ui:baseline` 放行新增违规。验收用到生成客户端时，如果本地生成物缺失或接口契约有改动，先运行 `pnpm prepare:clients`。
+
+- **局部改动**。只改页面文案、局部间距等展示细节时，在受影响页面及适用视口核对视觉效果。可能影响换行、截断或布局时补看窄屏，需要留存视觉差异或交付证据时截图。完成静态检查和页面核对即可。其他页面内的改动按影响补验相关交互、状态和测试。
+- **共享组件或核心交互改动**。改共享组件、全局样式、设计 Token、共用断点，或表单提交、导航、浮层焦点等核心交互时，先从相关入口验证受影响的行为和状态，在 1440×1000 与 390×844 下截图对照参考设计。入口验证通过后，运行 `pnpm --dir apps/web check`、`pnpm --dir apps/web build` 和 `pnpm test:visual` 完成 Web 回归。按[视觉回归说明](apps/web/visual/README.md)更新有意改变的快照。
+
+交付说明列出实际检查结果和未验证的视觉与交互项。有截图时附路径。
 
 ## 后端遵循规范
 
@@ -150,7 +157,7 @@
 
 1. 统一使用根目录 Prettier 配置：无分号、单引号、2 空格、行宽 120、尾随逗号；提交前运行 `pnpm format`。CI/交付检查运行 `pnpm format:check`，不得以编辑器自动格式化结果代替。导入块与后续代码之间保留一个空行，由 ESLint 的 `import-x/newline-after-import` 检查；Prettier 不负责语句之间的空行。
 2. 统一使用根目录 ESLint flat config；`pnpm lint` 必须通过，禁止用 `eslint-disable` 绕过规则，确需例外时在紧邻位置说明原因并缩小范围。各应用原有的 oxlint 脚本保留为快速检查，不作为唯一质量门禁。
-3. 新增或修改 TypeScript 必须通过类型检查；禁止 `any`、非空断言和强制类型转换掩盖问题。完成后运行对应应用的 check/build，涉及数据库时运行 `pnpm --dir apps/server test:db`。
+3. 新增或修改 TypeScript 必须通过类型检查，禁止 `any`、非空断言和强制类型转换掩盖问题。Web 单独检查类型使用 `pnpm --dir apps/web typecheck`，Web 完整回归已包含类型检查。Web 界面改动按 [UI 验收](#ui-验收)选择构建和测试范围，其他代码改动运行对应应用的 check/build。涉及数据库时运行 `pnpm --dir apps/server test:db`。
 4. 每实现一个可独立验收的功能，必须提交对应 Git 文件，提交前确认：
    - 功能代码、接口契约、测试和相关配置一并纳入，不把无关 UI 或他人未完成改动混入；
    - 通过 `pnpm lint`、`pnpm format:check` 及相关测试；
@@ -160,7 +167,7 @@
 
 ## 验证与交付
 
-1. 完整工程检查在仓库根目录运行 `pnpm check`，包含契约生成、全部构建、依赖边界、应用测试和联通测试。局部检查前先运行 `pnpm prepare:clients`；命令以各项目 `package.json` 为准。前端代码变更运行 `pnpm --dir apps/web lint` 和 `pnpm --dir apps/web build`；后端代码变更运行 `pnpm --dir apps/server check` 和 `pnpm --dir apps/server build`；CLI 代码变更运行 `pnpm --dir apps/cli check` 和 `pnpm --dir apps/cli build`。
+1. 完整工程检查在仓库根目录运行 `pnpm check`，包含契约生成、全部构建、依赖边界、应用测试和联通测试。Web 界面改动按 [UI 验收](#ui-验收)执行。其他代码改动做局部检查前先运行 `pnpm prepare:clients`，命令以各项目 `package.json` 为准。Web 非界面代码变更运行 `pnpm --dir apps/web lint` 和 `pnpm --dir apps/web build`。后端代码变更运行 `pnpm --dir apps/server check` 和 `pnpm --dir apps/server build`。CLI 代码变更运行 `pnpm --dir apps/cli check` 和 `pnpm --dir apps/cli build`。
 2. 业务逻辑变更与缺陷修复补充有意义的测试，优先覆盖边界、失败路径、权限和并发条件。测试验证外部行为，避免只重复实现；纯文档修改检查内容、链接和命令是否准确即可。
 3. 涉及数据库配置、迁移或持久化的变更运行 `pnpm --dir apps/server test:db`，验证迁移、权限、约束、事务和连接生命周期。业务关联建立后补充无外键一致性测试，不能仅以 mock 测试替代数据库验证。
 4. 交付前检查改动范围与敏感信息，同步受影响的接口和文档；接口变更同时核对 HTTP 方法、统一响应信封与业务错误码登记。说明实际完成内容、执行过的验证及未验证项，不将未运行的检查描述为通过。
