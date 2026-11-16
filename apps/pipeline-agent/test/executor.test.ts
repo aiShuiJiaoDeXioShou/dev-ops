@@ -344,7 +344,7 @@ function createFakeWorkspace(ensureCheckout: () => Promise<void>): RunWorkspace 
       return undefined
     },
     async collectDiff() {
-      return { patch: '', sha256: '', sizeBytes: 0, truncated: false }
+      return { patch: '', sizeBytes: 0, truncated: false }
     },
     async pushBranch(): Promise<void> {
       return undefined

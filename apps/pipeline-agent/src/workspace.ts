@@ -79,9 +79,10 @@ export interface RunWorkspace {
   /**
    * 收集基线到 HEAD 的统一差异。
    * @param baseSha 基线提交。
-   * @returns 差异正文、摘要、大小与是否截断。
+   * @returns 差异正文、大小与是否截断。
+   * @throws Git 差异读取失败时抛出。
    */
-  collectDiff(baseSha: string): Promise<{ patch: string; sha256: string; sizeBytes: number; truncated: boolean }>
+  collectDiff(baseSha: string): Promise<{ patch: string; sizeBytes: number; truncated: boolean }>
   /**
    * 推送 HEAD 到工作分支，禁止强推。
    * @param git 短期 Git 凭据。
@@ -272,15 +273,13 @@ export async function createRunWorkspace(options: RunWorkspaceOptions): Promise<
 
   async function collectDiff(baseSha: string): Promise<{
     patch: string
-    sha256: string
     sizeBytes: number
     truncated: boolean
   }> {
     const env = { PATH: process.env.PATH ?? '', HOME: join(rootDir, 'home'), GIT_CONFIG_NOSYSTEM: '1' }
     const patch = await runGit(['diff', '--binary', baseSha, 'HEAD'], env, gitTimeoutMs)
     const sizeBytes = Buffer.byteLength(patch, 'utf8')
-    const sha256 = createHash('sha256').update(patch, 'utf8').digest('hex')
-    return { patch, sha256, sizeBytes, truncated: false }
+    return { patch, sizeBytes, truncated: false }
   }
 
   async function pushBranch(git: RunPlanGit, branchName: string): Promise<void> {

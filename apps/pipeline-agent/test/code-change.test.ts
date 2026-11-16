@@ -46,7 +46,7 @@ test('T039 Agent 代码修改：应用补丁、提交、收集差异并推送工
   })
   const diff = await workspace.collectDiff(repo.commitSha)
   assert.match(diff.patch, /patched-content/)
-  assert.equal(diff.sha256, createHash('sha256').update(diff.patch, 'utf8').digest('hex'))
+  assert.equal(diff.sizeBytes, Buffer.byteLength(diff.patch, 'utf8'))
 
   await workspace.pushBranch(git, 'feature/agent-demo')
   const { stdout } = await execFileAsync('git', ['rev-parse', 'refs/heads/feature/agent-demo'], { cwd: repo.dir })
