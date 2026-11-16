@@ -626,20 +626,13 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
 
   async function testPassEligibility(actor: SessionUser, requirementId: string) {
     const { row } = await requireRequirement(actor, requirementId)
-    const linkedBugs = deps.bugs ? await deps.bugs(requirementId) : []
-    const blockers = linkedBugs.filter((bug) => bug.status !== 'resolved' && bug.status !== 'closed')
-    return { eligible: row.status === 'in_testing' && blockers.length === 0, blockers }
+    // 保留旧客户端读取的 blockers 字段。测试通过资格由需求状态决定。
+    return { eligible: row.status === 'in_testing', blockers: [] }
   }
 
   async function passTest(actor: SessionUser, requirementId: string, input: { version: number; conclusion: string }) {
     const { row } = await requireWorkflow(actor, requirementId)
     if (row.status !== 'in_testing') throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '只有测试中需求可以通过')
-    const eligibility = await testPassEligibility(actor, requirementId)
-    if (!eligibility.eligible) {
-      throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '关联 Bug 未全部解决或关闭', {
-        blockers: eligibility.blockers,
-      })
-    }
     return transition(actor, requirementId, { version: input.version, status: 'passed' }, 'test_passed', {
       note: reasonTextInService(input.conclusion, '测试结论'),
     })

@@ -230,9 +230,10 @@ export const restoreRequirementBodySchema = Type.Object(
 )
 export const eligibilityResponseSchema = apiResponseSchema(
   Type.Object({
-    eligible: Type.Boolean(),
+    eligible: Type.Boolean({ description: '需求处于测试中时为 true。' }),
     blockers: Type.Array(
       Type.Object({ id: uuidSchema, number: Type.Integer(), title: Type.String(), status: Type.String() }),
+      { description: '兼容旧客户端，固定返回空数组。', deprecated: true },
     ),
   }),
 )

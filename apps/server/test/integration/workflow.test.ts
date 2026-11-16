@@ -10,7 +10,7 @@ import { project } from '../../src/modules/projects/projects.tables.ts'
 import { createAuthenticatedUser } from '../support/auth.ts'
 import { FakeMailer } from '../support/fake-mailer.ts'
 
-test('需求提测、测试、Bug 阻碍、通过复核、取消恢复与版本冲突', { timeout: 90_000 }, async (t) => {
+test('需求带未解决 Bug 通过测试、通过后复核、取消恢复与版本冲突', { timeout: 90_000 }, async (t) => {
   const cleanup: Array<() => Promise<unknown>> = []
   t.after(async () => {
     const errors: unknown[] = []
@@ -177,23 +177,32 @@ test('需求提测、测试、Bug 阻碍、通过复核、取消恢复与版本�
   })
   let bugRow = bugCreated.json().data
 
-  let eligibility = await app.inject({
+  const eligibility = await app.inject({
     method: 'GET',
     url: `/api/v1/requirements/${requirementId}/test-pass-eligibility`,
     headers: { cookie: viewerUser.cookie },
   })
-  assert.equal(eligibility.json().data.eligible, false)
-  assert.equal(eligibility.json().data.blockers.length, 1)
+  assert.deepEqual(eligibility.json().data, { eligible: true, blockers: [] })
 
-  const blocked = await app.inject({
+  const testPass = await app.inject({
     method: 'POST',
     url: `/api/v1/requirements/${requirementId}/pass-test`,
     payload: { version: requirementRow.version, conclusion: '测试通过' },
     headers: { cookie: viewerUser.cookie },
   })
-  assert.equal(blocked.json().success, false)
-  assert.equal(blocked.json().code, 'PRECONDITION_FAILED')
-  assert.equal(blocked.json().data.blockers[0].id, bugRow.id)
+  assert.equal(testPass.json().data.status, 'passed', testPass.body)
+  requirementRow = testPass.json().data
+  assert.equal(requirementRow.latestTestSubmission.selfTestResult, 'passed')
+  assert.equal(requirementRow.linkedBugs[0].id, bugRow.id)
+  assert.equal(requirementRow.linkedBugs[0].status, 'pending')
+  assert.equal(requirementRow.needsReview, true)
+
+  const passedEligibility = await app.inject({
+    method: 'GET',
+    url: `/api/v1/requirements/${requirementId}/test-pass-eligibility`,
+    headers: { cookie: viewerUser.cookie },
+  })
+  assert.deepEqual(passedEligibility.json().data, { eligible: false, blockers: [] })
 
   const startFix = await app.inject({
     method: 'POST',
@@ -218,25 +227,14 @@ test('需求提测、测试、Bug 阻碍、通过复核、取消恢复与版本�
   assert.equal(passed.json().data.status, 'resolved', passed.body)
   bugRow = passed.json().data
 
-  eligibility = await app.inject({
+  const resolvedDetail = await app.inject({
     method: 'GET',
-    url: `/api/v1/requirements/${requirementId}/test-pass-eligibility`,
+    url: `/api/v1/requirements/${requirementId}`,
     headers: { cookie: viewerUser.cookie },
   })
-  assert.equal(eligibility.json().data.eligible, true)
+  assert.equal(resolvedDetail.json().data.needsReview, false)
 
-  const testPass = await app.inject({
-    method: 'POST',
-    url: `/api/v1/requirements/${requirementId}/pass-test`,
-    payload: { version: requirementRow.version, conclusion: '测试通过' },
-    headers: { cookie: viewerUser.cookie },
-  })
-  assert.equal(testPass.json().data.status, 'passed', testPass.body)
-  requirementRow = testPass.json().data
-  assert.equal(requirementRow.latestTestSubmission.selfTestResult, 'passed')
-  assert.equal(requirementRow.needsReview, false)
-
-  // 通过后重开 Bug，需求详情出现复核提示。
+  // 通过后重开 Bug，详情继续提供复核状态。
   const reopenedBug = await app.inject({
     method: 'POST',
     url: `/api/v1/bugs/${bugRow.id}/reopen`,
