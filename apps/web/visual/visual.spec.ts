@@ -197,7 +197,6 @@ test.describe('[desktop] 核心页面', () => {
     const pages: Array<[string, string, string]> = [
       ['changes', '/operations/changes', '变更'],
       ['skills', '/capabilities/skills', '技能库'],
-      ['templates', '/capabilities/templates', 'AGENTS.md 模板'],
       ['vault', '/vault', '凭据库'],
       ['team', '/settings/team?tab=connections', 'DevOps 研发团队'],
       ['nodes', '/settings/pipeline-nodes', '执行节点'],

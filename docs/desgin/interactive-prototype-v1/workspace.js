@@ -101,7 +101,7 @@ export function createTeamWorkspace(ctx) {
     return next;
   }
   /** 输出团队能力二级导航。@param {string} selected 当前子页。@returns {string} 导航 HTML。 */
-  function capabilityNav(selected) { return `<nav class="capability-nav" aria-label="团队能力">${[['Bot','智能体'],['Skills','Skills'],['templates','AGENTS.md'],['memory','记忆'],['connections','连接与节点']].map(([id,label])=>action('capability',label,id,`capability-tab ${selected===id?'active':''}`)).join('')}</nav>`; }
+  function capabilityNav(selected) { return `<nav class="capability-nav" aria-label="团队能力">${[['Bot','智能体'],['Skills','Skills'],['memory','记忆'],['connections','连接与节点']].map(([id,label])=>action('capability',label,id,`capability-tab ${selected===id?'active':''}`)).join('')}</nav>`; }
   /** 输出紧凑操作栏，页面名称仅供辅助技术识别。@param {string} title 页面名称。@param {string} tools 操作 HTML。@returns {string} 无重复大标题的工具栏。 */
   function heading(title,tools='') {return `<header class="work-page-head compact-page-head ${tools?'':'without-tools'}"><button type="button" class="icon-btn mobile-menu" data-action="menu" aria-label="展开导航">${icon('menu')}</button><h1 class="sr-only">${title}</h1><div class="row">${tools}</div></header>`;}
   /** 输出变量及密钥列表，密钥值不进入原型数据。@param {string} project 项目过滤。@returns {string} 环境配置界面。 */
@@ -243,7 +243,7 @@ export function createTeamWorkspace(ctx) {
     if(name==='open-task'){const t=db.tasks.find(t=>t.id===id);if(t){modal.close();openTask(t);}return;}
     if(name==='hide-task'){ui.task='';render();return;}
     if(name==='task-list'){dialog('协作任务',db.tasks.filter(t=>t.room===id).map(t=>taskRow(t)).join('')||empty('还没有任务'));return;}
-    if(name==='capability'){modal.close();state.page=id==='templates'?'Skills':id;if(id==='templates')state.skillTab='AGENTS.md 模板';else if(id==='Skills')state.skillTab='技能库';state.botDetail=null;render();return;}
+    if(name==='capability'){modal.close();state.page=id;state.botDetail=null;render();return;}
     if(name==='incident-detail'){const incident=db.incidents.find(i=>i.id===id);if(!incident)return;const t=db.tasks.find(t=>t.id===incident.task);dialog('异常处理 · '+incident.title,`<p>${esc(incident.evidence)}</p><ol class="incident-flow"><li><strong>发现异常</strong><span>${esc(incident.environment)} · 聚合 ${incident.count} 次</span></li><li><strong>建立问题</strong><span>${esc(t?.issue||'未关联')}</span></li><li><strong>Bot 排查与修复</strong><span>${esc(bot(t?.executor)?.name||'未指定')} · ${esc(t?.phase||'待处理')}</span></li><li><strong>发布并验证</strong><span>验收后制定变更计划，验证运行版本与健康状态。</span></li></ol><div class="form-actions">${action('open-task','进入排查会话',incident.task,'btn primary')}${t?action('issue','查看 Bug',t.id):''}${action('close','关闭')}</div>`);return;}
     if(name==='ops-tab'){ui.ops=id;render();return;}
     if(name==='environment'){ui.env=id;render();return;}

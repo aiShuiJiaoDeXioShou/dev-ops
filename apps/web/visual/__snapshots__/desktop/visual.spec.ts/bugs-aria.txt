@@ -1,9 +1,6 @@
 - main:
   - button "项目"
   - text: / Bug dev-ops 平台 进行中
-  - link "查看项目的协作约定模板":
-    - /url: /capabilities/templates
-    - text: 协作约定 未选用
   - button "项目设置"
   - tablist "项目功能":
     - tab "需求"

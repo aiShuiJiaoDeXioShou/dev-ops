@@ -106,11 +106,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
       ['release-check','发布核对','交付','核对版本与人工放行信息。','核对产物版本、目标环境和人工放行信息；不执行部署或发布。','0.9.0'],
     ].map(([id,name,category,description,instructions,version]) => ({id,name,category,description,instructions,version,source:'团队维护',enabled:id !== 'release-check'}));
   }
-  let agentTemplates = [
-    {id:'team-default',name:'团队通用',tag:'通用',description:'适合日常项目协作，统一沟通、权限与交付边界。',content:'# AGENTS.md\n\n## 协作约定\n- 使用中文沟通，明确事实与待确认事项。\n- 通过 @ 引用仓库、文件与 PR，避免猜测上下文。\n- 优先调用团队已启用的 Skills。\n\n## 工作边界\n- 保留他人尚未完成的修改。\n- 提测状态不触发流水线。\n- 发布前遵循团队人工放行流程。'},
-    {id:'web-team',name:'Web 研发',tag:'React / TypeScript',description:'前端项目的类型约束、组件职责与验证要求。',content:'# AGENTS.md\n\n## Web 研发约定\n- 使用 TypeScript，保持类型准确。\n- 组件聚焦展示与交互，避免重复状态。\n- 遵循项目已有样式和可访问性规范。\n- 修改后运行项目约定的检查和构建。\n\n## 协作\n- 通过 @ 引用文件、需求与 PR。\n- 仅调用团队已启用的 Skills。'},
-    {id:'service-team',name:'服务端研发',tag:'API / 数据库',description:'接口契约、权限校验、数据一致性与迁移约定。',content:'# AGENTS.md\n\n## 服务端研发约定\n- 在服务端校验身份、资源归属和权限。\n- 外部输入必须校验，外部调用必须设置超时。\n- 数据库变更使用版本化迁移。\n- 不向客户端暴露凭据、SQL 或内部堆栈。\n\n## 验证\n- 覆盖权限、失败路径和并发边界。\n- 使用团队 Skills 辅助核对接口契约。'},
-  ];
   // 扩展原型数据时保留已有事项与旧版技能开关，不覆盖用户的本地修改。
   const libraryValid = Array.isArray(data.library) && data.library.every(skill => ['id','name','category','description','instructions','version','source'].every(key => typeof skill[key] === 'string') && /^[a-z0-9-]+$/.test(skill.id) && typeof skill.enabled === 'boolean');
   if (!libraryValid) {
@@ -118,8 +113,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     const legacyNames = {'requirements':'需求梳理','release-summary':'交付摘要','release-check':'发布核对'};
     data.library.forEach(skill => { if (legacyNames[skill.id]) skill.enabled = data.skills[legacyNames[skill.id]]; });
   }
-  if (!data.projectTemplates || typeof data.projectTemplates !== 'object' || Array.isArray(data.projectTemplates)) data.projectTemplates = {};
-  Object.assign(state, { skillTab:'技能库', skillCategory:'全部', skillQuery:'', threads:[], threadByProject:{}, mentionQuery:null, mentionCategory:'全部', mentionIndex:0, chatError:'' });
+  Object.assign(state, { skillCategory:'全部', skillQuery:'', threads:[], threadByProject:{}, mentionQuery:null, mentionCategory:'全部', mentionIndex:0, chatError:'' });
 
   /** 初始团队智能体；状态和运行环境均为演示数据。@returns {object[]} 智能体定义。 */
   function defaultBots() {
@@ -191,7 +185,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
   /** 展示项目绑定配置，避免覆盖全局职责。@returns {void} 打开项目配置表单。 */
   function projectBotSettings() {
     const bot = currentBot(), binding = bot && bindingFor(bot.id); if (!binding) return;
-    dialog(`${bot.name} · 项目配置`,`<form id="binding-form"><div class="row binding-profile">${botAvatar(bot)}<div><strong>${esc(bot.name)}</strong><p class="small muted">${esc(bot.role)} · ${esc(project().name)}</p></div><span class="spacer"></span><button type="button" class="text-btn" data-bot-global="${bot.id}">全局配置 ↗</button></div><div class="settings-row"><div><strong>在本项目启用</strong></div><input type="checkbox" class="switch" name="enabled" ${binding.enabled ? 'checked' : ''} ${state.role === '浏览者' ? 'disabled' : ''}></div><div class="settings-row"><div><strong>允许读取关联仓库</strong><p>${esc(project().repo)}</p></div><input type="checkbox" class="switch" name="repoAccess" ${binding.repoAccess ? 'checked' : ''} ${state.role === '浏览者' ? 'disabled' : ''}></div><div class="settings-row"><div><strong>协作模板</strong><p>来自项目的 AGENTS.md 模板</p></div><button type="button" class="text-btn" data-template="${selectedTemplate().id}">${esc(selectedTemplate().name)}</button></div><div class="field" style="margin-top:20px"><span>项目可用 Skills</span>${skillChoices(binding.skills,bot.skills)}</div><label class="field" style="margin-top:20px">项目补充约定<textarea name="notes" maxlength="2000" ${state.role === '浏览者' ? 'readonly' : ''}>${esc(binding.notes)}</textarea></label><div class="form-actions"><button type="button" class="text-btn" data-unbind-bot="${bot.id}" ${state.role === '浏览者' ? 'disabled' : ''}>从项目移除</button><span class="spacer"></span><button class="btn primary" ${state.role === '浏览者' ? 'disabled' : ''}>保存项目配置</button></div></form>`);
+    dialog(`${bot.name} · 项目配置`,`<form id="binding-form"><div class="row binding-profile">${botAvatar(bot)}<div><strong>${esc(bot.name)}</strong><p class="small muted">${esc(bot.role)} · ${esc(project().name)}</p></div><span class="spacer"></span><button type="button" class="text-btn" data-bot-global="${bot.id}">全局配置 ↗</button></div><div class="settings-row"><div><strong>在本项目启用</strong></div><input type="checkbox" class="switch" name="enabled" ${binding.enabled ? 'checked' : ''} ${state.role === '浏览者' ? 'disabled' : ''}></div><div class="settings-row"><div><strong>允许读取关联仓库</strong><p>${esc(project().repo)}</p></div><input type="checkbox" class="switch" name="repoAccess" ${binding.repoAccess ? 'checked' : ''} ${state.role === '浏览者' ? 'disabled' : ''}></div><div class="field" style="margin-top:20px"><span>项目可用 Skills</span>${skillChoices(binding.skills,bot.skills)}</div><label class="field" style="margin-top:20px">项目补充约定<textarea name="notes" maxlength="2000" ${state.role === '浏览者' ? 'readonly' : ''}>${esc(binding.notes)}</textarea></label><div class="form-actions"><button type="button" class="text-btn" data-unbind-bot="${bot.id}" ${state.role === '浏览者' ? 'disabled' : ''}>从项目移除</button><span class="spacer"></span><button class="btn primary" ${state.role === '浏览者' ? 'disabled' : ''}>保存项目配置</button></div></form>`);
   }
   /** 打开独立 Bot 会话，无需关联项目。@param {string} id 智能体标识。@returns {void} 进入协作并保留原有历史。 */
   function globalChat(id) {
@@ -210,7 +204,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     return thread;
   }
   /** 获取项目选用的模板。@returns {object} 模板记录；未知值回退为团队通用。 */
-  function selectedTemplate() { return agentTemplates.find(item => item.id === data.projectTemplates[state.project]) || agentTemplates[0]; }
   /** 构建当前项目可引用的资源，不暴露其他项目的仓库内容。@returns {object[]} 引用候选。 */
   function references() {
     const repoAccess = bindingFor(currentBot()?.id)?.repoAccess;
@@ -305,7 +298,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     skills.forEach(skill => lines.push(`调用 ${skill.name} · v${skill.version}\n${skill.instructions}`));
     if (!lines.length) lines.push('你希望处理哪个仓库或事项？输入 @ 选择资源，也可以直接选择团队 Skill。');
     if (skills.length && !resourceRefs.length) lines.push('请再通过 @ 指定要处理的仓库、文件或事项。');
-    lines.push(`采用「${selectedTemplate().name}」协作约定。`);
     if (bindingFor(bot.id)?.notes) lines.push(`项目补充约定：${bindingFor(bot.id).notes}`);
     if (!thread.messages.length) thread.title = text.slice(0,45);
     thread.messages.push({author:'林然',text,bot:false},{author:bot.name,text:lines.join('\n\n'),bot:true,refs:selected});
@@ -314,12 +306,11 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     const feed = app.querySelector('.conversation-feed');
     if (feed) { feed.lastElementChild?.classList.add('reply-arrived'); feed.scrollTop = feed.scrollHeight; }
   }
-  /** 展示团队技能库和模板目录。@returns {string} 技能平台页面。 */
+  /** 展示团队技能库。@returns {string} 技能平台页面。 */
   function skillsPage() {
-    if (state.skillTab === 'AGENTS.md 模板') return `<header class="page-head skills-header"><div class="row">${button('menu','<span class="sr-only">展开导航</span>','menu','icon-btn mobile-menu')}<h1 class="sr-only">Skills</h1></div><div class="tabs" role="tablist">${['技能库','AGENTS.md 模板'].map(tab => `<button class="tab" aria-selected="${state.skillTab === tab}" data-skill-tab="${tab}">${tab}</button>`).join('')}</div></header><div class="catalog">${templatesPage()}</div>`;
     const query = state.skillQuery.toLowerCase();
     const skills = data.library.filter(skill => (state.skillCategory === '全部' || skill.category === state.skillCategory) && `${skill.name} ${skill.id} ${skill.description}`.toLowerCase().includes(query));
-    return `<header class="page-head skills-header"><div class="row">${button('menu','<span class="sr-only">展开导航</span>','menu','icon-btn mobile-menu')}<h1 class="sr-only">Skills</h1><span class="spacer"></span>${button('new-skill','发布 Skill','plus','btn primary')}</div><div class="tabs" role="tablist" aria-label="Skills 内容">${['技能库','AGENTS.md 模板'].map(tab => `<button class="tab" role="tab" aria-selected="${state.skillTab === tab}" data-skill-tab="${tab}">${tab}</button>`).join('')}</div></header><div class="catalog skills-catalog">${`<div class="skill-toolbar"><div class="category-pills">${['全部','产品','研发','交付'].map(category => `<button class="${state.skillCategory === category ? 'active' : ''}" data-skill-category="${category}">${category}</button>`).join('')}</div><label class="search">${icon('search')}<input id="skill-search" aria-label="搜索 Skills" placeholder="搜索团队技能" value="${esc(state.skillQuery)}"></label></div><div class="skill-grid">${skills.map(skill => `<article class="skill-card"><div class="row"><span class="skill-glyph">${icon('skill')}</span><span class="spacer"></span><span class="skill-state ${skill.enabled ? 'enabled' : ''}"><span class="dot ${skill.enabled ? 'green' : ''}"></span>${skill.enabled ? '已启用' : '已停用'}</span></div><button class="skill-title" data-skill-detail="${skill.id}">${esc(skill.name)}</button><p>${esc(skill.description)}</p><div class="skill-meta"><span>${esc(skill.category)}</span><span>v${esc(skill.version)}</span><span class="spacer"></span><span>${esc(skill.source)}</span></div><div class="skill-card-footer"><code>@skill/${esc(skill.id)}</code><button class="icon-btn" aria-label="使用${esc(skill.name)}" data-use-skill="${skill.id}" ${!skill.enabled || state.role === '浏览者' ? 'disabled' : ''}>${icon('send')}</button></div></article>`).join('')}</div>${skills.length ? '' : `<div class="empty">${icon('search')}<h3>没有找到技能</h3><p>换个关键词，或查看全部分类。</p>${button('clear-skills','清除筛选')}</div>`}`}</div>`;
+    return `<header class="page-head skills-header"><div class="row">${button('menu','<span class="sr-only">展开导航</span>','menu','icon-btn mobile-menu')}<h1>技能库</h1><span class="spacer"></span>${button('new-skill','发布 Skill','plus','btn primary')}</div></header><div class="catalog skills-catalog">${`<div class="skill-toolbar"><div class="category-pills">${['全部','产品','研发','交付'].map(category => `<button class="${state.skillCategory === category ? 'active' : ''}" data-skill-category="${category}">${category}</button>`).join('')}</div><label class="search">${icon('search')}<input id="skill-search" aria-label="搜索 Skills" placeholder="搜索团队技能" value="${esc(state.skillQuery)}"></label></div><div class="skill-grid">${skills.map(skill => `<article class="skill-card"><div class="row"><span class="skill-glyph">${icon('skill')}</span><span class="spacer"></span><span class="skill-state ${skill.enabled ? 'enabled' : ''}"><span class="dot ${skill.enabled ? 'green' : ''}"></span>${skill.enabled ? '已启用' : '已停用'}</span></div><button class="skill-title" data-skill-detail="${skill.id}">${esc(skill.name)}</button><p>${esc(skill.description)}</p><div class="skill-meta"><span>${esc(skill.category)}</span><span>v${esc(skill.version)}</span><span class="spacer"></span><span>${esc(skill.source)}</span></div><div class="skill-card-footer"><code>@skill/${esc(skill.id)}</code><button class="icon-btn" aria-label="使用${esc(skill.name)}" data-use-skill="${skill.id}" ${!skill.enabled || state.role === '浏览者' ? 'disabled' : ''}>${icon('send')}</button></div></article>`).join('')}</div>${skills.length ? '' : `<div class="empty">${icon('search')}<h3>没有找到技能</h3><p>换个关键词，或查看全部分类。</p>${button('clear-skills','清除筛选')}</div>`}`}</div>`;
   }
   /** 打开技能说明与管理入口。@param {string} id 技能标识。@returns {void} 展示可查看的定义。 */
   function skillDetail(id) {
@@ -341,14 +332,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     workspace.openBot('',bot.id,`@skill/${skill.id} `);
     persist();render();document.querySelector('[data-work-input="draft"]')?.focus();
   }
-  /** 查看协作模板全文。@param {string} id 模板标识。@returns {void} 显示预览与选用入口。 */
-  function templateDetail(id) {
-    const t = agentTemplates.find(item => item.id === id); if (!t) return;
-    const selectedProject = projects.find(p => p.id === state.templateProject) || project();
-    const selected = (data.projectTemplates[selectedProject.id] || agentTemplates[0].id) === id;
-    dialog(`${t.name} · AGENTS.md`,`<div class="row"><span class="badge">v${t.version}</span><span class="small muted">${esc(t.tag)}</span><span class="spacer"></span><button class="text-btn" data-document-edit="${id}" ${state.role === '浏览者' ? 'disabled' : ''}>编辑</button><button class="text-btn" data-document-duplicate="${id}" ${state.role === '浏览者' ? 'disabled' : ''}>创建副本</button></div><div class="document-toolbar"><button class="btn" data-document-copy="${id}">复制内容</button><button class="btn" data-document-link="${id}">复制预览链接</button><button class="btn" data-document-download="${id}">下载 AGENTS.md</button></div><pre class="skill-source document-preview">${esc(t.content)}</pre><p class="section-note">链接包含当前版本快照。本机预览链接仅能在可访问本机服务的环境打开，尚未发布到公网。</p><div class="template-apply"><label class="field">目标项目<select aria-label="选用模板的项目" data-change="templateDialogProject">${projects.map(p => `<option value="${p.id}" ${p.id === selectedProject.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label><button class="btn primary" data-apply-template="${id}" ${state.role === '浏览者' || selected ? 'disabled' : ''}>${selected ? '项目已选用' : '应用到项目'}</button></div><p class="small muted">用于项目 Bots 的协作约定，不覆盖远端仓库文件。</p>`);
-    modal.dataset.templateId = id;
-  }
   /** 输出讨论记录，用户内容一律转义。@param {object} entry 评论。@returns {string} 评论标记。 */
   function comment(entry) { return `<div class="comment">${entry.bot ? botAvatar(data.bots.find(bot => bot.name === entry.author) || data.bots[0],'small') : avatar(entry.author)}<div class="comment-content"><div class="comment-meta"><strong>${esc(entry.author)}</strong>${entry.bot ? '<span class="badge blue">Bot · 模拟</span>' : ''}<span class="quiet">${esc(entry.time)}</span></div><p class="comment-body">${esc(entry.text)}</p></div></div>`; }
   /** 输出事项详情并与主列表共享同一记录。@returns {string} 详情标记；无选中项时为空。 */
@@ -358,7 +341,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     return `<aside class="details ${state.expanded ? 'expanded' : ''}" aria-label="事项详情"><div class="detail-top"><h2>事项详情</h2><span class="spacer"></span>${button('edit-item','<span class="sr-only">编辑事项</span>','edit','icon-btn')}${button('expand','<span class="sr-only">展开详情</span>','expand','icon-btn')}${button('close-detail','<span class="sr-only">关闭详情</span>','close','icon-btn')}</div><div class="detail-scroll"><p class="detail-id">${row.id}</p><h2 class="detail-title">${esc(row.title)}</h2><div class="row spread"><select class="btn" aria-label="业务状态" data-change="status" ${state.role === '浏览者' ? 'disabled' : ''}>${options(stages,row.status)}</select><button class="btn" data-action="test" ${state.role === '浏览者' || row.status === '已完成' ? 'disabled' : ''}>标记提测</button></div><dl class="properties"><dt>${icon('user')}研发负责人</dt><dd>${esc(row.owner)}</dd><dt>${icon('users')}协作成员</dt><dd>${esc(row.collaborators || '未指定')}</dd>${row.tester ? `<dt>${icon('user')}测试负责人</dt><dd>${esc(row.tester)}</dd>` : ''}<dt>${icon('layers')}所属项目</dt><dd>${esc(project().name)}</dd><dt>${icon('repo')}关联仓库</dt><dd>${esc(project().repo)}</dd></dl><div class="task-actions"><button type="button" class="btn primary" data-work="issue-task" data-id="${esc(row.id)}" ${state.role === '浏览者' ? 'disabled' : ''}>交给 Bot 跟进</button></div><p class="description">${esc(row.description)}</p>${row.external ? `<p class="section-note"><a href="${esc(row.external)}" target="_blank" rel="noopener noreferrer">打开外部文档 ${icon('external')}</a></p>` : ''}<section class="code-links"><h3>代码关联</h3><div class="row">${icon('branch')}<button data-action="branch-file">${esc(row.branch)}</button></div>${row.pr ? `<div class="row">${icon('pr')}<button class="text-btn" data-pr="${row.pr}">#${row.pr} ${row.id === 'PRD-024' ? '统一错误响应结构' : '查看关联变更'}</button><span class="spacer"></span><span class="badge">${pullRequests().find(pr => pr.id === row.pr)?.status || '未关联'}</span></div>` : '<p class="section-note">暂未关联 PR</p>'}<div class="row">${icon('commit')}${button('commit','a7c92e1','','text-btn')}</div>${row.kind === 'Bug' && row.id === 'BUG-018' ? `<div class="row">${icon('bug')}${button('issue','Issue #18 · 远端 Open','','text-btn')}</div>` : ''}</section><div class="tabs detail-tabs" role="tablist" aria-label="详情内容">${['讨论','活动'].map(tab => `<button class="tab" role="tab" aria-selected="${state.detailTab === tab}" data-detail-tab="${tab}">${tab}</button>`).join('')}</div>${state.detailTab === '讨论' ? row.comments.map(comment).join('') || '<p class="section-note">还没有讨论，补充验收说明吧。</p>' : row.activity.map(activity => `<p class="activity-item">${esc(activity)}</p>`).join('')}</div><form id="comment-form" class="composer"><textarea name="comment" aria-label="讨论内容" placeholder="补充说明，或 @项目助手…" maxlength="2000" required ${state.role === '浏览者' ? 'disabled' : ''}></textarea><div class="composer-tools"><span class="hint">${state.role === '浏览者' ? '浏览者只读' : '讨论保存在此浏览器'}</span><button class="send" aria-label="发送讨论" ${state.role === '浏览者' ? 'disabled' : ''}>${icon('send')}</button></div></form></aside>`;
   }
   /** 输出一级项目、Bot 或 Skills 页面。@returns {string} 页面标记。 */
-  function catalog() { if(state.page==='team-admin')return teamAdmin.page();if(state.page==='vault')return vault.page(); if (state.page === 'collaboration') return workspace.collaboration(); if (state.page === 'operations') return workspace.operations(); if (state.page === 'memory') return workspace.memories(); if (state.page === 'connections') return workspace.connections(); if (state.page === 'variables') return workspace.variables(); if (state.page === 'Bot') return workspace.capabilityNav('Bot') + botsCatalog(); if (state.page === 'projects') return projectsPage(); return workspace.capabilityNav(state.skillTab === 'AGENTS.md 模板' ? 'templates' : 'Skills') + skillsPage(); }
+  function catalog() { if(state.page==='team-admin')return teamAdmin.page();if(state.page==='vault')return vault.page(); if (state.page === 'collaboration') return workspace.collaboration(); if (state.page === 'operations') return workspace.operations(); if (state.page === 'memory') return workspace.memories(); if (state.page === 'connections') return workspace.connections(); if (state.page === 'variables') return workspace.variables(); if (state.page === 'Bot') return workspace.capabilityNav('Bot') + botsCatalog(); if (state.page === 'projects') return projectsPage(); return workspace.capabilityNav('Skills') + skillsPage(); }
   let activeDropdown = null;
   let dropdownSequence = 0;
   /** 收起下拉菜单，保留已选值。@param {boolean} restoreFocus 是否归还触发器焦点。@returns {void} 清理顶层菜单。 */
@@ -442,7 +425,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     syncRoute();
     const focused = document.activeElement;
     const focusId = focused?.id;
-    const searchFocus = ['item-search','skill-search','bot-message','bot-search','roster-search','project-search','template-search','pr-search'].includes(focusId);
+    const searchFocus = ['item-search','skill-search','bot-message','bot-search','roster-search','project-search','pr-search'].includes(focusId);
     const position = searchFocus ? focused.selectionStart : 0;
     const scroll = app.querySelector('.main')?.scrollTop || 0;
     const pages = { '需求': itemsPage, 'Bug': itemsPage, '代码': codePage, 'PR': prPage, '产物与版本': artifactsPage, 'bots': () => workspace.collaboration(state.project), '环境变量': () => workspace.variables(state.project), '流水线':()=>workspace.pipelines(state.project) };
@@ -452,7 +435,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     if (searchFocus) { const input = document.getElementById(focusId); input?.focus(); input?.setSelectionRange(position,position); }
   }
   /** 切换项目并清理不适用的筛选。@param {string} id 项目 ID。@returns {void} 更新页面状态。 */
-  function selectProject(id) { workspace?.setProject(id); state.project = id; state.templateProject = id; state.page = 'project'; state.tab = '需求'; state.selected = null; state.filter = '全部'; state.owner = '全部负责人'; state.query = ''; state.branch = 'main'; state.file = 'README.md'; state.botDetail = null; state.rosterQuery = ''; state.menu = false; state.mentionQuery = null; state.chatError = ''; render(); }
+  function selectProject(id) { workspace?.setProject(id); state.project = id; state.page = 'project'; state.tab = '需求'; state.selected = null; state.filter = '全部'; state.owner = '全部负责人'; state.query = ''; state.branch = 'main'; state.file = 'README.md'; state.botDetail = null; state.rosterQuery = ''; state.menu = false; state.mentionQuery = null; state.chatError = ''; render(); }
   /** 打开可用 Escape 关闭的原生对话框。@param {string} title 标题。@param {string} body 已转义内容。@returns {void} 聚焦对话框。 */
   function dialog(title,body) { closeDropdown(); modal.classList.remove('vault-log-dialog'); delete modal.dataset.dirty; modal.innerHTML = `<header><h2 id="modal-title">${esc(title)}</h2>${button('close-modal','<span class="sr-only">关闭弹窗</span>','close','icon-btn')}</header><div class="modal-body">${body}</div>`; if (!modal.open) modal.showModal(); enhanceProjectSelects(modal); }
   /** 关闭编辑表单前保留用户输入并询问是否放弃。@returns {void} 显示原位提示或关闭弹窗。 */
@@ -485,14 +468,11 @@ import {createVault} from './modules/vault.js?v=20261108-30';
       delete data.remotePrs;
       data.remotePrs = projects.flatMap(p => pullRequests(p.id));
     }
-    if (Array.isArray(data.templates) && data.templates.length && data.templates.every(t => ['id','name','tag','description','content'].every(key => typeof t[key] === 'string'))) agentTemplates = data.templates;
-    data.templates = agentTemplates;
-    agentTemplates.forEach(t => { if (!t.version) t.version = 1; });
     const saved = data.conversations;
     if (saved && Array.isArray(saved.threads) && saved.threads.every(t => ['id','project','botId','title','draft'].every(key => typeof t[key] === 'string') && Array.isArray(t.messages) && t.messages.every(m => typeof m.text === 'string' && typeof m.author === 'string')) && saved.threadByProject && typeof saved.threadByProject === 'object') {
       state.threads = saved.threads; state.threadByProject = saved.threadByProject;
     }
-    Object.assign(state,{projectQuery:'',projectFilter:'全部',activitySource:'全部',templateQuery:'',templateProject:projects[0].id,prQuery:'',prFilter:'全部'});
+    Object.assign(state,{projectQuery:'',projectFilter:'全部',activitySource:'全部',prQuery:'',prFilter:'全部'});
   }
   /** 返回项目统计，进度只按事项完成情况计算。@param {string} id 项目标识。@returns {object} 当前事项与智能体数量。 */
   function projectMetrics(id) {
@@ -534,7 +514,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
   /** 编辑项目的本地业务信息，不改变远端仓库。@param {string} id 项目标识。@returns {void} 打开配置表单。 */
   function projectSettings(id) {
     const p = projects.find(item => item.id === id); if (!p) return;
-    dialog('项目设置',`<form id="project-settings-form" data-project-id="${p.id}"><div class="form-grid"><label class="field full">项目名称<input name="name" required maxlength="50" value="${esc(p.name)}"></label><label class="field">项目状态<select name="status">${options(['计划中','进行中','已暂停','已完成'],p.status)}</select></label><label class="field">负责人<select name="owner">${options(people,p.owner)}</select></label><label class="field full">项目说明<textarea name="description" maxlength="500">${esc(p.description)}</textarea></label></div><div class="settings-row"><div><strong>关联仓库</strong><p>${esc(p.provider)} · ${esc(p.repo)}</p></div><span class="badge">${state.failure ? '读取异常' : '已关联'}</span></div><div class="settings-row"><div><strong>AGENTS.md</strong><p>${esc((agentTemplates.find(t => t.id === data.projectTemplates[id]) || agentTemplates[0]).name)}</p></div><button type="button" class="text-btn" data-project-template="${p.id}">管理文件</button></div><p class="field-error" role="alert"></p><div class="form-actions">${button('close-modal','取消')}<button class="btn primary" ${state.role === '浏览者' ? 'disabled' : ''}>保存</button></div></form>`);
+    dialog('项目设置',`<form id="project-settings-form" data-project-id="${p.id}"><div class="form-grid"><label class="field full">项目名称<input name="name" required maxlength="50" value="${esc(p.name)}"></label><label class="field">项目状态<select name="status">${options(['计划中','进行中','已暂停','已完成'],p.status)}</select></label><label class="field">负责人<select name="owner">${options(people,p.owner)}</select></label><label class="field full">项目说明<textarea name="description" maxlength="500">${esc(p.description)}</textarea></label></div><div class="settings-row"><div><strong>关联仓库</strong><p>${esc(p.provider)} · ${esc(p.repo)}</p></div><span class="badge">${state.failure ? '读取异常' : '已关联'}</span></div><p class="field-error" role="alert"></p><div class="form-actions">${button('close-modal','取消')}<button class="btn primary" ${state.role === '浏览者' ? 'disabled' : ''}>保存</button></div></form>`);
     if (state.role === '浏览者') modal.querySelectorAll('#project-settings-form input,#project-settings-form select,#project-settings-form textarea').forEach(el => el.disabled = true);
   }
   /** 关联已有仓库的本地模拟流程，重复仓库跳回已有项目。@returns {void} 打开关联表单。 */
@@ -551,21 +531,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
   function downloadText(name,text) {
     const url = URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})), link = document.createElement('a');
     link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000); toast('已生成下载文件');
-  }
-  /** 构造独立可打开的文档快照链接，不依赖作者的本地存储。@param {object} template 文档。@returns {string} 同站点预览 URL。 */
-  function templateLink(template) {
-    const url = new URL('template-preview.html',location.href);
-    url.hash = encodeURIComponent(JSON.stringify({name:template.name,version:template.version,content:template.content})); return url.href;
-  }
-  /** 渲染模板库与明确的目标项目选择。@returns {string} 模板目录。 */
-  function templatesPage() {
-    const list = agentTemplates.filter(t => `${t.name} ${t.tag}`.toLowerCase().includes(state.templateQuery.toLowerCase()));
-    return `<div class="template-toolbar"><label class="row small muted">目标项目<select class="btn" aria-label="模板目标项目" data-change="templateProject">${projects.map(p => `<option value="${p.id}" ${p.id === state.templateProject ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label><button class="btn primary" data-action="new-template" ${state.role === '浏览者' ? 'disabled' : ''}>${icon('plus')}新建模板</button></div><div class="filters"><label class="search template-search">${icon('search')}<input id="template-search" placeholder="搜索模板名称或分类" aria-label="搜索模板" value="${esc(state.templateQuery)}"></label></div><div class="template-grid">${list.map(t => { const selected = (data.projectTemplates[state.templateProject] || agentTemplates[0].id) === t.id; return `<article class="template-card"><div class="row">${icon('file')}<span class="badge">${esc(t.tag)}</span><span class="spacer"></span>${selected ? '<span class="badge blue">当前选用</span>' : ''}</div><button class="template-title" data-template="${t.id}">${esc(t.name)}</button><p>${esc(t.description)}</p><pre>${esc(t.content.split('\n').slice(0,6).join('\n'))}</pre><div class="template-tools"><button data-document-copy="${t.id}">复制内容</button><button data-document-link="${t.id}">复制链接</button><button data-document-download="${t.id}">下载</button></div><div class="row"><span class="small quiet">v${t.version}</span><span class="spacer"></span><button class="text-btn" data-template="${t.id}">管理文件 ${icon('arrow')}</button></div></article>`; }).join('')}</div>${list.length ? '' : `<div class="empty"><h3>没有匹配的模板</h3>${button('clear-templates','清除筛选')}</div>`}`;
-  }
-  /** 编辑、复制或创建团队模板。@param {string} id 原模板 ID。@param {boolean} duplicate 是否创建副本。@returns {void} 显示编辑器。 */
-  function editTemplate(id = '',duplicate = false) {
-    if (!editable()) return; const t = agentTemplates.find(item => item.id === id);
-    dialog(t && !duplicate ? '编辑 AGENTS.md 模板' : '新建 AGENTS.md 模板',`<form id="template-form" data-template-id="${t && !duplicate ? t.id : ''}"><div class="form-grid"><label class="field">名称<input name="name" required maxlength="40" value="${esc(t ? t.name+(duplicate ? ' 副本' : '') : '')}"></label><label class="field">分类<input name="tag" required maxlength="30" value="${esc(t?.tag || '团队')}"></label><label class="field full">说明<input name="description" maxlength="200" value="${esc(t?.description || '')}"></label><label class="field full">AGENTS.md<textarea class="document-editor" name="content" required maxlength="20000" spellcheck="false">${esc(t?.content || '# AGENTS.md\n\n## 协作约定\n')}</textarea></label></div>${t && !duplicate ? '<p class="section-note">保存后，选用此模板的项目将使用新版本。需要独立维护时请先创建副本。</p>' : ''}<p class="field-error" role="alert"></p><div class="form-actions">${button('close-modal','取消')}<button class="btn primary">保存模板</button></div></form>`);
   }
   /** 选择允许使用此技能的独立 Bot，不要求项目上下文。@param {string} id 技能 ID。@returns {void} 打开选择器，选择后进入会话草稿。 */
   function chooseSkillTarget(id) {
@@ -590,7 +555,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     const url = new URL(location.href); url.searchParams.delete('view'); url.searchParams.set('page',state.page);
     for (const key of ['project','tab','item','section','target','bot','agent']) url.searchParams.delete(key);
     if (state.page === 'project') { url.searchParams.set('project',state.project); url.searchParams.set('tab',state.tab); if (state.selected) url.searchParams.set('item',state.selected); if (state.tab === 'bots' && currentBot()) url.searchParams.set('bot',currentBot().id); }
-    if (state.page === 'Skills') { url.searchParams.set('section',state.skillTab); url.searchParams.set('target',state.templateProject); }
     if (state.page === 'Bot' && state.botDetail) url.searchParams.set('agent',state.botDetail);
     workspace?.syncRoute(url);
     if (url.href !== location.href) { if (routeInitialized) history.pushState(null,'',url); else history.replaceState(null,'',url); }
@@ -603,8 +567,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     state.project = projects.some(p => p.id === query.get('project')) ? query.get('project') : projects[0].id;
     state.tab = ['需求','Bug','代码','PR','流水线','产物与版本','bots','环境变量'].includes(query.get('tab')) ? query.get('tab') : '需求';
     state.selected = data.rows.some(r => r.id === query.get('item') && r.project === state.project && r.kind === state.tab) ? query.get('item') : null;
-    state.skillTab = query.get('section') === 'AGENTS.md 模板' ? 'AGENTS.md 模板' : '技能库';
-    state.templateProject = projects.some(p => p.id === query.get('target')) ? query.get('target') : state.project;
     state.activeBot = data.bots.some(b => b.id === query.get('bot')) ? query.get('bot') : 'product';
     state.menu = false; state.botDetail = data.bots.some(b => b.id === query.get('agent')) ? query.get('agent') : null;
     workspace?.readRoute(query);
@@ -613,10 +575,8 @@ import {createVault} from './modules/vault.js?v=20261108-30';
   /** 分派显式按钮操作。@param {string} action 操作名。@returns {void} 执行本地交互。 */
   function action(action) {
     if (action === 'clear-projects') { state.projectQuery = ''; state.projectFilter = '全部'; render(); return; }
-    if (action === 'clear-templates') { state.templateQuery = ''; render(); return; }
     if (action === 'clear-prs') { state.prQuery = ''; state.prFilter = '全部'; render(); return; }
     if (action === 'project-settings') { projectSettings(state.project); return; }
-    if (action === 'new-template') { editTemplate(); return; }
     if (action === 'edit-item') { editItem(); return; }
     if (action === 'copy-file') { void copyText(fileContent()); return; }
     if (action === 'download-file') { downloadText(state.file.split('/').at(-1),fileContent()); return; }
@@ -660,18 +620,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
   document.addEventListener('click', event => {
     const target = event.target.closest('button'); if (target?.dataset.work) return; if (event.target.closest('[data-copy-code],[data-download-code]')) return; if (!target || Object.keys(target.dataset).length === 0) return;
     event.preventDefault();
-    if (target.dataset.documentCopy || target.dataset.documentLink || target.dataset.documentDownload || target.dataset.documentEdit || target.dataset.documentDuplicate) {
-      const id = target.dataset.documentCopy || target.dataset.documentLink || target.dataset.documentDownload || target.dataset.documentEdit || target.dataset.documentDuplicate;
-      const t = agentTemplates.find(item => item.id === id); if (!t) return;
-      if (target.dataset.documentCopy) void copyText(t.content);
-      if (target.dataset.documentLink) void copyText(templateLink(t));
-      if (target.dataset.documentDownload) downloadText('AGENTS.md',t.content);
-      if (target.dataset.documentEdit) editTemplate(id);
-      if (target.dataset.documentDuplicate) editTemplate(id,true);
-      return;
-    }
     if (target.dataset.projectSettings) { projectSettings(target.dataset.projectSettings); return; }
-    if (target.dataset.projectTemplate) { state.templateProject = target.dataset.projectTemplate; templateDetail(data.projectTemplates[state.templateProject] || agentTemplates[0].id); return; }
     if (target.dataset.activityDate) {
       const visible = projects.filter(p => (state.projectFilter === '全部' || p.status === state.projectFilter) && `${p.name} ${p.repo} ${p.owner}`.toLowerCase().includes(state.projectQuery.toLowerCase()));
       const day = activityDays(visible).find(d => d.date === target.dataset.activityDate); if (!day || day.future) return;
@@ -699,14 +648,11 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     if (target.dataset.unbindBot) { if (!editable()) return; data.bindings = data.bindings.filter(binding => !(binding.botId === target.dataset.unbindBot && binding.projectId === state.project)); persist(); modal.close(); state.activeBot = ''; render(); toast('已从项目移除，历史记录保留'); return; }
     if (target.dataset.reference) { insertReference(target.dataset.reference); return; }
     if (target.dataset.mentionCategory) { state.mentionCategory = target.dataset.mentionCategory; state.mentionIndex = 0; refreshMentions(); document.getElementById('bot-message').focus(); return; }
-    if (target.dataset.skillTab) { state.skillTab = target.dataset.skillTab; render(); return; }
     if (target.dataset.skillCategory) { state.skillCategory = target.dataset.skillCategory; render(); return; }
     if (target.dataset.skillDetail) { skillDetail(target.dataset.skillDetail); return; }
     if (target.dataset.editSkill) { editSkill(target.dataset.editSkill); return; }
     if (target.dataset.toggleSkill) { if (!editable()) return; const skill = data.library.find(item => item.id === target.dataset.toggleSkill); skill.enabled = !skill.enabled; persist(); render(); skillDetail(skill.id); return; }
     if (target.dataset.useSkill) { chooseSkillTarget(target.dataset.useSkill); return; }
-    if (target.dataset.template) { templateDetail(target.dataset.template); return; }
-    if (target.dataset.applyTemplate) { if (!editable()) return; data.projectTemplates[state.templateProject] = target.dataset.applyTemplate; persist(); modal.close(); render(); toast(`已为${projects.find(p => p.id === state.templateProject)?.name}选用模板`); return; }
     if (target.dataset.thread) { state.threadByProject[threadKey()] = target.dataset.thread; state.mentionQuery = null; modal.close(); render(); return; }
     if (target.dataset.prompt) {
       if (!canChat()) { toast('当前智能体不可用'); return; }
@@ -732,8 +678,6 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     const el = event.target;
     if (modal.open && el.closest('#modal form')) modal.dataset.dirty = 'true';
     const key = el.dataset.change;
-    if (key === 'templateProject') state.templateProject = el.value;
-    if (key === 'templateDialogProject') { state.templateProject = el.value; templateDetail(modal.dataset.templateId); return; }
     if (['projectFilter','prFilter','activitySource'].includes(key)) state[key] = el.value;
     if (key === 'project') { selectProject(el.value); return; }
     if (key === 'status') { if (!editable()) { render(); return; } const row = data.rows.find(item => item.id === state.selected); if (el.value === '待提测' || el.value === '测试中') { testDialog(el.value); render(); } else updateStatus(row,el.value); return; }
@@ -745,7 +689,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
   });
   document.addEventListener('input', event => {
     if (modal.open && event.target.closest('#modal form')) modal.dataset.dirty = 'true';
-    const queryFields = {'project-search':'projectQuery','template-search':'templateQuery','pr-search':'prQuery'};
+    const queryFields = {'project-search':'projectQuery','pr-search':'prQuery'};
     if (queryFields[event.target.id]) { state[queryFields[event.target.id]] = event.target.value; render(); return; }
     if (event.target.id === 'item-search') { state.query = event.target.value; render(); }
     if (event.target.id === 'bot-search') { state.botQuery = event.target.value; render(); }
@@ -759,20 +703,9 @@ import {createVault} from './modules/vault.js?v=20261108-30';
     }
   });
   document.addEventListener('submit', event => {
-    const form = event.target; const formId = form.getAttribute('id'); if (!['new-form','test-form','comment-form','chat-form','connect-form','skill-form','bot-form','binding-form','template-form','project-settings-form','project-create-form','item-edit-form'].includes(formId)) return;
+    const form = event.target; const formId = form.getAttribute('id'); if (!['new-form','test-form','comment-form','chat-form','connect-form','skill-form','bot-form','binding-form','project-settings-form','project-create-form','item-edit-form'].includes(formId)) return;
     event.preventDefault(); if (!editable()) return;
     const values = new FormData(form);
-    if (formId === 'template-form') {
-      const name = String(values.get('name')).trim(), tag = String(values.get('tag')).trim(), content = String(values.get('content')).trim();
-      if (!name || !tag || !content) { form.querySelector('.field-error').textContent = '名称、分类和正文不能为空。'; return; }
-      const existing = agentTemplates.find(t => t.id === form.dataset.templateId);
-      if (agentTemplates.some(t => t.id !== existing?.id && t.name === name)) { form.querySelector('.field-error').textContent = '模板名称已存在。'; return; }
-      const fields = {name,tag,content,description:String(values.get('description')).trim()};
-      const id = existing?.id || `template-${Date.now()}`;
-      if (existing) Object.assign(existing,fields,{version:Number(existing.version)+1});
-      else agentTemplates.push({id,...fields,version:1});
-      data.templates = agentTemplates; persist(); render(); templateDetail(id); toast('模板已保存'); return;
-    }
     if (formId === 'project-settings-form') {
       const p = projects.find(item => item.id === form.dataset.projectId), name = String(values.get('name')).trim();
       if (!name) { form.querySelector('.field-error').textContent = '项目名称不能为空。'; return; }
@@ -844,7 +777,7 @@ import {createVault} from './modules/vault.js?v=20261108-30';
   });
   modal.addEventListener('cancel', event => { event.preventDefault(); requestDialogClose(); });
   loadInteractionData();
-  workspace = createTeamWorkspace({data,state,projects,esc,icon,botAvatar,options,dialog,toast,persist,render,editable,modal,closeDialog:requestDialogClose,enhanceSelects:enhanceProjectSelects,skills:()=>data.library,templateName:id=>(agentTemplates.find(t=>t.id===data.projectTemplates[id])||agentTemplates[0]).name,newBot:()=>editBot()});
+  workspace = createTeamWorkspace({data,state,projects,esc,icon,botAvatar,options,dialog,toast,persist,render,editable,modal,closeDialog:requestDialogClose,enhanceSelects:enhanceProjectSelects,skills:()=>data.library,newBot:()=>editBot()});
   const moduleContext={data,state,projects,esc,icon,botAvatar,options,dialog,toast,persist,render,modal,editable,teamContext};
   teamAdmin=createTeamAdmin(moduleContext);
   vault=createVault(moduleContext);

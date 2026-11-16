@@ -1,9 +1,6 @@
 - main:
-  - navigation "能力内容":
-    - tab "技能库" [selected]
-    - tab "AGENTS.md 模板"
+  - heading "技能库" [level=1]
   - button "发布 Skill"
-  - heading "Skills" [level=1]
   - group "技能分类":
     - button "全部" [pressed]
     - button "产品"

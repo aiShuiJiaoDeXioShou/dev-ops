@@ -54,17 +54,6 @@ export interface DemoSkill {
   enabled: boolean
 }
 
-/** AGENTS.md 模板的演示定义；正文保存 Markdown 全文。 */
-export interface DemoAgentTemplate {
-  id: string
-  teamId: string
-  name: string
-  tag: string
-  description: string
-  content: string
-  version: string
-}
-
 /** 项目记忆，botId 为空字符串表示团队共识而非单个智能体的记忆。 */
 export interface DemoMemory {
   id: string
@@ -92,17 +81,14 @@ export interface DemoConnection {
   status: ConnectionStatus
 }
 
-/** 能力中心五个页面共享的演示数据，独立持久化以免修改现有 store 结构。 */
+/** 能力中心共享的演示数据，独立持久化以免修改现有 store 结构。 */
 export interface CapabilityData {
   version: 1
   bots: DemoBot[]
   runs: DemoBotRun[]
   skills: DemoSkill[]
-  templates: DemoAgentTemplate[]
   memories: DemoMemory[]
   connections: DemoConnection[]
-  /** 项目 ID 到当前选用的 AGENTS.md 模板 ID。 */
-  projectTemplates: Record<string, string>
 }
 
 /** 能力演示数据在浏览器中的存储键，与项目/事项数据分开维护。 */
@@ -352,72 +338,6 @@ function seedSkills(): DemoSkill[] {
   }))
 }
 
-/** 构造两个演示团队的 AGENTS.md 模板初始数据。 */
-function seedTemplates(): DemoAgentTemplate[] {
-  return [
-    {
-      id: 'team-default',
-      teamId: 'rd',
-      name: '团队通用',
-      tag: '通用',
-      description: '适合日常项目协作，统一沟通、权限与交付边界。',
-      version: '1',
-      content:
-        '# AGENTS.md\n\n## 协作约定\n- 使用中文沟通，明确事实与待确认事项。\n- 通过 @ 引用仓库、文件与 PR，避免猜测上下文。\n- 优先调用团队已启用的 Skills。\n\n## 工作边界\n- 保留他人尚未完成的修改。\n- 提测状态不触发流水线。\n- 发布前遵循团队人工放行流程。',
-    },
-    {
-      id: 'web-team',
-      teamId: 'rd',
-      name: 'Web 研发',
-      tag: 'React / TypeScript',
-      description: '前端项目的类型约束、组件职责与验证要求。',
-      version: '2',
-      content:
-        '# AGENTS.md\n\n## Web 研发约定\n- 使用 TypeScript，保持类型准确。\n- 组件聚焦展示与交互，避免重复状态。\n- 遵循项目已有样式和可访问性规范。\n- 修改后运行项目约定的检查和构建。\n\n## 协作\n- 通过 @ 引用文件、需求与 PR。\n- 仅调用团队已启用的 Skills。',
-    },
-    {
-      id: 'service-team',
-      teamId: 'rd',
-      name: '服务端研发',
-      tag: 'API / 数据库',
-      description: '接口契约、权限校验、数据一致性与迁移约定。',
-      version: '1',
-      content:
-        '# AGENTS.md\n\n## 服务端研发约定\n- 在服务端校验身份、资源归属和权限。\n- 外部输入必须校验，外部调用必须设置超时。\n- 数据库变更使用版本化迁移。\n- 不向客户端暴露凭据、SQL 或内部堆栈。\n\n## 验证\n- 覆盖权限、失败路径和并发边界。\n- 使用团队 Skills 辅助核对接口契约。',
-    },
-    {
-      id: 'team-default',
-      teamId: 'product',
-      name: '团队通用',
-      tag: '通用',
-      description: '适合日常项目协作，统一沟通、权限与交付边界。',
-      version: '1',
-      content:
-        '# AGENTS.md\n\n## 协作约定\n- 使用中文沟通，明确事实与待确认事项。\n- 通过 @ 引用项目资源，避免猜测上下文。\n- 优先调用团队已启用的 Skills。\n\n## 工作边界\n- 客户可见文案需经产品确认。\n- 提测状态不触发流水线。\n- 发布前遵循团队人工放行流程。',
-    },
-    {
-      id: 'mobile-team',
-      teamId: 'product',
-      name: '移动端研发',
-      tag: 'Flutter / iOS',
-      description: '移动端项目的兼容性、验收与发布约定。',
-      version: '1',
-      content:
-        '# AGENTS.md\n\n## 移动端研发约定\n- 变更需覆盖 iOS 与 Android 首启场景。\n- 保留客户反馈原文并标注受影响版本。\n- 使用团队定义的验收清单。\n\n## 发布\n- 发布前确认人工放行信息。\n- 不直接修改远端仓库中的 AGENTS.md。',
-    },
-    {
-      id: 'product-delivery',
-      teamId: 'product',
-      name: '产品交付',
-      tag: '需求 / 验收',
-      description: '需求梳理、客户反馈归集与验收结论的输出约定。',
-      version: '1',
-      content:
-        '# AGENTS.md\n\n## 产品协作约定\n- 需求必须包含目标、范围与验收标准。\n- 客户反馈按主题与影响范围归类。\n- 验收结论标注确认人与时间。\n\n## 边界\n- 记忆保存长期约定，任务状态以对应记录为准。',
-    },
-  ]
-}
-
 /** 构造两个演示团队的项目记忆初始数据。 */
 function seedMemories(): DemoMemory[] {
   return [
@@ -554,15 +474,8 @@ export function createInitialCapabilityData(): CapabilityData {
     bots: seedBots(),
     runs: seedRuns(),
     skills: seedSkills(),
-    templates: seedTemplates(),
     memories: seedMemories(),
     connections: seedConnections(),
-    projectTemplates: {
-      'dev-ops': 'team-default',
-      'data-platform': 'service-team',
-      'mobile-app': 'mobile-team',
-      'ops-console': 'team-default',
-    },
   }
 }
 
@@ -630,20 +543,6 @@ function isDemoSkill(value: unknown): value is DemoSkill {
   )
 }
 
-/** 校验 AGENTS.md 模板记录的必要字段。 */
-function isDemoAgentTemplate(value: unknown): value is DemoAgentTemplate {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.teamId === 'string' &&
-    typeof value.name === 'string' &&
-    typeof value.tag === 'string' &&
-    typeof value.description === 'string' &&
-    typeof value.content === 'string' &&
-    typeof value.version === 'string'
-  )
-}
-
 /** 校验记忆记录的必要字段。 */
 function isDemoMemory(value: unknown): value is DemoMemory {
   return (
@@ -699,17 +598,10 @@ function readStoredCapabilityData(value: unknown): CapabilityData | null {
   const bots = toRecordArray(value.bots, isDemoBot)
   const runs = toRecordArray(value.runs, isDemoBotRun)
   const skills = toRecordArray(value.skills, isDemoSkill)
-  const templates = toRecordArray(value.templates, isDemoAgentTemplate)
   const memories = toRecordArray(value.memories, isDemoMemory)
   const connections = toRecordArray(value.connections, isDemoConnection)
-  if (!bots || !runs || !skills || !templates || !memories || !connections) return null
-  if (!isRecord(value.projectTemplates)) return null
-  const projectTemplates: Record<string, string> = {}
-  for (const [projectId, templateId] of Object.entries(value.projectTemplates)) {
-    if (typeof templateId !== 'string') return null
-    projectTemplates[projectId] = templateId
-  }
-  return { version: 1, bots, runs, skills, templates, memories, connections, projectTemplates }
+  if (!bots || !runs || !skills || !memories || !connections) return null
+  return { version: 1, bots, runs, skills, memories, connections }
 }
 
 /**

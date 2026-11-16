@@ -25,7 +25,6 @@ import { VaultPage } from '@/prototype/pages/vault-page'
 import { TeamAdminPage } from '@/prototype/pages/team-admin-page'
 import { BotsPage } from '@/prototype/pages/capabilities/bots-page'
 import { SkillsPage } from '@/prototype/pages/capabilities/skills-page'
-import { TemplatesPage } from '@/prototype/pages/capabilities/templates-page'
 import { MemoryPage } from '@/prototype/pages/capabilities/memory-page'
 import { ConnectionsPage } from '@/prototype/pages/capabilities/connections-page'
 import { V01HomePage } from '@/prototype/pages/v01/v01-home-page'
@@ -70,7 +69,6 @@ export function Component() {
             <Route index element={<Navigate to="bots" replace />} />
             <Route path="bots" element={<BotsPage />} />
             <Route path="skills" element={<SkillsPage />} />
-            <Route path="templates" element={<TemplatesPage />} />
             <Route path="memory" element={<MemoryPage />} />
             <Route path="connections" element={<ConnectionsPage />} />
           </Route>

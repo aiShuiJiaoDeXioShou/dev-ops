@@ -15,7 +15,6 @@ import { canWriteKnowledge } from '../api/mutations'
 import { skillListQueryOptions } from '../api/queries'
 import { SKILL_CATEGORY_LABELS, SKILL_CATEGORY_OPTIONS } from '../model/labels'
 import type { SkillListItem } from '../model/types'
-import { CapabilitiesHeader } from './capabilities-header'
 import { SkillDetailDialog } from './skill-detail'
 import { SkillForm } from './skill-form'
 
@@ -49,7 +48,7 @@ export function SkillList({ teamId }: { teamId: string }) {
     const next = new URLSearchParams(params)
     if (value) next.set(key, value)
     else next.delete(key)
-    if (key !== 'skill' && key !== 'template' && key !== 'page') next.delete('page')
+    if (key !== 'skill' && key !== 'page') next.delete('page')
     setParams(next, { replace: true })
   }
   const filtered = Boolean(search || category)
@@ -62,7 +61,10 @@ export function SkillList({ teamId }: { teamId: string }) {
 
   return (
     <>
-      <CapabilitiesHeader active="skills" action={headerAction} />
+      <header className="page-head skills-header">
+        <h1>技能库</h1>
+        {headerAction}
+      </header>
       <div className="catalog skills-catalog">
         {query.isError ? (
           <PageError

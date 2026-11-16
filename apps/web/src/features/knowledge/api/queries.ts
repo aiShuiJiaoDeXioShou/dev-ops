@@ -10,14 +10,6 @@ export interface SkillListFilters {
   pageSize?: number
 }
 
-/** 模板列表筛选条件。 */
-export interface TemplateListFilters {
-  search?: string
-  tag?: string
-  page?: number
-  pageSize?: number
-}
-
 /** 团队技能列表；改筛选或翻页时沿用上一页数据，避免列表在请求期间卸载搜索框。 */
 export function skillListQueryOptions(teamId: string, filters: SkillListFilters) {
   return queryOptions({
@@ -52,60 +44,5 @@ export function skillActivitiesQueryOptions(skillId: string, page = 1) {
     queryKey: ['knowledge', 'skills', 'activities', skillId, page],
     queryFn: ({ signal }) => apiClient.listSkillActivities(skillId, { page, pageSize: 20 }, { signal }),
     enabled: Boolean(skillId),
-  })
-}
-
-/** 团队模板列表；改筛选或翻页时沿用上一页数据，避免列表在请求期间卸载搜索框。 */
-export function templateListQueryOptions(teamId: string, filters: TemplateListFilters) {
-  return queryOptions({
-    queryKey: ['knowledge', 'templates', 'list', teamId, filters],
-    queryFn: ({ signal }) => apiClient.listAgentTemplates(teamId, filters, { signal }),
-    enabled: Boolean(teamId),
-    placeholderData: keepPreviousData,
-  })
-}
-
-/** 模板详情。 */
-export function templateQueryOptions(templateId: string) {
-  return queryOptions({
-    queryKey: ['knowledge', 'templates', 'detail', templateId],
-    queryFn: ({ signal }) => apiClient.getAgentTemplate(templateId, { signal }),
-    enabled: Boolean(templateId),
-  })
-}
-
-/** 模板版本历史。 */
-export function templateVersionsQueryOptions(templateId: string, page = 1) {
-  return queryOptions({
-    queryKey: ['knowledge', 'templates', 'versions', templateId, page],
-    queryFn: ({ signal }) => apiClient.listAgentTemplateVersions(templateId, { page, pageSize: 20 }, { signal }),
-    enabled: Boolean(templateId),
-  })
-}
-
-/** 模板活动记录。 */
-export function templateActivitiesQueryOptions(templateId: string, page = 1) {
-  return queryOptions({
-    queryKey: ['knowledge', 'templates', 'activities', templateId, page],
-    queryFn: ({ signal }) => apiClient.listAgentTemplateActivities(templateId, { page, pageSize: 20 }, { signal }),
-    enabled: Boolean(templateId),
-  })
-}
-
-/** 项目当前选用模板。 */
-export function projectAgentTemplateQueryOptions(projectId: string) {
-  return queryOptions({
-    queryKey: ['knowledge', 'project-template', projectId],
-    queryFn: ({ signal }) => apiClient.getProjectAgentTemplate(projectId, { signal }),
-    enabled: Boolean(projectId),
-  })
-}
-
-/** 模板快照内容。 */
-export function templateSnapshotQueryOptions(token: string) {
-  return queryOptions({
-    queryKey: ['knowledge', 'snapshot', token],
-    queryFn: ({ signal }) => apiClient.getTemplateSnapshot(token, { signal }),
-    enabled: Boolean(token),
   })
 }

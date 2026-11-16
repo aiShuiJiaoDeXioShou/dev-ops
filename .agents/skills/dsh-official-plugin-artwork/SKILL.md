@@ -5,7 +5,7 @@ description: 设计或评审 DevOps 工作区的项目品牌、Bot 头像、能�
 
 # DevOps 品牌与能力目录素材
 
-先查已有素材、实际使用的尺寸和同类条目。项目标识使用已选用的折叠 D，Bot 头像沿用现有静态或动态版本。Skills 和 AGENTS.md 模板目录沿用本项目的分类、状态与详情结构。特定条目的独立配图或功能预览随对应需求制作。[项目品牌](../../../apps/web/public/prototype/brand.svg) · [Bot 素材](../../../apps/web/public/prototype/bots/) · [能力页模式](../../../docs/design/patterns.md#能力页skills--agentsmd-模板)
+先查已有素材、实际使用的尺寸和同类条目。项目标识使用已选用的折叠 D，Bot 头像沿用现有静态或动态版本。技能库沿用本项目的分类、状态与详情结构。特定条目的独立配图或功能预览随对应需求制作。[项目品牌](../../../apps/web/public/prototype/brand.svg) · [Bot 素材](../../../apps/web/public/prototype/bots/) · [能力页模式](../../../docs/design/patterns.md#能力页skills)
 
 ## 设计与落地
 

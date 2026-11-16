@@ -19,7 +19,6 @@ pnpm dev:prototype
 - [运维](http://127.0.0.1:4178/?v=20261108-30&page=operations)
 - [项目环境变量](http://127.0.0.1:4178/?v=20261108-30&page=project&project=dev-ops&tab=%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F)
 - [智能体管理](http://127.0.0.1:4178/?v=20261108-30&page=Bot)
-- [AGENTS.md 模板](http://127.0.0.1:4178/?v=20261108-30&page=Skills&section=AGENTS.md%20模板)
 - [记忆](http://127.0.0.1:4178/?v=20261108-30&page=memory)
 - [连接与节点](http://127.0.0.1:4178/?v=20261108-30&page=connections)
 

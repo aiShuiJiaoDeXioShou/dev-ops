@@ -3581,16 +3581,6 @@ export const apiFixtures: Record<string, unknown> = {
       updatedAt: '2026-11-11T03:45:12.582Z',
     },
   },
-  '/api/v1/projects/53d557da-d55b-5985-b44a-db55b313d0f2/agent-template': {
-    success: true,
-    code: 'OK',
-    message: 'OK',
-    requestId: 'req-e',
-    data: {
-      selection: null,
-      version: 0,
-    },
-  },
   '/api/v1/projects/53d557da-d55b-5985-b44a-db55b313d0f2/requirements': {
     success: true,
     code: 'OK',
@@ -10668,41 +10658,6 @@ export const apiFixtures: Record<string, unknown> = {
       total: 1,
     },
   },
-  '/api/v1/teams/3796db16-0d50-5b0d-9006-07c05b16f0f6/agent-templates': {
-    success: true,
-    code: 'OK',
-    message: 'OK',
-    requestId: 'req-2y',
-    data: {
-      items: [
-        {
-          id: 'cde109eb-dbfb-50fb-85ce-8f73092436c6',
-          name: '[audit] UI 审计模板 副本',
-          tag: '团队',
-          description: '[audit] 用于 UI 审计的 AGENTS.md 模板',
-          excerpt: '# AGENTS.md\n\n## 协作约定\n\n- [audit] 仅用于测试',
-          contentVersion: 1,
-          version: 1,
-          selectedProjectCount: 1,
-          updatedAt: '2026-11-11T04:01:32.137Z',
-        },
-        {
-          id: '38e8c32c-09f1-5fcb-81d8-594f132b2ef1',
-          name: '[audit] UI 审计模板',
-          tag: '团队',
-          description: '[audit] 用于 UI 审计的 AGENTS.md 模板',
-          excerpt: '# AGENTS.md\n\n## 协作约定\n\n- [audit] 仅用于测试',
-          contentVersion: 1,
-          version: 1,
-          selectedProjectCount: 0,
-          updatedAt: '2026-11-11T04:01:27.271Z',
-        },
-      ],
-      page: 1,
-      pageSize: 20,
-      total: 2,
-    },
-  },
   '/api/v1/credentials/27494f1f-e238-541c-a12d-65a320a9a068/usage': {
     success: true,
     code: 'OK',
@@ -11064,7 +11019,6 @@ export const apiFixtures: Record<string, unknown> = {
           title: '变更计划部署版本缺少服务选择，创建必然失败',
           status: 'resolved',
         },
-          authorName: '管理员',
       ],
       linkedCodeReferences: [
         {
@@ -11072,7 +11026,6 @@ export const apiFixtures: Record<string, unknown> = {
           repositoryId: 'ee855a9d-032d-5c92-b022-dbffe6e71efd',
           targetType: 'requirement',
           targetId: '0d027f14-bcff-50dc-a0bc-6557527de7a9',
-          authorName: '管理员',
           objectType: 'change_request',
           remoteId: '1',
           title: 'feat: 平台体验审计与自举迭代（2026-11）',
@@ -11080,7 +11033,6 @@ export const apiFixtures: Record<string, unknown> = {
           url: 'https://github.com/example/dev-ops/pull/1',
           lastCheckStatus: 'ok',
           lastErrorCode: null,
-          authorName: '管理员',
           lastCheckedAt: '2026-11-11T04:31:54.675Z',
         },
         {
@@ -11112,6 +11064,7 @@ export const apiFixtures: Record<string, unknown> = {
         {
           id: 'd6f4d488-4d54-555b-baed-6552329d91df',
           authorUserId: '6ef930cc-e417-5754-82ae-1fc59f3aa0db',
+          authorName: '管理员',
           bodyMarkdown:
             '## 本轮实现摘要（2026-11-11）\n\n- 修复忘记密码链路：启用 better-auth 重置邮件，前端改用 request-password-reset；本机已用真实 SMTP 收信、重置并重新登录验证。\n- 修复变更计划部署版本缺少服务选择：新增服务下拉与必填校验，弹窗改为固定标题/底栏；外部执行类型不可放行。\n- 服务端：重复邀请 500 修复、幂等作用域按实际路径、错误日志脱敏、413 语义。\n- CLI：team list 修复；新增 code / project repository commits|commit|pull-requests|pull-request|pull-request-diff；--json 参数错误、配置退出码、--all、日期校验。\n- Web：页签与晴雨表标签可见性、详情错误态、页头布局、弹窗焦点归还、移动抽屉、搜索防抖、移动端代码页与登录、个人资料修改密码/名称等 20+ 项。\n- 流水线：新增 platform-smoke 工作流并在本机节点成功运行，产物 build-info 可下载；Agent 透传代理环境变量。\n- 验证：server 117/117、test:db 121/121、web 258/258、CLI 108/108、Agent 61/61、ui:check 0 新增；未完成项见 specs/008-platform-ux-iteration/evidence.md。',
           createdAt: '2026-11-11T04:31:55.036Z',
@@ -11119,6 +11072,7 @@ export const apiFixtures: Record<string, unknown> = {
         {
           id: '85dbe9ef-7fa2-551f-9053-f85827aaba62',
           authorUserId: '6ef930cc-e417-5754-82ae-1fc59f3aa0db',
+          authorName: '管理员',
           bodyMarkdown:
             '## 验收结论（2026-11-11）\n\n- `pnpm check` 全链路通过（含契约生成、全部构建、依赖边界、应用测试与 e2e）；`test:db` 121/121、Web 258/258、CLI 108/108、Agent 61/61。\n- 需求状态已流转至 `passed`；Bug #9 经修复→回归通过→`resolved`。\n- PR #1 已创建：https://github.com/example/dev-ops/pull/1 ；真实提交与 PR 已在“代码引用”中可查。\n- 流水线 `platform-smoke` 真实运行成功，产物 `build-info` 可下载。\n- 仍待后续处理：头像上传（需存储方案确认）、PR 筛选入 URL、凭据配置请求日志弹窗、变更详情项目 UUID 展示、全站页面标题等 P2；真实 GitHub 写权限、非本机节点与生产部署未验证。详见 specs/008-platform-ux-iteration/evidence.md。',
           createdAt: '2026-11-11T04:38:07.054Z',
@@ -11126,6 +11080,7 @@ export const apiFixtures: Record<string, unknown> = {
         {
           id: 'b1f3bcca-b2bb-56d9-9e34-b2513c00334b',
           authorUserId: '6ef930cc-e417-5754-82ae-1fc59f3aa0db',
+          authorName: '管理员',
           bodyMarkdown:
             '## 视觉与交互修订（2026-11，追加）\n\n依据 DSH 风格探索稿 v3 与官方 Web UI style reference，重新收敛页面层级与控件密度：\n\n- 侧栏分组标签、38px 导航行、弱化底部边界；选中态使用中性底 + 蓝色文字。\n- 项目工作区页头/页签压缩；需求/Bug 列表去掉重复标题，筛选、搜索与主操作合并为一条工具条；表格改发丝线、48px 行高、中性选中底。\n- 需求/Bug 详情增加固定工具条与“返回列表”，正文取消内层卡片，页签改下划线式；详情独立滚动，窄屏整屏覆盖。\n- 代码页把代码浏览器上移为主内容，写能力区块下沉；变更详情改为主内容 + 属性侧栏；项目首页晴雨表与项目卡片收紧，移除未开放的 Bots 指标。\n- 全局筛选/搜索轻量化，按路由设置标题；移动端列表保留标题 + 状态，隐藏次要列。\n\n说明与截图：docs/design/web-refresh-2026-11/README.md；对应提交见 PR #1。',
           createdAt: '2026-11-11T04:56:40.003Z',

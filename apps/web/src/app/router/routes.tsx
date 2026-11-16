@@ -91,16 +91,6 @@ export function createAppRoutes(): RouteObject[] {
                   lazy: () => import('@/pages/capabilities/skills-page'),
                   HydrateFallback: DelayedPageSkeleton,
                 },
-                {
-                  path: 'templates',
-                  lazy: () => import('@/pages/capabilities/templates-page'),
-                  HydrateFallback: DelayedPageSkeleton,
-                },
-                {
-                  path: 'snapshots/:token',
-                  lazy: () => import('@/pages/capabilities/template-snapshot-page'),
-                  HydrateFallback: DelayedPageSkeleton,
-                },
               ],
             },
             {

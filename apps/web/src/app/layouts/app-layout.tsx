@@ -32,7 +32,6 @@ export function AppLayout() {
       ['/projects/', '项目工作区'],
       ['/projects', '项目'],
       ['/operations/changes', '变更与发布'],
-      ['/capabilities/templates', 'AGENTS.md 模板'],
       ['/capabilities/skills', '团队 Skills'],
       ['/capabilities', '能力'],
       ['/vault', '凭据库'],

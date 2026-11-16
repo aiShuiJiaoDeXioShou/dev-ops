@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query'
 import { FolderGit2, Settings, TriangleAlert } from 'lucide-react'
 import { ProjectSettingsDialog } from '@/features/projects/ui/project-settings-dialog'
 import { projectQueryOptions } from '@/features/projects/api/queries'
-import { AgentTemplateBadge } from '@/features/knowledge/ui/agent-template-badge'
 import { describeRequestError } from '@/shared/api/errors'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
@@ -67,7 +66,6 @@ export function Component() {
             <Tag>{STATUS_LABELS[detail.status]}</Tag>
           </div>
           <div className="row header-actions">
-            <AgentTemplateBadge projectId={projectId} />
             <Button
               type="button"
               variant="ghost"

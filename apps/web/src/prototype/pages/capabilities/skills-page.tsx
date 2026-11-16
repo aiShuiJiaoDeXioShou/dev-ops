@@ -358,25 +358,11 @@ export function SkillsPage() {
       <header className="page-head skills-header">
         <div className="row">
           <ProtoIconButton label="展开导航" icon="menu" className="mobile-menu" onClick={openMenu} />
-          <h1 className="sr-only">Skills</h1>
+          <h1>技能库</h1>
           <ProtoButton variant="primary" disabled={readOnly} onClick={openCreate}>
             <PrototypeIcon name="plus" />
             发布 Skill
           </ProtoButton>
-        </div>
-        <div className="tabs" role="tablist" aria-label="Skills 内容">
-          <button type="button" role="tab" className="tab" aria-selected={true}>
-            技能库
-          </button>
-          <button
-            type="button"
-            role="tab"
-            className="tab"
-            aria-selected={false}
-            onClick={() => navigate('/prototype/capabilities/templates')}
-          >
-            AGENTS.md 模板
-          </button>
         </div>
       </header>
 

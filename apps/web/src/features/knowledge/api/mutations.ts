@@ -12,10 +12,4 @@ export const knowledgeMutations = {
   updateSkill: apiClient.updateSkill.bind(apiClient),
   enableSkill: apiClient.enableSkill.bind(apiClient),
   disableSkill: apiClient.disableSkill.bind(apiClient),
-  createTemplate: apiClient.createAgentTemplate.bind(apiClient),
-  updateTemplate: apiClient.updateAgentTemplate.bind(apiClient),
-  duplicateTemplate: apiClient.duplicateAgentTemplate.bind(apiClient),
-  applyProjectTemplate: apiClient.applyProjectAgentTemplate.bind(apiClient),
-  clearProjectTemplate: apiClient.clearProjectAgentTemplate.bind(apiClient),
-  createSnapshotLink: apiClient.createTemplateSnapshotLink.bind(apiClient),
 }

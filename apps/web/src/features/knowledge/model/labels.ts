@@ -18,12 +18,6 @@ export const KNOWLEDGE_ACTION_LABELS: Record<string, string> = {
   skill_updated: '编辑技能',
   skill_enabled: '启用技能',
   skill_disabled: '停用技能',
-  agent_template_created: '新建模板',
-  agent_template_updated: '编辑模板',
-  agent_template_duplicated: '创建副本',
-  agent_template_applied: '选用模板',
-  agent_template_selection_cleared: '取消选用模板',
-  agent_template_snapshot_created: '生成快照链接',
 }
 
 /** 将活动动作码转成中文文案。 */
