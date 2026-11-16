@@ -42,87 +42,61 @@ import { Markdown } from '@/shared/lib/markdown'
 import { highlightCode } from '@/shared/lib/highlight'
 import 'highlight.js/styles/github.css'
 
-interface FileTreeNode {
-  name: string
-  path: string
-  type: 'file' | 'directory'
-  children: FileTreeNode[]
-}
+type FileTreeEntry = { path: string; type: 'file' | 'directory' }
 
-/**
- * 将远端扁平文件树转换为可折叠的目录树。
- * @param entries 远端文件树条目。
- * @returns 目录优先、文件随后的树结构。
- */
-function buildFileTree(entries: Array<{ path: string; type: 'file' | 'directory' }>): FileTreeNode[] {
-  const root: FileTreeNode[] = []
-  const sorted = [...entries].sort((left, right) => left.path.localeCompare(right.path))
-  for (const entry of sorted) {
-    const parts = entry.path.split('/').filter(Boolean)
-    let level = root
-    let currentPath = ''
-    parts.forEach((part, index) => {
-      currentPath = currentPath ? `${currentPath}/${part}` : part
-      const isLast = index === parts.length - 1
-      let node = level.find((item) => item.name === part && item.path === currentPath)
-      if (!node) {
-        node = {
-          name: part,
-          path: currentPath,
-          type: isLast ? entry.type : 'directory',
-          children: [],
-        }
-        level.push(node)
-      } else if (isLast) {
-        node.type = entry.type
-      }
-      level = node.children
-    })
-  }
-  const sortNodes = (nodes: FileTreeNode[]): FileTreeNode[] => {
-    nodes.sort((left, right) => {
-      if (left.type !== right.type) return left.type === 'directory' ? -1 : 1
-      return left.name.localeCompare(right.name)
-    })
-    for (const node of nodes) sortNodes(node.children)
-    return nodes
-  }
-  return sortNodes(root)
-}
-
-/**
- * 渲染可折叠的代码目录树。
- * @param props.nodes 树节点；depth 层级；activePath 当前文件；expanded 展开目录；onToggle/onSelect 回调。
- * @returns 文件与目录行。
- */
-function FileTree({
-  nodes,
-  depth = 0,
-  activePath,
-  expanded,
-  onToggle,
-  onSelect,
-}: {
-  nodes: FileTreeNode[]
-  depth?: number
+interface FileTreeScope {
+  projectId: string
+  repositoryId: string
+  branch?: string
   activePath: string
   expanded: Set<string>
   onToggle: (path: string) => void
   onSelect: (path: string) => void
-}) {
+}
+
+function DirectoryChildren({ scope, path, depth }: { scope: FileTreeScope; path: string; depth: number }) {
+  const directory = useQuery(repositoryTreeQueryOptions(scope.projectId, scope.repositoryId, scope.branch, path))
+  if (directory.isPending) {
+    return (
+      <p className="section-note ml-5" role="status">
+        正在读取目录…
+      </p>
+    )
+  }
+  if (directory.isError) {
+    return (
+      <div className="ml-5">
+        <p className="section-note" role="alert">
+          {describeRequestError(directory.error).description}
+        </p>
+        <Button variant="ghost" size="sm" onClick={() => void directory.refetch()} disabled={directory.isFetching}>
+          重试读取目录
+        </Button>
+      </div>
+    )
+  }
+  if (directory.data.data.entries.length === 0) return <p className="section-note ml-5">空目录</p>
+  return <FileTree entries={directory.data.data.entries} depth={depth} scope={scope} />
+}
+
+function FileTree({ entries, scope, depth = 0 }: { entries: FileTreeEntry[]; scope: FileTreeScope; depth?: number }) {
+  const { activePath, expanded, onToggle, onSelect } = scope
+  const sorted = [...entries].sort((left, right) =>
+    left.type === right.type ? left.path.localeCompare(right.path) : left.type === 'directory' ? -1 : 1,
+  )
   return (
     <>
-      {nodes.map((node) => {
-        const isDirectory = node.type === 'directory'
-        const isExpanded = expanded.has(node.path)
+      {sorted.map((entry) => {
+        const isDirectory = entry.type === 'directory'
+        const isExpanded = expanded.has(entry.path)
         return (
-          <div key={node.path}>
+          <div key={entry.path}>
             <button
               type="button"
-              className={`file ${!isDirectory && activePath === node.path ? 'active' : ''} ${isDirectory ? 'directory' : ''}`}
+              className={`file ${!isDirectory && activePath === entry.path ? 'active' : ''} ${isDirectory ? 'directory' : ''}`}
               aria-expanded={isDirectory ? isExpanded : undefined}
               style={{ paddingLeft: 10 + depth * 14 }}
-              onClick={() => (isDirectory ? onToggle(node.path) : onSelect(node.path))}
+              onClick={() => (isDirectory ? onToggle(entry.path) : onSelect(entry.path))}
             >
               {isDirectory ? (
                 <>
@@ -136,18 +110,9 @@ function FileTree({
               ) : (
                 <FileText className="size-4" aria-hidden="true" />
               )}
-              {node.name}
+              {entry.path.split('/').at(-1)}
             </button>
-            {isDirectory && isExpanded && node.children.length > 0 && (
-              <FileTree
-                nodes={node.children}
-                depth={depth + 1}
-                activePath={activePath}
-                expanded={expanded}
-                onToggle={onToggle}
-                onSelect={onSelect}
-              />
-            )}
+            {isDirectory && isExpanded && <DirectoryChildren scope={scope} path={entry.path} depth={depth + 1} />}
           </div>
         )
       })}
@@ -181,6 +146,10 @@ function archiveUrlFor(provider: string, webUrl: string, branch: string): string
  */
 export function Component() {
   const { projectId = '' } = useParams()
+  return <ProjectCodePage key={projectId} projectId={projectId} />
+}
+
+function ProjectCodePage({ projectId }: { projectId: string }) {
   const { showToast } = useToast()
   const project = useQuery(projectQueryOptions(projectId))
   const repositories = useQuery(projectRepositoriesQueryOptions(projectId))
@@ -199,26 +168,12 @@ export function Component() {
   const branch = selectedBranch || repository?.defaultBranch || branchOptions[0] || undefined
   const tree = useQuery(repositoryTreeQueryOptions(projectId, repository?.id ?? '', branch))
   const entries = tree.data?.data.entries ?? []
-  const treeNodes = buildFileTree(entries)
   const files = entries.filter((entry) => entry.type === 'file').map((entry) => entry.path)
   const defaultPath = pickDefaultPreviewPath(files)
-  const activePath = selectedPath && files.includes(selectedPath) ? selectedPath : defaultPath
+  const activePath = selectedPath || defaultPath
   const file = useQuery(repositoryFileQueryOptions(projectId, repository?.id ?? '', tree.data?.data.branch, activePath))
   useEffect(() => {
     setViewMode('preview')
-  }, [activePath])
-  useEffect(() => {
-    if (!activePath) return
-    const parents = activePath.split('/').slice(0, -1)
-    setExpanded((previous) => {
-      const next = new Set(previous)
-      let current = ''
-      for (const parent of parents) {
-        current = current ? `${current}/${parent}` : parent
-        next.add(current)
-      }
-      return next
-    })
   }, [activePath])
   if (project.isPending || repositories.isPending) return <DelayedPageSkeleton />
   if (project.isError || !project.data) {
@@ -300,6 +255,7 @@ export function Component() {
                 onSelect={() => {
                   setSelectedBranch(item)
                   setSelectedPath('')
+                  setExpanded(new Set())
                 }}
               >
                 {item === currentBranch ? (
@@ -332,6 +288,7 @@ export function Component() {
               setSelectedRepositoryId(event.target.value)
               setSelectedBranch('')
               setSelectedPath('')
+              setExpanded(new Set())
             }}
           >
             {linkedRepositories.map((item) => (
@@ -390,15 +347,20 @@ export function Component() {
                   <span key={index} className="skeleton-line" style={{ width: `${width}%` }} />
                 ))}
               </div>
-            ) : treeNodes.length === 0 ? (
+            ) : entries.length === 0 ? (
               <p className="section-note">仓库没有可展示的文件。</p>
             ) : (
               <FileTree
-                nodes={treeNodes}
-                activePath={activePath}
-                expanded={expanded}
-                onToggle={toggleDirectory}
-                onSelect={setSelectedPath}
+                entries={entries}
+                scope={{
+                  projectId,
+                  repositoryId: repository.id,
+                  branch: tree.data?.data.branch,
+                  activePath,
+                  expanded,
+                  onToggle: toggleDirectory,
+                  onSelect: setSelectedPath,
+                }}
               />
             )}
           </nav>
@@ -442,7 +404,7 @@ export function Component() {
                 </button>
               </span>
             </div>
-            {file.isPending ? (
+            {file.isPending && activePath ? (
               <p className="section-note" style={{ padding: 16 }}>
                 正在读取文件…
               </p>

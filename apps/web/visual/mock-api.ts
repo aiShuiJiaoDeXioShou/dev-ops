@@ -71,7 +71,8 @@ const envVariablePage = envelope({
  */
 export async function installApiMocks(page: Page): Promise<void> {
   await page.route('**/api/v1/**', async (route) => {
-    const path = new URL(route.request().url()).pathname
+    const url = new URL(route.request().url())
+    const { pathname: path } = url
     if (path === '/api/v1/attachments/policy') return route.fulfill({ json: envelope(attachmentPolicy) })
     if (path === `/api/v1/projects/${VISUAL_IDS.projectId}/artifacts`) {
       return route.fulfill({ json: artifactPage })
@@ -82,7 +83,31 @@ export async function installApiMocks(page: Page): Promise<void> {
     if (path.includes('/eligibility')) {
       return route.fulfill({ json: envelope({ eligible: true, blockers: [] }) })
     }
-    if (apiFixtures[path]) return route.fulfill({ json: apiFixtures[path] })
+    const fixture = apiFixtures[path]
+    const directory = url.searchParams.get('path')
+    if (
+      path.endsWith('/tree') &&
+      directory !== null &&
+      fixture &&
+      typeof fixture === 'object' &&
+      'data' in fixture &&
+      fixture.data &&
+      typeof fixture.data === 'object' &&
+      'entries' in fixture.data &&
+      Array.isArray(fixture.data.entries)
+    ) {
+      const prefix = directory ? `${directory}/` : ''
+      const entries = fixture.data.entries.filter((entry: unknown) => {
+        if (!entry || typeof entry !== 'object' || !('path' in entry) || typeof entry.path !== 'string') return false
+        return (
+          entry.path.startsWith(prefix) &&
+          entry.path.length > prefix.length &&
+          !entry.path.slice(prefix.length).includes('/')
+        )
+      })
+      return route.fulfill({ json: { ...fixture, data: { ...fixture.data, entries } } })
+    }
+    if (fixture) return route.fulfill({ json: fixture })
     return route.fulfill({ json: emptyPage() })
   })
 }

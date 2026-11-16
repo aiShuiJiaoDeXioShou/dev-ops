@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page, type TestInfo } from '@playwright/test'
+import { test, expect, type Locator, type Page, type Request, type TestInfo } from '@playwright/test'
 import { installApiMocks } from './mock-api'
 import { VISUAL_IDS } from './fixtures'
 
@@ -184,6 +184,11 @@ test.describe('[desktop] 核心页面', () => {
       ['environment', `/projects/${VISUAL_IDS.projectId}/environment`, '环境变量'],
     ]
     for (const [name, path, tab] of pages) {
+      const reads: Request[] = []
+      const recordRead = (request: Request) => {
+        if (/\/repositories\/[^/]+\/(tree|file)$/.test(new URL(request.url()).pathname)) reads.push(request)
+      }
+      if (name === 'code') page.on('request', recordRead)
       await prepare(page, path)
       await expect(page.getByRole('tab', { name: tab })).toBeVisible()
       await expectPageSnapshot(page, testInfo, name)
@@ -197,14 +202,40 @@ test.describe('[desktop] 核心页面', () => {
         const fileTree = page.getByRole('navigation', { name: '文件目录' })
         const directory = fileTree.getByRole('button', { name: '.devops', exact: true })
         const subdirectory = fileTree.getByRole('button', { name: 'workflows', exact: true })
+        // React 严格模式可能取消首次挂载时的请求；仅统计随后保留的读取。
+        const readPaths = (resource: 'tree' | 'file') =>
+          reads
+            .filter((request) => request.failure()?.errorText !== 'net::ERR_ABORTED')
+            .map((request) => new URL(request.url()))
+            .filter((url) => url.pathname.endsWith(`/${resource}`))
+            .map((url) => url.searchParams.get('path'))
+        expect(readPaths('tree')).toEqual([''])
         await expect(directory).toHaveAttribute('aria-expanded', 'false')
         await expect(directory.locator('.lucide-chevron-right')).toHaveCSS('transform', 'none')
         await directory.click()
         await expect(directory).toHaveAttribute('aria-expanded', 'true')
         await expect(directory.locator('.lucide-chevron-down')).toHaveCSS('transform', 'none')
         await expect(subdirectory).toBeVisible()
+        await subdirectory.click()
+        const workflow = fileTree.getByRole('button', { name: 'platform-smoke.yml', exact: true })
+        await expect(workflow).toBeVisible()
+        await workflow.click()
+        await expect(page.locator('.file-head')).toContainText('.devops/workflows/platform-smoke.yml')
+        await expect(page.getByRole('button', { name: '复制内容' })).toBeEnabled()
+        const readme = fileTree.getByRole('button', { name: 'README.md', exact: true })
+        await readme.click()
+        await expect(page.getByRole('button', { name: '复制内容' })).toBeEnabled()
+        const readCount = reads.length
         await directory.click()
         await expect(subdirectory).toHaveCount(0)
+        await directory.click()
+        await expect(workflow).toBeVisible()
+        await workflow.click()
+        await expect(page.getByRole('button', { name: '复制内容' })).toBeEnabled()
+        expect(reads).toHaveLength(readCount)
+        expect(readPaths('tree')).toEqual(['', '.devops', '.devops/workflows'])
+        expect(readPaths('file')).toEqual(['README.md', '.devops/workflows/platform-smoke.yml'])
+        page.off('request', recordRead)
 
         // 代码变更收进工具栏抽屉；写能力调用由日志图标打开，均不再铺在代码浏览器下方。
         await page.getByRole('button', { name: '代码变更' }).first().click()

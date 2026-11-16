@@ -105,17 +105,33 @@ export function useTeamRepositories(teamId: string, enabled = true) {
   }
 }
 
-/** 仓库文件树。 */
-export function repositoryTreeQueryOptions(projectId: string, repositoryId: string, branch?: string) {
+const REPOSITORY_READ_STALE_TIME = 60_000
+
+/**
+ * 按项目、仓库、分支和目录缓存一层子项；空路径读取根目录。
+ * @param projectId 项目标识。
+ * @param repositoryId 已关联的仓库标识。
+ * @param branch 选中的分支，省略时由服务端解析默认分支。
+ * @param path 仓库相对目录路径。
+ * @returns 目录查询配置，缓存有效期内重新展开不会发请求。
+ */
+export function repositoryTreeQueryOptions(projectId: string, repositoryId: string, branch?: string, path = '') {
   return queryOptions({
-    queryKey: ['code', 'tree', projectId, repositoryId, branch],
-    queryFn: ({ signal }) =>
-      apiClient.listRepositoryTree(projectId, repositoryId, branch ? { branch } : undefined, { signal }),
+    queryKey: ['code', 'tree', projectId, repositoryId, branch, path],
+    queryFn: ({ signal }) => apiClient.listRepositoryTree(projectId, repositoryId, { branch, path }, { signal }),
     enabled: Boolean(projectId && repositoryId),
+    staleTime: REPOSITORY_READ_STALE_TIME,
   })
 }
 
-/** 仓库文件内容。 */
+/**
+ * 按项目、仓库、分支和文件路径缓存已读取的文件内容。
+ * @param projectId 项目标识。
+ * @param repositoryId 已关联的仓库标识。
+ * @param branch 已解析的分支，缺省时等待根目录加载。
+ * @param path 仓库相对文件路径。
+ * @returns 文件查询配置，缓存有效期内重复打开复用正文。
+ */
 export function repositoryFileQueryOptions(
   projectId: string,
   repositoryId: string,
@@ -124,9 +140,9 @@ export function repositoryFileQueryOptions(
 ) {
   return queryOptions({
     queryKey: ['code', 'file', projectId, repositoryId, branch, path],
-    queryFn: ({ signal }) =>
-      apiClient.getRepositoryFile(projectId, repositoryId, { ...(branch ? { branch } : {}), path }, { signal }),
-    enabled: Boolean(projectId && repositoryId && path),
+    queryFn: ({ signal }) => apiClient.getRepositoryFile(projectId, repositoryId, { branch, path }, { signal }),
+    enabled: Boolean(projectId && repositoryId && branch && path),
+    staleTime: REPOSITORY_READ_STALE_TIME,
   })
 }
 
