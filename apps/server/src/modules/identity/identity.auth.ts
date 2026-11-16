@@ -1,9 +1,50 @@
 import { randomUUID } from 'node:crypto'
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
+import sharp from 'sharp'
 import type { AppConfig } from '../../platform/config/env.ts'
 import type { Database } from '../../platform/database/client.ts'
 import { authAccount, authSession, authUser, authVerification } from './identity.tables.ts'
+
+const AVATAR_SIZE = 160
+const AVATAR_MAX_BYTES = 32 * 1024
+const AVATAR_PREFIX = 'data:image/jpeg;base64,'
+
+async function normalizeAvatar(image: unknown): Promise<string> {
+  const invalid = () => APIError.fromStatus('BAD_REQUEST', { message: '头像无法保存，请重新选择图片。' })
+  if (
+    typeof image !== 'string' ||
+    !image.startsWith(AVATAR_PREFIX) ||
+    image.length > AVATAR_PREFIX.length + Math.ceil(AVATAR_MAX_BYTES / 3) * 4
+  ) {
+    throw invalid()
+  }
+
+  const encoded = image.slice(AVATAR_PREFIX.length)
+  const bytes = Buffer.from(encoded, 'base64')
+  if (
+    bytes.length < 3 ||
+    bytes.length > AVATAR_MAX_BYTES ||
+    bytes.toString('base64') !== encoded ||
+    bytes.readUIntBE(0, 3) !== 0xffd8ff
+  ) {
+    throw invalid()
+  }
+
+  // 只解码头像尺寸的 JPEG，并重新编码以丢弃元数据和附带内容。
+  const jpeg = sharp(bytes, { limitInputPixels: AVATAR_SIZE ** 2, failOn: 'warning' })
+  try {
+    const { width, height } = await jpeg.metadata()
+    if (width === AVATAR_SIZE && height === AVATAR_SIZE) {
+      const thumbnail = await jpeg.jpeg({ quality: 82 }).toBuffer()
+      if (thumbnail.length <= AVATAR_MAX_BYTES) return AVATAR_PREFIX + thumbnail.toString('base64')
+    }
+  } catch {
+    throw invalid()
+  }
+  throw invalid()
+}
 
 /**
  * 创建平台 Better Auth 实例。
@@ -79,6 +120,16 @@ export function createIdentityAuth(db: Database, config: AppConfig, mailer?: Aut
         emailVerified: 'email_verified',
         createdAt: 'created_at',
         updatedAt: 'updated_at',
+      },
+    },
+    databaseHooks: {
+      user: {
+        update: {
+          before: async (data) => {
+            if (data.image === undefined || data.image === null) return
+            return { data: { ...data, image: await normalizeAvatar(data.image) } }
+          },
+        },
       },
     },
     account: {

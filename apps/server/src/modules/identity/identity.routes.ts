@@ -32,6 +32,10 @@ export const identityAuthRoutes: FastifyPluginAsync<{ auth: IdentityAuth; origin
   app.route({
     method: ['GET', 'POST'],
     url: '/auth/*',
+    schema: {
+      description:
+        'Better Auth 认证协议端点，保留协议状态码。POST /api/v1/auth/update-user 可用登录 Cookie 更新本人的显示名称 name 和头像 image。头像为 160×160 的 JPEG data URL，解码后最多 32 KiB，传 null 可移除。GET /api/v1/auth/get-session 返回当前头像。',
+    },
     handler: async (request, reply) => {
       if (isSignUpPath(request.url)) {
         return reply.code(404).send(failure(ERROR_CODES.NOT_FOUND, '接口不存在', request.id))

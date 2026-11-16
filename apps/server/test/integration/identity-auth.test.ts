@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { test } from 'node:test'
 import { sql } from 'drizzle-orm'
 import { Client } from 'pg'
+import sharp from 'sharp'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { loadConfig } from '../../src/platform/config/env.ts'
 import { migrateDatabase } from '../../src/platform/database/migrate.ts'
@@ -116,6 +117,51 @@ test('Better Auth + PostgreSQL 隔离兼容：无外键、UUID、数据库会话
   })
   assert.equal(session.statusCode, 200, session.body)
   assert.equal(session.json().user.email, email)
+
+  await t.test('本人可保存和移除头像，图片校验失败时保留既有资料', async () => {
+    const url = '/api/v1/auth/update-user'
+    const headers = { cookie: cookieHeader, origin: config.APP_ORIGIN }
+    const jpeg = await sharp({ create: { width: 160, height: 160, channels: 3, background: 'blue' } })
+      .jpeg()
+      .toBuffer()
+    const image = `data:image/jpeg;base64,${jpeg.toString('base64')}`
+    const anonymous = await app.inject({ method: 'POST', url, payload: { image } })
+    assert.equal(anonymous.statusCode, 401)
+
+    const update = async (payload: { name?: string; image?: string | null }) =>
+      app.inject({ method: 'POST', url, headers, payload })
+    const readSession = async () => app.inject({ url: '/api/v1/auth/get-session', headers })
+    const uploaded = await update({ name: '新名称', image })
+    assert.equal(uploaded.statusCode, 200, uploaded.body)
+    assert.equal(uploaded.json().status, true)
+
+    const saved = (await readSession()).json().user
+    assert.equal(saved.name, '新名称')
+    assert.match(saved.image, /^data:image\/jpeg;base64,/)
+    const metadata = await sharp(Buffer.from(saved.image.split(',')[1], 'base64')).metadata()
+    assert.equal(metadata.width, 160)
+    assert.equal(metadata.height, 160)
+
+    const renamed = await update({ name: '再次改名' })
+    assert.equal(renamed.statusCode, 200, renamed.body)
+    assert.equal((await readSession()).json().user.image, saved.image)
+
+    for (const invalid of [
+      'https://example.test/image.jpg',
+      'data:image/jpeg;base64,',
+      'data:image/jpeg;base64,/9j/',
+    ]) {
+      const rejected = await update({ name: '应保留原名称', image: invalid })
+      assert.equal(rejected.statusCode, 400, rejected.body)
+    }
+    const unchanged = (await readSession()).json().user
+    assert.equal(unchanged.name, '再次改名')
+    assert.equal(unchanged.image, saved.image)
+
+    const removed = await update({ image: null })
+    assert.equal(removed.statusCode, 200, removed.body)
+    assert.equal((await readSession()).json().user.image, null)
+  })
 
   const signOut = await app.inject({
     method: 'POST',
