@@ -1,34 +1,38 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Folder, Plus, Search, Settings, TriangleAlert, Users } from 'lucide-react'
+import { Folder, Plus, Search, Settings, TriangleAlert, Users } from 'lucide-react'
 import { useSession } from '@/features/identity/model/session'
 import { describeRequestError } from '@/shared/api/errors'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
-import { UserAvatar } from '@/shared/ui/user-avatar'
 import { EmptyState } from '@/shared/ui/page-state'
+import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
+import { Combobox } from '@/shared/ui/controls/combobox'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
-import { projectActivityQueryOptions, projectListQueryOptions } from '../api/queries'
 import {
-  parseProjectFilters,
-  PROJECT_STATUS_LABELS,
-  projectFilterParams,
-  updateProjectFilters,
-  type ProjectStatus,
-} from '../model/filters'
+  projectActivityQueryOptions,
+  projectListQueryOptions,
+  projectRepositoryOptionsQueryOptions,
+} from '../api/queries'
+import { parseProjectFilters, PROJECT_STATUS_LABELS, projectFilterParams, updateProjectFilters } from '../model/filters'
 import { ProjectForm } from './project-form'
 import { ProjectSettingsDialog } from './project-settings-dialog'
 import { ActivityBarometer } from './activity-barometer'
 
-/** 项目列表：项目卡片、状态筛选、搜索与创建入口。 */
+/** 项目首页，显示晴雨表、项目卡片及仓库和状态筛选。 */
 export function ProjectList() {
   const navigate = useNavigate()
   const { currentTeam, role } = useSession()
   const [params, setParams] = useSearchParams()
   const filters = parseProjectFilters(params)
+  const status =
+    filters.status === 'active' || filters.status === 'paused' || filters.status === 'ended'
+      ? filters.status
+      : undefined
+  const repositoryId = filters.repositoryId || undefined
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null)
   const [activitySource, setActivitySource] = useState<'all' | 'activity' | 'code' | 'pull_request'>('all')
@@ -36,15 +40,18 @@ export function ProjectList() {
   const query = useQuery(
     projectListQueryOptions(currentTeam?.id ?? '', {
       search: filters.search || undefined,
-      status: (filters.status || undefined) as ProjectStatus | undefined,
+      status,
+      repositoryId,
       page: filters.page,
       pageSize: filters.pageSize,
     }),
   )
+  const repositories = useQuery(projectRepositoryOptionsQueryOptions(currentTeam?.id ?? ''))
   const activity = useQuery(
     projectActivityQueryOptions(currentTeam?.id ?? '', {
-      ...(filters.search ? { search: filters.search } : {}),
-      ...(filters.status ? { status: filters.status as ProjectStatus } : {}),
+      search: filters.search || undefined,
+      status,
+      repositoryId,
       source: activitySource,
     }),
   )
@@ -97,6 +104,20 @@ export function ProjectList() {
     )
   }
   const projects = query.data.data.items
+  const hasFilters = Boolean(filters.search || filters.status || filters.repositoryId)
+  const repositoryOptions = [
+    { value: '', label: repositories.isPending ? '仓库加载中…' : '全部仓库' },
+    ...(repositories.data ?? []).map((repository) => ({
+      value: repository.id,
+      label: `${repository.namespace}/${repository.name} · ${repository.connectionName ?? repository.providerKey}`,
+    })),
+  ]
+  if (repositoryId && !repositoryOptions.some((option) => option.value === repositoryId)) {
+    repositoryOptions.push({
+      value: repositoryId,
+      label: repositories.isPending || repositories.isError ? '所选仓库' : '所选仓库不可用',
+    })
+  }
   const statusOptions = [
     { value: '', label: '全部' },
     ...Object.entries(PROJECT_STATUS_LABELS).map(([value, label]) => ({ value, label })),
@@ -135,28 +156,48 @@ export function ProjectList() {
               </option>
             ))}
           </Select>
+          <div className="project-repository-filter">
+            <Combobox
+              aria-label="按仓库筛选"
+              options={repositoryOptions}
+              value={filters.repositoryId}
+              onValueChange={(value) => update({ repositoryId: value })}
+              searchPlaceholder="搜索仓库"
+              emptyMessage="没有匹配的仓库"
+              disabled={repositories.isPending && !repositoryId}
+              className="project-repository-filter-trigger"
+            />
+          </div>
           <label className="search">
             <Search className="size-4" aria-hidden="true" />
             <Input
               className="search-input"
               aria-label="搜索项目"
-              placeholder="搜索项目、仓库或负责人"
+              placeholder="搜索项目名称或说明"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
             />
           </label>
+          {repositories.isError && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" role="alert">
+              仓库选项加载失败
+              <Button type="button" size="sm" variant="ghost" onClick={() => void repositories.refetch()}>
+                重试
+              </Button>
+            </div>
+          )}
         </div>
         {projects.length === 0 ? (
           <EmptyState
             mascot="project"
-            title={filters.search || filters.status ? '没有匹配的项目' : '还没有项目'}
+            title={hasFilters ? '没有匹配的项目' : '还没有项目'}
             description={
-              filters.search || filters.status
-                ? '当前搜索或状态筛选没有找到项目，可以清除筛选后重新查看。'
+              hasFilters
+                ? '可以调整筛选条件，或清除筛选后查看全部项目。'
                 : '创建第一个项目，把需求、Bug、代码引用和团队协作放在同一个工作区。'
             }
             action={
-              filters.search || filters.status ? (
+              hasFilters ? (
                 <Button type="button" variant="outline" onClick={() => setParams(new URLSearchParams())}>
                   清除筛选
                 </Button>
@@ -181,13 +222,13 @@ export function ProjectList() {
               >
                 <div className="project-card-head">
                   <span className="project-symbol">
-                    <Folder className="size-5" aria-hidden="true" />
+                    <Folder className="size-4" aria-hidden="true" />
                   </span>
                   <div className="project-identity">
                     <Link className="project-card-title" to={`/projects/${project.id}/requirements`}>
                       {project.name}
                     </Link>
-                    <p className="repo-caption">{project.description || '暂无项目说明'}</p>
+                    {project.description && <p className="repo-caption">{project.description}</p>}
                   </div>
                   <Button
                     type="button"
@@ -209,7 +250,9 @@ export function ProjectList() {
                   </span>
                   <span className="project-owner">
                     <UserAvatar name={project.owner.name} image={project.owner.image} className="size-5" />
-                    {project.owner.name}
+                    <span className="project-owner-name" title={project.owner.name}>
+                      {project.owner.name}
+                    </span>
                   </span>
                 </div>
                 {(() => {
@@ -234,24 +277,16 @@ export function ProjectList() {
                           <span>待审 PR</span>
                         </Link>
                       </div>
-                      <div className="project-card-footer">
-                        <div className="project-progress">
-                          <div className="progress-caption">
-                            <span>
-                              完成度 <b>{percent}%</b>
-                            </span>
-                            <span>
-                              {done}/{total}
-                            </span>
-                          </div>
-                          <progress max={100} value={percent} aria-label={`${project.name}事项完成度`}>
-                            {percent}%
-                          </progress>
-                        </div>
-                        <Link className="text-btn row" to={`/projects/${project.id}/requirements`}>
-                          进入项目
-                          <ArrowRight className="size-3.5" aria-hidden="true" />
-                        </Link>
+                      <div className="project-progress progress-caption project-progress-inline">
+                        <span>
+                          完成度 <b>{percent}%</b>
+                        </span>
+                        <progress max={100} value={percent} aria-label={`${project.name}事项完成度`}>
+                          {percent}%
+                        </progress>
+                        <span>
+                          {done}/{total}
+                        </span>
                       </div>
                     </>
                   )

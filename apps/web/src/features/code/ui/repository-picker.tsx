@@ -34,6 +34,7 @@ export function RepositoryPicker({ projectId, canManage }: { projectId: string; 
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: projectRepositoriesQueryOptions(projectId).queryKey }),
       queryClient.invalidateQueries({ queryKey: ['code', 'available-repositories', projectId] }),
+      queryClient.invalidateQueries({ queryKey: ['projects'] }),
     ])
   }
   const unlink = useMutation({

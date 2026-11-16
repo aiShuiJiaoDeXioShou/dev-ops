@@ -95,6 +95,9 @@ export const server = setupServer(
       ],
     }),
   ),
+  http.get('*/api/v1/teams/:teamId/project-repositories', () =>
+    success({ items: [], page: 1, pageSize: 100, total: 0 }),
+  ),
   http.get('*/api/v1/teams/:teamId/projects', () =>
     success({
       items: [

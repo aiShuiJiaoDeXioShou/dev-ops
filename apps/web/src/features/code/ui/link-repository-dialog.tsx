@@ -57,6 +57,7 @@ export function LinkRepositoryDialog({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: projectRepositoriesQueryOptions(projectId).queryKey }),
         queryClient.invalidateQueries({ queryKey: ['code', 'available-repositories', projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['projects'] }),
       ])
       showToast('仓库已关联。', 'success')
       onOpenChange(false)

@@ -2980,49 +2980,49 @@ dialog h2 {
 }
 .project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 256px), 1fr));
   gap: 12px;
 }
 .project-card {
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: var(--radius);
+  padding: 12px;
   min-width: 0;
-  background: white;
+  background: var(--card);
   transition: border-color 150ms ease, background-color 150ms ease;
 }
 .project-card:hover {
-  border-color: #cbd3df;
+  border-color: var(--input);
 }
 .project-card-head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 .project-identity {
   flex: 1;
   min-width: 0;
 }
 .project-symbol {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   background: var(--side);
-  border-radius: 7px;
+  border-radius: var(--radius-md);
   display: grid;
   place-items: center;
   flex-shrink: 0;
 }
 .project-symbol .icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 .project-card-title {
   display: block;
   font-weight: 600;
-  font-size: 15.5px;
+  font-size: 14px;
   text-align: left;
   padding: 0;
-  margin: 0 0 5px;
+  margin: 0;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3030,6 +3030,11 @@ dialog h2 {
 }
 .project-card-title:hover {
   color: var(--blue);
+}
+.project-card-head .project-settings-button {
+  min-width: 32px;
+  min-height: 32px;
+  flex-shrink: 0;
 }
 .repo-caption {
   color: var(--quiet);
@@ -3041,11 +3046,12 @@ dialog h2 {
 .project-state-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 13px 0 12px;
+  gap: 8px;
+  margin: 8px 0;
   font-size: 12px;
 }
 .project-card .status {
+  flex-shrink: 0;
   font-size: 12px;
 }
 .project-owner {
@@ -3053,24 +3059,30 @@ dialog h2 {
   align-items: center;
   gap: 5px;
   margin-left: auto;
+  min-width: 0;
   color: var(--muted-foreground);
   white-space: nowrap;
+}
+.project-owner-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .project-owner .avatar {
   width: 20px;
   height: 20px;
   font-size: 10px;
+  flex-shrink: 0;
 }
 .project-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 4px;
   background: transparent;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   border-radius: 0;
-  padding: 12px 0;
-  margin-bottom: 12px;
+  padding: 4px 0;
+  margin-bottom: 6px;
 }
 .project-metrics > * {
   padding: 0 10px;
@@ -3090,10 +3102,10 @@ dialog h2 {
 }
 .project-metrics strong {
   display: block;
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 1.25;
-  margin-bottom: 4px;
+  margin-bottom: 0;
   font-variant-numeric: tabular-nums;
 }
 .project-metrics span {
@@ -3104,7 +3116,7 @@ dialog h2 {
 .project-card-footer {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 12px;
   font-size: 12px;
 }
 .project-progress {
@@ -3122,6 +3134,18 @@ dialog h2 {
   font-weight: 500;
   color: var(--muted-foreground);
   margin-left: 4px;
+}
+.project-progress-inline {
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+}
+.project-progress-inline span {
+  flex-shrink: 0;
+}
+.project-progress-inline progress {
+  flex: 1;
+  min-width: 0;
 }
 progress {
   display: block;
@@ -3172,6 +3196,13 @@ select.btn:hover:not(:disabled) {
 .project-home .filters {
   gap: 12px;
   margin-bottom: 16px;
+}
+.project-repository-filter {
+  flex: 0 1 192px;
+  min-width: 0;
+}
+.project-repository-filter .project-repository-filter-trigger {
+  min-height: 34px;
 }
 .project-home .search {
   min-height: 34px;
@@ -3260,18 +3291,19 @@ select.btn:hover:not(:disabled) {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-@media (max-width: 1000px) {
+@media (max-width: 767px) {
   .project-grid {
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (pointer: coarse) {
+  .project-card-head .project-settings-button,
+  .project-repository-filter .project-repository-filter-trigger {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 @media (max-width: 550px) {
-  .project-grid {
-    grid-template-columns: 1fr;
-  }
-  .project-card {
-    padding: 14px;
-  }
   .activity-map {
     padding: 12px;
   }
@@ -3285,8 +3317,13 @@ select.btn:hover:not(:disabled) {
   .activity-breakdown {
     grid-template-columns: repeat(2, 1fr);
   }
+  .project-home .project-repository-filter {
+    flex: 1 1 0;
+  }
   .project-home .search {
-    min-width: 160px;
+    min-width: 0;
+    max-width: none;
+    flex: 1 0 100%;
   }
   .document-toolbar {
     gap: 6px;

@@ -1,5 +1,6 @@
 import { queryOptions, useQueries, useQuery } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
+import { readAllPages } from '@/shared/api/read-all-pages'
 
 /** 团队 Git 连接。 */
 export function gitConnectionsQueryOptions(teamId: string) {
@@ -25,49 +26,13 @@ export function projectRepositoriesQueryOptions(projectId: string) {
     enabled: Boolean(projectId),
   })
 }
-/**
- * 读取项目可关联的全部仓库；按接口分页上限循环拉取，避免只看到第一页。
- * @param projectId 项目标识。
- * @param signal 请求取消信号。
- * @returns 团队有效连接下可用的仓库，包含来源状态与默认分支。
- */
-async function listAllAvailableRepositories(projectId: string, signal: AbortSignal) {
-  const pageSize = 100
-  const first = await apiClient.listAvailableRepositories(projectId, { page: 1, pageSize }, { signal })
-  const repositories = [...first.data.items]
-  const lastPage = Math.ceil(first.data.total / pageSize)
-  for (let page = 2; page <= lastPage; page += 1) {
-    const next = await apiClient.listAvailableRepositories(projectId, { page, pageSize }, { signal })
-    repositories.push(...next.data.items)
-  }
-  return repositories
-}
-
 /** 项目可关联仓库。 */
 export function availableRepositoriesQueryOptions(projectId: string) {
   return queryOptions({
     queryKey: ['code', 'available-repositories', projectId, 'all'],
-    queryFn: ({ signal }) => listAllAvailableRepositories(projectId, signal),
+    queryFn: ({ signal }) => readAllPages((page) => apiClient.listAvailableRepositories(projectId, page, { signal })),
     enabled: Boolean(projectId),
   })
-}
-
-/**
- * 读取单条连接下的全部仓库，按接口分页上限循环拉取，避免新建项目时只看到第一页。
- * @param connectionId Git 连接标识。
- * @param signal 请求取消信号。
- * @returns 该连接已同步的全部仓库。
- */
-async function listAllConnectionRepositories(connectionId: string, signal: AbortSignal) {
-  const pageSize = 100
-  const first = await apiClient.listGitConnectionRepositories(connectionId, { page: 1, pageSize }, { signal })
-  const repositories = [...first.data.items]
-  const lastPage = Math.ceil(first.data.total / pageSize)
-  for (let page = 2; page <= lastPage; page += 1) {
-    const next = await apiClient.listGitConnectionRepositories(connectionId, { page, pageSize }, { signal })
-    repositories.push(...next.data.items)
-  }
-  return repositories
 }
 
 /**
@@ -84,7 +49,8 @@ export function useTeamRepositories(teamId: string, enabled = true) {
     queries: activeConnections.map(({ id: connectionId }) =>
       queryOptions({
         queryKey: ['code', 'connection-repositories', connectionId, 'all'],
-        queryFn: ({ signal }) => listAllConnectionRepositories(connectionId, signal),
+        queryFn: ({ signal }) =>
+          readAllPages((page) => apiClient.listGitConnectionRepositories(connectionId, page, { signal })),
         enabled: enabled && Boolean(connectionId),
       }),
     ),

@@ -385,6 +385,7 @@
     - option "进行中"
     - option "暂停"
     - option "已结束"
+  - combobox "按仓库筛选": 全部仓库
   - textbox "搜索项目"
   - article:
     - link "[audit] 权限测试项目":
@@ -404,10 +405,9 @@
       - /url: /projects/b297c9a0-9503-524a-b1e7-bec5342996c7/prs
       - strong: "0"
       - text: 待审 PR
-    - text: 完成度 0% 0/0
+    - text: 完成度 0%
     - progressbar "[audit] 权限测试项目事项完成度": 0%
-    - link "进入项目":
-      - /url: /projects/b297c9a0-9503-524a-b1e7-bec5342996c7/requirements
+    - text: 0/0
   - article:
     - link "[audit] 项目-UI-审计":
       - /url: /projects/76814609-c626-5568-9489-7d25f2d4b376/requirements
@@ -426,14 +426,12 @@
       - /url: /projects/76814609-c626-5568-9489-7d25f2d4b376/prs
       - strong: "0"
       - text: 待审 PR
-    - text: 完成度 0% 0/0
+    - text: 完成度 0%
     - progressbar "[audit] 项目-UI-审计事项完成度": 0%
-    - link "进入项目":
-      - /url: /projects/76814609-c626-5568-9489-7d25f2d4b376/requirements
+    - text: 0/0
   - article:
     - link "[audit] dev project":
       - /url: /projects/ea012525-b981-53de-810f-773c485546b3/requirements
-    - paragraph: 暂无项目说明
     - button "[audit] dev project项目设置"
     - text: 进行中 开发同学
     - link "0 待处理需求":
@@ -448,10 +446,9 @@
       - /url: /projects/ea012525-b981-53de-810f-773c485546b3/prs
       - strong: "0"
       - text: 待审 PR
-    - text: 完成度 0% 0/0
+    - text: 完成度 0%
     - progressbar "[audit] dev project事项完成度": 0%
-    - link "进入项目":
-      - /url: /projects/ea012525-b981-53de-810f-773c485546b3/requirements
+    - text: 0/0
   - article:
     - link "dev-ops 平台":
       - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/requirements
@@ -470,7 +467,6 @@
       - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/prs
       - strong: "0"
       - text: 待审 PR
-    - text: 完成度 33% 7/21
+    - text: 完成度 33%
     - progressbar "dev-ops 平台事项完成度": 33%
-    - link "进入项目":
-      - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/requirements
+    - text: 7/21
