@@ -6,6 +6,7 @@ import { GitAdapterError } from '../../src/adapters/git/git.types.ts'
 import { activity } from '../../src/modules/collaboration/collaboration.tables.ts'
 import { pipelineRun, pipelineRunStep } from '../../src/modules/pipeline/pipeline.tables.ts'
 import {
+  INVALID_YAML_WORKFLOW,
   VALID_WORKFLOW,
   TEST_COMMIT_SHA,
   arrayField,
@@ -104,6 +105,20 @@ test('T028 触发运行：工作流校验、提交固定、快照、幂等、权
     const jobs = arrayField(summary, 'jobs').map((job) => asRecord(job, '计划 job'))
     assert.equal(jobs.length, 1)
     assert.equal(stringField(jobs[0] ?? {}, 'id'), 'build')
+  })
+
+  await t.test('非法工作流详情仍返回原始内容的哈希', async () => {
+    const response = await injectJson(
+      app,
+      'GET',
+      `/api/v1/projects/${context.projectId}/pipeline-workflows/detail?path=${encodeURIComponent('.devops/workflows/broken.yaml')}&ref=main`,
+      { cookie: context.viewer.cookie },
+    )
+    const data = expectSuccess(response, '读取非法工作流详情')
+    assert.equal(data.valid, false)
+    assert.equal(data.planSummary, null)
+    assert.equal(stringField(data, 'content'), INVALID_YAML_WORKFLOW)
+    assert.equal(stringField(data, 'contentHash'), createHash('sha256').update(INVALID_YAML_WORKFLOW).digest('hex'))
   })
 
   await t.test('非法工作流不可触发，且不创建运行记录', async () => {

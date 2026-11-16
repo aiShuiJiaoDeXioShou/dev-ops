@@ -564,7 +564,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
         content: file.content,
         maxBytes: config.workflowMaxBytes,
       })
-      const contentHash = hashWorkflowContent(file.content)
+      const contentHash = parsed.ok ? parsed.workflow.hash : hashWorkflowContent(file.content)
       const base = {
         path: workflowPath,
         repositoryId: repository.id,
