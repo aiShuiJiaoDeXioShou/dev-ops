@@ -82,6 +82,7 @@ const botViewSchema = Type.Object({
   modelId: Type.Union([Type.String(), Type.Null()]),
   connectionName: Type.Union([Type.String(), Type.Null()]),
   updatedAt: dateTime,
+  lastActiveAt: Type.Union([dateTime, Type.Null()]),
 })
 
 const botRunSummarySchema = Type.Object({

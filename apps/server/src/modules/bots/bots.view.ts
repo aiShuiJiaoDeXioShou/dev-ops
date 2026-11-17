@@ -8,6 +8,7 @@ export type BotViewRecord = {
   connectionStatus: string | null
   hasModel: boolean
   workerOnline: boolean
+  lastActiveAt: Date | null
 }
 
 /**
@@ -48,6 +49,7 @@ export function toBotView(row: BotViewRecord, skillIds: string[]): BotView {
     connectionName: row.connectionName,
     modelId: record.model_id,
     updatedAt: record.updated_at.toISOString(),
+    lastActiveAt: row.lastActiveAt?.toISOString() ?? null,
     skillIds,
   }
 }

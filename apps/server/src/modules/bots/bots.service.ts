@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, eq, gt, ilike, inArray, isNull, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
@@ -68,7 +68,7 @@ async function setBotSkills(tx: BotRunTransaction, row: BotRow, actorId: string,
   }
 }
 
-function botReadQuery(db: BotRead) {
+function botReadQuery(db: BotRead, visibleTo?: string) {
   return db
     .select({
       record: bot,
@@ -76,6 +76,17 @@ function botReadQuery(db: BotRead) {
       connectionName: botModelConnection.name,
       connectionStatus: botModelConnection.status,
       hasModel: sql<boolean>`${botModelCatalog.id} is not null`,
+      lastActiveAt: visibleTo
+        ? sql<Date | null>`(
+            select max(coalesce(${botRun.finished_at}, ${botRun.started_at})) from ${botRun}
+            join ${botConversationMember} on ${botConversationMember.conversation_id} = ${botRun.conversation_id}
+              and ${botConversationMember.team_id} = ${botRun.team_id}
+              and ${botConversationMember.member_kind} = 'user' and ${botConversationMember.member_id} = ${visibleTo}
+              and ${botConversationMember.removed_at} is null
+            where ${botRun.bot_id} = ${bot.id} and ${botRun.team_id} = ${bot.team_id}
+          )`.mapWith(botRun.updated_at)
+        : sql<null>`null`,
+
       workerOnline: sql<boolean>`exists (
       select 1 from ${botModelCatalog}
       where ${botModelCatalog.reported_at} > clock_timestamp() - ${WORKER_ONLINE_WINDOW_SECONDS} * interval '1 second'
@@ -162,7 +173,7 @@ export async function requireRunnableBot(tx: BotRunTransaction, teamId: string, 
  */
 export function createBotsService(db: Database) {
   async function requireVisible(actor: SessionUser, botId: string, roles?: TeamRole[]) {
-    const [row] = await botReadQuery(db).where(eq(bot.id, botId))
+    const [row] = await botReadQuery(db, actor.id).where(eq(bot.id, botId))
     if (!row) throwMissingBot()
     const [member] = await db
       .select({ role: teamMember.role })
@@ -230,13 +241,19 @@ export function createBotsService(db: Database) {
     async list(actor: SessionUser, teamId: string, filters: BotListFilters) {
       await requireTeamMember(db, actor.id, teamId)
       const query = filters.query?.trim().replace(/[\\%_]/gu, '\\$&')
-      const rows = await botReadQuery(db)
+      const rows = await botReadQuery(db, actor.id)
         .where(
           and(
             eq(bot.team_id, teamId),
             filters.ownerUserId ? eq(bot.owner_user_id, filters.ownerUserId) : undefined,
             filters.cursor ? gt(bot.id, filters.cursor) : undefined,
-            query ? ilike(bot.name, `%${query}%`) : undefined,
+            query
+              ? or(
+                  ilike(bot.name, `%${query}%`),
+                  ilike(bot.responsibility, `%${query}%`),
+                  ilike(authUser.name, `%${query}%`),
+                )
+              : undefined,
           ),
         )
         .orderBy(asc(bot.id))
