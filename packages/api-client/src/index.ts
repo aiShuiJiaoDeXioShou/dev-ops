@@ -2341,6 +2341,54 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 查询当前可见的 Bot 笔记与本人画像。 */
+    async listBotMemories(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/bot-memories', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-memories', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-memories`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 保存一条当前成员有权新增的记忆。 */
+    async createBotMemory(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-memories', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-memories', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-memories`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 修改记忆正文或常驻状态。 */
+    async updateBotMemory(
+      id: string,
+      body: ApiBody<'/api/v1/bot-memories/{memoryId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-memories/{memoryId}/update', 'post'>>(
+        `/api/v1/bot-memories/${segment(id)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 删除一条当前成员可修改的记忆。 */
+    async removeBotMemory(id: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-memories/{memoryId}/remove', 'post'>>(
+        `/api/v1/bot-memories/${segment(id)}/remove`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
     /** 读取团队技能列表。 */
     async listSkills(
       teamId: string,
