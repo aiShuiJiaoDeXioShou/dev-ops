@@ -25,6 +25,7 @@ import { skillListQueryOptions } from '@/features/knowledge/api/queries'
 import { botDetailQueryOptions, botQueryKey, botRunsQueryOptions, type BotRunView } from '../api/queries'
 import { BotAvatar } from './bot-avatar'
 import { BotForm } from './bot-form'
+import { BotModelForm } from './bot-model-form'
 import { BotStatus } from './bot-status'
 
 const runLabels = {
@@ -92,14 +93,16 @@ interface BotDetailProps {
   teamId: string
   userId: string
   canEdit: boolean
+  canBindModel: boolean
   onClose: () => void
 }
 
 /** 沿用原型右侧详情栏，保留配置和当前会话权限下的运行记录。 */
-export function BotDetail({ botId, teamId, userId, canEdit, onClose }: BotDetailProps) {
+export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClose }: BotDetailProps) {
   const query = useQuery(botDetailQueryOptions(botId))
   const bot = query.data?.data
   const [editing, setEditing] = useState(false)
+  const [bindingModel, setBindingModel] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const detailRef = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
@@ -222,6 +225,17 @@ export function BotDetail({ botId, teamId, userId, canEdit, onClose }: BotDetail
                 <dd className="wrap-break-word">
                   {bot.modelId ?? '未绑定模型'}
                   {bot.connectionName && <span className="small quiet block">{bot.connectionName}</span>}
+                  {canBindModel && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setBindingModel(true)}
+                    >
+                      绑定模型
+                    </Button>
+                  )}
                 </dd>
                 <dt>
                   <Shield className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
@@ -310,6 +324,7 @@ export function BotDetail({ botId, teamId, userId, canEdit, onClose }: BotDetail
               )}
             </div>
           )}
+          {bindingModel && <BotModelForm bot={bot} onClose={() => setBindingModel(false)} />}
           {editing && <BotForm teamId={teamId} defaultOwnerId={userId} bot={bot} onClose={() => setEditing(false)} />}
         </>
       )}

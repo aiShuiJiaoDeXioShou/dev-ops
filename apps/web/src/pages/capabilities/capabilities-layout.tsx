@@ -15,6 +15,9 @@ export function Component() {
           <NavLink to="skills" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
             Skills
           </NavLink>
+          <NavLink to="connections" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
+            连接与节点
+          </NavLink>
         </nav>
         <Outlet context={detailHost} />
       </div>

@@ -22,19 +22,21 @@ import { credentialUsageQueryOptions, credentialsQueryOptions, type CredentialLi
 import { CredentialValueReveal } from './credential-value-dialog'
 
 type CreateCredentialBody = ApiBody<'/api/v1/teams/{teamId}/credentials', 'post'>
-type CredentialKind = 'api_key' | 'account_password' | 'ssh_key'
-/** 目录分类：三类凭据分类加一个“已撤销”状态视图，与设计稿左侧胶囊一致。 */
+type CredentialKind = CreateCredentialBody['kind']
+/** 目录分类：凭据类型及已撤销状态。 */
 type CredentialCategory = '' | CredentialKind | 'revoked'
 type CredentialSummary = CredentialList['items'][number]
 const CATEGORY_OPTIONS: { value: CredentialCategory; label: string }[] = [
   { value: '', label: '全部' },
   { value: 'api_key', label: 'API 密钥' },
+  { value: 'model_api_key', label: '模型 API Key' },
   { value: 'account_password', label: '账号密码' },
   { value: 'ssh_key', label: 'SSH 密钥' },
   { value: 'revoked', label: '已撤销' },
 ]
 const KIND_LABELS: Record<string, string> = {
   api_key: 'API 密钥',
+  model_api_key: '模型 API Key',
   account_password: '账号密码',
   ssh_key: 'SSH 密钥',
   active: '可用',
@@ -463,6 +465,7 @@ export function CredentialVault() {
                 onChange={(event) => setForm({ ...form, kind: event.target.value as CredentialKind })}
               >
                 <option value="api_key">API 密钥</option>
+                <option value="model_api_key">模型 API Key</option>
                 <option value="account_password">账号密码</option>
                 <option value="ssh_key">SSH 密钥</option>
               </Select>

@@ -29,6 +29,7 @@ export function Component() {
             teamId={currentTeam.id}
             userId={user.id}
             canEdit={canEdit}
+            canBindModel={role === 'admin'}
             onClose={() => navigate({ pathname: '/capabilities/bots', search }, { replace: true })}
           />,
           detailHost,

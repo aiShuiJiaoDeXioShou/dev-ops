@@ -1,0 +1,146 @@
+import { useState } from 'react'
+import { createIdempotencyKey } from '@dev-ops/api-client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link2, Plus } from 'lucide-react'
+import { botConnectionsOptions, connectionQueryKey, type BotConnection } from '@/features/bots/api/connections'
+import { botQueryKey } from '@/features/bots/api/queries'
+import { BotConnectionForm } from '@/features/bots/ui/bot-connection-form'
+import { useSession } from '@/features/identity/model/session'
+import { apiClient } from '@/shared/api/client'
+import { describeRequestError } from '@/shared/api/errors'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/shared/ui/controls/alert-dialog'
+import { Button } from '@/shared/ui/controls/button'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { useToast } from '@/shared/ui/toast'
+
+const labels = { active: '可用', disabled: '已停用', login_failed: '需重新登录' }
+const reasons: Record<string, string> = {
+  manual: '手动停用',
+  login_user_demoted: '登录人已失去团队管理员权限',
+  auth_expired: '订阅授权已失效',
+}
+
+function ConnectionsList({ teamId, canManage }: { teamId: string; canManage: boolean }) {
+  const [createOpen, setCreateOpen] = useState(false)
+  const query = useQuery(botConnectionsOptions(teamId))
+  const queryClient = useQueryClient()
+  const { showToast } = useToast()
+  const update = useMutation({
+    mutationFn: (connection: BotConnection) =>
+      apiClient.setBotConnectionEnabled(
+        connection.id,
+        connection.status !== 'active',
+        { version: connection.version },
+        { idempotencyKey: createIdempotencyKey() },
+      ),
+    onSuccess: async ({ data }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: connectionQueryKey }),
+        queryClient.invalidateQueries({ queryKey: botQueryKey }),
+      ])
+      showToast(data.status === 'active' ? '模型连接已启用' : '模型连接已停用', 'success')
+    },
+    onError: (error) => showToast(describeRequestError(error).description, 'error'),
+  })
+  const items = query.data?.data ?? []
+  return (
+    <>
+      <header className="work-page-head compact-page-head without-tools">
+        <h1 className="sr-only">连接与节点</h1>
+      </header>
+      <div className="work-padding">
+        <div className="row spread mb-4">
+          <h2>模型连接</h2>
+          {canManage && (
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" aria-hidden="true" />
+              添加模型连接
+            </Button>
+          )}
+        </div>
+        {query.isPending && <DelayedPageSkeleton />}
+        {query.isError && (
+          <PageError title="模型连接加载失败" error={query.error} onRetry={() => void query.refetch()} />
+        )}
+        {query.isSuccess && items.length === 0 && (
+          <EmptyState
+            icon={<Link2 />}
+            title="还没有模型连接"
+            description={
+              canManage ? '添加 API Key 或订阅连接后即可为智能体绑定模型。' : '可用模型连接由团队管理员配置。'
+            }
+          />
+        )}
+        {items.length > 0 && (
+          <div className="connection-grid">
+            {items.map((connection) => (
+              <article className="connection-card" key={connection.id}>
+                <div className="row">
+                  <h3 className="wrap-break-word">{connection.name}</h3>
+                  <span className="spacer" />
+                  <span className="badge">{labels[connection.status]}</span>
+                </div>
+                <p>
+                  {connection.authType === 'oauth' ? '订阅登录' : 'API Key'} · {connection.providerId}
+                  {connection.loginUserName && ` · ${connection.loginUserName}`}
+                </p>
+                {connection.disabledReason && reasons[connection.disabledReason] && (
+                  <p>{reasons[connection.disabledReason]}</p>
+                )}
+                {canManage && connection.status === 'active' && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button type="button" variant="outline" disabled={update.isPending}>
+                        停用连接
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>停用 {connection.name}？</AlertDialogTitle>
+                        <AlertDialogDescription>绑定这条连接的智能体将停止运行，历史记录保留。</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>取消</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => update.mutate(connection)}>确认停用</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                {canManage && connection.status === 'disabled' && connection.disabledReason === 'manual' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={update.isPending}
+                    onClick={() => update.mutate(connection)}
+                  >
+                    启用连接
+                  </Button>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+      {createOpen && <BotConnectionForm teamId={teamId} onClose={() => setCreateOpen(false)} />}
+    </>
+  )
+}
+
+/** 「能力 → 连接与节点」下的团队模型连接。 */
+export function Component() {
+  const { currentTeam, role, isReady } = useSession()
+  if (!isReady) return <DelayedPageSkeleton />
+  if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
+  return <ConnectionsList key={currentTeam.id} teamId={currentTeam.id} canManage={role === 'admin'} />
+}

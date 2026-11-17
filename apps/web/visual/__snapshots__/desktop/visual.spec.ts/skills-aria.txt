@@ -4,6 +4,8 @@
       - /url: /capabilities/bots
     - link "Skills":
       - /url: /capabilities/skills
+    - link "连接与节点":
+      - /url: /capabilities/connections
   - heading "技能库" [level=1]
   - button "发布 Skill"
   - group "技能分类":
