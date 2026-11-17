@@ -2047,6 +2047,80 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 读取当前用户可见的团队 Bot 会话。 */
+    async listBotConversations(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/bot-conversations', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-conversations', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-conversations`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 创建或打开私聊。 */
+    async createBotConversation(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-conversations', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-conversations', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-conversations`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取会话及可见成员。 */
+    async getBotConversation(conversationId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}', 'get'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 按消息序号读取历史。 */
+    async listBotMessages(
+      conversationId: string,
+      query?: ApiQuery<'/api/v1/bot-conversations/{conversationId}/messages', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/messages', 'get'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/messages`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 将一条消息写入会话并安排运行。 */
+    async sendBotMessage(
+      conversationId: string,
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/messages', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/messages', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/messages`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 增量读取会话事件与当前在途运行。 */
+    async listBotConversationEvents(
+      conversationId: string,
+      query?: ApiQuery<'/api/v1/bot-conversations/{conversationId}/events', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/events', 'get'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/events`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
     /** 读取团队技能列表。 */
     async listSkills(
       teamId: string,
