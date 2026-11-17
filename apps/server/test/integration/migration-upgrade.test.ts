@@ -56,6 +56,10 @@ test('从 V0.4a 迁移升级：保留流水线、版本历史和模型凭据并�
   const modelKeyId = randomUUID()
   try {
     await client.query(
+      'INSERT INTO app.project (id, team_id, name, owner_user_id, created_by_user_id) VALUES ($1, $2, $3, $4, $4)',
+      [projectId, teamId, '升级前创建的项目', actorId],
+    )
+    await client.query(
       `INSERT INTO app.pipeline_run (id, team_id, project_id, repository_id, workflow_path, git_ref, commit_sha, run_plan, workflow_snapshot, workflow_hash, status, trigger_source, initiator_channel, triggered_by_user_id, idempotency_key, timeout_seconds)
        VALUES ($1,$2,$3,$4,'.devops/workflows/ci.yml','main',$5,'{}'::jsonb,'name: ci','hash','succeeded','manual','web',$6,'upgrade-1',600)`,
       [runId, teamId, projectId, legacyRepositoryId, 'a'.repeat(40), actorId],
@@ -140,6 +144,11 @@ test('从 V0.4a 迁移升级：保留流水线、版本历史和模型凭据并�
       [projectId],
     )
     assert.equal(projectLink.rows[0]?.repository_id, legacyRepositoryId)
+    const templates = await verify.query<{ work_item_templates: unknown }>(
+      'SELECT work_item_templates FROM app.project WHERE id = $1',
+      [projectId],
+    )
+    assert.deepEqual(templates.rows[0]?.work_item_templates, {})
   } finally {
     await verify.end()
   }

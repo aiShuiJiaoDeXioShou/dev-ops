@@ -365,4 +365,93 @@ test('需求创建、内容校验、筛选、版本、评论、活动、项目�
     headers: { cookie: otherUser.cookie },
   })
   assert.equal(crossTeam.json().code, 'FORBIDDEN')
+
+  await t.test('流程模板分类型保存，新建事项继承节点，旧事项保留规划', async () => {
+    const projectPath = '/api/v1/projects/' + projectId
+    const headers = { cookie: adminUser.cookie }
+    const projectDetail = await app.inject({ url: projectPath, headers })
+    const version: number = projectDetail.json().data.version
+    const oldItem = await app.inject({ url: '/api/v1/requirements/' + requirementId, headers })
+    const oldPlan: unknown = oldItem.json().data.plan
+    const requirementNodes = [
+      { id: 'pending', title: '待处理' },
+      { id: 'in_development', title: '研发执行' },
+      { id: 'review', title: '上线前审查' },
+      { id: 'submitted', title: '待测试' },
+      { id: 'in_testing', title: '测试' },
+      { id: 'passed', title: '已通过' },
+    ]
+    const bugNodes = [
+      { id: 'pending', title: '故障确认' },
+      { id: 'in_fix', title: '定位与修复' },
+      { id: 'in_regression', title: '回归' },
+      { id: 'resolved', title: '已解决' },
+    ]
+    const update = (
+      kind: 'requirement' | 'bug',
+      nodes: typeof requirementNodes,
+      expectedVersion: number,
+      cookie = adminUser.cookie,
+    ) =>
+      app.inject({
+        method: 'POST',
+        url: projectPath + '/update',
+        headers: { cookie },
+        payload: { version: expectedVersion, workItemTemplate: { kind, nodes } },
+      })
+    const noStages = await update('requirement', [{ id: 'review', title: '评审' }], version)
+    assert.equal(noStages.json().code, 'VALIDATION_ERROR')
+    const forbidden = await update('requirement', requirementNodes, version, viewerUser.cookie)
+    assert.equal(forbidden.json().code, 'FORBIDDEN')
+    const saved = await update('requirement', requirementNodes, version)
+    assert.equal(saved.json().success, true, saved.body)
+    assert.deepEqual(saved.json().data.workItemTemplates, { requirement: requirementNodes })
+    const conflict = await update('bug', bugNodes, version)
+    assert.equal(conflict.json().code, 'VERSION_CONFLICT')
+    const savedBug = await update('bug', bugNodes, version + 1)
+    assert.equal(savedBug.json().success, true, savedBug.body)
+    assert.deepEqual(savedBug.json().data.workItemTemplates, { requirement: requirementNodes, bug: bugNodes })
+
+    const inheritedRequirement = await app.inject({
+      method: 'POST',
+      url: projectPath + '/requirements',
+      headers,
+      payload: { title: '带模板的需求', contentMode: 'markdown', contentMarkdown: '验证模板快照' },
+    })
+    assert.equal(inheritedRequirement.json().success, true, inheritedRequirement.body)
+    assert.deepEqual(
+      inheritedRequirement.json().data.plan,
+      requirementNodes.map((node) => ({ ...node, startsOn: null, endsOn: null, tasks: [] })),
+    )
+    const inheritedBug = await app.inject({
+      method: 'POST',
+      url: projectPath + '/bugs',
+      headers,
+      payload: {
+        title: '带模板的 Bug',
+        phenomenon: '未显示内容',
+        expectedBehavior: '显示内容',
+        reproductionUnknown: true,
+      },
+    })
+    assert.equal(inheritedBug.json().success, true, inheritedBug.body)
+    assert.deepEqual(
+      inheritedBug.json().data.plan,
+      bugNodes.map((node) => ({ ...node, startsOn: null, endsOn: null, tasks: [] })),
+    )
+
+    const oldItemAfterSave = await app.inject({ url: '/api/v1/requirements/' + requirementId, headers })
+    assert.deepEqual(oldItemAfterSave.json().data.plan, oldPlan)
+    const templateChangedAgain = await update(
+      'requirement',
+      requirementNodes.map((node) => (node.id === 'review' ? { ...node, title: '回看记录' } : node)),
+      version + 2,
+    )
+    assert.equal(templateChangedAgain.json().success, true, templateChangedAgain.body)
+    const createdBeforeTemplateEdit = await app.inject({
+      url: '/api/v1/requirements/' + inheritedRequirement.json().data.id,
+      headers,
+    })
+    assert.deepEqual(createdBeforeTemplateEdit.json().data.plan, inheritedRequirement.json().data.plan)
+  })
 })

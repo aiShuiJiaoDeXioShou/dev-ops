@@ -140,6 +140,7 @@ export async function insertBug(
     evidenceUrl: string | null
     fixOwnerUserId: string | null
     regressionOwnerUserId: string | null
+    plan: BugRow['work_plan']
     createdByUserId: string
   },
 ) {
@@ -159,6 +160,7 @@ export async function insertBug(
       evidence_url: input.evidenceUrl,
       fix_owner_user_id: input.fixOwnerUserId,
       regression_owner_user_id: input.regressionOwnerUserId,
+      work_plan: input.plan,
       created_by_user_id: input.createdByUserId,
     })
     .returning()

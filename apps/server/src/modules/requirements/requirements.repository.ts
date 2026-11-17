@@ -123,6 +123,7 @@ export async function insertRequirement(
     acceptanceCriteria: string | null
     devOwnerUserId: string | null
     testOwnerUserId: string | null
+    plan: RequirementRow['work_plan']
     createdByUserId: string
   },
 ) {
@@ -141,6 +142,7 @@ export async function insertRequirement(
       acceptance_criteria: input.acceptanceCriteria,
       dev_owner_user_id: input.devOwnerUserId,
       test_owner_user_id: input.testOwnerUserId,
+      work_plan: input.plan,
       created_by_user_id: input.createdByUserId,
     })
     .returning()

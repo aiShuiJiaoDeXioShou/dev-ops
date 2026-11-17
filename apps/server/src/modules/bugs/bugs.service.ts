@@ -13,7 +13,11 @@ import {
   type PageResult,
 } from '../collaboration/collaboration.service.ts'
 import { findActiveTeamMemberIds, isActiveTeamMember } from '../identity/identity.repository.ts'
-import { validateWorkItemPlan, type WorkItemPlan } from '../collaboration/work-item-plan.ts'
+import {
+  instantiateWorkItemTemplate,
+  validateWorkItemPlan,
+  type WorkItemPlan,
+} from '../collaboration/work-item-plan.ts'
 import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -207,7 +211,7 @@ export function createBugsService(deps: BugsServiceDeps) {
     const attachmentIds = [...new Set(input.attachmentIds ?? [])]
     const bugId = randomUUID()
     const row = await db.transaction(async (tx) => {
-      await lockProjectForWrite(tx, projectId)
+      const { workItemTemplates } = await lockProjectForWrite(tx, projectId)
       const number = await nextBugNumber(tx, projectId)
       const created = await insertBug(tx, {
         id: bugId,
@@ -223,6 +227,7 @@ export function createBugsService(deps: BugsServiceDeps) {
         evidenceUrl,
         fixOwnerUserId: input.fixOwnerUserId ?? null,
         regressionOwnerUserId: null,
+        plan: instantiateWorkItemTemplate(workItemTemplates.bug),
         createdByUserId: actor.id,
       })
       for (const requirementId of requirementIds) {
