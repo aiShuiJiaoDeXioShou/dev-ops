@@ -1,5 +1,8 @@
 name: dev-ops
 
+# bot-worker 在 Server 包内作为独立宿主机进程运行，由本文件提供 PostgreSQL。
+# Phase 2 提供入口后：pnpm --dir apps/server dev:bot-worker
+# 并发与超时由 apps/server/.env 配置，见 apps/server/.env.example 的 V0.5 Bot 执行服务。
 services:
   mailpit:
     image: axllent/mailpit:v1.27.0

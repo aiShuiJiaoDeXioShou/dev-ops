@@ -20,8 +20,6 @@ Git 连接、仓库/PR 读取与自研流水线的分层结构见[Git、PR 与�
 
 运行时内部端口、原生协议映射、双向事件及控制顺序见 [Bots 运行时适配契约与示例](docs/architecture/bots-runtime-examples.md)。
 
-轻量个人 Bot 首版已初始化在 [apps/bot](apps/bot/README.md)，使用 pi、DeepSeek 与 SQLite；运行 `pnpm --dir apps/bot dev chat` 开始对话。
-
 前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。截至 2026-11-10，V0.1、V0.2、V0.3 阶段 A 与 V0.4a 已交付；下一版本为 V0.4b（流水线部署与产品发布），Bot 与运维后移，版本状态见[需求版本规划](docs/prd/release-plan.md)。
 
 界面与主要操作可查看 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](docs/desgin/interactive-prototype-v1/README.md)。
@@ -36,6 +34,7 @@ Web UI 的 token、组件选择、页面模式、交互规范和 AI 实现约束
 
 ```bash
 nvm use
+git submodule update --init
 pnpm install --frozen-lockfile
 pnpm db:setup
 pnpm db:up
@@ -89,6 +88,8 @@ pnpm test:e2e
 pnpm check
 pnpm test:db
 ```
+
+本地安装依赖前先检出 `packages/devops-bot` 子模块；`pnpm check:bot-submodule` 可单独检查。GitHub Actions 的递归检出需要 `DEVOPS_BOT_CHECKOUT_TOKEN`（对父仓库与私有子模块均有 Contents 只读权限）。
 
 `pnpm check` 从后端 TypeBox 路由导出契约，生成 API 类型及独立校验器，构建所有应用，检查模块依赖，再运行工程、应用和跨应用联通测试。除 `test:db` 外，无需预先启动数据库或后端。`pnpm test:db` 使用本机 PostgreSQL，在隔离测试库中验证迁移、权限与事务，结束后删除测试库。
 

@@ -31,6 +31,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1164.0",
     "@better-auth/drizzle-adapter": "1.7.18",
+    "@dev-ops/devops-bot": "workspace:*",
     "@dev-ops/pipeline-protocol": "workspace:*",
     "@fastify/swagger": "^9.9.3",
     "@fastify/swagger-ui": "^5.2.6",

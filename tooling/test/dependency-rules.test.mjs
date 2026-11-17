@@ -64,6 +64,36 @@ test('真实依赖扫描允许 Web 与后端模块直接导入，并拒绝越界
       },
     ],
     [
+      'Bot 执行入口和适配模块可导入库',
+      null,
+      {
+        'apps/server/src/modules/bots/runtime/index.ts':
+          "export { value } from '../../../../../../packages/devops-bot/src/index.js'",
+        'apps/server/src/entrypoints/bot-worker.ts':
+          "export { value } from '../../../../packages/devops-bot/src/index.js'",
+        'packages/devops-bot/src/index.ts': 'export const value = 1',
+      },
+    ],
+    [
+      '禁止业务模块直接导入 Bot 库',
+      'only-bot-runtime-consumes-devops-bot',
+      {
+        'apps/server/src/modules/projects/bot.ts':
+          "export { value } from '../../../../../packages/devops-bot/src/index.js'",
+        'packages/devops-bot/src/index.ts': 'export const value = 1',
+      },
+    ],
+    [
+      '禁止 Bot 执行适配器绕过库直接导入 pi',
+      'only-devops-bot-consumes-pi',
+      {
+        'apps/server/src/modules/bots/runtime/index.ts': "export { Agent } from '@earendil-works/pi-agent-core'",
+        'node_modules/@earendil-works/pi-agent-core/package.json':
+          '{"name":"@earendil-works/pi-agent-core","main":"index.js"}',
+        'node_modules/@earendil-works/pi-agent-core/index.js': 'export const Agent = 1',
+      },
+    ],
+    [
       '循环依赖',
       'no-circular',
       {

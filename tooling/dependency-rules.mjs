@@ -57,6 +57,20 @@ const configuration = {
       from: { path: '^apps/server/src/' },
       to: { path: '^(packages/api-client/|@dev-ops/api-client)' },
     },
+    {
+      name: 'only-bot-runtime-consumes-devops-bot',
+      severity: 'error',
+      from: {
+        pathNot: '^packages/devops-bot/|^apps/server/src/(?:modules/bots/runtime/|entrypoints/bot-worker\\.ts$)',
+      },
+      to: { path: '^(?:packages/devops-bot/|@dev-ops/devops-bot(?:/|$))|node_modules/@dev-ops/devops-bot(?:/|$)' },
+    },
+    {
+      name: 'only-devops-bot-consumes-pi',
+      severity: 'error',
+      from: { pathNot: '^packages/devops-bot/' },
+      to: { path: '(?:^|/)@earendil-works/pi-' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules|/generated/' },

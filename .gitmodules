@@ -1,0 +1,3 @@
+[submodule "packages/devops-bot"]
+	path = packages/devops-bot
+	url = ../devops-bot.git

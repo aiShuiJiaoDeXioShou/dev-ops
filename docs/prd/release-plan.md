@@ -42,7 +42,7 @@
 | 后端 | identity、projects、requirements、bugs、code、collaboration、delivery、pipeline、configuration、integrations、knowledge、health 已注册，含流水线调度 Worker；公开 OpenAPI 133 个路径 | [业务模块](../../apps/server/src/modules)、[数据库 schema](../../apps/server/src/bootstrap/database-schema.ts) |
 | 数据库 | PostgreSQL 18 + Drizzle 迁移已建立业务表（迁移至 0021）；尚无 Bot、会话、任务、通知、事件与变更计划相关表 | [迁移目录](../../apps/server/drizzle) |
 | CLI | `devops` 已实现配置、健康检查、团队、项目、需求、Bug、Git／代码与交付上报命令 | [CLI 说明](../../apps/cli/README.md) |
-| Bot | `apps/bot` 独立个人 Bot（DeepSeek + SQLite）可用；平台内 Bot 子系统尚未实现 | [Bot 说明](../../apps/bot/README.md) |
+| Bot | 独立个人 Bot 原型验证了 DeepSeek 与 SQLite。共享运行能力已迁入 devops-bot。 | [devops-bot](../../packages/devops-bot/README.md) |
 | 流水线 | V0.4a 控制面、调度 Worker、执行节点 Agent 与三个 Web 页面已交付，并完成本机 Gitea + Docker 现场验收 | 见文末实现现状补充、[验收证据](../../specs/005-v04a-pipeline-runner/evidence.md) |
 | 验证 | V0.4a 记录：根目录 `pnpm check` 通过，服务端 85/85、Agent 59/59、协议 6/6、`test:db` 94/94、`test:e2e` 11/11（含真实 Docker 4/4）；真实 GitHub／Gitea 与非本机节点仍未验证 | [验收证据](../../specs/005-v04a-pipeline-runner/evidence.md) |
 
