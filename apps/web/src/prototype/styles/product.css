@@ -43,6 +43,7 @@
   .work-item-edit-button,
   .work-item-owner-trigger,
   .work-item-task-check,
+  .work-item-template-step,
   .work-item-icon-button {
     min-block-size: 44px;
   }

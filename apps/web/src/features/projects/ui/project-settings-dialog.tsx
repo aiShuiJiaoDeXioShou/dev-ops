@@ -18,6 +18,7 @@ import { PageSkeleton } from '@/shared/ui/page-skeleton'
 import { projectQueryOptions } from '../api/queries'
 import { ProjectLifecycleAction } from './project-lifecycle-action'
 import { ProjectSettingsForm } from './project-settings-form'
+import { ProjectWorkItemTemplates } from './project-work-item-templates'
 import { ServiceManagement } from './service-management'
 import { PageError } from '@/shared/ui/page-state'
 
@@ -61,7 +62,7 @@ export function ProjectSettingsDialog({
       >
         <DialogFormHeader>
           <DialogTitle>项目设置</DialogTitle>
-          <DialogDescription>项目资料、关联仓库与项目服务分别维护，保存只作用于当前分组。</DialogDescription>
+          <DialogDescription>维护项目资料、代码仓库、项目服务和事项流程模板。</DialogDescription>
         </DialogFormHeader>
         {project.isPending ? (
           <DialogFormBody>
@@ -86,6 +87,7 @@ export function ProjectSettingsDialog({
                 <TabsTrigger value="profile">基本资料</TabsTrigger>
                 <TabsTrigger value="repositories">代码仓库</TabsTrigger>
                 <TabsTrigger value="services">项目服务</TabsTrigger>
+                <TabsTrigger value="work-item-templates">流程模板</TabsTrigger>
               </TabsList>
             </div>
             <DialogFormBody>
@@ -141,6 +143,9 @@ export function ProjectSettingsDialog({
               </TabsContent>
               <TabsContent value="services">
                 <ServiceManagement projectId={projectId} />
+              </TabsContent>
+              <TabsContent value="work-item-templates">
+                <ProjectWorkItemTemplates project={project.data.data} readOnly={!canManage} />
               </TabsContent>
             </DialogFormBody>
           </Tabs>
