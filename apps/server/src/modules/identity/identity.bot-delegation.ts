@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { randomBytes } from 'node:crypto'
 import type { IncomingHttpHeaders } from 'node:http'
 import type { SessionUser } from './identity.types.ts'
@@ -11,6 +12,26 @@ export interface BotActor {
   viaBotId: string
   runId: string
   leaseEpoch: number
+}
+
+const currentDelegation = new AsyncLocalStorage<BotActor>()
+
+/**
+ * 在一次内部平台调用的异步链中保留已校验的 Bot 身份。
+ * @param actor 仅由执行进程按租约、团队和触发人确定的身份。
+ * @param invoke 本次内部 HTTP 调用。
+ * @returns 调用结果，作用域不会延伸到其他请求。
+ */
+export function withBotActor<Result>(actor: BotActor, invoke: () => Result): Result {
+  return currentDelegation.run(actor, invoke)
+}
+
+/**
+ * 读取当前请求的内部 Bot 归属，供业务审计使用。
+ * @returns 当前委托 actor；普通用户的请求返回 undefined。
+ */
+export function getCurrentBotActor(): BotActor | undefined {
+  return currentDelegation.getStore()
 }
 
 /**

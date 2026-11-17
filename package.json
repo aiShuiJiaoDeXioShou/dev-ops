@@ -13,7 +13,7 @@
     "dev:server": "pnpm --filter @dev-ops/server dev",
     "dev:prototype": "pnpm --filter @dev-ops/web exec vite ../../docs/desgin/interactive-prototype-v1 --host 127.0.0.1 --port 4178 --strictPort",
     "cli": "pnpm --filter @dev-ops/cli dev",
-    "api:generate": "pnpm --filter @dev-ops/server api:export && node tooling/scripts/generate-api-client.mjs",
+    "api:generate": "pnpm --filter @dev-ops/server api:export && node tooling/scripts/generate-api-client.mjs && node tooling/scripts/generate-bot-api-catalog.mjs",
     "prepare:clients": "pnpm api:generate && pnpm --filter @dev-ops/api-client build",
     "build": "pnpm check:bot-submodule && pnpm api:generate && pnpm -r build",
     "check:bot-submodule": "node tooling/scripts/check-bot-submodule.mjs",

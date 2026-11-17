@@ -46,6 +46,7 @@ export interface NewActivity {
   entityId: string
   action: string
   actorUserId: string
+  viaBotId?: string
   changes?: Record<string, unknown>
   reason?: string
   note?: string
@@ -91,6 +92,7 @@ export async function insertActivity(executor: DatabaseExecutor, input: NewActiv
       entity_id: input.entityId,
       action: input.action,
       actor_user_id: input.actorUserId,
+      via_bot_id: input.viaBotId ?? null,
       changes: input.changes ?? null,
       reason: input.reason ?? null,
       note: input.note ?? null,

@@ -96,6 +96,7 @@ const activitySchema = Type.Object({
   id: uuidSchema,
   action: Type.String(),
   actorUserId: uuidSchema,
+  viaBotId: Type.Optional(uuidSchema),
   changes: Type.Union([Type.Record(Type.String(), Type.Unknown()), Type.Null()]),
   reason: Type.Union([Type.String(), Type.Null()]),
   note: Type.Union([Type.String(), Type.Null()]),

@@ -376,3 +376,32 @@ export async function requestBotRunStop(tx: BotRunTransaction, runId: string, ac
   await writeRunState(tx, run, actorId)
   return run
 }
+
+/**
+ * 在成员退出时停止由其在当前团队触发的运行。
+ * @param tx 提交成员状态变更的事务。
+ * @param teamId 退出的团队。
+ * @param userId 失去团队权限的运行触发人。
+ * @param actorId 处理成员变更的操作者。
+ * @returns 所有在途运行处理后结束；正执行的运行在续租时取消。
+ */
+export async function stopBotRunsForTriggerUser(
+  tx: BotRunTransaction,
+  teamId: string,
+  userId: string,
+  actorId: string,
+) {
+  const rows = await tx
+    .select({ id: botRun.id })
+    .from(botRun)
+    .where(
+      and(
+        eq(botRun.team_id, teamId),
+        eq(botRun.trigger_user_id, userId),
+        inArray(botRun.status, ['queued', 'running']),
+      ),
+    )
+    .orderBy(asc(botRun.conversation_id), asc(botRun.id))
+    .for('update')
+  for (const run of rows) await requestBotRunStop(tx, run.id, actorId)
+}

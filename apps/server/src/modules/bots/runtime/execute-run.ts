@@ -1,11 +1,20 @@
-import { runBot, webTools, type RunOutcome } from '@dev-ops/devops-bot'
+import {
+  openApiTools,
+  runBot,
+  webTools,
+  type ApiInvoker,
+  type PlatformApiOperation,
+  type RunOutcome,
+} from '@dev-ops/devops-bot'
 import type { Database } from '../../../platform/database/client.ts'
 import type { AppConfig } from '../../../platform/config/env.ts'
 import type { SecretCipher } from '../../configuration/configuration.crypto.ts'
-import { finishBotRun, renewBotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
+import { finishBotRun, renewBotRunLease, type BotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
+import { fetchBotPublicPage } from './public-page.ts'
 import { createPgRunSink } from './run-sink.ts'
+import { auditBotWebTools } from './web-tool-audit.ts'
 import { createTaskResultTool } from './task-tools.ts'
 
 export type BotRunner = typeof runBot
@@ -16,6 +25,10 @@ type RuntimeOptions = {
   cipher: SecretCipher | null
   execute: BotRunner
   onFailure: (run: BotRunRecord) => void
+  platformApi?: (
+    lease: BotRunLease,
+    run: BotRunRecord,
+  ) => { catalog: readonly PlatformApiOperation[]; invoker: ApiInvoker }
 }
 
 const unavailable: RunOutcome = {
@@ -79,12 +92,23 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       teamId: run.team_id,
       connectionId: input.connectionId,
     })
+    const api = options.platformApi?.(lease, run)
     const outcome = await options.execute({
       model: input.model,
       context: input.context,
       tools: [
-        ...webTools({ providerId: input.model.providerId, credentials }),
+        ...auditBotWebTools(
+          db,
+          run,
+          lease,
+          webTools({
+            providerId: input.model.providerId,
+            credentials,
+            fetchPublicPage: fetchBotPublicPage,
+          }),
+        ),
         ...(run.task_id ? [createTaskResultTool(db, lease)] : []),
+        ...(api ? openApiTools(api.catalog, api.invoker) : []),
       ],
       limits: { maxTurns: config.BOT_RUN_MAX_TURNS, timeoutMs: config.BOT_RUN_TIMEOUT_SECONDS * 1_000 },
       signal,
@@ -97,7 +121,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
           patch: unavailableMemoryWrite,
           remove: unavailableMemoryWrite,
         },
-        api: { invoke: async () => ({ ok: false, code: 'BOT_API_FORBIDDEN' }) },
+        api: api?.invoker ?? { invoke: async () => ({ ok: false, code: 'BOT_API_FORBIDDEN' }) },
       },
     })
     if (leaseIsValid) await sink.finish(shutdown.aborted ? { ...outcome, ...interrupted } : outcome)

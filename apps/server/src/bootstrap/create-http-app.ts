@@ -115,7 +115,8 @@ export function createHttpApp(
 
   const idempotency = createIdempotencyHooks({
     db: services.database.db,
-    getUserId: async (headers) => (await resolveActor(services.auth, services.tokens, headers))?.user.id ?? null,
+    getUserId: async (headers) =>
+      (await resolveActor(services.auth, services.tokens, headers, options.botDelegation))?.user.id ?? null,
   })
   app.addHook('preHandler', idempotency.preHandler)
   app.addHook('onSend', idempotency.onSend)

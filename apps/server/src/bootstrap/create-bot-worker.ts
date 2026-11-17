@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createDatabase } from '../platform/database/client.ts'
 import type { AppConfig } from '../platform/config/env.ts'
-import { claimBotRun } from '../modules/bots/bots.run-queue.repository.ts'
+import { claimBotRun, type BotRunLease, type BotRunRecord } from '../modules/bots/bots.run-queue.repository.ts'
 import { executeClaimedBotRun, type BotRunner } from '../modules/bots/runtime/execute-run.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import {
@@ -10,6 +10,10 @@ import {
   type BotModelCatalogEntry,
 } from '../modules/bots/bots.catalog.ts'
 import { runPendingBotLogin, type BotProviderLogin } from '../modules/bots/runtime/login-runner.ts'
+import { catalogBotApis } from '../modules/bots/bots.api-catalog.ts'
+import { createBotApiInvoker } from '../modules/bots/runtime/api-invoker.ts'
+import { createBotDelegation } from '../modules/identity/identity.bot-delegation.ts'
+import { createHttpApp } from './create-http-app.ts'
 
 type Log = (level: 'info' | 'error', message: string, context?: Record<string, unknown>) => void
 const POLL_INTERVAL_MS = 1_000
@@ -31,6 +35,22 @@ export function createBotWorker(
 ) {
   const database = createDatabase(config, (code) => log('error', 'Bot 数据库空闲连接异常', { code }))
   const db = database.db
+  const delegation = createBotDelegation()
+  const apiApp = createHttpApp({ ...config, DOCS_ENABLED: true }, { botDelegation: delegation })
+  let catalog: ReturnType<typeof catalogBotApis> = []
+  const platformApi = (lease: BotRunLease, run: BotRunRecord) => ({
+    catalog,
+    invoker: createBotApiInvoker({
+      db,
+      app: apiApp,
+      delegation,
+      catalog,
+      lease,
+      teamId: run.team_id,
+      conversationId: run.conversation_id,
+      botId: run.bot_id,
+    }),
+  })
   const owner = randomUUID()
   const cipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY) : null
   const shutdown = new AbortController()
@@ -58,7 +78,11 @@ export function createBotWorker(
     while (!shutdown.signal.aborted && active.size < limits.global) {
       const run = await claimBotRun(db, owner, limits)
       if (!run) return
-      const running = executeClaimedBotRun({ config, db, cipher, execute, onFailure }, run, shutdown.signal)
+      const running = executeClaimedBotRun(
+        { config, db, cipher, execute, onFailure, platformApi },
+        run,
+        shutdown.signal,
+      )
         .catch(() => onFailure(run))
         .finally(() => {
           active.delete(running)
@@ -100,6 +124,8 @@ export function createBotWorker(
     async start() {
       await database.check()
       if (shutdown.signal.aborted || timer) return
+      await apiApp.ready()
+      catalog = catalogBotApis(apiApp.swagger())
       if (options.catalog) {
         await publishBotModelCatalog(db, options.catalog)
         catalogTimer = setInterval(reportOnline, CATALOG_HEARTBEAT_INTERVAL_MS)
@@ -122,7 +148,7 @@ export function createBotWorker(
         if (catalogTimer) clearInterval(catalogTimer)
         await polling
         await Promise.all([...active, loginJob, catalogHeartbeat])
-        await database.close()
+        await Promise.all([database.close(), apiApp.close()])
       })()
       await closing
     },

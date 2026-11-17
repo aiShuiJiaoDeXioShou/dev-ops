@@ -1,4 +1,5 @@
 import { disableOAuthConnectionsForUser } from '../bots/bots.connections.repository.ts'
+import { stopBotRunsForTriggerUser } from '../bots/bots.run-queue.repository.ts'
 import { randomUUID } from 'node:crypto'
 import type { AppConfig } from '../../platform/config/env.ts'
 import type { Database } from '../../platform/database/client.ts'
@@ -292,6 +293,9 @@ export function createIdentityService(deps: IdentityServiceDeps) {
       }
       const row = await updateTeamMember(tx, membership.id, input)
       if (!row) throw new ApiError(ERROR_CODES.NOT_FOUND, '团队成员不存在')
+      if (membership.status === 'active' && row.status !== 'active') {
+        await stopBotRunsForTriggerUser(tx, teamId, targetUserId, actor.id)
+      }
       if (membership.role === 'admin' && (row.role !== 'admin' || row.status !== 'active')) {
         await disableOAuthConnectionsForUser(tx, teamId, targetUserId, actor.id)
       }

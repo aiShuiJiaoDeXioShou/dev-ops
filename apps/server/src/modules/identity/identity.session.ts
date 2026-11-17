@@ -5,7 +5,7 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import type { Database } from '../../platform/database/client.ts'
 import type { IdentityAuth } from './identity.auth.ts'
 import { platformAdmin, teamMember } from './identity.tables.ts'
-import { isBotDelegationToken } from './identity.bot-delegation.ts'
+import { getCurrentBotActor, isBotDelegationToken } from './identity.bot-delegation.ts'
 import type { SessionUser } from './identity.types.ts'
 
 export type TeamRole = 'admin' | 'developer' | 'viewer'
@@ -58,6 +58,7 @@ export async function requireSessionUser(auth: IdentityAuth, headers: IncomingHt
  * @throws 非正常管理员时抛出 FORBIDDEN。
  */
 export async function requirePlatformAdmin(db: Database, userId: string): Promise<void> {
+  if (getCurrentBotActor()) throw new ApiError(ERROR_CODES.FORBIDDEN, '执行进程只具有当前团队权限')
   const [row] = await db
     .select({ userId: platformAdmin.user_id })
     .from(platformAdmin)
