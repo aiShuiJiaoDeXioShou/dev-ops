@@ -10,6 +10,8 @@ import { lockWritableBotConversation, requireBotConversation } from '../collabor
 import { botConversationMember, botEvent } from '../collaboration/bot-conversations.tables.ts'
 import type { SessionUser } from '../identity/identity.session.ts'
 import { teamMember } from '../identity/identity.tables.ts'
+import { readBotInbox } from './bot-inbox.read.ts'
+import { readTaskReviews, reviewBotTask } from './bot-tasks.review.service.ts'
 import type { AppendBotTaskInput, CreateBotTaskInput, TaskTraceView } from './bot-tasks.schema.ts'
 import { botTask, botTaskInput } from './bot-tasks.tables.ts'
 import { botTaskView, taskRunView } from './bot-tasks.view.ts'
@@ -255,6 +257,7 @@ export function createBotTasksService(db: Database) {
           createdAt: created_at.toISOString(),
         })),
         runs: runs.map(taskRunView),
+        ...(await readTaskReviews(db, row)),
         trace: await loadTaskTrace(
           db,
           row,
@@ -344,6 +347,18 @@ export function createBotTasksService(db: Database) {
         if (!updated) stateConflict('任务状态已变化，请刷新后重试')
         return botTaskView(updated)
       })
+    },
+    /** 由当前人类成员验收提交的结果。 */
+    accept(actor: SessionUser, taskId: string, input: { resultId: string; comment?: string }) {
+      return reviewBotTask(db, actor, taskId, 'accepted', input)
+    },
+    /** 退回最新结果，填写原因并开启新的任务输入版本。 */
+    requestChanges(actor: SessionUser, taskId: string, input: { resultId: string; comment: string }) {
+      return reviewBotTask(db, actor, taskId, 'changes_requested', input)
+    },
+    /** 派生团队中当前成员可见的待处理任务。 */
+    inbox(actor: SessionUser, teamId: string) {
+      return readBotInbox(db, actor, teamId)
     },
     /** 停止当前会话中排队或执行中的运行。 */
     async stop(actor: SessionUser, runId: string) {

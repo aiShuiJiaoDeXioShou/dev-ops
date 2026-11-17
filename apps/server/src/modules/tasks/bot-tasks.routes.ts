@@ -1,7 +1,9 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import { conversationParams } from '../collaboration/bot-conversations.schema.ts'
-import { requireActor } from '../identity/identity.actor.ts'
+import { conversationParams, conversationTeamParams } from '../collaboration/bot-conversations.schema.ts'
+import { requireActor, requireSessionActor } from '../identity/identity.actor.ts'
+import { botInboxResponse } from './bot-inbox.read.ts'
+import { acceptTaskResultBody, requestTaskChangesBody } from './bot-tasks.review.schema.ts'
 import {
   runParams,
   runResponse,
@@ -12,6 +14,7 @@ import {
   taskListResponse,
   taskParams,
   taskResponse,
+  taskReviewResponse,
   taskRunResponse,
   taskVersionBody,
 } from './bot-tasks.schema.ts'
@@ -103,6 +106,53 @@ export const botTaskRoutes: FastifyPluginAsyncTypebox<{ service: BotTasksService
     async (request) =>
       success(
         await service.cancel(await requireActor(request), request.params.taskId, request.body.version),
+        request.id,
+      ),
+  )
+  app.get(
+    '/teams/:teamId/bot-inbox',
+    {
+      schema: {
+        summary: '列出当前成员的待处理任务',
+        params: conversationTeamParams,
+        response: { 200: botInboxResponse },
+      },
+    },
+    async (request) => success(await service.inbox(await requireActor(request), request.params.teamId), request.id),
+  )
+  app.post(
+    '/bot-tasks/:taskId/accept',
+    {
+      schema: {
+        summary: '验收最新任务结果',
+        params: taskParams,
+        body: acceptTaskResultBody,
+        response: { 200: taskReviewResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.accept(await requireSessionActor(request, '验收任务'), request.params.taskId, request.body),
+        request.id,
+      ),
+  )
+  app.post(
+    '/bot-tasks/:taskId/request-changes',
+    {
+      schema: {
+        summary: '退回任务结果并继续处理',
+        params: taskParams,
+        body: requestTaskChangesBody,
+        response: { 200: taskReviewResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.requestChanges(
+          await requireSessionActor(request, '退回任务结果'),
+          request.params.taskId,
+          request.body,
+        ),
         request.id,
       ),
   )

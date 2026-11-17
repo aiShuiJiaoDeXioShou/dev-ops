@@ -369,7 +369,7 @@ export async function requestBotRunStop(tx: BotRunTransaction, runId: string, ac
           eq(botTask.executor_bot_id, run.bot_id),
           eq(botTask.input_version, run.input_version),
           eq(botTask.blocked, false),
-          inArray(botTask.status, ['pending', 'waiting']),
+          inArray(botTask.status, ['pending', 'waiting', 'in_progress']),
         ),
       )
   }

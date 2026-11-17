@@ -1,5 +1,6 @@
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
+import { taskResultSchema, taskReviewSchema } from './bot-tasks.review.schema.ts'
 
 const id = Type.String({ pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' })
 const nullableId = Type.Union([id, Type.Null()])
@@ -105,9 +106,12 @@ export const taskDetailResponse = apiResponseSchema(
     inputs: Type.Array(input),
     runs: Type.Array(run),
     trace: Type.Array(trace),
+    results: Type.Array(taskResultSchema),
+    reviews: Type.Array(taskReviewSchema),
   }),
 )
 export const taskResponse = apiResponseSchema(task)
+export const taskReviewResponse = apiResponseSchema(Type.Object({ task, review: taskReviewSchema }))
 export const runResponse = apiResponseSchema(run)
 
 export type BotTaskView = Static<typeof task>

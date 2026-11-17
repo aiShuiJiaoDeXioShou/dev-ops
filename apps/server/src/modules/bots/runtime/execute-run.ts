@@ -6,6 +6,7 @@ import { finishBotRun, renewBotRunLease, type BotRunRecord } from '../bots.run-q
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
 import { createPgRunSink } from './run-sink.ts'
+import { createTaskResultTool } from './task-tools.ts'
 
 export type BotRunner = typeof runBot
 
@@ -81,7 +82,10 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
     const outcome = await options.execute({
       model: input.model,
       context: input.context,
-      tools: webTools({ providerId: input.model.providerId, credentials }),
+      tools: [
+        ...webTools({ providerId: input.model.providerId, credentials }),
+        ...(run.task_id ? [createTaskResultTool(db, lease)] : []),
+      ],
       limits: { maxTurns: config.BOT_RUN_MAX_TURNS, timeoutMs: config.BOT_RUN_TIMEOUT_SECONDS * 1_000 },
       signal,
       ports: {
