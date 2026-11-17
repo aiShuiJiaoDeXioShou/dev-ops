@@ -28,6 +28,7 @@ test('[desktop] [mobile] 待处理链接打开任务并验收结果', async ({ p
     responsibility: '',
     instructions: '',
     tags: [],
+    skillReferences: [],
     members: [
       { id: userId, name: '业务负责人', kind: 'user' },
       { id: botId, name: '交付助理', kind: 'bot' },

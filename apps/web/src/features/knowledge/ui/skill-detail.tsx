@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Download, PackageOpen, Pencil, Power } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
@@ -193,9 +194,11 @@ export function SkillDetailDialog({
                 </>
               )}
               <span className="flex-1" />
-              <Button type="button" disabled title="Bot 协作上线后可用">
-                在 bots 中使用（尚未开放）
-              </Button>
+              {canWrite && skill.enabled && (
+                <Button asChild>
+                  <Link to={`/collaboration?skill=${encodeURIComponent(skill.id)}`}>在 Bots 中使用</Link>
+                </Button>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">最近更新 {formatDateTime(skill.updatedAt)}</p>
             <details className="space-y-3">

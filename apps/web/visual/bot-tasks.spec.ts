@@ -27,6 +27,7 @@ test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ p
     responsibility: '',
     instructions: '',
     tags: [],
+    skillReferences: [],
     members: [
       { id: userId, name: '业务负责人', kind: 'user' },
       { id: botId, name: '交付助理', kind: 'bot' },
@@ -66,6 +67,7 @@ test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ p
     failureKind: null,
     failureMessage: null,
     turns: 0,
+    skillVersions: [],
     usage: null,
   })
   const path = `**/api/v1/bot-conversations/${roomId}`

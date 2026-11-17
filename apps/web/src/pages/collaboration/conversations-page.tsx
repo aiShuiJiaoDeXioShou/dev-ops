@@ -53,6 +53,8 @@ function ConversationRoom({
   openList,
   listToggleRef,
   initialTaskId,
+  initialSkillId,
+  onSkillUsed,
 }: {
   id: string
   userId: string
@@ -61,6 +63,8 @@ function ConversationRoom({
   openList: () => void
   listToggleRef: React.RefObject<HTMLButtonElement | null>
   initialTaskId?: string
+  initialSkillId?: string
+  onSkillUsed: () => void
 }) {
   const client = useQueryClient()
   const [panel, setPanel] = useState<'task' | 'settings' | null>(initialTaskId ? 'task' : null)
@@ -70,7 +74,7 @@ function ConversationRoom({
   const taskOpener = useRef<HTMLButtonElement>(null)
   const settingsOpener = useRef<HTMLButtonElement>(null)
   const newTaskOpener = useRef<HTMLElement>(null)
-  const detail = useQuery(conversationOptions(id))
+  const detail = useQuery({ ...conversationOptions(id), refetchInterval: 10000 })
   const messages = useInfiniteQuery({ ...messagesOptions(id), enabled: detail.isSuccess })
   const events = useQuery({ ...conversationEventsOptions(client, id), enabled: detail.isSuccess })
   const room = detail.data?.data
@@ -253,8 +257,10 @@ function ConversationRoom({
           <ConversationComposer
             room={room}
             readOnly={readOnly}
+            initialSkillId={initialSkillId}
             runningId={events.data?.activeRuns.find((run) => run.status === 'running')?.id}
             onSent={() => {
+              if (initialSkillId) onSkillUsed()
               void Promise.all([
                 client.invalidateQueries({ queryKey: messagesOptions(id).queryKey }),
                 client.invalidateQueries({ queryKey: conversationsQueryKey }),
@@ -416,9 +422,11 @@ function TeamConversations({
   const listCloseRef = useRef<HTMLButtonElement>(null)
   const navigate = useNavigate()
   const inbox = useQuery(botInboxOptions(teamId))
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const isInbox = params.get('view') === 'inbox'
   const linkedTask = params.get('task') ?? undefined
+  const linkedSkill = params.get('skill') ?? undefined
+  const skillSearch = linkedSkill ? `?skill=${encodeURIComponent(linkedSkill)}` : ''
   const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim()), activeTag || undefined))
   const rooms = list.data?.pages.flatMap(({ data }) => data.items) ?? []
   const closeList = () => {
@@ -540,7 +548,7 @@ function TeamConversations({
             aria-pressed={room.id === id}
             onClick={() => {
               closeList()
-              void navigate(`/collaboration/${room.id}`)
+              void navigate(`/collaboration/${room.id}${skillSearch}`)
             }}
           >
             <span className="conversation-mark">
@@ -568,9 +576,16 @@ function TeamConversations({
       </aside>
       {id && !isInbox ? (
         <ConversationRoom
-          key={`${id}:${linkedTask ?? ''}`}
+          key={`${id}:${linkedTask ?? ''}:${linkedSkill ?? ''}`}
           id={id}
           initialTaskId={linkedTask}
+          initialSkillId={linkedSkill}
+          onSkillUsed={() => {
+            const updated = new URLSearchParams(params)
+            updated.delete('skill')
+            setParams(updated, { replace: true })
+          }}
+
           userId={userId}
           readOnly={readOnly}
           listOpen={listOpen}
@@ -600,7 +615,11 @@ function TeamConversations({
             <EmptyState
               icon={<MessagesSquare />}
               title="选择会话"
-              description="从会话列表继续对话，或从智能体目录打开私聊。"
+              description={
+                linkedSkill
+                  ? '选择已配置这项技能的会话，技能会带入输入框。'
+                  : '从会话列表继续对话，或从智能体目录打开私聊。'
+              }
               action={
                 <Button asChild variant="outline">
                   <Link to="/capabilities/bots">查看智能体</Link>
@@ -636,7 +655,7 @@ function TeamConversations({
             setNewGroupOpen(false)
             closeList()
             void client.invalidateQueries({ queryKey: conversationsQueryKey })
-            void navigate(`/collaboration/${room.id}`)
+            void navigate(`/collaboration/${room.id}${skillSearch}`)
           }}
         />
       )}

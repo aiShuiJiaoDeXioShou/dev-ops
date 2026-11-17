@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { skillChoicesOptions } from '@/features/knowledge/api/queries'
 import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
@@ -15,6 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/shared/ui/controls/alert-dialog'
 import { Button } from '@/shared/ui/controls/button'
+import { Checkbox } from '@/shared/ui/controls/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -44,6 +46,13 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
   const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
   const defaultOwner = bot?.ownerUserId ?? defaultOwnerId
+  const skillCatalog = useInfiniteQuery(skillChoicesOptions(teamId))
+  const [selectedSkills, setSelectedSkills] = useState(bot?.skillIds ?? [])
+  const changedSkills =
+    selectedSkills.length !== (bot?.skillIds.length ?? 0) || selectedSkills.some((id) => !bot?.skillIds.includes(id))
+  const skills = skillCatalog.data?.pages.flatMap(({ data }) => data.items) ?? []
+  const selectableSkills = skills.filter((skill) => skill.enabled || selectedSkills.includes(skill.id))
+
   const [discardOpen, setDiscardOpen] = useState(false)
   const [name, setName] = useState(bot?.name ?? '')
   const [responsibility, setResponsibility] = useState(bot?.responsibility ?? '')
@@ -53,7 +62,13 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
   const selectedOwnerActive = owners.some((member) => member.userId === ownerUserId)
   const mutation = useMutation({
     mutationFn: () => {
-      const input = { name: name.trim(), responsibility: responsibility.trim(), instructions, ownerUserId }
+      const input = {
+        name: name.trim(),
+        responsibility: responsibility.trim(),
+        instructions,
+        ownerUserId,
+        ...(changedSkills ? { skillIds: selectedSkills } : {}),
+      }
       const options = { idempotencyKey: createIdempotencyKey() }
       return bot
         ? apiClient.updateBot(bot.id, { ...input, configVersion: bot.configVersion }, options)
@@ -75,7 +90,8 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
       name !== (bot?.name ?? '') ||
       responsibility !== (bot?.responsibility ?? '') ||
       instructions !== (bot?.instructions ?? '') ||
-      ownerUserId !== defaultOwner
+      ownerUserId !== defaultOwner ||
+      changedSkills
     if (hasEdits) setDiscardOpen(true)
     else onClose()
   }
@@ -156,6 +172,44 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
                   rows={5}
                 />
               </label>
+              <fieldset className="field full">
+                <legend>Skills</legend>
+                {skillCatalog.isPending && <p className="small muted">正在加载技能…</p>}
+                {skillCatalog.isError && (
+                  <Button type="button" variant="outline" onClick={() => void skillCatalog.refetch()}>
+                    重试加载技能
+                  </Button>
+                )}
+                {skillCatalog.isSuccess && !selectableSkills.length && <p className="small muted">暂无已启用的技能</p>}
+                <div className="work-checks">
+                  {selectableSkills.map((skill) => (
+                    <label className="row" key={skill.id}>
+                      <Checkbox
+                        checked={selectedSkills.includes(skill.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedSkills((previous) =>
+                            checked === true ? [...previous, skill.id] : previous.filter((id) => id !== skill.id),
+                          )
+                        }}
+                      />
+                      <span>
+                        {skill.name}
+                        {!skill.enabled && '（已停用）'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {skillCatalog.hasNextPage && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={skillCatalog.isFetchingNextPage}
+                    onClick={() => void skillCatalog.fetchNextPage()}
+                  >
+                    加载更多技能
+                  </Button>
+                )}
+              </fieldset>
               {mutation.error && (
                 <p role="alert" className="text-sm text-destructive">
                   {describeRequestError(mutation.error).description}

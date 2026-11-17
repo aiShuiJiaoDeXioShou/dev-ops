@@ -245,6 +245,22 @@ function TaskRun({
           {run.modelId} · {run.turns} 轮
         </p>
       )}
+      <details className="small">
+        <summary>技能版本</summary>
+        {run.skillVersions === null ? (
+          <p>版本未知</p>
+        ) : !run.skillVersions.length ? (
+          <p>未使用技能</p>
+        ) : (
+          <ul>
+            {run.skillVersions.map((skill) => (
+              <li key={skill.skillId}>
+                {skill.name} · {skill.status === 'unavailable' ? '不可用' : (skill.version ?? '版本未知')}
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
       {run.failureMessage && <p>{run.failureMessage}</p>}
       {trace.length > 0 && (
         <details>

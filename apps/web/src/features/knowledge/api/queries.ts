@@ -1,4 +1,4 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 import type { SkillListItem } from '../model/types'
 
@@ -17,6 +17,17 @@ export function skillListQueryOptions(teamId: string, filters: SkillListFilters)
     queryFn: ({ signal }) => apiClient.listSkills(teamId, filters, { signal }),
     enabled: Boolean(teamId),
     placeholderData: keepPreviousData,
+  })
+}
+
+/** 读取可配置的团队技能，保留停用条目以供已有配置移除。 */
+export function skillChoicesOptions(teamId: string) {
+  const pageSize = 100
+  return infiniteQueryOptions({
+    queryKey: ['knowledge', 'skills', 'choices', teamId],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) => apiClient.listSkills(teamId, { page: pageParam, pageSize }, { signal }),
+    getNextPageParam: ({ data }) => (data.page * pageSize < data.total ? data.page + 1 : undefined),
   })
 }
 

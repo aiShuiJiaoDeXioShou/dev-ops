@@ -47,6 +47,7 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
     responsibility: '',
     instructions: '',
     tags: [],
+    skillReferences: [],
     members: [{ id: userId, name: '负责人', kind: 'user' }, ...bots.map(({ id, name }) => ({ id, name, kind: 'bot' }))],
   }
   const routeBase = `**/api/v1/teams/${teamId}`

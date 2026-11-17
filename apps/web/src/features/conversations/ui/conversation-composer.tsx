@@ -16,30 +16,53 @@ function stringWithMention(text: string, name: string) {
   return `${text.replace(/@[^\s@]*$/u, '')}@${name} `
 }
 
+type Candidate = { id: string; kind: 'bot' | 'skill'; name: string; token: string }
+function asSkillCandidate(skill: BotConversation['skillReferences'][number]): Candidate {
+  return { id: skill.id, name: skill.name, token: skill.identifier, kind: 'skill' }
+}
+
 /** 复用对话原型的输入区，发送失败时用原请求标识重试同一草稿。 */
 export function ConversationComposer({
   room,
   readOnly,
   runningId,
+  initialSkillId,
   onSent,
 }: {
   room: BotConversation
   readOnly: boolean
   runningId?: string
+  initialSkillId?: string
   onSent: () => void
 }) {
-  const [draft, setDraft] = useState('')
+  const defaultBot = room.leaderBotId ?? room.members.find(({ kind }) => kind === 'bot')?.id
+  const initialReference = room.skillReferences.find(
+    ({ id, botIds }) => id === initialSkillId && !!defaultBot && botIds.includes(defaultBot),
+  )
+  const [draft, setDraft] = useState(initialReference ? `@${initialReference.identifier} ` : '')
+  const [selectedSkills, setSelectedSkills] = useState<Candidate[]>(
+    initialReference ? [asSkillCandidate(initialReference)] : [],
+  )
   const [hideMentions, setHideMentions] = useState(false)
-  const [selected, setSelected] = useState<BotConversation['members'][number]>()
+  const [selected, setSelected] = useState<Candidate>()
   const input = useRef<HTMLTextAreaElement>(null)
   const requestId = useRef<string>(undefined)
   const mention = hideMentions ? undefined : activeMention(draft)?.[1]
-  const candidates =
+  const selectedBotId = selected && draft.includes(`@${selected.token} `) ? selected.id : undefined
+  const targetBot = selectedBotId ?? defaultBot
+  const skillCandidates = room.skillReferences.filter(({ botIds }) => !!targetBot && botIds.includes(targetBot))
+  const candidates: Candidate[] =
     mention === undefined
       ? []
-      : room.members.filter(
-          (member) => member.kind === 'bot' && member.name.toLowerCase().includes(mention.toLowerCase()),
-        )
+      : [
+          ...room.members
+            .filter(({ kind }) => kind === 'bot')
+            .map(({ id, name }) => ({ id, kind: 'bot' as const, name, token: name })),
+          ...skillCandidates.map(asSkillCandidate),
+        ]
+          .filter(({ name, token }) => `${name} ${token}`.toLowerCase().includes(mention.toLowerCase()))
+          .slice(0, 12)
+  const activeSkills = selectedSkills.filter(({ token }) => draft.includes(`@${token} `) || draft.endsWith(`@${token}`))
   const send = useMutation({
     mutationFn: () => {
       const id = requestId.current ?? crypto.randomUUID()
@@ -49,7 +72,8 @@ export function ConversationComposer({
         {
           text: draft,
           clientRequestId: id,
-          mentionBotId: selected && draft.includes(`@${selected.name} `) ? selected.id : undefined,
+          mentionBotId: selectedBotId,
+          ...(activeSkills.length ? { skillIds: activeSkills.map(({ id }) => id) } : {}),
         },
         { idempotencyKey: id },
       )
@@ -57,6 +81,7 @@ export function ConversationComposer({
     onSuccess: () => {
       setDraft('')
       setSelected(undefined)
+      setSelectedSkills([])
       requestId.current = undefined
       onSent()
       input.current?.focus()
@@ -72,9 +97,13 @@ export function ConversationComposer({
     requestId.current = undefined
     if (send.isError) send.reset()
   }
-  const insert = (candidate: BotConversation['members'][number]) => {
-    change(stringWithMention(draft, candidate.name))
-    setSelected(candidate)
+  const insert = (candidate: Candidate) => {
+    change(stringWithMention(draft, candidate.token))
+    if (candidate.kind === 'bot') setSelected(candidate)
+    else
+      setSelectedSkills((previous) =>
+        previous.some(({ id }) => id === candidate.id) ? previous : [...previous, candidate],
+      )
     input.current?.focus()
   }
   const submit = () => {
@@ -100,12 +129,14 @@ export function ConversationComposer({
               className="mention-choice"
               onClick={() => insert(candidate)}
             >
-              @{candidate.name}
+              @{candidate.token}
+              {candidate.kind === 'skill' ? ` · ${candidate.name}` : null}
             </Button>
           ))}
         </div>
       )}
       {room.kind === 'group' && <p className="dsh-note">智能体读取团队资料后，结果对会话全体成员可见。</p>}
+      {initialSkillId && !initialReference && <p className="dsh-note">所选会话的默认智能体无法调用这项技能。</p>}
       <Textarea
         ref={input}
         rows={1}

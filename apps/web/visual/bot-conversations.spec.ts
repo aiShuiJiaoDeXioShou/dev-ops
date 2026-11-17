@@ -21,6 +21,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   )
   const stamp = '2026-11-17T08:00:00.000Z'
   const botId = 'da55aa00-0000-4000-8000-000000000011'
+  const skillId = 'da55aa00-0000-4000-8000-000000000014'
   const runId = 'da55aa00-0000-4000-8000-000000000020'
   const room: Room = {
     id: 'da55aa00-0000-4000-8000-000000000012',
@@ -32,6 +33,9 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     responsibility: '',
     instructions: '',
     tags: [],
+    skillReferences: [
+      { id: skillId, name: '交付复核', identifier: 'delivery-review', summary: '核对证据', botIds: [botId] },
+    ],
     members: [
       { id: botId, name: '验收助理', kind: 'bot' },
       { id: userId, name: '负责人', kind: 'user' },
@@ -124,4 +128,6 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).click()
   await page.getByRole('combobox', { name: '按工作标签筛选' }).selectOption(tagId)
   await expect(page.getByText('没有匹配的会话')).toBeVisible()
+  await page.goto(`/collaboration/${room.id}?skill=${skillId}`)
+  await expect(page.getByRole('textbox', { name: '协作消息' })).toHaveValue('@delivery-review ')
 })
