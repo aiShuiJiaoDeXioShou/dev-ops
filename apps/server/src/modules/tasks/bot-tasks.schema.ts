@@ -1,4 +1,5 @@
 import { Type, type Static } from 'typebox'
+import { botSkillVersionSchema } from '../bots/bots.skills.ts'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 import { workTagViewSchema } from '../collaboration/work-tags.schema.ts'
 import { taskResultSchema, taskReviewSchema } from './bot-tasks.review.schema.ts'
@@ -58,6 +59,7 @@ const run = Type.Object({
   finishedAt: nullableText,
   modelConnectionId: nullableId,
   modelId: nullableText,
+  skillVersions: Type.Union([Type.Array(botSkillVersionSchema), Type.Null()]),
   failureKind: nullableText,
   failureMessage: nullableText,
   turns: Type.Integer({ minimum: 0 }),

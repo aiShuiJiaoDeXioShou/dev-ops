@@ -1,4 +1,5 @@
 import { Type, type Static } from 'typebox'
+import { botSkillVersionSchema } from './bots.skills.ts'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 
 const uuid = Type.String({ pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' })
@@ -95,6 +96,7 @@ const botRunSummarySchema = Type.Object({
     Type.Literal('failed'),
     Type.Literal('stopped'),
   ]),
+  skillVersions: Type.Union([Type.Array(botSkillVersionSchema), Type.Null()]),
   failureKind: Type.Union([Type.String(), Type.Null()]),
   failureMessage: Type.Union([Type.String(), Type.Null()]),
   turns: Type.Integer({ minimum: 0 }),

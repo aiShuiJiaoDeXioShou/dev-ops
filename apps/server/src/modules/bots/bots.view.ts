@@ -1,3 +1,4 @@
+import { skillVersionsOf } from './bots.skills.ts'
 import type { BotRunSummary, BotView } from './bots.schema.ts'
 import type { bot, botRun } from './bots.tables.ts'
 
@@ -75,6 +76,7 @@ export function toBotRunSummary(row: typeof botRun.$inferSelect): BotRunSummary 
     id: row.id,
     conversationId: row.conversation_id,
     status,
+    skillVersions: skillVersionsOf(row.config_snapshot),
     failureKind: row.failure_kind,
     failureMessage: row.failure_message,
     turns: row.turns,

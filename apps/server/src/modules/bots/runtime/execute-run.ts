@@ -15,6 +15,7 @@ import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
 import { createPgMemoryStore } from './memory-store.ts'
 import { fetchBotPublicPage } from './public-page.ts'
+import { createSkillViewTool } from './skill-tool.ts'
 import { createPgRunSink } from './run-sink.ts'
 import { auditBotWebTools } from './web-tool-audit.ts'
 import { createTaskResultTool } from './task-tools.ts'
@@ -84,6 +85,15 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       await sink.finish(unavailable)
       return
     }
+    if (input.hasUnavailableSkillReference) {
+      await sink.finish({
+        ...unavailable,
+        status: 'failed',
+        failureKind: 'tool_error',
+        failureMessage: '引用的技能已停用或版本不可用',
+      })
+      return
+    }
     const credentials = createPgCredentialStore({
       db,
       cipher: options.cipher,
@@ -97,6 +107,9 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       context: input.context,
       tools: [
         ...memoryTools(memory),
+        ...(input.skillVersions.some(({ status }) => status === 'available')
+          ? [createSkillViewTool(db, run, lease, input.skillVersions)]
+          : []),
         ...auditBotWebTools(
           db,
           run,

@@ -89,7 +89,20 @@ export const conversationListResponse = apiResponseSchema(
   }),
 )
 export const conversationResponse = apiResponseSchema(
-  Type.Object({ ...conversation.properties, members: Type.Array(member), tags: Type.Array(workTagViewSchema) }),
+  Type.Object({
+    ...conversation.properties,
+    members: Type.Array(member),
+    tags: Type.Array(workTagViewSchema),
+    skillReferences: Type.Array(
+      Type.Object({
+        id: uuid,
+        name: Type.String(),
+        identifier: Type.String(),
+        summary: Type.String(),
+        botIds: Type.Array(uuid),
+      }),
+    ),
+  }),
 )
 export const conversationMessagesResponse = apiResponseSchema(
   Type.Object({

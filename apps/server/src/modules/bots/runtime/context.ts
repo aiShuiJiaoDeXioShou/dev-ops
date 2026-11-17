@@ -8,6 +8,7 @@ import { botMessageBodySchema } from '../../collaboration/bot-message-body.ts'
 import { authUser, teamMember } from '../../identity/identity.tables.ts'
 import { botTask, botTaskInput } from '../../tasks/bot-tasks.tables.ts'
 import type { BotRunRecord } from '../bots.run-queue.repository.ts'
+import { skillVersionsOf, type BotSkillVersion } from '../bots.skills.ts'
 import { botModelConnection } from '../bots.tables.ts'
 import { readEssentialMemories } from './memory-store.ts'
 
@@ -95,6 +96,8 @@ export async function loadBotRunContext(
   model: RunBotOptions['model']
   context: RunBotOptions['context']
   connectionId: string
+  skillVersions: BotSkillVersion[]
+  hasUnavailableSkillReference: boolean
 } | null> {
   const snapshot = run.config_snapshot
   if (!Check(configSnapshotSchema, snapshot)) return null
@@ -182,6 +185,11 @@ export async function loadBotRunContext(
     botId: run.bot_id,
     userId: run.trigger_user_id,
   })
+  const skillVersions = skillVersionsOf(run.config_snapshot) ?? []
+  const availableSkills = skillVersions.filter(({ status }) => status === 'available')
+  const references =
+    inputRow && Check(botMessageBodySchema, inputRow.body) ? (inputRow.body.references?.skillIds ?? []) : []
+  const hasUnavailableSkillReference = references.some((id) => !availableSkills.some(({ skillId }) => skillId === id))
   const systemSections = [
     {
       title: '平台约束',
@@ -191,9 +199,20 @@ export async function loadBotRunContext(
     { title: 'Bot 指令', body: snapshot.instructions },
     { title: '会话职责', body: conversation.responsibility },
     { title: '会话指令', body: conversation.instructions },
+    {
+      title: '已配置技能',
+      body: availableSkills
+        .map(
+          (skill) =>
+            `- ${skill.name}（${skill.identifier}，${skill.version}）：${skill.summary}${references.includes(skill.skillId) ? '（本条消息已引用）' : ''}`,
+        )
+        .join('\n'),
+    },
   ].filter(({ body }) => body.trim())
   return {
     connectionId: snapshot.modelConnectionId,
+    skillVersions,
+    hasUnavailableSkillReference,
     model: { providerId: connection.provider, modelId: snapshot.modelId },
     context: { systemSections, essentialMemories, history, input },
   }

@@ -181,6 +181,19 @@ export async function requireRunnableBot(tx: BotRunTransaction, teamId: string, 
 }
 
 /**
+ * 找出当前团队候选中可运行的 Bot，供会话技能候选校验。
+ * @param db 当前数据库连接。
+ * @param teamId 当前团队。
+ * @param ids 已通过成员关系限定的 Bot 标识。
+ * @returns 可运行标识列表。
+ */
+export async function runnableBotIds(db: BotRead, teamId: string, ids: string[]) {
+  if (ids.length === 0) return []
+  const rows = await botReadQuery(db).where(and(eq(bot.team_id, teamId), inArray(bot.id, ids)))
+  return rows.filter((row) => botAvailability(row) === 'available').map(({ record }) => record.id)
+}
+
+/**
  * 创建团队 Bot 管理服务。
  * @param db 平台数据库连接。
  * @returns 带团队、角色和配置版本校验的读写用例。

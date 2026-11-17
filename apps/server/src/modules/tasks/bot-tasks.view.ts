@@ -1,3 +1,4 @@
+import { skillVersionsOf } from '../bots/bots.skills.ts'
 import type { BotRunRecord } from '../bots/bots.run-queue.repository.ts'
 import type { BotTaskView, TaskRunView } from './bot-tasks.schema.ts'
 import type { botTask } from './bot-tasks.tables.ts'
@@ -72,6 +73,7 @@ export function taskRunView(row: BotRunRecord): TaskRunView {
     finishedAt: row.finished_at?.toISOString() ?? null,
     modelConnectionId: snapshotString(row.config_snapshot, 'modelConnectionId'),
     modelId: snapshotString(row.config_snapshot, 'modelId'),
+    skillVersions: skillVersionsOf(row.config_snapshot),
     failureKind: row.failure_kind,
     failureMessage: row.failure_message,
     turns: row.turns,

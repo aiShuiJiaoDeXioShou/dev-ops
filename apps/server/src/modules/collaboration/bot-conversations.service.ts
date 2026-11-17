@@ -5,12 +5,12 @@ import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { enqueueBotRun, type BotRunTransaction } from '../bots/bots.run-queue.repository.ts'
-import { requireRunnableBot } from '../bots/bots.service.ts'
-import { bot, botRun, botSkill } from '../bots/bots.tables.ts'
+import { requireRunnableBot, runnableBotIds } from '../bots/bots.service.ts'
+import { readBotSkillCandidates } from '../bots/bots.skills.ts'
+import { bot, botRun } from '../bots/bots.tables.ts'
 import { redactChatContent } from '../bots/runtime/content.ts'
 import { requireTeamMember, type SessionUser, type TeamRole } from '../identity/identity.session.ts'
 import { authUser, teamMember } from '../identity/identity.tables.ts'
-import { skill } from '../knowledge/knowledge.tables.ts'
 import {
   botConversation,
   botConversationMember,
@@ -143,7 +143,13 @@ export async function readBotConversationView(db: ReadDb, row: ConversationRow) 
     readMembers(db, row),
     readTargetWorkTags(db, row.team_id, { targetKind: 'conversation', targetId: row.id }),
   ])
-  return { ...viewOf(row), members, tags }
+  const available = await runnableBotIds(
+    db,
+    row.team_id,
+    members.filter(({ kind }) => kind === 'bot').map(({ id }) => id),
+  )
+  const skillReferences = await readBotSkillCandidates(db, row.team_id, available)
+  return { ...viewOf(row), members, tags, skillReferences }
 }
 
 function mentionedBotNames(text: string, members: ConversationMemberView[]): string[] {
@@ -398,22 +404,11 @@ export function createBotConversationsService(db: Database) {
           throw error
         }
         if (input.skillIds?.length) {
-          const skills = await tx
-            .select({ id: skill.id })
-            .from(skill)
-            .innerJoin(
-              botSkill,
-              and(
-                eq(botSkill.team_id, conversation.team_id),
-                eq(botSkill.bot_id, targetId),
-                eq(botSkill.skill_id, skill.id),
-              ),
-            )
-            .where(
-              and(eq(skill.team_id, conversation.team_id), eq(skill.enabled, true), inArray(skill.id, input.skillIds)),
-            )
-          if (skills.length !== new Set(input.skillIds).size)
-            throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '消息引用的技能未配置或已停用')
+          const skills = await readBotSkillCandidates(tx, conversation.team_id, [targetId])
+          const ids = new Set(skills.map(({ id }) => id))
+          if (!input.skillIds.every((id) => ids.has(id))) {
+            throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '消息引用的技能未配置、已停用或版本未知')
+          }
         }
         const [latest] = await tx
           .select({ sequence: botMessage.sequence })

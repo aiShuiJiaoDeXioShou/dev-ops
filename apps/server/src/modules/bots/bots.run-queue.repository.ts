@@ -3,6 +3,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import type { Database } from '../../platform/database/client.ts'
 import { appendBotEvents } from '../collaboration/bot-events.repository.ts'
 import { botTask } from '../tasks/bot-tasks.tables.ts'
+import { snapshotBotSkills } from './bots.skills.ts'
 import { bot, botRun } from './bots.tables.ts'
 
 export type BotRunTransaction = Parameters<Parameters<Database['transaction']>[0]>[0]
@@ -94,7 +95,7 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
     const previous = alias(botRun, 'previous_run')
     const teamRunning = alias(botRun, 'team_running')
     const [candidate] = await tx
-      .select({ id: botRun.id })
+      .select({ id: botRun.id, teamId: botRun.team_id, botId: botRun.bot_id })
       .from(botRun)
       .where(
         and(
@@ -131,6 +132,7 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
       .limit(1)
       .for('update', { skipLocked: true })
     if (!candidate) return null
+    const skillVersions = await snapshotBotSkills(tx, candidate.teamId, candidate.botId)
 
     const [run] = await tx
       .update(botRun)
@@ -142,7 +144,8 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
         config_snapshot: sql`coalesce((
           select jsonb_build_object(
             'name', ${bot.name}, 'responsibility', ${bot.responsibility}, 'instructions', ${bot.instructions},
-            'modelConnectionId', ${bot.model_connection_id}, 'modelId', ${bot.model_id}, 'status', ${bot.status}
+            'modelConnectionId', ${bot.model_connection_id}, 'modelId', ${bot.model_id}, 'status', ${bot.status},
+            'skillVersions', ${JSON.stringify(skillVersions)}::jsonb
           )
           from ${bot}
           where ${bot.id} = ${botRun.bot_id} and ${bot.team_id} = ${botRun.team_id}
