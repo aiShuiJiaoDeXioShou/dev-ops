@@ -85,8 +85,11 @@ test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ p
     created = true
     return route.fulfill({ json: success({ task: task(), runId, runStatus: 'queued' }) })
   })
+  await page.route(`**/api/v1/teams/${teamId}/bot-inbox`, (route) =>
+    route.fulfill({ json: success({ items: [], count: 0 }) }),
+  )
   await page.route(`**/api/v1/bot-tasks/${taskId}`, (route) =>
-    route.fulfill({ json: success({ ...task(), inputs: [], runs: [run()], trace: [] }) }),
+    route.fulfill({ json: success({ ...task(), inputs: [], runs: [run()], trace: [], results: [], reviews: [] }) }),
   )
   await page.route(`**/api/v1/bot-runs/${runId}/stop`, (route) => {
     stopped = true

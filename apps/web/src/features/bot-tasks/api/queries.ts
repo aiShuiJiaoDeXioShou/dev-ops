@@ -33,3 +33,12 @@ export function botTaskOptions(id: string) {
     queryFn: ({ signal }) => apiClient.getBotTask(id, { signal }),
   })
 }
+
+/** 读取待验收与受阻任务和未处理计数。 */
+export function botInboxOptions(teamId: string) {
+  return queryOptions({
+    queryKey: [...taskQueries, 'inbox', teamId],
+    queryFn: ({ signal }) => apiClient.getBotInbox(teamId, { signal }),
+    refetchInterval: 10_000,
+  })
+}

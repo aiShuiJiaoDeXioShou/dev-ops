@@ -32,6 +32,9 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   }
   let stage: 'empty' | 'queued' | 'running' | 'complete' = 'empty'
   const list: Message[] = []
+  await page.route(`**/api/v1/teams/${teamId}/bot-inbox`, (route) =>
+    route.fulfill({ json: success({ items: [], count: 0 }) }),
+  )
   const messagePath = `**/api/v1/bot-conversations/${room.id}/messages`
   const eventsPath = `**/api/v1/bot-conversations/${room.id}/events`
   await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) =>

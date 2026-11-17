@@ -1,8 +1,9 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, ClipboardList, Menu, MessagesSquare, Search, X } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
-import { taskQueries } from '@/features/bot-tasks/api/queries'
+import { Bot, ClipboardList, Inbox, Menu, MessagesSquare, Search, X } from 'lucide-react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { botInboxOptions, taskQueries } from '@/features/bot-tasks/api/queries'
+import { BotInbox } from '@/features/bot-tasks/ui/bot-inbox'
 import { ConversationTaskPanel } from '@/features/bot-tasks/ui/conversation-task-panel'
 import { NewTaskDialog } from '@/features/bot-tasks/ui/new-task-dialog'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
@@ -39,6 +40,7 @@ function ConversationRoom({
   listOpen,
   openList,
   listToggleRef,
+  initialTaskId,
 }: {
   id: string
   userId: string
@@ -46,11 +48,12 @@ function ConversationRoom({
   listOpen: boolean
   openList: () => void
   listToggleRef: React.RefObject<HTMLButtonElement | null>
+  initialTaskId?: string
 }) {
   const client = useQueryClient()
-  const [taskPanelOpen, setTaskPanelOpen] = useState(false)
+  const [taskPanelOpen, setTaskPanelOpen] = useState(Boolean(initialTaskId))
   const [newTaskOpen, setNewTaskOpen] = useState(false)
-  const [taskId, setTaskId] = useState<string>()
+  const [taskId, setTaskId] = useState(initialTaskId)
   const taskOpener = useRef<HTMLButtonElement>(null)
   const newTaskOpener = useRef<HTMLElement>(null)
   const detail = useQuery(conversationOptions(id))
@@ -324,6 +327,10 @@ function TeamConversations({
   const listToggleRef = useRef<HTMLButtonElement>(null)
   const listCloseRef = useRef<HTMLButtonElement>(null)
   const navigate = useNavigate()
+  const inbox = useQuery(botInboxOptions(teamId))
+  const [params] = useSearchParams()
+  const isInbox = params.get('view') === 'inbox'
+  const linkedTask = params.get('task') ?? undefined
   const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim())))
   const rooms = list.data?.pages.flatMap(({ data }) => data.items) ?? []
   const closeList = () => {
@@ -378,6 +385,20 @@ function TeamConversations({
             </Button>
           )}
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn('inbox-link', isInbox && 'active')}
+          aria-pressed={isInbox}
+          onClick={() => {
+            closeList()
+            void navigate('/collaboration?view=inbox')
+          }}
+        >
+          <Inbox className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+          待你处理
+          {inbox.isSuccess && <span className="counter">{inbox.data.data.count}</span>}
+        </Button>
         {list.isPending && <DelayedPageSkeleton />}
         {list.isError && <PageError title="会话列表加载失败" error={list.error} onRetry={() => void list.refetch()} />}
         {list.isSuccess && rooms.length === 0 && (
@@ -418,10 +439,11 @@ function TeamConversations({
           </Button>
         )}
       </aside>
-      {id ? (
+      {id && !isInbox ? (
         <ConversationRoom
-          key={id}
+          key={`${id}:${linkedTask ?? ''}`}
           id={id}
+          initialTaskId={linkedTask}
           userId={userId}
           readOnly={readOnly}
           listOpen={listOpen}
@@ -445,16 +467,20 @@ function TeamConversations({
               <Menu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
             </Button>
           </header>
-          <EmptyState
-            icon={<MessagesSquare />}
-            title="选择会话"
-            description="从会话列表继续对话，或从智能体目录打开私聊。"
-            action={
-              <Button asChild variant="outline">
-                <Link to="/capabilities/bots">查看智能体</Link>
-              </Button>
-            }
-          />
+          {isInbox ? (
+            <BotInbox teamId={teamId} />
+          ) : (
+            <EmptyState
+              icon={<MessagesSquare />}
+              title="选择会话"
+              description="从会话列表继续对话，或从智能体目录打开私聊。"
+              action={
+                <Button asChild variant="outline">
+                  <Link to="/capabilities/bots">查看智能体</Link>
+                </Button>
+              }
+            />
+          )}
         </section>
       )}
     </div>

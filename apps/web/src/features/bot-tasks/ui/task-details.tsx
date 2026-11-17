@@ -9,6 +9,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
+import { TaskResults } from './task-results'
 import { botTaskOptions, taskQueries, taskStatusLabels, type BotTaskDetail } from '../api/queries'
 
 const runLabels = { queued: '排队中', running: '执行中', succeeded: '已完成', failed: '失败', stopped: '已停止' }
@@ -138,6 +139,14 @@ export function TaskDetails({
           {describeRequestError(action.error).description}
         </p>
       )}
+      <TaskResults
+        task={task}
+        readOnly={readOnly}
+        onReviewed={() => {
+          void client.invalidateQueries({ queryKey: taskQueries })
+          onChanged()
+        }}
+      />
       <h3 className="task-section-title">运行轨迹</h3>
       {task.runs.length === 0 && <p className="small muted">暂无运行记录</p>}
       {task.runs.map((run) => (
