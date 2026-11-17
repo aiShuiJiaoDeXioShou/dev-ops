@@ -1,4 +1,4 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query'
 import type { ApiQuery, ApiSuccessData } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 
@@ -32,5 +32,15 @@ export function botRunsQueryOptions(botId: string, cursor?: string) {
     queryKey: [...botQueryKey, 'runs', botId, cursor],
     queryFn: ({ signal }) => apiClient.listBotRuns(botId, { cursor }, { signal }),
     placeholderData: keepPreviousData,
+  })
+}
+
+/** 分页查询选择器所需的团队 Bot。 */
+export function botChoicesOptions(teamId: string) {
+  return infiniteQueryOptions({
+    queryKey: [...botQueryKey, 'choices', teamId],
+    initialPageParam: '',
+    queryFn: ({ signal, pageParam }) => apiClient.listBots(teamId, { cursor: pageParam || undefined }, { signal }),
+    getNextPageParam: ({ data }) => data.nextCursor ?? undefined,
   })
 }

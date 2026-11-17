@@ -231,6 +231,17 @@ function ConversationRoom({
               loadEarlier={() => void messages.fetchNextPage()}
             />
           )}
+          {events.data?.activity
+            .filter(({ payload }) => activityText(payload, 'state') === 'memory_written')
+            .map((event) => {
+              const action = activityText(event.payload, 'action')
+              return (
+                <details key={event.sequence} className="dsh-note">
+                  <summary>{action === 'remove' ? '已删除记忆' : action === 'patch' ? '已更新记忆' : '已记住'}</summary>
+                  <Link to="/capabilities/memory">查看长期记忆</Link>
+                </details>
+              )
+            })}
           {events.isError && (
             <div className="row dsh-readonly-note" role="status">
               运行状态更新失败

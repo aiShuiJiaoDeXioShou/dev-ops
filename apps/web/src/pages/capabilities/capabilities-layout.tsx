@@ -15,6 +15,9 @@ export function Component() {
           <NavLink to="skills" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
             Skills
           </NavLink>
+          <NavLink to="memory" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
+            记忆
+          </NavLink>
           <NavLink to="connections" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
             连接与节点
           </NavLink>

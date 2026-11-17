@@ -108,6 +108,11 @@ export function createAppRoutes(): RouteObject[] {
                   HydrateFallback: DelayedPageSkeleton,
                 },
                 {
+                  path: 'memory',
+                  lazy: () => import('@/pages/capabilities/bot-memory-page'),
+                  HydrateFallback: DelayedPageSkeleton,
+                },
+                {
                   path: 'connections',
                   lazy: () => import('@/pages/capabilities/bot-connections-page'),
                   HydrateFallback: DelayedPageSkeleton,
