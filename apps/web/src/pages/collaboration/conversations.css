@@ -45,6 +45,26 @@
     text-align: left;
   }
 
+  .live-conversations .conversation-list-empty {
+    /* 侧栏使用共享空状态的紧凑尺寸。 */
+    padding: 20px 12px !important;
+  }
+
+  .live-conversations .conversation-list-empty .empty-art {
+    zoom: 0.55;
+  }
+
+  .live-conversations .conversation-list-empty h3 {
+    font-size: var(--text-sm) !important;
+  }
+
+  .live-conversations .conversation-main-empty {
+    flex: 1;
+    min-height: 0;
+    justify-content: safe center;
+    overflow-y: auto;
+  }
+
   .live-conversations .conversation-item.active,
   .live-conversations .dsh-chat-header,
   .live-conversations .dsh-composer,

@@ -238,9 +238,8 @@ function TeamConversations({
             </Button>
           </div>
         )}
-        {list.isSuccess && rooms.length === 0 && (
-          <p className="small muted">{filter || activeTag ? '没有匹配的会话' : '还没有会话'}</p>
-        )}
+        {hasNoConversations && <EmptyState mascot="orbit" title="暂无会话" className="conversation-list-empty" />}
+        {list.isSuccess && rooms.length === 0 && !hasNoConversations && <p className="small muted">没有匹配的会话</p>}
         {rooms.map((room) => (
           <Button
             key={room.id}
@@ -328,7 +327,9 @@ function TeamConversations({
             <DelayedPageSkeleton />
           ) : (
             <EmptyState
-              icon={<ConversationIcon name="chat" />}
+              mascot={hasNoConversations ? 'orbit' : undefined}
+              icon={hasNoConversations ? undefined : <ConversationIcon name="chat" />}
+              className={hasNoConversations ? 'conversation-main-empty' : undefined}
               title={hasNoConversations ? '还没有会话' : '选择会话'}
               description={emptyDescription}
               action={
