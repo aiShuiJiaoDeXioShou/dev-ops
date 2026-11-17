@@ -347,6 +347,7 @@ test('[desktop] [mobile] 旧运维入口下线后可从项目直接触发流水�
     await page.getByRole('button', { name: '打开导航' }).click()
   }
   const navigation = page.getByRole('navigation', { name: '主导航' })
+  await expect(navigation.getByRole('link', { name: '协作' })).toHaveAttribute('href', '/collaboration')
   await expect(navigation.getByRole('link', { name: '项目' })).toBeVisible()
   await expect(navigation.getByRole('link', { name: '运维' })).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('navigation.png') })

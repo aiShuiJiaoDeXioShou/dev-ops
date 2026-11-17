@@ -51,13 +51,13 @@ async function submitLoginForm() {
 }
 
 describe('登录后的会话重定向', () => {
-  it('从根路径登录后进入项目列表，不被登录前的空会话缓存重定向', async () => {
+  it('从根路径登录后进入协作，不被登录前的空会话缓存重定向', async () => {
     mockSignInFlow()
     const router = renderApplication('/')
     expect(await screen.findByRole('heading', { name: '登录研发工作台', level: 1 })).toBeVisible()
     await submitLoginForm()
-    expect(await screen.findByRole('heading', { name: '项目', level: 1 })).toBeVisible()
-    expect(router.state.location.pathname).toBe('/projects')
+    expect(await screen.findByRole('heading', { name: '协作', level: 1 })).toBeVisible()
+    expect(router.state.location.pathname).toBe('/collaboration')
   })
 
   it('从受保护深链登录后回到原目标页面', async () => {

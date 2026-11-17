@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Folder, LayoutGrid, LogOut, Menu, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
+import { Folder, LayoutGrid, LogOut, Menu, MessagesSquare, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
@@ -30,10 +30,13 @@ export function AppLayout() {
   useEffect(() => {
     // 页面标题用于浏览器多标签、历史记录与读屏识别；无法匹配时回退到产品名。
     const titles: Array<[string, string]> = [
+      ['/collaboration', '协作'],
       ['/projects/', '项目工作区'],
       ['/projects', '项目'],
       ['/capabilities/skills', '团队 Skills'],
       ['/capabilities/bots', '智能体'],
+      ['/capabilities/connections', '连接与节点'],
+      ['/capabilities/memory', '记忆'],
       ['/capabilities', '能力'],
       ['/vault', '凭据库'],
       ['/settings/pipeline-nodes', '执行节点'],
@@ -81,8 +84,9 @@ export function AppLayout() {
     queryClient.clear()
     navigate('/login', { replace: true })
   }
-  const navIcons = { folder: Folder, capabilities: LayoutGrid, shield: Shield } as const
+  const navIcons = { collaboration: MessagesSquare, folder: Folder, capabilities: LayoutGrid, shield: Shield } as const
   const primaryNavItems = [
+    { to: '/collaboration', label: '协作', icon: 'collaboration' as const },
     { to: '/projects', label: '项目', icon: 'folder' as const },
     { to: '/capabilities', label: '能力', icon: 'capabilities' as const },
     ...(role !== 'viewer' ? [{ to: '/vault', label: '凭据库', icon: 'shield' as const }] : []),
@@ -110,7 +114,7 @@ export function AppLayout() {
             <XIcon className="size-4" aria-hidden="true" />
           </Button>
         ) : null}
-        <Link className="brand" to="/projects" aria-label="项目列表">
+        <Link className="brand" to="/collaboration" aria-label="协作首页">
           <img src="/prototype/brand.svg" width={29} height={29} alt="" />
           DevOps
         </Link>

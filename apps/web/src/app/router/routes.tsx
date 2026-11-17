@@ -44,7 +44,7 @@ export function createAppRoutes(): RouteObject[] {
           ErrorBoundary: RouteErrorPage,
           HydrateFallback: DelayedPageSkeleton,
           children: [
-            { index: true, element: <Navigate to="/projects" replace /> },
+            { index: true, element: <Navigate to="/collaboration" replace /> },
             {
               path: 'collaboration/:conversationId?',
               lazy: () => import('@/pages/collaboration/conversations-page'),

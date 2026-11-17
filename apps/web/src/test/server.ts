@@ -73,6 +73,10 @@ export const server = setupServer(
   ),
   http.get('*/api/v1/auth/get-session', () => HttpResponse.json(sessionFixture)),
   http.get('*/api/v1/me/teams', () => success({ teams: [teamFixture], isPlatformAdmin: false })),
+  http.get('*/api/v1/teams/:teamId/bot-conversations', () => success({ items: [], nextCursor: null })),
+  http.get('*/api/v1/teams/:teamId/bot-inbox', () => success({ items: [], count: 0 })),
+  http.get('*/api/v1/teams/:teamId/work-tags', () => success({ items: [], nextCursor: null })),
+
   http.get('*/api/v1/teams/:teamId/project-activity', () =>
     success({
       timezone: 'UTC',

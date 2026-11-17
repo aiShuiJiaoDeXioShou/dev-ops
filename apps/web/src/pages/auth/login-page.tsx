@@ -29,14 +29,14 @@ export function Component() {
   useEffect(() => {
     if (!session.data) return
     const redirect = params.get('redirect')
-    navigate(redirect && redirect.startsWith('/') ? redirect : '/projects', { replace: true })
+    navigate(redirect && redirect.startsWith('/') ? redirect : '/collaboration', { replace: true })
   }, [session.data, params, navigate])
   const mutation = useMutation({
     mutationFn: () => signInEmail(email.trim(), password),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: sessionQueryOptions.queryKey })
       const redirect = params.get('redirect')
-      navigate(redirect && redirect.startsWith('/') ? redirect : '/projects', { replace: true })
+      navigate(redirect && redirect.startsWith('/') ? redirect : '/collaboration', { replace: true })
     },
     onError: (cause: unknown) => {
       setError(cause instanceof AuthRequestError ? cause.message : '登录失败，请稍后重试。')

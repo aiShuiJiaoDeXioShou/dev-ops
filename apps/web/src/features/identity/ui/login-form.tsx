@@ -21,7 +21,7 @@ export function LoginForm() {
       // 若此时缓存仍是登录前的 null，会把刚登录的用户再次重定向到登录页。
       await queryClient.refetchQueries({ queryKey: sessionQueryOptions.queryKey, type: 'all' })
       const redirect = params.get('redirect')
-      navigate(redirect && redirect.startsWith('/') ? redirect : '/projects', { replace: true })
+      navigate(redirect && redirect.startsWith('/') ? redirect : '/collaboration', { replace: true })
     },
     onError: (cause: unknown) => setError(cause instanceof Error ? cause.message : '登录失败，请稍后重试。'),
   })
