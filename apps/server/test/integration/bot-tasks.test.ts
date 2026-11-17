@@ -75,4 +75,19 @@ test('任务保存输入版本，排队停止和中断后可以重新运行，�
   assert.equal(cancelled.data.status, 'cancelled')
   assert.equal((await post(`${taskPath}/rerun`, { version: cancelled.data.version })).code, 'BOT_TASK_STATE_CONFLICT')
   assert.equal((await get(`${roomPath}/tasks`)).data.items[0].status, 'cancelled')
+  const amendedTask = await post(`${roomPath}/tasks`, { ...taskInput, title: '新增要求的任务' })
+  assert.equal(amendedTask.code, 'OK', amendedTask.message)
+  const amendedPath = `/bot-tasks/${amendedTask.data.task.id}`
+  const old = await claimBotRun(db, 'task-test', limits)
+  assert.ok(old)
+  const oldLease = { id: old.id, epoch: old.lease_epoch, owner: 'task-test' }
+  const beforeAppend = (await get(amendedPath)).data
+  const added = await post(`${amendedPath}/append`, { version: beforeAppend.version, content: '使用新版验收范围' })
+  assert.equal(added.code, 'OK', added.message)
+  assert.equal(added.data.inputVersion, 2)
+  await db.transaction((tx) => finishBotRun(tx, oldLease, { status: 'succeeded' }))
+  const afterOldRun = (await get(amendedPath)).data
+  assert.equal(afterOldRun.inputVersion, 2)
+  assert.equal(afterOldRun.status, 'waiting')
+  assert.equal(afterOldRun.runs[0].inputVersion, 1)
 })

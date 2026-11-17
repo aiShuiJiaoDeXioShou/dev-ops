@@ -2,11 +2,12 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { testApiInvoker } from '@dev-ops/devops-bot/testing'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { catalogBotApis } from '../../src/modules/bots/bots.api-catalog.ts'
 import { botApiExclusion, type BotApiMethod } from '../../src/modules/bots/bots.api-denylist.ts'
 import { claimBotRun, renewBotRunLease } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { botApiCall } from '../../src/modules/bots/bots.tables.ts'
 import { createBotApiInvoker } from '../../src/modules/bots/runtime/api-invoker.ts'
 import { createBotDelegation } from '../../src/modules/identity/identity.bot-delegation.ts'
 import { teamMember } from '../../src/modules/identity/identity.tables.ts'
@@ -95,6 +96,26 @@ test('平台 API 委托使用团队范围与当前成员角色，写入只执行
     denied: { method: 'GET', path: '/api/v1/me/tokens' },
     countWrites: async () => (await get(`/projects/${own.data.id}/requirements`)).data.items.length,
   }))
+  const unknownWrite = { ...write, idempotencyKey: 'unknown-action' }
+  const failedTransport = t.mock.method(app, 'inject', () => {
+    throw new Error('模拟平台在写调用时失去响应')
+  })
+  try {
+    const unknown = await api.invoke(unknownWrite)
+    const retried = await api.invoke(unknownWrite)
+    assert.equal(unknown.ok, false)
+    assert.equal(retried.ok, false)
+    assert.equal(unknown.code, 'BOT_API_RESULT_UNKNOWN')
+    assert.equal(retried.code, unknown.code)
+    assert.equal(failedTransport.mock.callCount(), 1)
+  } finally {
+    failedTransport.mock.restore()
+  }
+  const [unknownRecord] = await db
+    .select({ status: botApiCall.status, code: botApiCall.result_code })
+    .from(botApiCall)
+    .where(and(eq(botApiCall.run_id, run.id), eq(botApiCall.idempotency_key, unknownWrite.idempotencyKey)))
+  assert.deepEqual(unknownRecord, { status: 'unknown', code: 'BOT_API_RESULT_UNKNOWN' })
   await delegation.withToken(
     {
       user: { id: devUser.userId, email: 'fixture@example.test', name: '开发者' },

@@ -11,6 +11,7 @@ import type { Database } from '../../../platform/database/client.ts'
 import type { AppConfig } from '../../../platform/config/env.ts'
 import type { SecretCipher } from '../../configuration/configuration.crypto.ts'
 import { finishBotRun, renewBotRunLease, type BotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
+import type { BotCallLog } from './api-invoker.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
 import { createPgMemoryStore } from './memory-store.ts'
@@ -28,6 +29,7 @@ type RuntimeOptions = {
   cipher: SecretCipher | null
   execute: BotRunner
   onFailure: (run: BotRunRecord) => void
+  logCall?: (event: BotCallLog) => void
   platformApi?: (
     lease: BotRunLease,
     run: BotRunRecord,
@@ -119,6 +121,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
             credentials,
             fetchPublicPage: fetchBotPublicPage,
           }),
+          options.logCall,
         ),
         ...(run.task_id ? [createTaskResultTool(db, lease)] : []),
         ...(api ? openApiTools(api.catalog, api.invoker) : []),

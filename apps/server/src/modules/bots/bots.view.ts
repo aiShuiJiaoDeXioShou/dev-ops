@@ -20,9 +20,9 @@ export type BotViewRecord = {
 export function botAvailability(row: BotViewRecord): BotView['availability'] {
   if (row.record.status === 'disabled') return 'disabled'
   if (!row.record.model_connection_id || !row.record.model_id) return 'model_unbound'
-  if (row.connectionStatus !== 'active') return 'model_unavailable'
+  if (row.connectionStatus !== 'active' || !row.hasModel) return 'model_unavailable'
   if (!row.workerOnline) return 'worker_offline'
-  return row.hasModel ? 'available' : 'model_unavailable'
+  return 'available'
 }
 
 /**

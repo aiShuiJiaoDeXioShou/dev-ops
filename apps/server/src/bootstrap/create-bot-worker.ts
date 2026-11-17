@@ -11,7 +11,7 @@ import {
 } from '../modules/bots/bots.catalog.ts'
 import { runPendingBotLogin, type BotProviderLogin } from '../modules/bots/runtime/login-runner.ts'
 import { catalogBotApis } from '../modules/bots/bots.api-catalog.ts'
-import { createBotApiInvoker } from '../modules/bots/runtime/api-invoker.ts'
+import { createBotApiInvoker, type BotCallLog } from '../modules/bots/runtime/api-invoker.ts'
 import { createBotDelegation } from '../modules/identity/identity.bot-delegation.ts'
 import { createHttpApp } from './create-http-app.ts'
 
@@ -38,6 +38,7 @@ export function createBotWorker(
   const delegation = createBotDelegation()
   const apiApp = createHttpApp({ ...config, DOCS_ENABLED: true }, { botDelegation: delegation })
   let catalog: ReturnType<typeof catalogBotApis> = []
+  const logCall = (event: BotCallLog) => log('info', 'Bot 工具调用已记录', event)
   const platformApi = (lease: BotRunLease, run: BotRunRecord) => ({
     catalog,
     invoker: createBotApiInvoker({
@@ -49,6 +50,7 @@ export function createBotWorker(
       teamId: run.team_id,
       conversationId: run.conversation_id,
       botId: run.bot_id,
+      logCall,
     }),
   })
   const owner = randomUUID()
@@ -78,8 +80,14 @@ export function createBotWorker(
     while (!shutdown.signal.aborted && active.size < limits.global) {
       const run = await claimBotRun(db, owner, limits)
       if (!run) return
+      log('info', 'Bot 运行已领取', {
+        runId: run.id,
+        teamId: run.team_id,
+        botId: run.bot_id,
+        conversationId: run.conversation_id,
+      })
       const running = executeClaimedBotRun(
-        { config, db, cipher, execute, onFailure, platformApi },
+        { config, db, cipher, execute, onFailure, platformApi, logCall },
         run,
         shutdown.signal,
       )

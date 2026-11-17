@@ -14,6 +14,7 @@ import { botTask } from '../tasks/bot-tasks.tables.ts'
 import { stopRunsForBot, type BotRunTransaction } from './bots.run-queue.repository.ts'
 import type { BindBotModelInput, BotListFilters, BotView, CreateBotInput, UpdateBotInput } from './bots.schema.ts'
 import { bot, botModelCatalog, botModelConnection, botRun, botSkill } from './bots.tables.ts'
+import { redactChatContent } from './runtime/content.ts'
 import { botAvailability, toBotRunSummary, toBotView, type BotViewRecord } from './bots.view.ts'
 
 const PAGE_SIZE = 30
@@ -23,14 +24,25 @@ const WORKER_ONLINE_WINDOW_SECONDS = 90
 type BotRead = Pick<Database, 'select'>
 type BotRow = typeof bot.$inferSelect
 
+/**
+ * 构造执行进程可用性投影，目录心跳是 Bot 列表与队列共用的判断依据。
+ * @returns 检查是否有近期执行进程心跳的 SQL 表达式。
+ */
+export function botWorkerOnline() {
+  return sql<boolean>`exists (
+    select 1 from ${botModelCatalog}
+    where ${botModelCatalog.reported_at} > clock_timestamp() - ${WORKER_ONLINE_WINDOW_SECONDS} * interval '1 second'
+  )`
+}
+
 function errorsForNameConflict(error: unknown): never {
   if (isUniqueViolation(error)) throw new ApiError(ERROR_CODES.DUPLICATE_RELATION, '团队中已有同名 Bot')
   throw error
 }
 
 function nameAndResponsibility(input: Pick<CreateBotInput, 'name' | 'responsibility'>) {
-  const name = input.name.trim()
-  const responsibility = input.responsibility.trim()
+  const name = redactChatContent(input.name.trim())
+  const responsibility = redactChatContent(input.responsibility.trim())
   if (!name || !responsibility) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '请填写名称与职责')
   return { name, responsibility }
 }
@@ -91,10 +103,7 @@ function botReadQuery(db: BotRead, visibleTo?: string) {
           )`.mapWith(botRun.updated_at)
         : sql<null>`null`,
 
-      workerOnline: sql<boolean>`exists (
-      select 1 from ${botModelCatalog}
-      where ${botModelCatalog.reported_at} > clock_timestamp() - ${WORKER_ONLINE_WINDOW_SECONDS} * interval '1 second'
-    )`,
+      workerOnline: botWorkerOnline(),
     })
     .from(bot)
     .leftJoin(authUser, eq(authUser.id, bot.owner_user_id))
@@ -163,10 +172,16 @@ function throwMissingBot(): never {
  * @param tx 将创建会话消息或任务的事务。
  * @param teamId 该会话的所属团队。
  * @param botId 候选执行者。
+ * @param options 入队时允许有有效模型但执行进程暂时离线；分配执行者时仍要求在线。
  * @returns 团队范围内的 Bot 记录。
  * @throws Bot 不存在或不可运行时返回业务错误，并附可用性原因。
  */
-export async function requireRunnableBot(tx: BotRunTransaction, teamId: string, botId: string) {
+export async function requireRunnableBot(
+  tx: BotRunTransaction,
+  teamId: string,
+  botId: string,
+  options?: { allowOffline?: boolean },
+) {
   const [locked] = await tx
     .select({ id: bot.id })
     .from(bot)
@@ -176,7 +191,9 @@ export async function requireRunnableBot(tx: BotRunTransaction, teamId: string, 
   const [row] = await botReadQuery(tx).where(and(eq(bot.id, botId), eq(bot.team_id, teamId)))
   if (!row) throwMissingBot()
   const reason = botAvailability(row)
-  if (reason !== 'available') throw new ApiError(ERROR_CODES.BOT_UNAVAILABLE, '当前 Bot 无法开始运行', { reason })
+  if (reason !== 'available' && !(options?.allowOffline && reason === 'worker_offline')) {
+    throw new ApiError(ERROR_CODES.BOT_UNAVAILABLE, '当前 Bot 无法开始运行', { reason })
+  }
   return row.record
 }
 
@@ -328,7 +345,7 @@ export function createBotsService(db: Database) {
               owner_user_id: input.ownerUserId,
               created_by: actor.id,
               avatar_key: input.avatarKey ?? null,
-              instructions: input.instructions?.trim() ?? '',
+              instructions: redactChatContent(input.instructions?.trim() ?? ''),
             })
             .returning()
           if (!row) throw new Error('未能创建 Bot')
@@ -354,7 +371,9 @@ export function createBotsService(db: Database) {
             ...fields,
             owner_user_id: input.ownerUserId,
             avatar_key: input.avatarKey === undefined ? previous.avatar_key : input.avatarKey,
-            instructions: input.instructions === undefined ? previous.instructions : input.instructions.trim(),
+            instructions: redactChatContent(
+              input.instructions === undefined ? previous.instructions : input.instructions.trim(),
+            ),
           }
         },
         async (tx, row) => {
@@ -420,7 +439,7 @@ export function createBotsService(db: Database) {
                 and(
                   eq(botTask.team_id, row.team_id),
                   eq(botTask.executor_bot_id, row.id),
-                  inArray(botTask.status, ['pending', 'in_progress', 'waiting']),
+                  inArray(botTask.status, ['pending', 'in_progress', 'waiting', 'awaiting_review']),
                 ),
               )
           }

@@ -90,7 +90,7 @@ async function stopRemovedMemberRuns(
         eq(botTask.team_id, row.team_id),
         eq(botTask.conversation_id, row.id),
         eq(botTask.executor_bot_id, input.memberId),
-        inArray(botTask.status, ['pending', 'in_progress', 'waiting']),
+        inArray(botTask.status, ['pending', 'in_progress', 'waiting', 'awaiting_review']),
       ),
     )
 }

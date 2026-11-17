@@ -50,7 +50,7 @@ async function taskInWritableConversation(tx: BotRunTransaction, actor: SessionU
 
 async function activeTaskRuns(tx: BotRunTransaction, row: TaskRow) {
   return tx
-    .select({ id: botRun.id })
+    .select({ id: botRun.id, status: botRun.status })
     .from(botRun)
     .where(
       and(eq(botRun.team_id, row.team_id), eq(botRun.task_id, row.id), inArray(botRun.status, ['queued', 'running'])),
@@ -74,7 +74,7 @@ async function enqueueTask(tx: BotRunTransaction, row: TaskRow, actor: SessionUs
 
 async function canExecute(tx: BotRunTransaction, teamId: string, botId: string) {
   try {
-    await requireRunnableBot(tx, teamId, botId)
+    await requireRunnableBot(tx, teamId, botId, { allowOffline: true })
     return true
   } catch (error) {
     if (error instanceof ApiError && error.code === ERROR_CODES.BOT_UNAVAILABLE) return false
@@ -292,12 +292,22 @@ export function createBotTasksService(db: Database) {
       return db.transaction(async (tx) => {
         const { row } = await taskInWritableConversation(tx, actor, taskId)
         compareVersion(row, input.version)
-        if (row.status !== 'waiting') stateConflict('只可向等待中的任务补充要求')
-        if ((await activeTaskRuns(tx, row)).length) stateConflict('任务已有排队或执行中的运行')
+        if (!['pending', 'in_progress', 'waiting'].includes(row.status)) stateConflict('任务当前阶段不可补充要求')
+        const runs = await activeTaskRuns(tx, row)
+        for (const run of runs) {
+          if (run.status === 'queued') await requestBotRunStop(tx, run.id, actor.id, false)
+        }
+        // 领取中的运行保持原版本并继续留下轨迹，最终结果不能覆盖刚保存的新要求。
         const [updated] = await tx
           .update(botTask)
-          .set({ input_version: row.input_version + 1, version: row.version + 1, updated_at: sql`clock_timestamp()` })
-          .where(and(eq(botTask.id, row.id), eq(botTask.version, row.version), eq(botTask.status, 'waiting')))
+          .set({
+            status: 'waiting',
+            wait_reason: row.wait_reason ?? 'needs_input',
+            input_version: row.input_version + 1,
+            version: row.version + 1,
+            updated_at: sql`clock_timestamp()`,
+          })
+          .where(and(eq(botTask.id, row.id), eq(botTask.version, row.version), eq(botTask.status, row.status)))
           .returning()
         if (!updated) stateConflict('任务状态已变化，请刷新后重试')
         await tx.insert(botTaskInput).values({
@@ -391,7 +401,7 @@ export function createBotTasksService(db: Database) {
             ),
           )
         if (!executor) stateConflict('执行者已离开会话，请先转交任务')
-        await requireRunnableBot(tx, row.team_id, row.executor_bot_id)
+        await requireRunnableBot(tx, row.team_id, row.executor_bot_id, { allowOffline: true })
         const [updated] = await tx
           .update(botTask)
           .set({

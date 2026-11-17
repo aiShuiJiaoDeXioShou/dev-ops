@@ -1,4 +1,3 @@
-import { getCurrentBotActor } from '../identity/identity.bot-delegation.ts'
 import { randomUUID } from 'node:crypto'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
@@ -170,7 +169,6 @@ export async function appendActivity(
   const action = requireNonEmpty(input.action, '动作', 48)
   const reason = input.reason === undefined ? undefined : requireNonEmpty(input.reason, '原因', 2000)
   const note = input.note === undefined ? undefined : requireNonEmpty(input.note, '说明', 2000)
-  const bot = getCurrentBotActor()
   const row = await insertActivity(executor, {
     id: randomUUID(),
     teamId: input.teamId,
@@ -179,7 +177,6 @@ export async function appendActivity(
     entityId: input.entityId,
     action,
     actorUserId: input.actorUserId,
-    viaBotId: bot?.teamId === input.teamId && bot.user.id === input.actorUserId ? bot.viaBotId : undefined,
     changes: input.changes,
     reason,
     note,

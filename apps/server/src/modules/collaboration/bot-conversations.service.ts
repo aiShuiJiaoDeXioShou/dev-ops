@@ -1,11 +1,11 @@
-import { and, asc, desc, eq, exists, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Check } from 'typebox/value'
 import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { enqueueBotRun, type BotRunTransaction } from '../bots/bots.run-queue.repository.ts'
-import { requireRunnableBot, runnableBotIds } from '../bots/bots.service.ts'
+import { botWorkerOnline, requireRunnableBot, runnableBotIds } from '../bots/bots.service.ts'
 import { readBotSkillCandidates } from '../bots/bots.skills.ts'
 import { bot, botRun } from '../bots/bots.tables.ts'
 import { redactChatContent } from '../bots/runtime/content.ts'
@@ -391,7 +391,7 @@ export function createBotConversationsService(db: Database) {
           throw new ApiError(ERROR_CODES.BOT_NOT_FOUND, '引用的智能体不是当前会话成员')
         }
         try {
-          await requireRunnableBot(tx, conversation.team_id, targetId)
+          await requireRunnableBot(tx, conversation.team_id, targetId, { allowOffline: !input.skillIds?.length })
         } catch (error) {
           if (
             !explicit &&
@@ -469,8 +469,27 @@ export function createBotConversationsService(db: Database) {
         .where(and(eventScope, cursor !== undefined && !resetRequired ? gt(botEvent.sequence, cursor) : undefined))
         .orderBy(asc(botEvent.sequence))
         .limit(EVENT_PAGE_SIZE)
+      const queued = alias(botRun, 'queued_run')
+      const previousQueued = db
+        .select({ amount: count() })
+        .from(queued)
+        .where(
+          and(
+            eq(queued.team_id, botRun.team_id),
+            eq(queued.status, 'queued'),
+            sql`(${queued.created_at}, ${queued.id}) <= (${botRun.created_at}, ${botRun.id})`,
+          ),
+        )
       const active = await db
-        .select({ id: botRun.id, botId: botRun.bot_id, status: botRun.status })
+        .select({
+          id: botRun.id,
+          botId: botRun.bot_id,
+          status: botRun.status,
+          workerOnline: botWorkerOnline(),
+          teamQueuePosition: sql<
+            number | null
+          >`case when ${botRun.status} = 'queued' then (${previousQueued}) end`.mapWith(Number),
+        })
         .from(botRun)
         .where(
           and(
@@ -481,8 +500,12 @@ export function createBotConversationsService(db: Database) {
         )
         .orderBy(asc(botRun.created_at), asc(botRun.id))
         .limit(200)
-      const activeRuns = active.flatMap<ConversationActiveRun>((row) =>
-        row.status === 'queued' || row.status === 'running' ? [{ ...row, status: row.status }] : [],
+      const activeRuns = active.flatMap<ConversationActiveRun>(
+        ({ id, botId, status, teamQueuePosition, workerOnline }) => {
+          if (status === 'running') return [{ id, botId, status }]
+          if (status !== 'queued' || teamQueuePosition === null) return []
+          return [{ id, botId, status, teamQueuePosition, ...(workerOnline ? {} : { queueReason: 'worker_offline' }) }]
+        },
       )
       return {
         items: rows.map(toEvent),

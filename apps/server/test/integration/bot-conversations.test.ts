@@ -5,6 +5,7 @@ import { and, eq, lte } from 'drizzle-orm'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { publishBotModelCatalog } from '../../src/modules/bots/bots.catalog.ts'
 import { claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { botModelCatalog } from '../../src/modules/bots/bots.tables.ts'
 import { createPgRunSink } from '../../src/modules/bots/runtime/run-sink.ts'
 import { botEvent } from '../../src/modules/collaboration/bot-conversations.tables.ts'
 import { platformAdmin, teamMember } from '../../src/modules/identity/identity.tables.ts'
@@ -121,6 +122,19 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   const stale = await get(`${eventsPath}?after=1`, devUser)
   assert.equal(stale.data.resetRequired, true)
   assert.equal((await get(`${eventsPath}?after=9999999999999999999`, devUser)).code, 'VALIDATION_ERROR')
+
+  await db
+    .update(botModelCatalog)
+    .set({ reported_at: new Date(0) })
+    .where(eq(botModelCatalog.provider_id, 'fixture'))
+  const whileOffline = await post(messagePath, devUser, { text: '离线时仍可发送', clientRequestId: randomUUID() })
+  assert.equal(whileOffline.code, 'OK', whileOffline.message)
+  const queued = (await get(eventsPath, devUser)).data.activeRuns
+  assert.deepEqual(queued, [
+    { id: first.data.runId, botId, status: 'running' },
+    { id: second.data.runId, botId, status: 'queued', teamQueuePosition: 1, queueReason: 'worker_offline' },
+    { id: whileOffline.data.runId, botId, status: 'queued', teamQueuePosition: 2, queueReason: 'worker_offline' },
+  ])
 
   await db.update(teamMember).set({ role: 'viewer' }).where(eq(teamMember.user_id, devUser.userId))
   assert.equal((await get(messagePath, devUser)).code, 'OK')

@@ -48,6 +48,8 @@ const activeRun = Type.Object({
   id: uuid,
   botId: uuid,
   status: Type.Union([Type.Literal('queued'), Type.Literal('running')]),
+  teamQueuePosition: Type.Optional(Type.Integer({ minimum: 1 })),
+  queueReason: Type.Optional(Type.Literal('worker_offline')),
 })
 
 export const conversationParams = Type.Object({ conversationId: uuid })

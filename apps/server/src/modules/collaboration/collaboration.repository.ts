@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
+import { getCurrentBotActor } from '../identity/identity.bot-delegation.ts'
 import { activity, comment } from './collaboration.tables.ts'
 
 /** 数据所有者可传入根连接或同一事务连接。 */
@@ -82,6 +83,9 @@ export async function insertComment(executor: DatabaseExecutor, input: NewCommen
  * @returns 新活动行。
  */
 export async function insertActivity(executor: DatabaseExecutor, input: NewActivity) {
+  const actor = getCurrentBotActor()
+  const delegatedBot =
+    actor?.teamId === input.teamId && actor.user.id === input.actorUserId ? actor.viaBotId : undefined
   const [row] = await executor
     .insert(activity)
     .values({
@@ -92,7 +96,7 @@ export async function insertActivity(executor: DatabaseExecutor, input: NewActiv
       entity_id: input.entityId,
       action: input.action,
       actor_user_id: input.actorUserId,
-      via_bot_id: input.viaBotId ?? null,
+      via_bot_id: input.viaBotId ?? delegatedBot ?? null,
       changes: input.changes ?? null,
       reason: input.reason ?? null,
       note: input.note ?? null,

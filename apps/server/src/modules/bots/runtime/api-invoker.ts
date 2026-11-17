@@ -25,6 +25,17 @@ const API_PREFIX = '/api/v1/'
 const RESULT_UNKNOWN = 'BOT_API_RESULT_UNKNOWN'
 const DENIED = 'BOT_API_FORBIDDEN'
 
+export type BotCallLog = {
+  runId: string
+  teamId: string
+  conversationId: string
+  botId: string
+  callId: string
+  kind: 'platform_api' | 'web_fetch' | 'web_search'
+  status: 'succeeded' | 'rejected' | 'failed' | 'unknown'
+  code: string
+}
+
 type InvokerOptions = {
   db: Database
   app: Pick<FastifyInstance, 'inject'>
@@ -34,6 +45,7 @@ type InvokerOptions = {
   teamId: string
   conversationId: string
   botId: string
+  logCall?: (event: BotCallLog) => void
 }
 
 function isObject(input: unknown): input is Record<string, unknown> {
@@ -232,6 +244,14 @@ export function createBotApiInvoker(options: InvokerOptions): ApiInvoker {
               },
             },
           ])
+        })
+        options.logCall?.({
+          ...scope,
+          botId: options.botId,
+          callId: savedCallId,
+          kind: 'platform_api',
+          status,
+          code: result.code,
         })
         return result
       }
