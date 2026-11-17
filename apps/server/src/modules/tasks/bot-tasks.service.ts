@@ -8,6 +8,7 @@ import { botApiCall, botRun } from '../bots/bots.tables.ts'
 import { redactChatContent } from '../bots/runtime/content.ts'
 import { lockWritableBotConversation, requireBotConversation } from '../collaboration/bot-conversations.service.ts'
 import { botConversationMember, botEvent } from '../collaboration/bot-conversations.tables.ts'
+import { readTargetWorkTags } from '../collaboration/work-tags.repository.ts'
 import type { SessionUser } from '../identity/identity.session.ts'
 import { teamMember } from '../identity/identity.tables.ts'
 import { readBotInbox } from './bot-inbox.read.ts'
@@ -234,7 +235,7 @@ export function createBotTasksService(db: Database) {
       const row = await taskRowFor(db, taskId)
       const room = await requireBotConversation(db, actor, row.conversation_id)
       if (room.team_id !== row.team_id) taskMissing()
-      const [inputs, runs, handoffs] = await Promise.all([
+      const [inputs, runs, handoffs, tags] = await Promise.all([
         db
           .select()
           .from(botTaskInput)
@@ -253,6 +254,7 @@ export function createBotTasksService(db: Database) {
           .where(and(eq(botTaskHandoff.team_id, row.team_id), eq(botTaskHandoff.task_id, row.id)))
           .orderBy(desc(botTaskHandoff.created_at), desc(botTaskHandoff.id))
           .limit(50),
+        readTargetWorkTags(db, row.team_id, { targetKind: 'task', targetId: row.id }),
       ])
       return {
         ...botTaskView(row),
@@ -264,6 +266,7 @@ export function createBotTasksService(db: Database) {
           createdAt: created_at.toISOString(),
         })),
         runs: runs.map(taskRunView),
+        tags,
         handoffs: handoffs.map((item) => ({
           id: item.id,
           fromBotId: item.from_bot_id,

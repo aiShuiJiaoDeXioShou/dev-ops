@@ -1,5 +1,6 @@
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
+import { workTagViewSchema } from '../collaboration/work-tags.schema.ts'
 import { taskResultSchema, taskReviewSchema } from './bot-tasks.review.schema.ts'
 
 const id = Type.String({ pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' })
@@ -117,6 +118,7 @@ export const taskDetailResponse = apiResponseSchema(
     runs: Type.Array(run),
     trace: Type.Array(trace),
     results: Type.Array(taskResultSchema),
+    tags: Type.Array(workTagViewSchema),
     reviews: Type.Array(taskReviewSchema),
     handoffs: Type.Array(
       Type.Object({

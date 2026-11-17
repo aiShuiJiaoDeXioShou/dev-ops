@@ -15,7 +15,8 @@ import type { BotRunLease } from '../bots.run-queue.repository.ts'
 export function createTaskResultTool(db: Database, lease: BotRunLease): BotTool {
   return {
     name: 'submit_task_result',
-    description: '工作完成后提交任务正文、完成说明与证据供成员验收。只提交一次，禁止在结果中放入凭据。',
+    description:
+      '工作完成后提交任务正文、完成说明与证据供成员验收。只提交一次，可附 1 至 12 个简短工作标签。禁止在结果中放入凭据。',
     parameters: submitTaskResultInput,
     /** 检查模型参数并在当前租约内提交结果。 */
     async execute(input, signal) {

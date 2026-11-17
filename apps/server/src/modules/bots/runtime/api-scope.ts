@@ -4,7 +4,7 @@ import type { Database } from '../../../platform/database/client.ts'
 import { attachment } from '../../attachments/attachments.tables.ts'
 import { bug } from '../../bugs/bugs.tables.ts'
 import { codeReference } from '../../code/code.tables.ts'
-import { botConversation } from '../../collaboration/bot-conversations.tables.ts'
+import { botConversation, workTag } from '../../collaboration/bot-conversations.tables.ts'
 import { buildRecord, externalReview } from '../../delivery/delivery.tables.ts'
 import { gitConnection } from '../../integrations/integrations.tables.ts'
 import { skill } from '../../knowledge/knowledge.tables.ts'
@@ -33,6 +33,7 @@ const TEAM_OWNED_RESOURCES: Readonly<Record<string, PgTable & { id: PgColumn; te
   reviews: externalReview,
   skills: skill,
   'tools/code-changes': codeChange,
+  'work-tags': workTag,
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu
 

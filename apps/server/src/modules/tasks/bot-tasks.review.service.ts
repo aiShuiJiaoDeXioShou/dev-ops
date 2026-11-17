@@ -4,6 +4,7 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { enqueueBotRun, lockBotRunLease, type BotRunLease } from '../bots/bots.run-queue.repository.ts'
 import { hasChatCredential, redactChatContent } from '../bots/runtime/content.ts'
+import { linkBotResultTags } from '../collaboration/work-tags.repository.ts'
 import { lockWritableBotConversation } from '../collaboration/bot-conversations.service.ts'
 import type { SessionUser } from '../identity/identity.session.ts'
 import type { SubmitTaskResultInput, TaskResultView, TaskReviewView } from './bot-tasks.review.schema.ts'
@@ -110,10 +111,14 @@ export async function submitBotTaskResult(db: Database, lease: BotRunLease, inpu
       })
       .returning()
     if (!saved) throw new Error('未能保存 Bot 任务结果')
+    if (!task.tagged_at) {
+      await linkBotResultTags(tx, { teamId: task.team_id, taskId: task.id, botId: run.bot_id, tags: input.tags ?? [] })
+    }
     const [updated] = await tx
       .update(botTask)
       .set({
         status: 'awaiting_review',
+        tagged_at: task.tagged_at ?? sql`clock_timestamp()`,
         wait_reason: null,
         blocked: false,
         version: task.version + 1,

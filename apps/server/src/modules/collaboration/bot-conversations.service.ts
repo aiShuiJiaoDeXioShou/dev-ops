@@ -28,6 +28,7 @@ import type {
   SendBotMessageInput,
 } from './bot-conversations.schema.ts'
 import { botMessageBodySchema } from './bot-message-body.ts'
+import { readTargetWorkTags } from './work-tags.repository.ts'
 
 const EDIT_ROLES: TeamRole[] = ['admin', 'developer']
 const LIST_PAGE_SIZE = 30
@@ -138,7 +139,11 @@ async function readMembers(db: ReadDb, conversation: ConversationRow): Promise<C
  * @returns 当前成员与会话配置。
  */
 export async function readBotConversationView(db: ReadDb, row: ConversationRow) {
-  return { ...viewOf(row), members: await readMembers(db, row) }
+  const [members, tags] = await Promise.all([
+    readMembers(db, row),
+    readTargetWorkTags(db, row.team_id, { targetKind: 'conversation', targetId: row.id }),
+  ])
+  return { ...viewOf(row), members, tags }
 }
 
 function mentionedBotNames(text: string, members: ConversationMemberView[]): string[] {

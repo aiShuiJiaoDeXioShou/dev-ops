@@ -8,6 +8,7 @@ export const submitTaskResultInput = Type.Object(
     body: Type.String({ minLength: 1, maxLength: 24000 }),
     completionNote: Type.String({ minLength: 1, maxLength: 4000 }),
     evidence: Type.Array(Type.String({ minLength: 1, maxLength: 2000 }), { maxItems: 20 }),
+    tags: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 40 }), { maxItems: 12 })),
   },
   { additionalProperties: false },
 )

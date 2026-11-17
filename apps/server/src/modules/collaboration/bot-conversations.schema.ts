@@ -1,6 +1,7 @@
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 import { botMessageBodySchema } from './bot-message-body.ts'
+import { workTagViewSchema } from './work-tags.schema.ts'
 
 const uuid = Type.String({ pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' })
 const kind = Type.Union([Type.Literal('direct'), Type.Literal('group')])
@@ -88,7 +89,7 @@ export const conversationListResponse = apiResponseSchema(
   }),
 )
 export const conversationResponse = apiResponseSchema(
-  Type.Object({ ...conversation.properties, members: Type.Array(member) }),
+  Type.Object({ ...conversation.properties, members: Type.Array(member), tags: Type.Array(workTagViewSchema) }),
 )
 export const conversationMessagesResponse = apiResponseSchema(
   Type.Object({
