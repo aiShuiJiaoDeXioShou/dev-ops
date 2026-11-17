@@ -9,7 +9,7 @@ const memory = Type.Object({
   botId: id,
   botName: Type.String(),
   scope,
-  content,
+  content: Type.String(),
   essential: Type.Boolean(),
   sourceUserName: Type.Union([Type.String(), Type.Null()]),
   sourceConversationId: Type.Union([id, Type.Null()]),
