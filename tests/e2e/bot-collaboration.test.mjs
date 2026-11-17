@@ -90,15 +90,10 @@ async function verifyBotCollaboration(t, live) {
       name: '协作验收助理',
       ownerUserId: user.id,
       responsibility: '按成员明确要求核对团队项目与交付',
+      modelBinding: { connectionId: connection.id, modelId: live ? 'deepseek-flash' : 'test-chat' },
     }),
   )
-  checked(
-    await post(`/api/v1/bots/${bot.id}/bind-model`, {
-      configVersion: bot.configVersion,
-      connectionId: connection.id,
-      modelId: live ? 'deepseek-flash' : 'test-chat',
-    }),
-  )
+  assert.equal(bot.modelConnectionId, connection.id)
   const room = checked(await post(`${team}/bot-conversations`, { kind: 'direct', botId: bot.id }))
   const roomPath = `/api/v1/bot-conversations/${room.id}`
   const sendStarted = performance.now()

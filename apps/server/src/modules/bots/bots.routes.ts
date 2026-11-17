@@ -41,6 +41,7 @@ export const botsRoutes: FastifyPluginAsyncTypebox<{ service: BotsService }> = a
     {
       schema: {
         summary: '创建团队 Bot',
+        description: '管理员可以在创建时通过 modelBinding 同时绑定团队模型连接和模型。',
         params: botTeamParams,
         body: createBotBody,
         response: { 200: botResponse },

@@ -86,6 +86,33 @@ test('Bot 配置满足团队和角色约束，停用阻止新运行并收口现�
     auth_types: ['api_key'],
     reported_at: new Date(),
   })
+  const initialBinding = { connectionId: connection.id, modelId: 'fixture-chat' }
+  const createWithModel = { ...input, name: '带模型的助理', ownerUserId: adminUser.userId }
+  assert.equal((await post(list, devUser, { ...createWithModel, modelBinding: initialBinding })).code, 'FORBIDDEN')
+  assert.equal(
+    (await post(list, adminUser, { ...createWithModel, modelBinding: { connectionId: connection.id } })).code,
+    'VALIDATION_ERROR',
+  )
+  assert.equal(
+    (
+      await post(list, adminUser, {
+        ...createWithModel,
+        modelBinding: { ...initialBinding, connectionId: randomUUID() },
+      })
+    ).code,
+    'BOT_MODEL_CONNECTION_UNAVAILABLE',
+  )
+  assert.equal(
+    (await post(list, adminUser, { ...createWithModel, modelBinding: { ...initialBinding, modelId: 'missing' } })).code,
+    'BOT_MODEL_NOT_IN_CATALOG',
+  )
+  const initiallyBound = await post(list, adminUser, { ...createWithModel, modelBinding: initialBinding })
+  assert.equal(initiallyBound.code, 'OK', initiallyBound.message)
+  assert.equal(initiallyBound.data.modelConnectionId, connection.id)
+  assert.equal(initiallyBound.data.modelId, initialBinding.modelId)
+  assert.equal(initiallyBound.data.availability, 'available')
+  assert.equal(initiallyBound.data.configVersion, 1)
+
   const binding = { configVersion: 2, connectionId: connection.id, modelId: 'fixture-chat' }
   assert.equal((await post(`${detail}/bind-model`, devUser, binding)).code, 'FORBIDDEN')
   const bound = await post(`${detail}/bind-model`, adminUser, binding)

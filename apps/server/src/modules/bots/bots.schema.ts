@@ -10,6 +10,10 @@ const instructions = Type.String({ maxLength: 16_000 })
 const skillIds = Type.Array(uuid, { maxItems: 50, uniqueItems: true })
 const dateTime = Type.String()
 const nullableId = Type.Union([uuid, Type.Null()])
+const modelBinding = Type.Object(
+  { connectionId: uuid, modelId: Type.String({ minLength: 1, maxLength: 200 }) },
+  { additionalProperties: false },
+)
 
 export const botTeamParams = Type.Object({ teamId: uuid })
 export const botParams = Type.Object({ botId: uuid })
@@ -31,6 +35,7 @@ export const createBotBody = Type.Object(
     avatarKey: Type.Optional(Type.String({ minLength: 1, maxLength: 240 })),
     instructions: Type.Optional(instructions),
     skillIds: Type.Optional(skillIds),
+    modelBinding: Type.Optional(modelBinding),
   },
   { additionalProperties: false },
 )
@@ -52,8 +57,7 @@ export const botVersionBody = Type.Object({ configVersion: version }, { addition
 export const bindBotModelBody = Type.Object(
   {
     configVersion: version,
-    connectionId: uuid,
-    modelId: Type.String({ minLength: 1, maxLength: 200 }),
+    ...modelBinding.properties,
   },
   { additionalProperties: false },
 )

@@ -56,6 +56,38 @@ async function requireOwner(tx: BotRunTransaction, teamId: string, userId: strin
   if (!owner) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '负责人必须是团队中的有效成员')
 }
 
+async function requireModelBinding(
+  tx: BotRunTransaction,
+  teamId: string,
+  input: Pick<BindBotModelInput, 'connectionId' | 'modelId'>,
+) {
+  const [connection] = await tx
+    .select({
+      id: botModelConnection.id,
+      status: botModelConnection.status,
+      providerId: botModelConnection.provider_id,
+      authType: botModelConnection.auth_type,
+    })
+    .from(botModelConnection)
+    .where(and(eq(botModelConnection.id, input.connectionId), eq(botModelConnection.team_id, teamId)))
+    .for('update')
+  if (!connection || connection.status !== 'active') {
+    throw new ApiError(ERROR_CODES.BOT_MODEL_CONNECTION_UNAVAILABLE, '模型连接当前不可用')
+  }
+  const [model] = await tx
+    .select({ id: botModelCatalog.id })
+    .from(botModelCatalog)
+    .where(
+      and(
+        eq(botModelCatalog.provider_id, connection.providerId),
+        eq(botModelCatalog.model_id, input.modelId),
+        sql`${connection.authType} = any(${botModelCatalog.auth_types})`,
+      ),
+    )
+  if (!model) throw new ApiError(ERROR_CODES.BOT_MODEL_NOT_IN_CATALOG, '模型目录中没有所选模型')
+  return { model_connection_id: connection.id, model_id: input.modelId }
+}
+
 async function setBotSkills(tx: BotRunTransaction, row: BotRow, actorId: string, skillIds: string[]) {
   if (skillIds.length) {
     const validSkills = await tx
@@ -330,17 +362,26 @@ export function createBotsService(db: Database) {
     async get(actor: SessionUser, id: string) {
       return viewWithSkills(db, await requireVisible(actor, id))
     },
-    /** 在团队内创建 Bot，校验负责人、技能及名称唯一性。 */
+    /**
+     * 在团队内创建 Bot。管理员可在同一事务中绑定模型，失败时整次创建回滚。
+     * @param actor 发起创建的用户。
+     * @param teamId Bot 所属团队。
+     * @param input Bot 配置及可选的初始模型绑定。
+     * @returns 持久化后的 Bot 配置与可用性。
+     * @throws 权限不足、配置无效或团队内名称重复时返回业务错误。
+     */
     async create(actor: SessionUser, teamId: string, input: CreateBotInput) {
       const fields = nameAndResponsibility(input)
       try {
         return await db.transaction(async (tx) => {
-          await requireTeamMember(tx, actor.id, teamId, BOT_EDIT_ROLES)
+          await requireTeamMember(tx, actor.id, teamId, input.modelBinding ? ['admin'] : BOT_EDIT_ROLES)
           await requireOwner(tx, teamId, input.ownerUserId)
+          const binding = input.modelBinding && (await requireModelBinding(tx, teamId, input.modelBinding))
           const [row] = await tx
             .insert(bot)
             .values({
               ...fields,
+              ...binding,
               team_id: teamId,
               owner_user_id: input.ownerUserId,
               created_by: actor.id,
@@ -382,35 +423,21 @@ export function createBotsService(db: Database) {
         },
       )
     },
-    /** 团队管理员为 Bot 绑定可用连接和目录中的指定模型。 */
+    /**
+     * 团队管理员使用当前配置版本绑定有效连接和目录模型。
+     * @param actor 发起绑定的用户。
+     * @param id 待修改的 Bot 标识。
+     * @param input 连接、模型及当前配置版本。
+     * @returns 更新后的 Bot 配置与可用性。
+     * @throws 权限不足、配置版本冲突或连接与模型不可用时返回业务错误。
+     */
     async bind(actor: SessionUser, id: string, input: BindBotModelInput) {
       return checkedUpdate(
         actor,
         id,
         input.configVersion,
         ['admin'],
-        async (tx, previous) => {
-          const [connection] = await tx
-            .select()
-            .from(botModelConnection)
-            .where(and(eq(botModelConnection.id, input.connectionId), eq(botModelConnection.team_id, previous.team_id)))
-            .for('update')
-          if (!connection || connection.status !== 'active') {
-            throw new ApiError(ERROR_CODES.BOT_MODEL_CONNECTION_UNAVAILABLE, '模型连接当前不可用')
-          }
-          const [model] = await tx
-            .select({ id: botModelCatalog.id })
-            .from(botModelCatalog)
-            .where(
-              and(
-                eq(botModelCatalog.provider_id, connection.provider_id),
-                eq(botModelCatalog.model_id, input.modelId),
-                sql`${connection.auth_type} = any(${botModelCatalog.auth_types})`,
-              ),
-            )
-          if (!model) throw new ApiError(ERROR_CODES.BOT_MODEL_NOT_IN_CATALOG, '模型目录中没有所选模型')
-          return { model_connection_id: connection.id, model_id: input.modelId }
-        },
+        (tx, previous) => requireModelBinding(tx, previous.team_id, input),
         (tx, row) => addActivity(tx, row, actor.id, 'bot_model_bound'),
       )
     },
