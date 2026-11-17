@@ -5,14 +5,12 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import type { Database } from '../../platform/database/client.ts'
 import type { IdentityAuth } from './identity.auth.ts'
 import { platformAdmin, teamMember } from './identity.tables.ts'
+import { isBotDelegationToken } from './identity.bot-delegation.ts'
+import type { SessionUser } from './identity.types.ts'
 
 export type TeamRole = 'admin' | 'developer' | 'viewer'
 
-export interface SessionUser {
-  id: string
-  email: string
-  name: string
-}
+export type { SessionUser } from './identity.types.ts'
 
 /** 将 Fastify/Node 请求头转换为 Better Auth 需要的 Headers。 */
 export function toAuthHeaders(headers: IncomingHttpHeaders): Headers {
@@ -45,6 +43,8 @@ export async function getSessionUser(auth: IdentityAuth, headers: IncomingHttpHe
  * @throws 无有效会话时抛出 UNAUTHENTICATED。
  */
 export async function requireSessionUser(auth: IdentityAuth, headers: IncomingHttpHeaders): Promise<SessionUser> {
+  const bearer = headers.authorization?.match(/^Bearer\s+(.+)$/iu)?.[1]
+  if (bearer && isBotDelegationToken(bearer)) throw new ApiError(ERROR_CODES.FORBIDDEN, '该操作需要登录会话')
   const user = await getSessionUser(auth, headers)
   if (!user) throw new ApiError(ERROR_CODES.UNAUTHENTICATED, '请先登录')
   return user

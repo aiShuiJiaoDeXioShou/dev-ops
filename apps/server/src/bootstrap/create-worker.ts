@@ -11,6 +11,7 @@ import { reconcileChangeExecutionFromRun } from '../modules/operations/operation
 import { runProjectFileCleanup } from '../modules/projects/projects.file-cleanup.ts'
 import { createProjectDashboardSync } from '../modules/projects/projects.dashboard-sync.ts'
 import { createGitConnectionAdapterFactory } from './create-git-connection-adapter.ts'
+import { reconcileExpiredBotRuns } from '../modules/bots/bots.run-queue.repository.ts'
 
 export type { PipelineSchedulerLogger } from '../modules/pipeline/pipeline.scheduler.ts'
 
@@ -89,6 +90,9 @@ export function createWorker(
     cycleRunning = true
     try {
       await scheduler.runCycle()
+      await reconcileExpiredBotRuns(database.db).catch(() => {
+        log('error', 'Bot 运行租约收口失败', {})
+      })
       await reconcilePendingCodeChanges(database.db, (runId, error) => {
         log('warn', '代码变更结果暂未回填', {
           runId,

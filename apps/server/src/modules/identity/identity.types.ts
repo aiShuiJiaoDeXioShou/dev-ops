@@ -4,3 +4,10 @@ export interface UserSummary {
   name: string | null
   image?: string | null
 }
+
+/** 认证完成后交给业务模块的用户标识和显示信息。 */
+export interface SessionUser {
+  id: string
+  email: string
+  name: string
+}

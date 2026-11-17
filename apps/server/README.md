@@ -291,3 +291,23 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 - 团队管理员可用 `GET /api/v1/teams/:teamId/project-recycle-bin` 分页查询回收站，或向 `POST /api/v1/projects/:projectId/restore` 提交版本，按原名称和标识恢复。普通项目和子资源接口隐藏回收站项目。
 - `POST /api/v1/projects/:projectId/cleanup-files` 由团队管理员提交项目版本和本人密码，排队清理平台托管附件和流水线产物。任务结束后可恢复项目，清理过的文件不可用，数据库元数据、日志和审计记录保留。两个密码操作共用每账号五分钟十次的验证配额。
 - 部署时先执行数据库迁移，然后统一更新 API 与 Worker，最后发布 Web。Worker 重启后会接管租约过期的任务，失败任务可在回收站手动重试。
+
+## Bot 执行服务
+
+从仓库根目录运行 `pnpm --dir apps/server dev:bot-worker` 启动执行服务，编译后也可以运行 `pnpm --dir apps/server start:bot-worker`。执行服务和 HTTP 进程共享 PostgreSQL。调度 Worker 收口过期的运行租约。
+
+| 业务错误码                         | 含义                               |
+| ---------------------------------- | ---------------------------------- |
+| `BOT_NOT_FOUND`                    | Bot 不存在或不可见                 |
+| `BOT_UNAVAILABLE`                  | Bot 已停用、未绑定模型或模型不可用 |
+| `BOT_MODEL_CONNECTION_UNAVAILABLE` | 模型连接已停用或登录失败           |
+| `BOT_MODEL_NOT_IN_CATALOG`         | 所选模型不在模型目录中             |
+| `BOT_CONVERSATION_NOT_FOUND`       | 会话不存在或用户不可见             |
+| `BOT_MENTION_AMBIGUOUS`            | 会话消息同时指定多个 Bot           |
+| `BOT_NO_RECEIVER`                  | 会话没有可用的承接 Bot             |
+| `BOT_TASK_STATE_CONFLICT`          | 任务状态拒绝该操作                 |
+| `BOT_RUN_STATE_CONFLICT`           | 运行状态拒绝该操作                 |
+| `BOT_API_FORBIDDEN`                | 委托调用命中平台接口排除规则       |
+| `BOT_MEMORY_LIMIT`                 | 记忆条数或常驻长度达到上限         |
+| `BOT_MEMORY_SECRET`                | 内容包含疑似凭据                   |
+| `BOT_LOGIN_FAILED`                 | 订阅登录失败、超时或取消           |

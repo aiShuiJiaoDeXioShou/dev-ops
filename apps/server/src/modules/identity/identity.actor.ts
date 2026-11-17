@@ -5,11 +5,9 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import type { IdentityAuth } from './identity.auth.ts'
 import { getSessionUser, type SessionUser } from './identity.session.ts'
 import type { TokenService } from './identity.tokens.ts'
+import { isBotDelegationToken, type BotActor, type BotDelegation } from './identity.bot-delegation.ts'
 
-export interface Actor {
-  user: SessionUser
-  credential: 'session' | 'token'
-}
+export type Actor = { user: SessionUser; credential: 'session' | 'token' } | BotActor
 
 function bearerToken(headers: IncomingHttpHeaders): string | null {
   const value = headers.authorization
@@ -19,10 +17,11 @@ function bearerToken(headers: IncomingHttpHeaders): string | null {
 }
 
 /**
- * 解析请求身份：API Token 优先，其次现有 Cookie 会话。
+ * 解析请求身份，支持登录会话、API Token 和进程内 Bot 委托。
  * @param auth Better Auth 实例。
  * @param tokens API Token 服务。
  * @param headers 原始请求头。
+ * @param botDelegation 执行进程内部 HTTP 实例持有的凭据存储；外部 HTTP 实例省略。
  * @returns 已认证 actor；无有效凭据返回 null。
  * @remarks Authorization 存在但无效时不回退 Cookie，避免不同凭据混用。
  */
@@ -30,9 +29,11 @@ export async function resolveActor(
   auth: IdentityAuth,
   tokens: TokenService,
   headers: IncomingHttpHeaders,
+  botDelegation?: BotDelegation | null,
 ): Promise<Actor | null> {
   const token = bearerToken(headers)
   if (token !== null) {
+    if (isBotDelegationToken(token)) return botDelegation?.resolve(token, headers) ?? null
     const authenticated = await tokens.authenticate(token)
     if (!authenticated) return null
     return { user: authenticated.user, credential: 'token' }
@@ -42,13 +43,18 @@ export async function resolveActor(
 }
 
 /**
- * 要求当前请求具有有效身份（API Token 或 Cookie 会话）。
+ * 要求当前请求具有 API Token、Cookie 会话或进程内 Bot 委托身份。
  * @param request Fastify 请求，实例已装饰 db/auth/tokenService。
  * @returns 当前用户。
  * @throws 无有效凭据时抛出 UNAUTHENTICATED。
  */
 export async function requireActor(request: FastifyRequest): Promise<SessionUser> {
-  const actor = await resolveActor(request.server.auth, request.server.tokenService, request.headers)
+  const actor = await resolveActor(
+    request.server.auth,
+    request.server.tokenService,
+    request.headers,
+    request.server.botDelegation,
+  )
   if (!actor) throw new ApiErrorClass(ERROR_CODES.UNAUTHENTICATED, '请先登录或提供有效 API Token')
   return actor.user
 }
@@ -58,11 +64,12 @@ export async function requireActor(request: FastifyRequest): Promise<SessionUser
  * @param request Fastify 请求。
  * @param action 需要登录会话的操作名称，省略时用于管理 API Token。
  * @returns 当前登录用户。
- * @throws 使用 API Token 时抛出 FORBIDDEN；无会话时抛出 UNAUTHENTICATED。
+ * @throws 使用 API Token 或内部委托时抛出 FORBIDDEN；无会话时抛出 UNAUTHENTICATED。
  */
 export async function requireSessionActor(request: FastifyRequest, action?: string): Promise<SessionUser> {
   const token = bearerToken(request.headers)
   if (token !== null) {
+    if (isBotDelegationToken(token)) throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, '该操作需要登录会话')
     throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, action ? `请使用登录会话${action}` : 'API Token 不能管理 API Token')
   }
   const user = await getSessionUser(request.server.auth, request.headers)

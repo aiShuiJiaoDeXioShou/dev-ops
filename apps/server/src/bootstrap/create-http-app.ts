@@ -33,6 +33,7 @@ import { gitHubAccountRoutes } from '../modules/integrations/integrations.github
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
 import { resolveActor } from '../modules/identity/identity.actor.ts'
+import type { BotDelegation } from '../modules/identity/identity.bot-delegation.ts'
 import type { PipelineCredentialProvider } from '../modules/pipeline/pipeline.credentials.ts'
 
 declare module 'fastify' {
@@ -40,6 +41,7 @@ declare module 'fastify' {
     db: Database
     auth: IdentityAuth
     tokenService: import('../modules/identity/identity.tokens.ts').TokenService
+    botDelegation: BotDelegation | null
   }
 }
 
@@ -60,6 +62,7 @@ export function createHttpApp(
     githubUserFetcher?: typeof fetch
     /** 流水线 Git 凭据签发提供者；集成测试可注入替身，避免依赖本机 Git 登录态。 */
     pipelineCredentials?: PipelineCredentialProvider
+    botDelegation?: BotDelegation
   } = {},
 ) {
   const app = Fastify({
@@ -87,6 +90,7 @@ export function createHttpApp(
   app.decorate('db', services.database.db)
   app.decorate('auth', services.auth)
   app.decorate('tokenService', services.tokens)
+  app.decorate('botDelegation', options.botDelegation ?? null)
   app.addHook('onClose', async () => {
     await services.close()
   })

@@ -12,6 +12,31 @@ export {
   personalAccessToken,
 } from '../modules/identity/identity.tables.ts'
 export { comment, activity } from '../modules/collaboration/collaboration.tables.ts'
+export {
+  bot,
+  botApiCall,
+  botLoginSession,
+  botMemory,
+  botModelCatalog,
+  botModelConnection,
+  botRun,
+  botSkill,
+} from '../modules/bots/bots.tables.ts'
+export {
+  botConversation,
+  botConversationMember,
+  botEvent,
+  botMessage,
+  workTag,
+  workTagLink,
+} from '../modules/collaboration/bot-conversations.tables.ts'
+export {
+  botTask,
+  botTaskHandoff,
+  botTaskInput,
+  botTaskResult,
+  botTaskReview,
+} from '../modules/tasks/bot-tasks.tables.ts'
 export { storageBucket, storageBucketEvent } from '../modules/storage/storage.tables.ts'
 export { attachment } from '../modules/attachments/attachments.tables.ts'
 export { project, projectService, projectServiceRepository } from '../modules/projects/projects.tables.ts'

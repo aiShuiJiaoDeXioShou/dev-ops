@@ -218,6 +218,13 @@
       "when": 1794855051050,
       "tag": "0030_work_item_plan",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794876241213,
+      "tag": "0031_bot_collaboration",
+      "breakpoints": true
     }
   ]
 }

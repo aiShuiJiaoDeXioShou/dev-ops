@@ -26,7 +26,9 @@
     "api:export": "node --import tsx scripts/export-openapi.ts",
     "seed:root": "node --env-file-if-exists=.env --import tsx scripts/seed-root.ts",
     "dev:worker": "node --env-file-if-exists=.env --import tsx --watch src/entrypoints/worker.ts",
-    "start:worker": "node --env-file-if-exists=.env dist/entrypoints/worker.js"
+    "start:worker": "node --env-file-if-exists=.env dist/entrypoints/worker.js",
+    "dev:bot-worker": "node --env-file-if-exists=.env --import tsx --watch src/entrypoints/bot-worker.ts",
+    "start:bot-worker": "node --env-file-if-exists=.env dist/entrypoints/bot-worker.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1164.0",

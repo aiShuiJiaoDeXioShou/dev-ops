@@ -55,6 +55,12 @@ const environmentSchema = Type.Object({
   ATTACHMENT_MAX_PER_RECORD: Type.Integer({ minimum: 1, maximum: 200, default: 50 }),
   ATTACHMENT_TEMP_TTL_HOURS: Type.Integer({ minimum: 1, maximum: 168, default: 24 }),
   STORAGE_PROBE_TIMEOUT_MS: Type.Integer({ minimum: 1_000, maximum: 60_000, default: 10_000 }),
+  BOT_GLOBAL_CONCURRENCY: Type.Integer({ minimum: 1, maximum: 100, default: 4 }),
+  BOT_TEAM_CONCURRENCY: Type.Integer({ minimum: 1, maximum: 100, default: 2 }),
+  BOT_RUN_TIMEOUT_SECONDS: Type.Integer({ minimum: 1, maximum: 3_600, default: 600 }),
+  BOT_RUN_MAX_TURNS: Type.Integer({ minimum: 1, maximum: 100, default: 8 }),
+  BOT_LEASE_TTL_SECONDS: Type.Integer({ minimum: 2, maximum: 600, default: 30 }),
+  BOT_LEASE_HEARTBEAT_SECONDS: Type.Integer({ minimum: 1, maximum: 300, default: 10 }),
   // V0.4b 项目写能力与发布：补丁、差异响应与部署验证上限；均为字节或秒。
   CODE_CHANGE_PATCH_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 1_048_576 }),
   CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES: Type.Integer({ minimum: 4_096, maximum: 1_048_576, default: 262_144 }),
@@ -150,6 +156,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
   })
 
   validateDatabaseUrl(config.DATABASE_URL, 'DATABASE_URL')
+  if (config.BOT_LEASE_HEARTBEAT_SECONDS >= config.BOT_LEASE_TTL_SECONDS) {
+    throw new Error('BOT_LEASE_HEARTBEAT_SECONDS 必须小于 BOT_LEASE_TTL_SECONDS')
+  }
   const appOrigin = validateHttpOrigin(config.APP_ORIGIN, 'APP_ORIGIN')
 
   return {

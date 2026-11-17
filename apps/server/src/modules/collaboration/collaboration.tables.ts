@@ -35,6 +35,7 @@ export const activity = appSchema.table(
     entity_id: uuid('entity_id').notNull(),
     action: text('action').notNull(),
     actor_user_id: uuid('actor_user_id').notNull(),
+    via_bot_id: uuid('via_bot_id'),
     changes: jsonb('changes').$type<Record<string, unknown>>(),
     reason: text('reason'),
     note: text('note'),

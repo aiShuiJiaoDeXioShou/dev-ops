@@ -16,6 +16,7 @@ export function createTestApp(
     gitAdapterResolver?: (connectionId: string) => Promise<GitAdapter>
     activeConnectionIds?: (teamId: string) => Promise<string[]>
     gitAdapterFactory?: (connection: Parameters<GitAdapterFactory>[0]) => Promise<GitAdapter>
+    botDelegation?: NonNullable<Parameters<typeof createHttpApp>[1]>['botDelegation']
   } = {},
 ) {
   return createHttpApp(createTestConfig(overrides), options)
