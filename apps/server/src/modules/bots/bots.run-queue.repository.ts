@@ -51,7 +51,7 @@ export async function enqueueBotRun(
   return run
 }
 
-async function writeRunState(tx: BotRunTransaction, run: BotRunRecord) {
+async function writeRunState(tx: BotRunTransaction, run: BotRunRecord, actorId?: string) {
   await appendBotEvents(tx, { teamId: run.team_id, conversationId: run.conversation_id, runId: run.id }, [
     {
       kind: 'run_status',
@@ -60,6 +60,8 @@ async function writeRunState(tx: BotRunTransaction, run: BotRunRecord) {
         status: run.status,
         failureKind: run.failure_kind,
         failureMessage: run.failure_message,
+        stopRequested: run.stop_requested,
+        ...(actorId ? { actorId } : {}),
       },
     },
   ])
@@ -329,4 +331,48 @@ export async function stopRunsForBot(tx: BotRunTransaction, teamId: string, botI
     .returning()
   cancelled.sort((left, right) => left.conversation_id.localeCompare(right.conversation_id))
   for (const run of cancelled) await writeRunState(tx, run)
+}
+
+/**
+ * 停止待领取的运行，或设置执行进程下一次续租可读的停止标记。
+ * @param tx 保持会话权限及任务更新原子性的事务。
+ * @param runId 当前可管理的运行。
+ * @param actorId 发起停止的用户。
+ * @param resetTask 是否将尚未启动的关联任务转入等待；取消任务时关闭。
+ * @returns 已更新的运行；已结束或不存在时返回 null。
+ */
+export async function requestBotRunStop(tx: BotRunTransaction, runId: string, actorId: string, resetTask = true) {
+  const [run] = await tx
+    .update(botRun)
+    .set({
+      status: sql`case when ${botRun.status} = 'queued' then 'stopped' else ${botRun.status} end`,
+      stop_requested: true,
+      finished_at: sql`case when ${botRun.status} = 'queued' then clock_timestamp() else ${botRun.finished_at} end`,
+      updated_at: sql`clock_timestamp()`,
+    })
+    .where(and(eq(botRun.id, runId), inArray(botRun.status, ['queued', 'running'])))
+    .returning()
+  if (!run) return null
+  if (run.status === 'stopped' && run.task_id && resetTask) {
+    await tx
+      .update(botTask)
+      .set({
+        status: 'waiting',
+        wait_reason: 'stopped',
+        version: sql`${botTask.version} + 1`,
+        updated_at: sql`clock_timestamp()`,
+      })
+      .where(
+        and(
+          eq(botTask.id, run.task_id),
+          eq(botTask.team_id, run.team_id),
+          eq(botTask.executor_bot_id, run.bot_id),
+          eq(botTask.input_version, run.input_version),
+          eq(botTask.blocked, false),
+          inArray(botTask.status, ['pending', 'waiting']),
+        ),
+      )
+  }
+  await writeRunState(tx, run, actorId)
+  return run
 }
