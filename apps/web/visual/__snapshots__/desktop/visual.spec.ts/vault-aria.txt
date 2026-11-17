@@ -6,6 +6,7 @@
     - group "按分类筛选凭据":
       - button "全部" [pressed]
       - button "API 密钥"
+      - button "模型 API Key"
       - button "账号密码"
       - button "SSH 密钥"
       - button "已撤销"
