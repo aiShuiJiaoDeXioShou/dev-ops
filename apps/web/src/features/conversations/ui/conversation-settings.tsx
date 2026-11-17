@@ -1,84 +1,50 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { taskQueries } from '@/features/bot-tasks/api/queries'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/shared/ui/controls/alert-dialog'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { WorkTagEditor } from '@/features/work-tags/ui/work-tag-editor'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useGroupMemberChoices } from '../api/group-members'
-import { ConversationAvatar } from './conversation-avatar'
 import { ConversationIcon } from './conversation-icon'
 import { conversationOptions, conversationsQueryKey, type BotConversation } from '../api/queries'
 
 type Membership = { action: 'add' | 'remove'; memberId: string; kind: 'user' | 'bot' }
 
-/** 显示原型群组设置栏，保存群组属性或独立维护成员。 */
-export function GroupSettings({
+/**
+ * 按原型展示会话设置。私聊可维护工作标签，群组还可修改基本配置与成员。
+ * @param props 已加载的会话、当前用户、会话头像和关闭回调。
+ * @returns 右侧设置面板，挂载时聚焦关闭按钮。
+ */
+export function ConversationSettings({
   room,
   userId,
+  avatar,
   onClose,
 }: {
   room: BotConversation
   userId: string
+  avatar: ReactNode
   onClose: () => void
 }) {
   const client = useQueryClient()
   const close = useRef<HTMLButtonElement>(null)
-  const [editing, setEditing] = useState(false)
-  const [managing, setManaging] = useState(false)
-  const [name, setName] = useState(room.name)
-  const [leader, setLeader] = useState(room.leaderBotId ?? '')
-  const [responsibility, setResponsibility] = useState(room.responsibility)
-  const [instructions, setInstructions] = useState(room.instructions)
-  const [memberId, setMemberId] = useState('')
-  const choices = useGroupMemberChoices(room.teamId)
-  const bots = room.members.filter(({ kind }) => kind === 'bot')
-  const leaderBot = bots.find(({ id }) => id === room.leaderBotId)
-  const orderedBots = leaderBot ? [leaderBot, ...bots.filter(({ id }) => id !== leaderBot.id)] : bots
-  const members = new Set(room.members.map((member) => member.id))
-  const available = [
-    ...choices.users.map((member) => ({ id: member.userId, label: member.name, kind: 'user' as const })),
-    ...choices.bots.map((bot) => ({ id: bot.id, label: bot.name, kind: 'bot' as const })),
-  ].filter(({ id }) => !members.has(id))
-  const selected = available.find(({ id }) => id === memberId)
-  const save = useMutation({
-    mutationFn: () =>
-      apiClient.updateBotConversation(
-        room.id,
-        {
-          name: name.trim(),
-          responsibility: responsibility.trim(),
-          instructions: instructions.trim(),
-          leaderBotId: leader,
-        },
-        { idempotencyKey: createIdempotencyKey() },
-      ),
-    onSuccess: (result) => {
-      client.setQueryData(conversationOptions(room.id).queryKey, result)
-      void client.invalidateQueries({ queryKey: conversationsQueryKey })
-      onClose()
-    },
-  })
-  const membership = useMutation({
-    mutationFn: (change: Membership) =>
-      apiClient.updateBotConversationMember(
-        room.id,
-        change.action,
-        { memberId: change.memberId, kind: change.kind },
-        { idempotencyKey: createIdempotencyKey() },
-      ),
-    onSuccess: (result) => {
-      client.setQueryData(conversationOptions(room.id).queryKey, result)
-      void client.invalidateQueries({ queryKey: taskQueries })
-      void client.invalidateQueries({ queryKey: conversationsQueryKey })
-      setMemberId('')
-    },
-  })
   useEffect(() => {
     close.current?.focus()
   }, [])
@@ -101,9 +67,88 @@ export function GroupSettings({
         </Button>
       </div>
       <div className="settings-room-identity">
-        <ConversationAvatar kind={room.kind} bots={orderedBots} />
+        {avatar}
         <strong>{room.name}</strong>
       </div>
+      {room.kind === 'group' && <GroupSettingsFields room={room} userId={userId} onSaved={onClose} />}
+      <section className="settings-section">
+        <WorkTagEditor
+          teamId={room.teamId}
+          tags={room.tags}
+          target={{ targetKind: 'conversation', targetId: room.id }}
+          readOnly={false}
+          collapsible
+          onChanged={() => {
+            void client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey })
+            void client.invalidateQueries({ queryKey: [...conversationsQueryKey, room.teamId] })
+          }}
+        />
+      </section>
+    </aside>
+  )
+}
+
+function GroupSettingsFields({
+  room,
+  userId,
+  onSaved,
+}: {
+  room: BotConversation
+  userId: string
+  onSaved: () => void
+}) {
+  const client = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [managing, setManaging] = useState(false)
+  const [name, setName] = useState(room.name)
+  const [leader, setLeader] = useState(room.leaderBotId ?? '')
+  const [responsibility, setResponsibility] = useState(room.responsibility)
+  const [instructions, setInstructions] = useState(room.instructions)
+  const [memberId, setMemberId] = useState('')
+  const manageMembers = useRef<HTMLButtonElement>(null)
+  const choices = useGroupMemberChoices(room.teamId)
+  const members = new Set(room.members.map((member) => member.id))
+  const available = [
+    ...choices.users.map((member) => ({ id: member.userId, label: member.name, kind: 'user' as const })),
+    ...choices.bots.map((bot) => ({ id: bot.id, label: bot.name, kind: 'bot' as const })),
+  ].filter(({ id }) => !members.has(id))
+  const selected = available.find(({ id }) => id === memberId)
+  const save = useMutation({
+    mutationFn: () =>
+      apiClient.updateBotConversation(
+        room.id,
+        {
+          name: name.trim(),
+          responsibility: responsibility.trim(),
+          instructions: instructions.trim(),
+          leaderBotId: leader,
+        },
+        { idempotencyKey: createIdempotencyKey() },
+      ),
+    onSuccess: (result) => {
+      client.setQueryData(conversationOptions(room.id).queryKey, result)
+      void client.invalidateQueries({ queryKey: conversationsQueryKey })
+      onSaved()
+    },
+  })
+  const membership = useMutation({
+    mutationFn: (change: Membership) =>
+      apiClient.updateBotConversationMember(
+        room.id,
+        change.action,
+        { memberId: change.memberId, kind: change.kind },
+        { idempotencyKey: createIdempotencyKey() },
+      ),
+    onSuccess: (result, change) => {
+      client.setQueryData(conversationOptions(room.id).queryKey, result)
+      void client.invalidateQueries({ queryKey: taskQueries })
+      void client.invalidateQueries({ queryKey: conversationsQueryKey })
+      setMemberId('')
+      if (change.action === 'remove') manageMembers.current?.focus()
+    },
+  })
+  return (
+    <>
       <section className="settings-section">
         <div className="row">
           <strong>职责与指令</strong>
@@ -174,6 +219,7 @@ export function GroupSettings({
           <span className="spacer" />
           <Button
             unstyled
+            ref={manageMembers}
             type="button"
             className="text-btn"
             aria-expanded={managing}
@@ -194,14 +240,31 @@ export function GroupSettings({
               </span>
               {room.leaderBotId === member.id && <span className="team-tag">Leader</span>}
               {managing && member.id !== userId && member.id !== room.leaderBotId && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={membership.isPending}
-                  onClick={() => membership.mutate({ action: 'remove', memberId: member.id, kind: member.kind })}
-                >
-                  移出
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" variant="outline" disabled={membership.isPending}>
+                      移出
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>移出「{member.name}」？</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {member.kind === 'bot'
+                          ? '该智能体将离开会话，仍由它执行的任务会标记为受阻。'
+                          : '该成员将无法访问此会话及历史消息。'}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => membership.mutate({ action: 'remove', memberId: member.id, kind: member.kind })}
+                      >
+                        确认移出
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </li>
           ))}
@@ -243,23 +306,11 @@ export function GroupSettings({
             </div>
           ))}
       </section>
-      <section className="settings-section">
-        <WorkTagEditor
-          teamId={room.teamId}
-          tags={room.tags}
-          target={{ targetKind: 'conversation', targetId: room.id }}
-          readOnly={false}
-          onChanged={() => {
-            void client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey })
-            void client.invalidateQueries({ queryKey: conversationsQueryKey })
-          }}
-        />
-      </section>
       {(save.error || membership.error) && (
         <p className="field-error" role="alert">
           {describeRequestError(save.error ?? membership.error).description}
         </p>
       )}
-    </aside>
+    </>
   )
 }

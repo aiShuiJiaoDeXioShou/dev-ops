@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Download, PackageOpen, Pencil, Power } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
@@ -27,6 +26,7 @@ import { copyText, downloadTextFile } from '../lib/files'
 import { SKILL_CATEGORY_LABELS } from '../model/labels'
 import type { SkillDetail } from '../model/types'
 import { ActivityTimeline } from './activity-timeline'
+import { SkillBotPicker } from './skill-bot-picker'
 import { SkillForm } from './skill-form'
 import { VersionHistory } from './version-history'
 
@@ -52,6 +52,7 @@ export function SkillDetailDialog({
   const versions = useQuery(skillVersionsQueryOptions(skillId))
   const activities = useQuery(skillActivitiesQueryOptions(skillId))
   const [editOpen, setEditOpen] = useState(false)
+  const [botPickerOpen, setBotPickerOpen] = useState(false)
   const canWrite = canWriteKnowledge(role)
   const toggle = useMutation({
     mutationFn: async (skill: SkillDetail) =>
@@ -195,8 +196,8 @@ export function SkillDetailDialog({
               )}
               <span className="flex-1" />
               {canWrite && skill.enabled && (
-                <Button asChild>
-                  <Link to={`/collaboration?skill=${encodeURIComponent(skill.id)}`}>在 Bots 中使用</Link>
+                <Button type="button" onClick={() => setBotPickerOpen(true)}>
+                  在 Bots 中使用
                 </Button>
               )}
             </div>
@@ -219,6 +220,9 @@ export function SkillDetailDialog({
           </>
         )}
         {editOpen && skill && <SkillForm teamId={teamId} open={editOpen} onOpenChange={setEditOpen} skill={skill} />}
+        {botPickerOpen && canWrite && skill?.enabled && (
+          <SkillBotPicker teamId={teamId} skill={skill} onClose={() => setBotPickerOpen(false)} />
+        )}
       </DialogContent>
     </Dialog>
   )

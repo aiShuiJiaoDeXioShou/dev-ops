@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router'
 import { botTasksOptions, taskQueries } from '@/features/bot-tasks/api/queries'
 import { ConversationTaskPanel } from '@/features/bot-tasks/ui/conversation-task-panel'
 import { NewTaskDialog } from '@/features/bot-tasks/ui/new-task-dialog'
@@ -23,17 +22,10 @@ import {
   useRunClock,
   type ConversationRun,
 } from '@/features/conversations/ui/conversation-trajectory'
-import { GroupSettings } from '@/features/conversations/ui/group-settings'
-import { WorkTagEditor } from '@/features/work-tags/ui/work-tag-editor'
+import { ConversationSettings } from '@/features/conversations/ui/conversation-settings'
 import { Button } from '@/shared/ui/controls/button'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/ui/controls/dropdown-menu'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
@@ -41,7 +33,6 @@ import { PageError } from '@/shared/ui/page-state'
 const tabItems = [
   { id: 'chat', label: '对话' },
   { id: 'activity', label: '轨迹' },
-  { id: 'context', label: '上下文' },
 ]
 
 /**
@@ -255,10 +246,6 @@ export function ConversationRoom({
       </span>
     </>
   )
-  const counts: Record<string, number> = {
-    activity: runs.length,
-    context: room.tags.length + room.skillReferences.length,
-  }
   return (
     <>
       <Tabs className="conversation-main dsh-chat gap-0" value={tab} onValueChange={setTab} aria-label="当前会话">
@@ -276,7 +263,7 @@ export function ConversationRoom({
             >
               <ConversationIcon name="menu" />
             </Button>
-            {!readOnly && room.kind === 'group' ? (
+            {!readOnly ? (
               <Button
                 unstyled
                 type="button"
@@ -314,7 +301,7 @@ export function ConversationRoom({
                   </span>
                 )}
               </Button>
-              {!readOnly && room.kind === 'group' && (
+              {!readOnly && (
                 <Button
                   unstyled
                   type="button"
@@ -329,39 +316,25 @@ export function ConversationRoom({
               )}
             </div>
           </div>
-          <div className="dsh-tabs-row">
-            <TabsList unstyled className="dsh-tabs" aria-label="会话视图">
-              {tabItems.map(({ id, label }) => (
-                <TabsTrigger
-                  key={id}
-                  value={id}
-                  variant="unstyled"
-                  className="dsh-tab rounded-sm focus-visible:ring-inset"
-                  aria-label={label}
-                >
-                  <span className="dsh-tab-label">{label}</span>
-                  {!!counts[id] && (
-                    <span className="dsh-tab-count" aria-hidden="true">
-                      {counts[id]}
-                    </span>
-                  )}
-                  {id === 'activity' && liveRun && <span className="dsh-tab-pulse" aria-hidden="true" />}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button unstyled type="button" className="dsh-tab-more" aria-label="更多会话操作">
-                  <ConversationIcon name="more" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onSelect={openTask}>会话任务</DropdownMenuItem>
-                {!readOnly && <DropdownMenuItem onSelect={() => createTask()}>新建任务</DropdownMenuItem>}
-                <DropdownMenuItem onSelect={() => setTab('context')}>工作标签</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <TabsList unstyled className="dsh-tabs" aria-label="会话视图">
+            {tabItems.map(({ id, label }) => (
+              <TabsTrigger
+                key={id}
+                value={id}
+                variant="unstyled"
+                className="dsh-tab rounded-sm focus-visible:ring-inset"
+                aria-label={label}
+              >
+                <span className="dsh-tab-label">{label}</span>
+                {id === 'activity' && runs.length > 0 && (
+                  <span className="dsh-tab-count" aria-hidden="true">
+                    {runs.length}
+                  </span>
+                )}
+                {id === 'activity' && liveRun && <span className="dsh-tab-pulse" aria-hidden="true" />}
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </header>
         <TabsContent value="chat" forceMount className="dsh-scroll-area">
           {messages.isPending && <DelayedPageSkeleton />}
@@ -453,63 +426,6 @@ export function ConversationRoom({
             )}
           </div>
         </TabsContent>
-        <TabsContent value="context" className="dsh-tab-panel">
-          <div className="dsh-panel-scroll">
-            <section className="ctx-wrap">
-              <div className="dsh-panel-head">
-                <div>
-                  <strong>上下文</strong>
-                  <span className="dsh-panel-meta">
-                    {room.tags.length} 个工作标签 · {room.skillReferences.length} 项可引用技能
-                  </span>
-                </div>
-              </div>
-              <WorkTagEditor
-                tags={room.tags}
-                teamId={room.teamId}
-                target={{ targetKind: 'conversation', targetId: room.id }}
-                readOnly={readOnly}
-                onChanged={() => {
-                  void detail.refetch()
-                  void client.invalidateQueries({ queryKey: conversationsQueryKey })
-                }}
-              />
-              {(room.responsibility || room.instructions) && (
-                <dl className="work-properties">
-                  {room.responsibility && (
-                    <div>
-                      <dt>职责</dt>
-                      <dd>{room.responsibility}</dd>
-                    </div>
-                  )}
-                  {room.instructions && (
-                    <div>
-                      <dt>指令</dt>
-                      <dd>{room.instructions}</dd>
-                    </div>
-                  )}
-                </dl>
-              )}
-              {room.skillReferences.length > 0 && (
-                <ul className="ctx-list">
-                  {room.skillReferences.map(({ id, name, identifier, summary }) => (
-                    <li key={id} className="ctx-row">
-                      <span className="ctx-icon">
-                        <ConversationIcon name="layers" />
-                      </span>
-                      <span className="ctx-title">
-                        <Link to={`/capabilities/skills/${id}`}>{name}</Link>
-                        <small>
-                          @{identifier} · {summary}
-                        </small>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
-        </TabsContent>
       </Tabs>
       {taskPanelOpen && (
         <ConversationTaskPanel
@@ -525,7 +441,9 @@ export function ConversationRoom({
           onChanged={() => void events.refetch()}
         />
       )}
-      {panel === 'settings' && <GroupSettings room={room} userId={userId} onClose={closePanel} />}
+      {panel === 'settings' && !readOnly && (
+        <ConversationSettings room={room} userId={userId} avatar={avatar} onClose={closePanel} />
+      )}
       {newTaskOpen && (
         <NewTaskDialog
           room={room}

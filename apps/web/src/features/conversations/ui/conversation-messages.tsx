@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
@@ -6,7 +6,6 @@ import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
 import type { ConversationMessage } from '../api/queries'
-import { ConversationIcon } from './conversation-icon'
 
 export type MessageView = {
   id: string
@@ -24,32 +23,6 @@ export type MessageView = {
 
 const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
 const FOLLOW_DISTANCE_PX = 72
-
-function ReplyCopy({ text }: { text: string }) {
-  const [feedback, setFeedback] = useState('')
-  return (
-    <div className="dsh-message-actions">
-      <Button
-        type="button"
-        unstyled
-        className="dsh-action"
-        aria-label="复制回复"
-        title="复制回复"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(text)
-            setFeedback('已复制')
-          } catch {
-            setFeedback('复制失败')
-          }
-        }}
-      >
-        <ConversationIcon name={feedback === '已复制' ? 'check' : 'copy'} />
-      </Button>
-      {feedback && <span role="status">{feedback}</span>}
-    </div>
-  )
-}
 
 /**
  * 以原型的消息流显示对话、输出进度和历史状态。
@@ -128,7 +101,6 @@ export function ConversationMessages({
         <div className="dsh-messages">
           {items.map((message) => {
             const running = message.status === 'running'
-            const active = running || message.status === 'queued'
             const time = message.time && (
               <time className={message.kind === 'user' ? undefined : 'dsh-time'} dateTime={message.time}>
                 {clock.format(new Date(message.time))}
@@ -216,7 +188,6 @@ export function ConversationMessages({
                         <Link to="/capabilities/memory">查看长期记忆</Link>
                       </details>
                     ))}
-                    {message.runId && !active && message.text && <ReplyCopy text={message.text} />}
                   </>
                 )}
               </article>

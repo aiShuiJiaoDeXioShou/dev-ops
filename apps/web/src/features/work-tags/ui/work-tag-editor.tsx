@@ -8,23 +8,31 @@ import { Button } from '@/shared/ui/controls/button'
 import { Select } from '@/shared/ui/controls/select'
 import { workTagsOptions, type WorkTag, type WorkTagTarget } from '../api/queries'
 
-/** 展示目标关联的标签，写权限用户可以选择已有标签或取消关联。 */
+/**
+ * 展示会话或任务关联的标签，写权限用户可关联已有标签或取消关联。
+ * @param props 标签、所属团队、目标、写权限、是否折叠编辑控件，以及更改后的刷新回调。
+ * @returns 标签列表与适用的编辑控件。
+ */
 export function WorkTagEditor({
   tags,
   teamId,
   target,
   readOnly,
+  collapsible = false,
   onChanged,
 }: {
   tags: WorkTag[]
   teamId: string
   target: WorkTagTarget
   readOnly: boolean
+  collapsible?: boolean
   onChanged: () => void
 }) {
   const [selected, setSelected] = useState('')
+  const [editing, setEditing] = useState(false)
+  const canEdit = !readOnly && (!collapsible || editing)
   const client = useQueryClient()
-  const list = useInfiniteQuery({ ...workTagsOptions(teamId), enabled: !readOnly })
+  const list = useInfiniteQuery({ ...workTagsOptions(teamId), enabled: canEdit })
   const linked = new Set(tags.map(({ id }) => id))
   const remaining = (list.data?.pages.flatMap(({ data }) => data.items) ?? []).filter(({ id }) => !linked.has(id))
   const save = useMutation({
@@ -38,12 +46,32 @@ export function WorkTagEditor({
   })
   return (
     <div className="work-gap">
-      <h3 className="task-section-title">工作标签</h3>
+      {collapsible ? (
+        <div className="row">
+          <h4 className="font-semibold">工作标签</h4>
+          <span className="spacer" />
+          {!readOnly && (
+            <Button
+              unstyled
+              type="button"
+              className="text-btn"
+              aria-label={editing ? '收起工作标签管理' : '管理工作标签'}
+              aria-expanded={editing}
+              disabled={save.isPending}
+              onClick={() => setEditing(!editing)}
+            >
+              {editing ? '收起' : '管理'}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <h3 className="task-section-title">工作标签</h3>
+      )}
       <div className="ctx-refs">
         {tags.map(({ id, name }) => (
           <span className="ctx-ref" key={id}>
             {name}
-            {!readOnly && (
+            {canEdit && (
               <Button
                 type="button"
                 size="icon-xs"
@@ -59,7 +87,7 @@ export function WorkTagEditor({
         ))}
         {tags.length === 0 && <span className="small muted">暂无标签</span>}
       </div>
-      {!readOnly && (
+      {canEdit && (
         <div className="row flex-wrap">
           <label className="field">
             <span>添加工作标签</span>

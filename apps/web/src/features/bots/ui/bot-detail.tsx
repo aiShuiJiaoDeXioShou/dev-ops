@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Clock, Cpu, Layers, MessageSquare, Pencil, Shield, SquareTerminal, User, X } from 'lucide-react'
-import { useNavigate } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
@@ -22,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/t
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
-import { conversationOptions, conversationsQueryKey } from '@/features/conversations/api/queries'
+import { useOpenDirectConversation } from '@/features/conversations/api/open-direct'
 import { skillListQueryOptions } from '@/features/knowledge/api/queries'
 import { botDetailQueryOptions, botQueryKey, botRunsQueryOptions, type BotRunView } from '../api/queries'
 import { BotAvatar } from './bot-avatar'
@@ -125,17 +124,7 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
   const detailRef = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
   const { showToast } = useToast()
-  const navigate = useNavigate()
-  const openConversation = useMutation({
-    mutationFn: () =>
-      apiClient.createBotConversation(teamId, { kind: 'direct', botId }, { idempotencyKey: createIdempotencyKey() }),
-    onSuccess: async (response) => {
-      queryClient.setQueryData(conversationOptions(response.data.id).queryKey, response)
-      await queryClient.invalidateQueries({ queryKey: [...conversationsQueryKey, teamId], refetchType: 'none' })
-      void navigate(`/collaboration/${response.data.id}`)
-    },
-    onError: (error) => showToast(describeRequestError(error).description, 'error'),
-  })
+  const openConversation = useOpenDirectConversation(teamId)
   const skillQuery = useQuery({
     ...skillListQueryOptions(teamId, { pageSize: 100 }),
     enabled: Boolean(bot?.skillIds.length),
@@ -309,7 +298,11 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
                 type="button"
                 className="btn"
                 disabled={openConversation.isPending}
-                onClick={() => openConversation.mutate()}
+                onClick={() =>
+                  openConversation.mutate(botId, {
+                    onError: (error) => showToast(describeRequestError(error).description, 'error'),
+                  })
+                }
               >
                 <MessageSquare className="size-4" aria-hidden="true" />
                 {openConversation.isPending ? '正在打开…' : '打开对话'}

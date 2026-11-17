@@ -14,15 +14,31 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
   const tagId = 'da55aa00-0000-4000-8000-000000000090'
+  const tag = { id: tagId, name: '交付', updatedAt: '2026-11-17T08:00:00.000Z' }
   await page.route(`**/api/v1/teams/${teamId}/work-tags*`, (route) =>
-    route.fulfill({
-      json: success({ items: [{ id: tagId, name: '交付', updatedAt: '2026-11-17T08:00:00.000Z' }], nextCursor: null }),
-    }),
+    route.fulfill({ json: success({ items: [tag], nextCursor: null }) }),
   )
   const stamp = '2026-11-17T08:00:00.000Z'
   const botId = 'da55aa00-0000-4000-8000-000000000011'
   const skillId = 'da55aa00-0000-4000-8000-000000000014'
   const runId = 'da55aa00-0000-4000-8000-000000000020'
+  const skill = {
+    id: skillId,
+    name: '交付复核',
+    identifier: 'delivery-review',
+    summary: '核对证据',
+    category: 'delivery',
+    source: 'team',
+    enabled: true,
+    version: 1,
+    contentVersion: '1.0.0',
+    teamId,
+    content: '按验收条件核对证据。',
+    files: [],
+    createdByUserId: userId,
+    createdAt: stamp,
+    updatedAt: stamp,
+  } satisfies ApiSuccessData<'/api/v1/skills/{skillId}', 'get'>
   const room: Room = {
     id: 'da55aa00-0000-4000-8000-000000000012',
     teamId,
@@ -52,23 +68,68 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   )
   const eventsPath = `**/api/v1/bot-conversations/${room.id}/events`
   await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().postDataJSON()).toEqual({ kind: 'direct', botId })
+      return route.fulfill({ json: success(room) })
+    }
     const filtered = new URL(route.request().url()).searchParams.get('tagId') === tagId
     return route.fulfill({
       json: success({
-        items: filtered
-          ? []
-          : [
-              {
-                ...room,
-                botAvatars: [{ id: botId, avatarKey: 'orbit', enabled: true }],
-                lastMessagePreview: list.at(-1)?.body.blocks[0]?.text ?? null,
-              },
-            ],
+        items:
+          filtered && !room.tags.length
+            ? []
+            : [
+                {
+                  ...room,
+                  botAvatars: [{ id: botId, avatarKey: 'orbit', enabled: true }],
+                  lastMessagePreview: list.at(-1)?.body.blocks[0]?.text ?? null,
+                },
+              ],
         nextCursor: null,
       }),
     })
   })
   await page.route(`**/api/v1/bot-conversations/${room.id}`, (route) => route.fulfill({ json: success(room) }))
+  const bot = {
+    id: botId,
+    teamId,
+    name: room.name,
+    responsibility: '核对交付证据',
+    instructions: '',
+    avatarKey: 'orbit',
+    ownerUserId: userId,
+    ownerName: '负责人',
+    status: 'enabled',
+    availability: 'available',
+    configVersion: 1,
+    modelConnectionId: null,
+    connectionName: null,
+    modelId: 'deepseek-flash',
+    updatedAt: stamp,
+    lastActiveAt: null,
+    skillIds: [skillId],
+  } satisfies ApiSuccessData<'/api/v1/bots/{botId}', 'get'>
+  await page.route(`**/api/v1/teams/${teamId}/bots*`, (route) =>
+    route.fulfill({
+      json: success({
+        items: [
+          bot,
+          { ...bot, id: 'da55aa00-0000-4000-8000-000000000017', name: '未配置助理', skillIds: [] },
+          { ...bot, id: 'da55aa00-0000-4000-8000-000000000018', name: '离线助理', availability: 'worker_offline' },
+        ],
+        nextCursor: null,
+      }),
+    }),
+  )
+  await page.route(`**/api/v1/teams/${teamId}/skills*`, (route) =>
+    route.fulfill({ json: success({ items: [skill], page: 1, pageSize: 20, total: 1 }) }),
+  )
+  await page.route(`**/api/v1/skills/${skillId}`, (route) => route.fulfill({ json: success(skill) }))
+  await page.route(`**/api/v1/work-tags/${tagId}/link`, (route) => {
+    expect(route.request().postDataJSON()).toEqual({ targetKind: 'conversation', targetId: room.id })
+    room.tags = [tag]
+    return route.fulfill({ json: success({ id: tagId }) })
+  })
   await page.route(`${messagePath}*`, (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: success({ items: list, nextBefore: null }) })
     const input = route.request().postDataJSON()
@@ -121,9 +182,9 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
 
   await page.goto(`/collaboration/${room.id}`)
   const tabs = page.getByRole('tablist', { name: '会话视图' })
-  await expect(tabs.getByRole('tab')).toHaveCount(3)
+  await expect(tabs.getByRole('tab')).toHaveCount(2)
   await expect(tabs.getByRole('tab', { name: '对话' })).toBeVisible()
-  await expect(tabs.getByRole('tab', { name: '上下文' })).toBeVisible()
+  await expect(tabs.getByRole('tab', { name: '轨迹' })).toBeVisible()
   if (testInfo.project.name === 'mobile') {
     const toggle = page.getByRole('button', { name: '打开会话列表' })
     await expect(page.getByRole('button', { name: '打开导航', exact: true })).toHaveCount(0)
@@ -137,7 +198,9 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   const composer = page.getByRole('textbox', { name: '协作消息' })
   await expect(composer).toHaveCSS('background-image', 'none')
   await composer.fill('@')
-  await expect(page.getByRole('group', { name: '引用资源候选' })).toBeVisible()
+  const references = page.getByRole('group', { name: '引用资源候选' })
+  await expect(references.getByText('Bot', { exact: true })).toBeVisible()
+  await expect(references.getByText('技能 · 交付复核', { exact: true })).toBeVisible()
   await composer.press('Enter')
   await expect(composer).toHaveValue('@验收助理 ')
   await composer.fill('@验收助理 检查结果')
@@ -191,7 +254,37 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await page.getByRole('button', { name: '会话筛选' }).press('Enter')
   await page.getByRole('combobox', { name: '按工作标签筛选' }).selectOption(tagId)
   await expect(page.getByText('没有匹配的会话')).toBeVisible()
-  await page.goto(`/collaboration/${room.id}?skill=${skillId}`)
+
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '收起会话列表' }).press('Enter')
+  const settings = page.getByRole('button', { name: '会话设置', exact: true })
+  await settings.press('Enter')
+  const settingsPanel = page.getByRole('complementary', { name: '会话设置' })
+  const manageTags = settingsPanel.getByRole('button', { name: '管理工作标签' })
+  await expect(manageTags).toHaveAttribute('aria-expanded', 'false')
+  await manageTags.press('Enter')
+  await settingsPanel.getByRole('combobox', { name: '添加工作标签' }).selectOption(tagId)
+  await settingsPanel.getByRole('button', { name: '添加', exact: true }).press('Enter')
+  await expect(settingsPanel.getByRole('button', { name: '移除标签交付' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('bot-direct-settings.png'), animations: 'disabled' })
+  await page.keyboard.press('Escape')
+  await expect(settings).toBeFocused()
+  await expect(settingsPanel).toBeHidden()
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).press('Enter')
+  await expect(page.locator('.conversation-item').filter({ hasText: room.name })).toBeVisible()
+
+  await page.goto(`/capabilities/skills?skill=${skillId}`)
+  const useSkill = page.getByRole('button', { name: '在 Bots 中使用' })
+  await useSkill.press('Enter')
+  const picker = page.getByRole('dialog', { name: '使用 交付复核' })
+  const eligibleBot = picker.getByRole('button', { name: /验收助理/ })
+  await expect(eligibleBot).toBeVisible()
+  await expect(picker.getByRole('button', { name: /未配置助理|离线助理/ })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('skill-bot-picker.png'), animations: 'disabled' })
+  await page.keyboard.press('Escape')
+  await expect(useSkill).toBeFocused()
+  await useSkill.press('Enter')
+  await eligibleBot.press('Enter')
+  await expect(page).toHaveURL(new RegExp(`/collaboration/${room.id}\\?skill=${skillId}$`))
   await expect(page.getByRole('textbox', { name: '协作消息' })).toHaveValue('@delivery-review ')
 })
 

@@ -206,7 +206,7 @@ export function ConversationComposer({
               onClick={() => insert(candidate)}
             >
               @{candidate.token}
-              {candidate.kind === 'skill' ? ` · ${candidate.name}` : null}
+              <small>{candidate.kind === 'bot' ? 'Bot' : `技能 · ${candidate.name}`}</small>
             </Button>
           ))}
         </div>
