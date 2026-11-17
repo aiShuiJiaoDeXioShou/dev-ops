@@ -6,6 +6,7 @@ import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { enqueueBotRun, claimBotRun, renewBotRunLease } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { requireRunnableBot } from '../../src/modules/bots/bots.service.ts'
 import { botModelCatalog, botModelConnection, botRun } from '../../src/modules/bots/bots.tables.ts'
+import { credential } from '../../src/modules/configuration/configuration.tables.ts'
 import { teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { botTask } from '../../src/modules/tasks/bot-tasks.tables.ts'
 import { ApiError } from '../../src/platform/http/errors.ts'
@@ -57,6 +58,15 @@ test('Bot 配置满足团队和角色约束，停用阻止新运行并收口现�
     .where(and(eq(teamMember.team_id, teamId), eq(teamMember.user_id, viewerUser.userId)))
   assert.equal((await post(`${detail}/update`, devUser, { ...input, configVersion: 2 })).code, 'VALIDATION_ERROR')
 
+  const keyId = randomUUID()
+  await db.insert(credential).values({
+    id: keyId,
+    team_id: teamId,
+    name: '测试密钥',
+    kind: 'model_api_key',
+    status: 'active',
+    created_by_user_id: adminUser.userId,
+  })
   const [connection] = await db
     .insert(botModelConnection)
     .values({
@@ -64,7 +74,7 @@ test('Bot 配置满足团队和角色约束，停用阻止新运行并收口现�
       name: '测试连接',
       provider_id: 'fixture',
       auth_type: 'api_key',
-      credential_id: randomUUID(),
+      credential_id: keyId,
       status: 'active',
     })
     .returning()

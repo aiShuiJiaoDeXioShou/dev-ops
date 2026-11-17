@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import type { CredentialOptions, CredentialStore, ModelCredential } from '@dev-ops/devops-bot'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, gt, isNull, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Type } from 'typebox'
 import { Check } from 'typebox/value'
@@ -96,6 +96,7 @@ export function createPgCredentialStore(options: ConnectionOptions): CredentialS
           eq(credential.team_id, teamId),
           eq(credential.kind, 'model_api_key'),
           eq(credential.status, 'active'),
+          or(isNull(credential.expires_at), gt(credential.expires_at, sql`clock_timestamp()`)),
         ),
       )
     return secret && { type: 'api_key' as const, key: cipher.decrypt(secret) }

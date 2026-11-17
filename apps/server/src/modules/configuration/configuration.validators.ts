@@ -2,7 +2,7 @@ import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 
 /** 凭据分类：API 密钥、账号密码与 SSH 密钥。 */
-export type CredentialKind = 'api_key' | 'account_password' | 'ssh_key'
+export type CredentialKind = 'api_key' | 'model_api_key' | 'account_password' | 'ssh_key'
 /** 凭据在数据库中的状态；过期由 expires_at 派生，不写入状态列。 */
 export type CredentialDbStatus = 'active' | 'revoked'
 /** 对外展示的凭据状态：数据库状态或按期限派生的已过期。 */
@@ -19,7 +19,7 @@ export type CredentialUsageAction =
 /** 凭据使用结果；失败不保存密钥值。 */
 export type CredentialUsageResult = 'success' | 'denied' | 'expired' | 'failed'
 
-const CREDENTIAL_KINDS: ReadonlySet<string> = new Set(['api_key', 'account_password', 'ssh_key'])
+const CREDENTIAL_KINDS: ReadonlySet<string> = new Set(['api_key', 'model_api_key', 'account_password', 'ssh_key'])
 const CREDENTIAL_DB_STATUSES: ReadonlySet<string> = new Set(['active', 'revoked'])
 const ENVIRONMENTS: ReadonlySet<string> = new Set(['development', 'test', 'production'])
 const ENV_VAR_KINDS: ReadonlySet<string> = new Set(['plain', 'credential_ref'])

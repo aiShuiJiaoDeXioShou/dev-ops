@@ -6,6 +6,7 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { botConversationMember } from '../collaboration/bot-conversations.tables.ts'
 import { insertActivity } from '../collaboration/collaboration.repository.ts'
+import { credential } from '../configuration/configuration.tables.ts'
 import { requireTeamMember, type SessionUser, type TeamRole } from '../identity/identity.session.ts'
 import { authUser, teamMember } from '../identity/identity.tables.ts'
 import { skill } from '../knowledge/knowledge.tables.ts'
@@ -74,7 +75,10 @@ function botReadQuery(db: BotRead, visibleTo?: string) {
       record: bot,
       ownerName: authUser.name,
       connectionName: botModelConnection.name,
-      connectionStatus: botModelConnection.status,
+      connectionStatus: sql<string | null>`case
+        when ${botModelConnection.auth_type} = 'api_key' and ${credential.id} is null then 'disabled'
+        when ${botModelConnection.auth_type} = 'oauth' and ${botModelConnection.oauth_secret} is null then 'disabled'
+        else ${botModelConnection.status} end`,
       hasModel: sql<boolean>`${botModelCatalog.id} is not null`,
       lastActiveAt: visibleTo
         ? sql<Date | null>`(
@@ -97,6 +101,16 @@ function botReadQuery(db: BotRead, visibleTo?: string) {
     .leftJoin(
       botModelConnection,
       and(eq(botModelConnection.id, bot.model_connection_id), eq(botModelConnection.team_id, bot.team_id)),
+    )
+    .leftJoin(
+      credential,
+      and(
+        eq(credential.id, botModelConnection.credential_id),
+        eq(credential.team_id, bot.team_id),
+        eq(credential.kind, 'model_api_key'),
+        eq(credential.status, 'active'),
+        or(isNull(credential.expires_at), gt(credential.expires_at, sql`clock_timestamp()`)),
+      ),
     )
     .leftJoin(
       botModelCatalog,

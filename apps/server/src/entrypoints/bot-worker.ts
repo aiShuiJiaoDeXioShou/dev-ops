@@ -1,12 +1,17 @@
-import { runBot } from '@dev-ops/devops-bot'
+import { listModelCatalog, loginProvider, runBot } from '@dev-ops/devops-bot'
 import { createBotWorker } from '../bootstrap/create-bot-worker.ts'
 import { loadConfig } from '../platform/config/env.ts'
 
 const config = loadConfig()
-const worker = createBotWorker(config, runBot, (level, message, context) => {
-  const output = level === 'error' ? process.stderr : process.stdout
-  output.write(`${JSON.stringify({ level, message, ...context })}\n`)
-})
+const worker = createBotWorker(
+  config,
+  runBot,
+  (level, message, context) => {
+    const output = level === 'error' ? process.stderr : process.stdout
+    output.write(`${JSON.stringify({ level, message, ...context })}\n`)
+  },
+  { catalog: listModelCatalog(), login: loginProvider },
+)
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.once(signal, () => {

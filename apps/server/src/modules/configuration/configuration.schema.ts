@@ -6,6 +6,7 @@ const timestampSchema = Type.String({ minLength: 1, maxLength: 40 })
 const environmentSchema = Type.Union([Type.Literal('development'), Type.Literal('test'), Type.Literal('production')])
 const credentialKindSchema = Type.Union([
   Type.Literal('api_key'),
+  Type.Literal('model_api_key'),
   Type.Literal('account_password'),
   Type.Literal('ssh_key'),
 ])

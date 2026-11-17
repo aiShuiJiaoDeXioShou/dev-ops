@@ -33,6 +33,10 @@ import type { GitAdapterFactory } from '../modules/integrations/integrations.ser
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
 import { resolveActor } from '../modules/identity/identity.actor.ts'
 import { botsRoutes } from '../modules/bots/bots.routes.ts'
+import { botConnectionsRoutes } from '../modules/bots/bots.connections.routes.ts'
+import { createBotConnectionsService } from '../modules/bots/bots.connections.service.ts'
+import { createBotLoginService } from '../modules/bots/bots.login.service.ts'
+import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createBotsService } from '../modules/bots/bots.service.ts'
 import type { BotDelegation } from '../modules/identity/identity.bot-delegation.ts'
 import type { PipelineCredentialProvider } from '../modules/pipeline/pipeline.credentials.ts'
@@ -127,6 +131,14 @@ export function createHttpApp(
   }
 
   app.register(botsRoutes, { prefix: '/api/v1', service: createBotsService(services.database.db) })
+  const botCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY
+    ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY)
+    : null
+  app.register(botConnectionsRoutes, {
+    prefix: '/api/v1',
+    connections: createBotConnectionsService(services.database.db, botCipher),
+    login: createBotLoginService(services.database.db, botCipher),
+  })
   app.register(healthRoutes, { prefix: '/api/v1', checkDatabase: services.database.check })
   app.register(identityAuthRoutes, { prefix: '/api/v1', auth: services.auth, origin: config.APP_ORIGIN })
   app.register(identityTeamRoutes, { prefix: '/api/v1', auth: services.auth, service: services.identity })
