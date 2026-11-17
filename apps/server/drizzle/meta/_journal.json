@@ -225,6 +225,13 @@
       "when": 1794876241213,
       "tag": "0031_bot_collaboration",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794877261010,
+      "tag": "0032_bot_configuration_activity",
+      "breakpoints": true
     }
   ]
 }

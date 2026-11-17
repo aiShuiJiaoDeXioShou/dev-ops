@@ -33,6 +33,8 @@ import { gitHubAccountRoutes } from '../modules/integrations/integrations.github
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
 import { resolveActor } from '../modules/identity/identity.actor.ts'
+import { botsRoutes } from '../modules/bots/bots.routes.ts'
+import { createBotsService } from '../modules/bots/bots.service.ts'
 import type { BotDelegation } from '../modules/identity/identity.bot-delegation.ts'
 import type { PipelineCredentialProvider } from '../modules/pipeline/pipeline.credentials.ts'
 
@@ -125,6 +127,7 @@ export function createHttpApp(
     app.register(swaggerUi, { routePrefix: '/docs' })
   }
 
+  app.register(botsRoutes, { prefix: '/api/v1', service: createBotsService(services.database.db) })
   app.register(healthRoutes, { prefix: '/api/v1', checkDatabase: services.database.check })
   app.register(identityAuthRoutes, { prefix: '/api/v1', auth: services.auth, origin: config.APP_ORIGIN })
   app.register(identityTeamRoutes, { prefix: '/api/v1', auth: services.auth, service: services.identity })

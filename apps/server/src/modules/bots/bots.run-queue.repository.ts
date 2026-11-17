@@ -38,7 +38,14 @@ export async function enqueueBotRun(
     'team_id' | 'conversation_id' | 'task_id' | 'bot_id' | 'trigger_user_id' | 'trigger_message_id' | 'input_version'
   >,
 ): Promise<BotRunRecord> {
-  const [run] = await tx.insert(botRun).values(input).returning()
+  const [run] = await tx
+    .insert(botRun)
+    .values({
+      ...input,
+      created_at: sql`clock_timestamp()`,
+      updated_at: sql`clock_timestamp()`,
+    })
+    .returning()
   if (!run) throw new Error('未能创建 Bot 运行')
   await writeRunState(tx, run)
   return run
@@ -296,4 +303,30 @@ export async function reconcileExpiredBotRuns(db: Database): Promise<number> {
     }
     return runs.length
   })
+}
+
+/**
+ * 标记已停用 Bot 的在途运行，并在同一事务取消尚未开始的运行。
+ * @param tx 保存停用状态的事务。
+ * @param teamId Bot 所属团队。
+ * @param botId 被停用的 Bot。
+ * @returns 成功更新后完成。
+ */
+export async function stopRunsForBot(tx: BotRunTransaction, teamId: string, botId: string) {
+  const scope = and(eq(botRun.team_id, teamId), eq(botRun.bot_id, botId))
+  await tx
+    .update(botRun)
+    .set({ stop_requested: true, updated_at: sql`clock_timestamp()` })
+    .where(and(scope, eq(botRun.status, 'running'), eq(botRun.stop_requested, false)))
+  const cancelled = await tx
+    .update(botRun)
+    .set({
+      status: 'stopped',
+      finished_at: sql`clock_timestamp()`,
+      updated_at: sql`clock_timestamp()`,
+    })
+    .where(and(scope, eq(botRun.status, 'queued')))
+    .returning()
+  cancelled.sort((left, right) => left.conversation_id.localeCompare(right.conversation_id))
+  for (const run of cancelled) await writeRunState(tx, run)
 }

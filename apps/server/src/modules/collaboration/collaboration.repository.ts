@@ -24,6 +24,8 @@ export type ActivityEntityType =
   | 'credential_grant'
   | 'project_env_var'
   | 'skill'
+  | 'bot'
+  | 'bot_model_connection'
   | 'attachment'
 
 export interface NewComment {
