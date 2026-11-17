@@ -5,7 +5,6 @@ import { Link } from 'react-router'
 import { botTasksOptions, taskQueries } from '@/features/bot-tasks/api/queries'
 import { ConversationTaskPanel } from '@/features/bot-tasks/ui/conversation-task-panel'
 import { NewTaskDialog } from '@/features/bot-tasks/ui/new-task-dialog'
-import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import {
   conversationEventsOptions,
   conversationEventText,
@@ -43,7 +42,6 @@ const tabItems = [
   { id: 'chat', label: '对话' },
   { id: 'activity', label: '轨迹' },
   { id: 'context', label: '上下文' },
-  { id: 'members', label: '编队' },
 ]
 
 /**
@@ -260,7 +258,6 @@ export function ConversationRoom({
   const counts: Record<string, number> = {
     activity: runs.length,
     context: room.tags.length + room.skillReferences.length,
-    members: bots.length,
   }
   return (
     <>
@@ -509,86 +506,6 @@ export function ConversationRoom({
                     </li>
                   ))}
                 </ul>
-              )}
-            </section>
-          </div>
-        </TabsContent>
-        <TabsContent value="members" className="dsh-tab-panel">
-          <div className="dsh-panel-scroll">
-            <section className="team-panel">
-              <div className="dsh-panel-head">
-                <div>
-                  <strong>编队</strong>
-                  <span className="dsh-panel-meta">
-                    {bots.length} 位 Bot{room.kind === 'group' && leader && ` · Leader ${leader.name}`}
-                  </span>
-                </div>
-                {!readOnly && room.kind === 'group' && (
-                  <Button
-                    unstyled
-                    type="button"
-                    className="dsh-button"
-                    onClick={(event) => openSettings(event.currentTarget)}
-                  >
-                    会话设置
-                  </Button>
-                )}
-              </div>
-              <ul className="team-members">
-                {[...orderedBots, ...room.members.filter(({ kind }) => kind === 'user')].map((member) => (
-                  <li className="team-member" key={member.id}>
-                    {member.kind === 'bot' && (
-                      <BotAvatar botId={member.id} avatarKey={member.avatarKey ?? null} enabled={member.enabled} />
-                    )}
-                    <div className="team-main">
-                      <div className="team-name">
-                        <strong>{member.name}</strong>
-                        {member.id === room.leaderBotId && <span className="team-tag">Leader</span>}
-                      </div>
-                      <span className="team-role">
-                        {member.kind === 'bot' ? member.responsibility || '智能体' : '成员'}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <div className="ctx-section-head">
-                <h3>协作任务</h3>
-                <span className="ctx-count">{tasksInRoom.length}</span>
-                <span className="spacer" />
-                {!readOnly && (
-                  <Button
-                    unstyled
-                    type="button"
-                    className="dsh-button"
-                    onClick={(event) => createTask(event.currentTarget)}
-                  >
-                    新建任务
-                  </Button>
-                )}
-                <Button unstyled type="button" className="dsh-button" onClick={openTask}>
-                  全部任务
-                </Button>
-              </div>
-              {tasksInRoom.length > 0 ? (
-                <div className="dsh-task-list">
-                  {tasksInRoom.slice(0, 6).map((task) => (
-                    <Button
-                      unstyled
-                      key={task.id}
-                      type="button"
-                      className="work-task-row"
-                      onClick={() => {
-                        setTaskId(task.id)
-                        setPanel('task')
-                      }}
-                    >
-                      <strong>{task.title}</strong>
-                    </Button>
-                  ))}
-                </div>
-              ) : (
-                <p className="dsh-note">还没有协作任务。</p>
               )}
             </section>
           </div>

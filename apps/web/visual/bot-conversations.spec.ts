@@ -120,7 +120,10 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   })
 
   await page.goto(`/collaboration/${room.id}`)
-  await expect(page.getByRole('tab', { name: '对话' })).toBeVisible()
+  const tabs = page.getByRole('tablist', { name: '会话视图' })
+  await expect(tabs.getByRole('tab')).toHaveCount(3)
+  await expect(tabs.getByRole('tab', { name: '对话' })).toBeVisible()
+  await expect(tabs.getByRole('tab', { name: '上下文' })).toBeVisible()
   if (testInfo.project.name === 'mobile') {
     const toggle = page.getByRole('button', { name: '打开会话列表' })
     await expect(page.getByRole('button', { name: '打开导航', exact: true })).toHaveCount(0)

@@ -100,6 +100,7 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
   await dialog.getByRole('checkbox', { name: '复核助理' }).press('Space')
   await dialog.getByRole('button', { name: '创建群组' }).press('Enter')
   await expect(page.getByText('智能体读取团队资料后，结果对会话全体成员可见。')).toBeVisible()
+  await expect(page.getByRole('tablist', { name: '会话视图' }).getByRole('tab')).toHaveCount(3)
   const settings = page.getByRole('button', { name: '会话设置', exact: true })
   await settings.click()
   const panel = page.getByRole('complementary', { name: '会话设置' })
