@@ -1,4 +1,5 @@
 import {
+  memoryTools,
   openApiTools,
   runBot,
   webTools,
@@ -12,6 +13,7 @@ import type { SecretCipher } from '../../configuration/configuration.crypto.ts'
 import { finishBotRun, renewBotRunLease, type BotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
+import { createPgMemoryStore } from './memory-store.ts'
 import { fetchBotPublicPage } from './public-page.ts'
 import { createPgRunSink } from './run-sink.ts'
 import { auditBotWebTools } from './web-tool-audit.ts'
@@ -37,10 +39,6 @@ const unavailable: RunOutcome = {
   failureMessage: 'Bot 的模型连接、会话或触发人已不可用',
   turns: 0,
   usage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0 },
-}
-
-async function unavailableMemoryWrite(): Promise<never> {
-  throw new Error('当前运行未注册记忆工具')
 }
 
 /**
@@ -93,10 +91,12 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       connectionId: input.connectionId,
     })
     const api = options.platformApi?.(lease, run)
+    const memory = createPgMemoryStore(db, run, lease)
     const outcome = await options.execute({
       model: input.model,
       context: input.context,
       tools: [
+        ...memoryTools(memory),
         ...auditBotWebTools(
           db,
           run,
@@ -115,12 +115,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       ports: {
         credentials,
         sink,
-        memory: {
-          search: async () => [],
-          add: unavailableMemoryWrite,
-          patch: unavailableMemoryWrite,
-          remove: unavailableMemoryWrite,
-        },
+        memory,
         api: api?.invoker ?? { invoke: async () => ({ ok: false, code: 'BOT_API_FORBIDDEN' }) },
       },
     })

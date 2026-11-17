@@ -13,12 +13,13 @@ import { project } from '../../projects/projects.tables.ts'
 import { requirement } from '../../requirements/requirements.tables.ts'
 import { botTask } from '../../tasks/bot-tasks.tables.ts'
 import { codeChange } from '../../tools/tools.tables.ts'
-import { bot, botRun } from '../bots.tables.ts'
+import { bot, botMemory, botRun } from '../bots.tables.ts'
 
 const TEAM_OWNED_RESOURCES: Readonly<Record<string, PgTable & { id: PgColumn; team_id: PgColumn }>> = {
   attachments: attachment,
   bots: bot,
   'bot-conversations': botConversation,
+  'bot-memories': botMemory,
   'bot-runs': botRun,
   'bot-tasks': botTask,
   bugs: bug,

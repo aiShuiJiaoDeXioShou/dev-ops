@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { testCredentialStore, testRunSink } from '@dev-ops/devops-bot/testing'
+import { testCredentialStore, testMemoryStore, testRunSink } from '@dev-ops/devops-bot/testing'
 import type { RunEvent } from '@dev-ops/devops-bot'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { Type } from 'typebox'
@@ -9,6 +9,7 @@ import { Check } from 'typebox/value'
 import { claimBotRun, enqueueBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { botModelConnection } from '../../src/modules/bots/bots.tables.ts'
 import { createPgCredentialStore } from '../../src/modules/bots/runtime/credential-store.ts'
+import { createPgMemoryStore } from '../../src/modules/bots/runtime/memory-store.ts'
 import { createPgRunSink } from '../../src/modules/bots/runtime/run-sink.ts'
 import { botEvent } from '../../src/modules/collaboration/bot-conversations.tables.ts'
 import { createSecretCipher } from '../../src/modules/configuration/configuration.crypto.ts'
@@ -73,5 +74,29 @@ test('PostgreSQL Bot 端口通过共享接口一致性检查', async (t) => {
         })
       },
     }
+  })
+})
+
+test('PostgreSQL 记忆端口通过共享接口一致性检查', async (t) => {
+  const { db } = await createBotTestDatabase(t)
+  const botId = randomUUID()
+  const teamId = randomUUID()
+  await testMemoryStore(t, async () => {
+    async function makeStore() {
+      const queued = await db.transaction((tx) =>
+        enqueueBotRun(tx, {
+          team_id: teamId,
+          bot_id: botId,
+          conversation_id: randomUUID(),
+          trigger_user_id: randomUUID(),
+          input_version: 0,
+        }),
+      )
+      const run = await claimBotRun(db, 'memory-contract', { global: 4, perTeam: 4, ttlSeconds: 30 })
+      assert.ok(run)
+      assert.equal(run.id, queued.id)
+      return createPgMemoryStore(db, run, { id: run.id, owner: 'memory-contract', epoch: run.lease_epoch })
+    }
+    return { store: await makeStore(), otherScope: await makeStore() }
   })
 })

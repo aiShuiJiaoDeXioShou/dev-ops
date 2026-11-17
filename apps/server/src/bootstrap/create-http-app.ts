@@ -32,6 +32,8 @@ import { gitHubAccountRoutes } from '../modules/integrations/integrations.github
 import type { GitAdapterFactory } from '../modules/integrations/integrations.service.ts'
 import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
 import { resolveActor } from '../modules/identity/identity.actor.ts'
+import { botMemoryRoutes } from '../modules/bots/bots.memory.routes.ts'
+import { createBotMemoryService } from '../modules/bots/bots.memory.service.ts'
 import { botsRoutes } from '../modules/bots/bots.routes.ts'
 import { botConnectionsRoutes } from '../modules/bots/bots.connections.routes.ts'
 import { botConversationsRoutes } from '../modules/collaboration/bot-conversations.routes.ts'
@@ -138,6 +140,7 @@ export function createHttpApp(
     app.register(swaggerUi, { routePrefix: '/docs' })
   }
 
+  app.register(botMemoryRoutes, { prefix: '/api/v1', service: createBotMemoryService(services.database.db) })
   app.register(botsRoutes, { prefix: '/api/v1', service: createBotsService(services.database.db) })
   const botCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY
     ? createSecretCipher(config.GIT_CREDENTIAL_ENCRYPTION_KEY)
