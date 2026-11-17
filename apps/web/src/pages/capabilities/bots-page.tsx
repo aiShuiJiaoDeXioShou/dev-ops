@@ -17,9 +17,17 @@ export function Component() {
   if (!currentTeam)
     return <EmptyState mascot="group" title="尚未选择团队" description="加入团队后即可查看团队的智能体。" />
   const canEdit = role === 'admin' || role === 'developer'
+  const canBindModel = role === 'admin'
   return (
     <>
-      <BotList key={currentTeam.id} teamId={currentTeam.id} userId={user.id} canEdit={canEdit} selectedId={botId} />
+      <BotList
+        key={currentTeam.id}
+        teamId={currentTeam.id}
+        userId={user.id}
+        canEdit={canEdit}
+        canBindModel={canBindModel}
+        selectedId={botId}
+      />
       {detailHost &&
         botId &&
         createPortal(
@@ -29,7 +37,7 @@ export function Component() {
             teamId={currentTeam.id}
             userId={user.id}
             canEdit={canEdit}
-            canBindModel={role === 'admin'}
+            canBindModel={canBindModel}
             onClose={() => navigate({ pathname: '/capabilities/bots', search }, { replace: true })}
           />,
           detailHost,

@@ -1,6 +1,6 @@
-import { useId, useState, type FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
@@ -13,28 +13,25 @@ import {
   DialogFormHeader,
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
-import { Select } from '@/shared/ui/controls/select'
 import { useToast } from '@/shared/ui/toast'
 import { botQueryKey, type BotView } from '../api/queries'
-import { botCatalogOptions, botConnectionsOptions } from '../api/connections'
+import { useBotModelSelection } from '../model/use-bot-model-selection'
+import { BotModelFields } from './bot-model-fields'
 
-/** 允许团队管理员用目录中的可用模型更新智能体绑定。 */
+/**
+ * 允许团队管理员用目录中的可用模型更新智能体绑定。
+ * @param props 待更新的智能体和关闭弹窗的回调。
+ * @returns 模型绑定弹窗，保存失败时保留当前选择。
+ */
 export function BotModelForm({ bot, onClose }: { bot: BotView; onClose: () => void }) {
-  const id = useId()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
-  const [connectionId, setConnectionId] = useState(bot.modelConnectionId ?? '')
-  const [modelId, setModelId] = useState(bot.modelId ?? '')
-  const connections = useQuery(botConnectionsOptions(bot.teamId))
-  const available = connections.data?.data.filter((connection) => connection.status === 'active') ?? []
-  const selected = available.find((connection) => connection.id === connectionId)
-  const catalog = useQuery({ ...botCatalogOptions(bot.teamId, selected?.providerId), enabled: Boolean(selected) })
-  const models = catalog.data?.data.filter((model) => selected && model.authTypes.includes(selected.authType)) ?? []
+  const selection = useBotModelSelection(bot.teamId, true, bot.modelConnectionId ?? '', bot.modelId ?? '')
   const mutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (binding: { connectionId: string; modelId: string }) =>
       apiClient.bindBotModel(
         bot.id,
-        { connectionId, modelId, configVersion: bot.configVersion },
+        { ...binding, configVersion: bot.configVersion },
         {
           idempotencyKey: createIdempotencyKey(),
         },
@@ -47,7 +44,7 @@ export function BotModelForm({ bot, onClose }: { bot: BotView; onClose: () => vo
   })
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (selected && models.some((model) => model.modelId === modelId) && !mutation.isPending) mutation.mutate()
+    if (selection.binding && !mutation.isPending) mutation.mutate(selection.binding)
   }
 
   return (
@@ -64,58 +61,7 @@ export function BotModelForm({ bot, onClose }: { bot: BotView; onClose: () => vo
         </DialogFormHeader>
         <form className="flex min-h-0 flex-col" onSubmit={submit}>
           <DialogFormBody className="space-y-4">
-            <label className="field" htmlFor={`${id}-connection`}>
-              <span>模型连接</span>
-              <Select
-                id={`${id}-connection`}
-                value={selected?.id ?? ''}
-                disabled={connections.isPending || connections.isError}
-                onChange={(event) => {
-                  setConnectionId(event.target.value)
-                  setModelId('')
-                }}
-                required
-              >
-                <option value="">请选择可用连接</option>
-                {available.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            {connections.isSuccess && available.length === 0 && (
-              <p className="quiet small">在「连接与节点」添加可用模型连接。</p>
-            )}
-            <label className="field" htmlFor={`${id}-model`}>
-              <span>模型</span>
-              <Select
-                id={`${id}-model`}
-                value={modelId}
-                disabled={!selected || catalog.isPending || catalog.isError}
-                onChange={(event) => setModelId(event.target.value)}
-                required
-              >
-                <option value="">请选择模型</option>
-                {models.map((model) => (
-                  <option key={model.modelId} value={model.modelId}>
-                    {model.displayName}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            {(connections.isError || catalog.isError) && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  if (connections.isError) void connections.refetch()
-                  if (catalog.isError) void catalog.refetch()
-                }}
-              >
-                重试加载
-              </Button>
-            )}
+            <BotModelFields selection={selection} isSaving={mutation.isPending} />
             {mutation.error && (
               <p role="alert" className="text-sm text-destructive">
                 {describeRequestError(mutation.error).description}
@@ -126,11 +72,8 @@ export function BotModelForm({ bot, onClose }: { bot: BotView; onClose: () => vo
             <Button type="button" variant="outline" disabled={mutation.isPending} onClick={onClose}>
               取消
             </Button>
-            <Button
-              type="submit"
-              disabled={mutation.isPending || !selected || !models.some((model) => model.modelId === modelId)}
-            >
-              保存配置
+            <Button type="submit" disabled={mutation.isPending || !selection.binding}>
+              {mutation.isPending ? '正在保存…' : '保存配置'}
             </Button>
           </DialogFormFooter>
         </form>

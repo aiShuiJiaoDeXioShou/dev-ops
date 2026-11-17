@@ -16,6 +16,8 @@ const BUSINESS_MESSAGES: Record<string, string> = {
   CREDENTIAL_UNAVAILABLE: '凭据已撤销或已过期。',
   GITHUB_ACCOUNT_REQUIRED: '请绑定或重新授权你的 GitHub 账号。',
   GITHUB_REPOSITORY_FORBIDDEN: '你的 GitHub 账号缺少此仓库所需的权限。',
+  BOT_MODEL_CONNECTION_UNAVAILABLE: '所选模型连接不可用，请检查连接或重新选择。',
+  BOT_MODEL_NOT_IN_CATALOG: '所选模型不可用，请从模型目录重新选择。',
 }
 
 function botUnavailableMessage(data: unknown) {

@@ -13,6 +13,8 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
   const fixtureId = 'da55aa00-0000-4000-8000-000000000011'
+  const connectionId = 'da55aa00-0000-4000-8000-000000000013'
+  const modelId = 'deepseek-flash'
   const fixture: BotView = {
     id: fixtureId,
     teamId,
@@ -24,10 +26,10 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
     avatarKey: null,
     configVersion: 1,
     status: 'enabled',
-    availability: 'model_unbound',
-    connectionName: null,
-    modelConnectionId: null,
-    modelId: null,
+    availability: 'available',
+    connectionName: '团队 DeepSeek',
+    modelConnectionId: connectionId,
+    modelId,
     skillIds: [],
     updatedAt: '2026-11-17T08:00:00.000Z',
     lastActiveAt: null,
@@ -51,6 +53,37 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
   let exists = false
   let writes = 0
   let hasConversation = false
+  await page.route(`**/api/v1/teams/${teamId}/bot-model-connections`, (route) =>
+    route.fulfill({
+      json: success([
+        {
+          id: connectionId,
+          providerId: 'deepseek',
+          name: fixture.connectionName,
+          authType: 'api_key',
+          status: 'active',
+          disabledReason: null,
+          loginUserName: null,
+          version: 1,
+          updatedAt: fixture.updatedAt,
+        },
+      ]),
+    }),
+  )
+  await page.route(`**/api/v1/teams/${teamId}/bot-model-catalog*`, (route) =>
+    route.fulfill({
+      json: success([
+        { providerId: 'deepseek', modelId, displayName: 'DeepSeek Flash', authTypes: ['api_key'], contextWindow: 8192 },
+        {
+          providerId: 'deepseek',
+          modelId: 'fixture-oauth',
+          displayName: '订阅模型',
+          authTypes: ['oauth'],
+          contextWindow: 8192,
+        },
+      ]),
+    }),
+  )
   await page.route(`**/api/v1/teams/${teamId}/bot-inbox`, (route) =>
     route.fulfill({ json: success({ items: [], count: 0 }) }),
   )
@@ -91,6 +124,7 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
       expect(route.request().postDataJSON()).toMatchObject({
         name: fixture.name,
         responsibility: fixture.responsibility,
+        modelBinding: { connectionId, modelId },
       })
       exists = true
       writes++
@@ -125,7 +159,17 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
   await create.click()
   await form.getByLabel('名称', { exact: true }).fill(fixture.name)
   await form.getByLabel('职责', { exact: true }).fill(fixture.responsibility)
-  await form.getByRole('button', { name: '创建智能体', exact: true }).click()
+  const submit = form.getByRole('button', { name: '创建智能体', exact: true })
+  const connection = form.getByLabel('模型连接')
+  const model = form.getByLabel('默认模型')
+  await expect(model).toBeDisabled()
+  await expect(submit).toBeEnabled()
+  await connection.selectOption(connectionId)
+  await expect(submit).toBeDisabled()
+  await expect(model.getByRole('option', { name: '订阅模型' })).toHaveCount(0)
+  await model.selectOption(modelId)
+  await page.screenshot({ path: testInfo.outputPath('bot-create-model.png'), animations: 'disabled' })
+  await submit.click()
   await expect(page.getByRole('link', { name: `查看${fixture.name}详情` })).toBeVisible()
   expect(writes).toBe(1)
   await page.getByRole('link', { name: `查看${fixture.name}详情` }).click()
@@ -164,8 +208,12 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
   await expect(detail).toBeVisible()
   await expect(detail.getByRole('tab', { name: '运行记录' })).toBeVisible()
   await expect(detail.getByRole('tab', { name: '项目' })).toHaveCount(0)
-  await expect(detail.getByText('未绑定模型').first()).toBeVisible()
+  await expect(detail.getByRole('definition').filter({ hasText: modelId })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('bot-detail.png') })
+  await detail.getByRole('button', { name: '绑定模型' }).click()
+  const modelForm = page.getByRole('dialog', { name: '绑定模型' })
+  await expect(modelForm.getByRole('combobox', { name: '模型', exact: true })).toHaveValue(modelId)
+  await modelForm.getByRole('button', { name: '取消' }).click()
   await page.getByRole('button', { name: '停用智能体' }).click()
   const alert = page.getByRole('alertdialog')
   await expect(alert.getByRole('button', { name: '取消' })).toBeFocused()

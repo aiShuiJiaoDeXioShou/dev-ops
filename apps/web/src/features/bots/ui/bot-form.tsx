@@ -31,16 +31,23 @@ import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
 import { botQueryKey, type BotView } from '../api/queries'
+import { useBotModelSelection } from '../model/use-bot-model-selection'
+import { BotModelFields } from './bot-model-fields'
 
 interface BotFormProps {
   teamId: string
   bot?: BotView
   defaultOwnerId: string
+  canBindModel?: boolean
   onClose: () => void
 }
 
-/** 创建或编辑 Bot。调用方仅在弹窗打开时挂载，关闭后重新初始化草稿。 */
-export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) {
+/**
+ * 创建或编辑 Bot。调用方仅在弹窗打开时挂载，关闭后重新初始化草稿。
+ * @param props 团队、负责人、可选的待编辑 Bot、是否允许创建时绑定模型及关闭回调。
+ * @returns 智能体表单弹窗。
+ */
+export function BotForm({ teamId, bot, defaultOwnerId, canBindModel = false, onClose }: BotFormProps) {
   const id = useId()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
@@ -60,6 +67,13 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
   const [ownerUserId, setOwnerUserId] = useState(defaultOwner)
   const owners = members.data?.data.filter((member) => member.status === 'active') ?? []
   const selectedOwnerActive = owners.some((member) => member.userId === ownerUserId)
+  const canSelectModel = !bot && canBindModel
+  const modelSelection = useBotModelSelection(teamId, canSelectModel)
+  const canSave =
+    selectedOwnerActive &&
+    !!name.trim() &&
+    !!responsibility.trim() &&
+    (!modelSelection.connectionId || !!modelSelection.binding)
   const mutation = useMutation({
     mutationFn: () => {
       const input = {
@@ -72,7 +86,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
       const options = { idempotencyKey: createIdempotencyKey() }
       return bot
         ? apiClient.updateBot(bot.id, { ...input, configVersion: bot.configVersion }, options)
-        : apiClient.createBot(teamId, input, options)
+        : apiClient.createBot(teamId, { ...input, modelBinding: modelSelection.binding }, options)
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: botQueryKey })
@@ -82,7 +96,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
   })
   function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!mutation.isPending && selectedOwnerActive) mutation.mutate()
+    if (!mutation.isPending && canSave) mutation.mutate()
   }
   function close() {
     if (mutation.isPending) return
@@ -91,6 +105,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
       responsibility !== (bot?.responsibility ?? '') ||
       instructions !== (bot?.instructions ?? '') ||
       ownerUserId !== defaultOwner ||
+      !!modelSelection.connectionId ||
       changedSkills
     if (hasEdits) setDiscardOpen(true)
     else onClose()
@@ -161,6 +176,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
                 <span>运行环境</span>
                 <span className="runtime-cell">团队执行器</span>
               </div>
+              {canSelectModel && <BotModelFields selection={modelSelection} isOptional isSaving={mutation.isPending} />}
               <label className="field full" htmlFor={`${id}-instructions`}>
                 <span>职责说明</span>
                 <Textarea
@@ -221,10 +237,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
             <Button type="button" variant="outline" disabled={mutation.isPending} onClick={close}>
               取消
             </Button>
-            <Button
-              type="submit"
-              disabled={mutation.isPending || !selectedOwnerActive || !name.trim() || !responsibility.trim()}
-            >
+            <Button type="submit" disabled={mutation.isPending || !canSave}>
               {mutation.isPending ? '正在保存…' : bot ? '保存配置' : '创建智能体'}
             </Button>
           </DialogFormFooter>

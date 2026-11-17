@@ -18,11 +18,16 @@ interface BotListProps {
   teamId: string
   userId: string
   canEdit: boolean
+  canBindModel: boolean
   selectedId?: string
 }
 
-/** 团队智能体目录，沿用原型的页签、搜索和表格。 */
-export function BotList({ teamId, userId, canEdit, selectedId }: BotListProps) {
+/**
+ * 团队智能体目录，沿用原型的页签、搜索和表格。
+ * @param props 当前团队和成员、创建与绑定权限、已选中的智能体。
+ * @returns 可筛选的智能体目录和创建入口。
+ */
+export function BotList({ teamId, userId, canEdit, canBindModel, selectedId }: BotListProps) {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
@@ -217,7 +222,14 @@ export function BotList({ teamId, userId, canEdit, selectedId }: BotListProps) {
           </div>
         )}
       </div>
-      {createOpen && <BotForm teamId={teamId} defaultOwnerId={userId} onClose={() => setCreateOpen(false)} />}
+      {createOpen && (
+        <BotForm
+          teamId={teamId}
+          defaultOwnerId={userId}
+          canBindModel={canBindModel}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
     </>
   )
 }
