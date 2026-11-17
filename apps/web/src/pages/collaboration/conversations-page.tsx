@@ -33,6 +33,12 @@ const runStatuses: Record<string, string> = {
   failed: '执行失败',
 }
 
+function activityText(payload: unknown, key: string): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined
+  const value: unknown = Reflect.get(payload, key)
+  return typeof value === 'string' ? value : undefined
+}
+
 function ConversationRoom({
   id,
   userId,
@@ -227,12 +233,29 @@ function ConversationRoom({
           <div className="dsh-panel-scroll">
             {events.data?.activity.length ? (
               <ul className="tool-results">
-                {events.data.activity.map((entry) => (
-                  <li key={entry.sequence} className="tool-result-card">
-                    <time dateTime={entry.createdAt}>{clock.format(new Date(entry.createdAt))}</time>
-                    <strong>工具活动</strong>
-                  </li>
-                ))}
+                {events.data.activity.map((entry) => {
+                  const name = activityText(entry.payload, 'name') ?? '工具活动'
+                  const state = activityText(entry.payload, 'state')
+                  const path = activityText(entry.payload, 'path')
+                  const method = activityText(entry.payload, 'method')
+                  const code = activityText(entry.payload, 'code')
+                  return (
+                    <li key={entry.sequence} className="tool-result-card">
+                      <details>
+                        <summary>
+                          {name} · <time dateTime={entry.createdAt}>{clock.format(new Date(entry.createdAt))}</time>
+                        </summary>
+                        {path && (
+                          <p className="wrap-break-word">
+                            {method} {path}
+                          </p>
+                        )}
+                        {code && <p>{code}</p>}
+                        {state && <p className="small muted">{state}</p>}
+                      </details>
+                    </li>
+                  )
+                })}
               </ul>
             ) : (
               <EmptyState title="暂无执行轨迹" />

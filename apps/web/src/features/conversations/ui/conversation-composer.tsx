@@ -105,6 +105,7 @@ export function ConversationComposer({
           ))}
         </div>
       )}
+      {room.kind === 'group' && <p className="dsh-note">智能体读取团队资料后，结果对会话全体成员可见。</p>}
       <Textarea
         ref={input}
         rows={1}

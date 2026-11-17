@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router'
 import { formatDateTime } from '@/shared/lib/format'
 import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { activitiesQueryOptions, type CollabTarget } from '../api/queries'
@@ -52,7 +53,15 @@ export function ActivityTimeline({ target, targetId }: { target: CollabTarget; t
       {activities.map((activity) => (
         <li key={activity.id} className="space-y-1">
           <p className="text-sm">{ACTION_LABELS[activity.action] ?? activity.action}</p>
-          <p className="text-xs text-muted-foreground">{formatDateTime(activity.createdAt)}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatDateTime(activity.createdAt)}
+            {activity.viaBotId && (
+              <>
+                {' '}
+                · <Link to={`/capabilities/bots/${activity.viaBotId}`}>经由 Bot</Link>
+              </>
+            )}
+          </p>
           {activity.note && <p className="text-sm text-muted-foreground">{activity.note}</p>}
           {activity.reason && <p className="text-sm text-muted-foreground">原因：{activity.reason}</p>}
         </li>
