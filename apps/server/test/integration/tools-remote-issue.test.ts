@@ -8,7 +8,7 @@ import {
   injectJson,
   setupPipelineContext,
   stringField,
-} from '../helpers/operations.ts'
+} from './pipeline-harness.ts'
 
 test('T045 远端写：能力授权、远端 Issue 与评论', { timeout: 60_000 }, async (t) => {
   const context = await setupPipelineContext(t)

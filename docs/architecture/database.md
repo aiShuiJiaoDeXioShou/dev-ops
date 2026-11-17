@@ -129,7 +129,11 @@ V0.4a 新增 `pipeline` 模块的 7 张表，替代已下线的 `delivery` 外�
 
 非本地环境应由管理员预建数据库及两个独立角色，按本地初始化脚本的权限边界配置；基础迁移中的应用角色名为 `dev_ops_app`。远程连接按数据库服务要求启用并验证 TLS，不通过关闭证书校验绕过错误。连接池上限应结合进程数量和数据库连接容量设置。迁移成功不代表所有业务数据升级均已验证，发布前仍需针对实际表结构验证备份恢复和升级路径。
 
+部署运维下线迁移前，先停止发起旧变更，确认关联的流水线运行已结束，再停止旧版 API 与 Worker。应用迁移后启动新版 API 与 Worker。迁移会删除旧变更数据，回退到旧版需要能恢复这四张表的数据库备份。
+
 ## 补充：V0.4b 表与迁移（2026-11-11）
+
+以下记录描述 V0.4b 当时的库结构。旧运维下线迁移删除变更计划、放行、执行和事件表，保留流水线运行及服务运行版本历史。迁移清除其中指向旧变更详情的证据链接。
 
 - 迁移 `0022_v04b_deploy_release.sql` 新建：`project_capability_grant`、`tool_invocation`、`code_change`、`change_plan`、`change_plan_approval`、`change_execution`、`change_plan_event`，并为 `pipeline_run` 增加 `run_kind`（默认 `workflow`）与 `secret_environment`（默认 `production`）。
 - 部分唯一索引：`uk_project_capability_grant_active` 保证同一项目/用户/能力只有一条有效授权；`uk_change_plan_active_target` 保证同一服务 + 环境只有一条 `approved/executing/verifying` 计划。

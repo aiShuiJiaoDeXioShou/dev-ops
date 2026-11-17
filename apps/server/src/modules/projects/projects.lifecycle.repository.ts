@@ -3,7 +3,6 @@ import { and, asc, count, desc, eq, inArray, isNotNull, lte, notInArray, or, sql
 import type { Database } from '../../platform/database/client.ts'
 import { pipelineRun } from '../pipeline/pipeline.tables.ts'
 import { PIPELINE_TERMINAL_RUN_STATUSES } from '../pipeline/pipeline.state.ts'
-import { changeExecution, changePlan } from '../operations/operations.tables.ts'
 import { codeChange, toolInvocation } from '../tools/tools.tables.ts'
 import { project } from './projects.tables.ts'
 import { projectFileCleanup, projectPasswordLimit } from './projects.lifecycle.tables.ts'
@@ -74,16 +73,6 @@ export async function findProjectDeletionBlockers(tx: Transaction, projectId: st
             notInArray(pipelineRun.status, [...PIPELINE_TERMINAL_RUN_STATUSES]),
           ),
         )})`,
-      executions: sql<boolean>`exists (${tx
-        .select({ id: changeExecution.id })
-        .from(changeExecution)
-        .where(
-          and(eq(changeExecution.project_id, projectId), inArray(changeExecution.status, ['queued', 'running'])),
-        )})`,
-      plans: sql<boolean>`exists (${tx
-        .select({ id: changePlan.id })
-        .from(changePlan)
-        .where(and(eq(changePlan.project_id, projectId), inArray(changePlan.status, ['executing', 'verifying'])))})`,
       invocations: sql<boolean>`exists (${tx
         .select({ id: toolInvocation.id })
         .from(toolInvocation)
@@ -102,11 +91,7 @@ export async function findProjectDeletionBlockers(tx: Transaction, projectId: st
     .where(eq(project.id, projectId))
     .limit(1)
   if (!active) throw new Error('数据库缺少已锁定的项目')
-  return [
-    ...(active.runs ? ['流水线运行'] : []),
-    ...(active.executions || active.plans ? ['发布执行'] : []),
-    ...(active.invocations || active.changes ? ['远端写操作'] : []),
-  ]
+  return [...(active.runs ? ['流水线运行'] : []), ...(active.invocations || active.changes ? ['远端写操作'] : [])]
 }
 
 /**

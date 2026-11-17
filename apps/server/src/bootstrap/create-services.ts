@@ -21,11 +21,8 @@ import { createConfigurationService } from '../modules/configuration/configurati
 import { verifySessionPassword } from '../modules/identity/identity.password.ts'
 import { createDeliveryService } from '../modules/delivery/delivery.service.ts'
 import { createPipelineService } from '../modules/pipeline/pipeline.service.ts'
-import { createOperationsService } from '../modules/operations/operations.service.ts'
-import { reconcileChangeExecutionFromRun } from '../modules/operations/operations.execution.service.ts'
 import { createCodeChangeService, reconcileCodeChangeFromRun } from '../modules/tools/tools.code-change.service.ts'
 import { createRemoteWriteService } from '../modules/tools/tools.remote-write.service.ts'
-import { createDeploymentRunVersionWriter } from '../modules/delivery/delivery.run-version.public.ts'
 import { createPipelineNodesService } from '../modules/pipeline/pipeline.nodes.service.ts'
 import { createPipelineAgentService } from '../modules/pipeline/pipeline.agent.service.ts'
 import {
@@ -175,10 +172,7 @@ export function createServices(
   const pipelineAgent = createPipelineAgentService({
     db: database.db,
     onRunFinalized: async (runId) => {
-      await Promise.all([
-        reconcileCodeChangeFromRun(database.db, runId),
-        reconcileChangeExecutionFromRun(database.db, runId),
-      ])
+      await reconcileCodeChangeFromRun(database.db, runId)
     },
     config: {
       leaseTtlSeconds: config.PIPELINE_LEASE_TTL_SECONDS,
@@ -207,13 +201,6 @@ export function createServices(
     diffResponseMaxBytes: config.CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES,
   })
   const remoteWrite = createRemoteWriteService({ db: database.db, code })
-  const deploymentRunVersions = createDeploymentRunVersionWriter({ db: database.db })
-  const operations = createOperationsService({
-    db: database.db,
-    pipeline: pipeline,
-    delivery: deploymentRunVersions,
-    appOrigin: config.APP_ORIGIN,
-  })
   const projects = createProjectsService({
     db: database.db,
     counts: async (projectIds) => {
@@ -248,7 +235,6 @@ export function createServices(
     githubAccount,
     code,
     delivery,
-    operations,
     codeChanges,
     remoteWrite,
     pipeline,

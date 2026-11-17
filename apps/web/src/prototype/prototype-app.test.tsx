@@ -82,7 +82,6 @@ describe('交互原型路由', () => {
 
   it.each([
     ['/prototype/collaboration', '研发协作平台协作组', 'text'],
-    ['/prototype/operations', '运维', 'heading'],
     ['/prototype/vault', '凭据库', 'heading'],
     ['/prototype/team-admin', '团队管理', 'heading'],
     ['/prototype/capabilities/bots', '智能体目录', 'text'],

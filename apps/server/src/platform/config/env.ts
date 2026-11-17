@@ -65,8 +65,6 @@ const environmentSchema = Type.Object({
   CODE_CHANGE_PATCH_MAX_BYTES: Type.Integer({ minimum: 1_024, maximum: 1_048_576, default: 1_048_576 }),
   CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES: Type.Integer({ minimum: 4_096, maximum: 1_048_576, default: 262_144 }),
   CODE_CHANGE_TIMEOUT_SECONDS: Type.Integer({ minimum: 60, maximum: 3_600, default: 900 }),
-  DEPLOY_VERIFY_TIMEOUT_SECONDS: Type.Integer({ minimum: 5, maximum: 120, default: 30 }),
-  CHANGE_PLAN_LIST_MAX_PAGE_SIZE: Type.Integer({ minimum: 1, maximum: 100, default: 100 }),
 })
 
 function validateHttpOrigin(value: string, name: string): string {

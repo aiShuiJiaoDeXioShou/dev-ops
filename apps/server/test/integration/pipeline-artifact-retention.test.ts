@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm'
 import { pipelineArtifact } from '../../src/modules/pipeline/pipeline.tables.ts'
 import { createPipelineStorage } from '../../src/modules/pipeline/pipeline.storage.ts'
 import { cleanupExpiredPipelineArtifacts } from '../../src/modules/pipeline/pipeline.retention.ts'
-import { setupPipelineContext } from '../helpers/operations.ts'
+import { setupPipelineContext } from './pipeline-harness.ts'
 
 test('T093 产物保留期清理：删除文件并标记 missing', { timeout: 60_000 }, async (t) => {
   const context = await setupPipelineContext(t)

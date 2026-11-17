@@ -319,9 +319,8 @@ test.describe('[desktop] 核心页面', () => {
     }
   })
 
-  test('[desktop] 运维变更、能力、凭据、团队、节点、个人页', async ({ page }, testInfo) => {
+  test('[desktop] 能力、凭据、团队、节点、个人页', async ({ page }, testInfo) => {
     const pages: Array<[string, string, string]> = [
-      ['changes', '/operations/changes', '变更'],
       ['skills', '/capabilities/skills', '技能库'],
       ['vault', '/vault', '凭据库'],
       ['team', '/settings/team?tab=connections', 'DevOps 研发团队'],
@@ -335,6 +334,80 @@ test.describe('[desktop] 核心页面', () => {
       await expectPageSnapshot(page, testInfo, name)
     }
   })
+})
+
+test('[desktop] [mobile] 旧运维入口下线后可从项目直接触发流水线', async ({ page }, testInfo) => {
+  const projectPath = `/projects/${VISUAL_IDS.projectId}`
+  const runsPath = `/api/v1${projectPath}/pipeline-runs`
+  const workflowPath = '.devops/workflows/platform-smoke.yml'
+  const runId = 'cb040760-6343-400f-a5f4-56910d58d87f'
+
+  await prepare(page, `${projectPath}/requirements`)
+  if (testInfo.project.name === 'mobile') {
+    await page.getByRole('button', { name: '打开导航' }).click()
+  }
+  const navigation = page.getByRole('navigation', { name: '主导航' })
+  await expect(navigation.getByRole('link', { name: '项目' })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: '运维' })).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('navigation.png') })
+  if (testInfo.project.name === 'mobile') {
+    await page.getByRole('button', { name: '关闭导航' }).click()
+  }
+
+  await page.route(`**${runsPath}`, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    await route.fulfill({
+      json: {
+        success: true,
+        code: 'OK',
+        message: '运行已创建',
+        requestId: 'visual-trigger-run',
+        data: {
+          runId,
+          projectId: VISUAL_IDS.projectId,
+          repositoryId: 'ee855a9d-032d-5c92-b022-dbffe6e71efd',
+          workflowPath,
+          workflowName: 'platform-smoke',
+          ref: 'main',
+          commitSha: '7918a5f443727d57476fd854a1d007a756881002',
+          status: 'queued',
+          triggerSource: 'manual',
+          initiatorChannel: 'web',
+          triggeredByUserId: '6ef930cc-e417-5754-82ae-1fc59f3aa0db',
+          initiator: '管理员',
+          nodeId: null,
+          nodeName: null,
+          errorCode: null,
+          errorMessage: null,
+          durationSeconds: null,
+          cancelRequestedAt: null,
+          createdAt: '2026-11-11T04:00:00.000Z',
+          assignedAt: null,
+          startedAt: null,
+          finishedAt: null,
+          inputs: {},
+          steps: [],
+          artifacts: [],
+          logs: { items: [], totalSizeBytes: 0 },
+        },
+      },
+    })
+  })
+  await page.getByRole('tab', { name: '流水线', exact: true }).click()
+  await page.getByRole('button', { name: '触发运行', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '触发流水线运行' })
+  await expect(dialog).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('trigger-pipeline.png') })
+  const request = page.waitForRequest(
+    (candidate) => new URL(candidate.url()).pathname === runsPath && candidate.method() === 'POST',
+  )
+  await dialog.getByRole('button', { name: '触发运行', exact: true }).click()
+  expect((await request).postDataJSON()).toMatchObject({ workflowPath, ref: 'main' })
+  await expect(page.getByText('运行已创建：cb040760')).toBeVisible()
+  await expect(dialog).toHaveCount(0)
+
+  await page.goto('/operations/changes/retired')
+  await expect(page.getByRole('heading', { name: '页面不存在', level: 1 })).toBeVisible()
 })
 
 test('[desktop] [mobile] 团队邀请空态与 Bot 错误页', async ({ page }, testInfo) => {
@@ -429,10 +502,9 @@ test.describe('[desktop] 关键弹窗', () => {
     await expectPageSnapshot(page, testInfo, 'sheet-code-invocations')
   })
 
-  test('[desktop] 需求创建与变更计划创建弹窗固定底栏', async ({ page }, testInfo) => {
+  test('[desktop] 需求创建弹窗固定底栏', async ({ page }, testInfo) => {
     for (const [name, path, trigger] of [
       ['dialog-requirement-create', `/projects/${VISUAL_IDS.projectId}/requirements`, '新建需求'],
-      ['dialog-change-create', '/operations/changes', '新建变更计划'],
     ] as const) {
       await prepare(page, path)
       await page.getByRole('button', { name: trigger }).first().click()

@@ -24,8 +24,6 @@ test('configuration applies defaults without reading the host environment', () =
   assert.equal(config.CODE_CHANGE_PATCH_MAX_BYTES, 1_048_576)
   assert.equal(config.CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES, 262_144)
   assert.equal(config.CODE_CHANGE_TIMEOUT_SECONDS, 900)
-  assert.equal(config.DEPLOY_VERIFY_TIMEOUT_SECONDS, 30)
-  assert.equal(config.CHANGE_PLAN_LIST_MAX_PAGE_SIZE, 100)
 })
 
 test('configuration parses environment strings and production defaults', () => {

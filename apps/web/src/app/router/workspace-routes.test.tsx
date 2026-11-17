@@ -172,7 +172,6 @@ describe('工作区路由与数据状态', () => {
     )
     const router = renderApplication('/projects')
     await screen.findByRole('heading', { name: '项目', level: 1 })
-    // 主导航“运维”现指向变更列表；系统状态改为深链接访问，仍验证缓存复用。
     await act(() => router.navigate('/system/status'))
     expect(await screen.findByRole('heading', { name: '系统状态', level: 1 })).toBeVisible()
     expect(await screen.findByText('已联通：前端 → API 代理 → 后端 → PostgreSQL')).toBeVisible()

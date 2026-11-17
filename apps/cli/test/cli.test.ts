@@ -65,6 +65,7 @@ test('命令入口输出包版本，参数错误使用退出码 2 和标准错�
 test('未知选项、无效地址与非法超时在请求前被拒绝', async () => {
   for (const args of [
     ['--unknown'],
+    ['change', 'list'],
     ['--server'],
     ['health', 'extra'],
     ['health', '--server', 'invalid'],

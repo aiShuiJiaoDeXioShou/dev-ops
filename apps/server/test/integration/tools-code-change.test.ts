@@ -15,7 +15,7 @@ import {
   setupPipelineContext,
   stringField,
   VALID_WORKFLOW,
-} from '../helpers/operations.ts'
+} from './pipeline-harness.ts'
 
 const patch = 'diff --git a/src/a.ts b/src/a.ts\n+export const a = 1\n'
 const patchSha = createHash('sha256').update(patch, 'utf8').digest('hex')

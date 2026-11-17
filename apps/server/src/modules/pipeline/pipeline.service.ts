@@ -1017,23 +1017,6 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     return { runId, created: true }
   }
 
-  /**
-   * 读取内部运行的收口状态，供写能力模块回填结果。
-   * @param runId 运行标识。
-   * @returns 运行状态与结束时间；不存在时返回 null。
-   */
-  async function getInternalRunStatus(
-    runId: string,
-  ): Promise<{ status: string; finishedAt: string | null; errorCode: string | null } | null> {
-    const row = await findPipelineRunById(db, runId)
-    if (!row) return null
-    return {
-      status: row.status,
-      finishedAt: row.finished_at === null ? null : row.finished_at.toISOString(),
-      errorCode: row.error_code,
-    }
-  }
-
   return {
     listWorkflows,
     getWorkflowDetail,
@@ -1045,7 +1028,6 @@ export function createPipelineService(deps: PipelineServiceDeps) {
     listArtifacts,
     openArtifactDownload,
     createInternalRun,
-    getInternalRunStatus,
     readRunArtifact,
     createCodeChangeRun,
   }

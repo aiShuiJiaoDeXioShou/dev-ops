@@ -20,7 +20,6 @@ import { EnvironmentPage } from '@/prototype/pages/project/environment-page'
 import { CapabilitiesLayout } from '@/prototype/pages/capabilities/capabilities-layout'
 import { PrototypeNotFoundPage } from '@/prototype/pages/global-pages'
 import { CollaborationPage } from '@/prototype/pages/collaboration-page'
-import { OperationsPage } from '@/prototype/pages/operations-page'
 import { VaultPage } from '@/prototype/pages/vault-page'
 import { TeamAdminPage } from '@/prototype/pages/team-admin-page'
 import { BotsPage } from '@/prototype/pages/capabilities/bots-page'
@@ -64,7 +63,6 @@ export function Component() {
             <Route path="environment" element={<EnvironmentPage />} />
           </Route>
           <Route path="collaboration" element={<CollaborationPage />} />
-          <Route path="operations" element={<OperationsPage />} />
           <Route path="capabilities" element={<CapabilitiesLayout />}>
             <Route index element={<Navigate to="bots" replace />} />
             <Route path="bots" element={<BotsPage />} />

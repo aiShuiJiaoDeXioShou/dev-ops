@@ -175,9 +175,6 @@ const PUBLIC_BUSINESS_CODES = new Set([
   'DUPLICATE_RELATION',
   'INVALID_TRANSITION',
   'VERSION_CONFLICT',
-  'CHANGE_PLAN_TARGET_UNSUPPORTED',
-  'CHANGE_PLAN_APPROVAL_REQUIRED',
-  'CHANGE_VERIFICATION_MISMATCH',
   'CODE_CHANGE_NOT_FOUND',
   'PIPELINE_SECRET_UNAVAILABLE',
 ])
@@ -2190,102 +2187,6 @@ export function createApiClient(options: ApiClientOptions) {
       )
     },
 
-    /** 创建变更计划。 */
-    async createChangePlan(
-      projectId: string,
-      body: ApiBody<'/api/v1/projects/{projectId}/change-plans', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/change-plans', 'post'>>(
-        `/api/v1/projects/${segment(projectId)}/change-plans`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 读取团队变更计划列表。 */
-    async listChangePlans(
-      teamId: string,
-      query?: ApiQuery<'/api/v1/teams/{teamId}/change-plans', 'get'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/change-plans', 'get'>>(
-        `/api/v1/teams/${segment(teamId)}/change-plans`,
-        'GET',
-        undefined,
-        { ...options, query },
-      )
-    },
-    /** 读取变更计划详情。 */
-    async getChangePlan(planId: string, options: ApiCallOptions = {}) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}', 'get'>>(
-        `/api/v1/change-plans/${segment(planId)}`,
-        'GET',
-        undefined,
-        options,
-      )
-    },
-    /** 修改变更计划。 */
-    async updateChangePlan(
-      planId: string,
-      body: ApiBody<'/api/v1/change-plans/{planId}/update', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/update', 'post'>>(
-        `/api/v1/change-plans/${segment(planId)}/update`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 放行变更计划。 */
-    async approveChangePlan(
-      planId: string,
-      body: ApiBody<'/api/v1/change-plans/{planId}/approve', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/approve', 'post'>>(
-        `/api/v1/change-plans/${segment(planId)}/approve`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 执行已批准的变更计划。 */
-    async executeChangePlan(
-      planId: string,
-      body: ApiBody<'/api/v1/change-plans/{planId}/execute', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/execute', 'post'>>(
-        `/api/v1/change-plans/${segment(planId)}/execute`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 验证变更执行结果。 */
-    async verifyChangePlan(
-      planId: string,
-      body: ApiBody<'/api/v1/change-plans/{planId}/verify', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/verify', 'post'>>(
-        `/api/v1/change-plans/${segment(planId)}/verify`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 读取变更执行记录。 */
-    async listChangePlanExecutions(planId: string, options: ApiCallOptions = {}) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/executions', 'get'>>(
-        `/api/v1/change-plans/${segment(planId)}/executions`,
-        'GET',
-        undefined,
-        options,
-      )
-    },
     /** 读取项目写能力调用记录。 */
     async listToolInvocations(projectId: string, options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/tools/invocations', 'get'>>(
@@ -2427,45 +2328,6 @@ export function createApiClient(options: ApiClientOptions) {
     ) {
       return callTyped<ApiSuccessData<'/api/v1/projects/{projectId}/tools/comments', 'post'>>(
         `/api/v1/projects/${segment(projectId)}/tools/comments`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 核对后重试失败的计划。 */
-    async retryChangePlan(
-      planId: string,
-      body: ApiBody<'/api/v1/change-plans/{planId}/retry', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/retry', 'post'>>(
-        `/api/v1/change-plans/${segment(planId)}/retry`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 分页读取计划事件。 */
-    async listChangePlanEvents(
-      planId: string,
-      query?: ApiQuery<'/api/v1/change-plans/{planId}/events', 'get'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/events', 'get'>>(
-        `/api/v1/change-plans/${segment(planId)}/events`,
-        'GET',
-        undefined,
-        { ...options, query },
-      )
-    },
-    /** 取消变更计划。 */
-    async cancelChangePlan(
-      planId: string,
-      body: ApiBody<'/api/v1/change-plans/{planId}/cancel', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/change-plans/{planId}/cancel', 'post'>>(
-        `/api/v1/change-plans/${segment(planId)}/cancel`,
         'POST',
         body,
         options,

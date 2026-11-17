@@ -23,7 +23,6 @@ import type { GitAdapter } from '../adapters/git/git.types.ts'
 import { codeRoutes } from '../modules/code/code.routes.ts'
 import { deliveryRoutes } from '../modules/delivery/delivery.routes.ts'
 import { pipelineRoutes } from '../modules/pipeline/pipeline.routes.ts'
-import { operationsRoutes } from '../modules/operations/operations.routes.ts'
 import { toolsRoutes } from '../modules/tools/tools.routes.ts'
 import { pipelineAgentRoutes } from '../modules/pipeline/pipeline.agent.routes.ts'
 import { configurationRoutes } from '../modules/configuration/configuration.routes.ts'
@@ -155,7 +154,6 @@ export function createHttpApp(
     service: services.pipeline,
     nodes: services.pipelineNodes,
   })
-  app.register(operationsRoutes, { prefix: '/api/v1', service: services.operations })
   app.register(toolsRoutes, {
     prefix: '/api/v1',
     db: services.database.db,
