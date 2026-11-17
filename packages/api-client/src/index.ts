@@ -1877,6 +1877,86 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 读取团队 Bot 列表。 */
+    async listBots(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/bots', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bots', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bots`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 创建团队 Bot。 */
+    async createBot(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bots', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bots', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bots`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取 Bot 配置。 */
+    async getBot(id: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bots/{botId}', 'get'>>(
+        `/api/v1/bots/${segment(id)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 更新 Bot 常规配置。 */
+    async updateBot(id: string, body: ApiBody<'/api/v1/bots/{botId}/update', 'post'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bots/{botId}/update', 'post'>>(
+        `/api/v1/bots/${segment(id)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 启用或停用 Bot。停用动作同时请求结束该 Bot 的在途运行。 */
+    async setBotEnabled(
+      id: string,
+      enabled: boolean,
+      body: ApiBody<'/api/v1/bots/{botId}/enable', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bots/{botId}/enable', 'post'>>(
+        `/api/v1/bots/${segment(id)}/${enabled ? 'enable' : 'disable'}`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 以管理员身份为 Bot 绑定模型。 */
+    async bindBotModel(
+      id: string,
+      body: ApiBody<'/api/v1/bots/{botId}/bind-model', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bots/{botId}/bind-model', 'post'>>(
+        `/api/v1/bots/${segment(id)}/bind-model`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 获取当前成员能看到的 Bot 运行记录。 */
+    async listBotRuns(id: string, query?: ApiQuery<'/api/v1/bots/{botId}/runs', 'get'>, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bots/{botId}/runs', 'get'>>(
+        `/api/v1/bots/${segment(id)}/runs`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
     /** 读取团队技能列表。 */
     async listSkills(
       teamId: string,
