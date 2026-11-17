@@ -2204,6 +2204,41 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 列出当前成员可见的待验收和受阻任务。 */
+    async getBotInbox(teamId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-inbox', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-inbox`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 验收任务的最新结果。 */
+    async acceptBotTask(
+      taskId: string,
+      body: ApiBody<'/api/v1/bot-tasks/{taskId}/accept', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/accept', 'post'>>(
+        `/api/v1/bot-tasks/${segment(taskId)}/accept`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 退回任务结果并说明原因。 */
+    async requestBotTaskChanges(
+      taskId: string,
+      body: ApiBody<'/api/v1/bot-tasks/{taskId}/request-changes', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/request-changes', 'post'>>(
+        `/api/v1/bot-tasks/${segment(taskId)}/request-changes`,
+        'POST',
+        body,
+        options,
+      )
+    },
     /** 读取团队技能列表。 */
     async listSkills(
       teamId: string,
