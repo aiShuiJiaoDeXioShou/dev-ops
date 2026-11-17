@@ -91,7 +91,7 @@ export function createAppRoutes(): RouteObject[] {
               lazy: () => import('@/pages/capabilities/capabilities-layout'),
               HydrateFallback: DelayedPageSkeleton,
               children: [
-                { index: true, element: <Navigate to="skills" replace /> },
+                { index: true, element: <Navigate to="bots" replace /> },
                 {
                   path: 'skills',
                   lazy: () => import('@/pages/capabilities/skills-page'),

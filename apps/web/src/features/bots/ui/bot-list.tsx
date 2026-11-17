@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Bot, Plus, Search } from 'lucide-react'
-import { Link, useSearchParams } from 'react-router'
-import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
+import { Ellipsis, Plus, Search, SquareTerminal, UsersRound } from 'lucide-react'
+import { Link, useSearchParams, useNavigate } from 'react-router'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
+import { Tabs, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { formatRelativeTime } from '@/shared/lib/format'
 import { botListQueryOptions } from '../api/queries'
+import { BotAvatar } from './bot-avatar'
 import { BotForm } from './bot-form'
 import { BotStatus } from './bot-status'
 
@@ -16,19 +18,19 @@ interface BotListProps {
   teamId: string
   userId: string
   canEdit: boolean
+  selectedId?: string
 }
 
-/** 团队 Bot 目录，保留团队内的搜索、负责人和分页位置。 */
-export function BotList({ teamId, userId, canEdit }: BotListProps) {
+/** 团队智能体目录，沿用原型的页签、搜索和表格。 */
+export function BotList({ teamId, userId, canEdit, selectedId }: BotListProps) {
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const [createOpen, setCreateOpen] = useState(false)
   const search = params.get('query') ?? ''
-  const owner = params.get('ownerUserId') ?? ''
+  const scope = params.get('ownerUserId') === userId ? 'mine' : 'all'
+  const owner = params.get('ownerUserId') ?? undefined
   const cursor = params.get('cursor') ?? undefined
-  const query = useQuery(
-    botListQueryOptions(teamId, { query: search || undefined, ownerUserId: owner || undefined, cursor }),
-  )
-  const members = useQuery(teamMembersQueryOptions(teamId))
+  const query = useQuery(botListQueryOptions(teamId, { query: search || undefined, ownerUserId: owner, cursor }))
   const openCreate = () => setCreateOpen(true)
 
   function setFilter(key: string, value: string) {
@@ -39,55 +41,56 @@ export function BotList({ teamId, userId, canEdit }: BotListProps) {
     setParams(next, { replace: key !== 'cursor' })
   }
 
-  const hasFilter = Boolean(search || owner)
+  const filtered = Boolean(search || owner || cursor)
   const items = query.data?.data.items ?? []
   const nextCursor = query.data?.data.nextCursor
+  const newBot = (
+    <Button type="button" className="new-agent-btn h-9 px-3" onClick={openCreate}>
+      <Plus className="size-4" aria-hidden="true" />
+      创建智能体
+    </Button>
+  )
   return (
     <>
-      <header className="page-head skills-header">
-        <h1>智能体</h1>
-        {canEdit && (
-          <Button type="button" onClick={openCreate}>
-            <Plus className="size-4" aria-hidden="true" /> 创建 Bot
-          </Button>
-        )}
-      </header>
-      <div className="catalog skills-catalog">
-        <div className="filters flex flex-wrap gap-3">
+      <header className="agent-page-header">
+        <h1 className="sr-only">智能体</h1>
+        <div className="agent-filters">
+          <Tabs
+            value={scope}
+            className="w-full md:flex-1"
+            onValueChange={(value) => setFilter('ownerUserId', value === 'mine' ? userId : '')}
+          >
+            <TabsList
+              className="tabs w-full justify-start gap-6 rounded-none bg-transparent p-0"
+              aria-label="智能体筛选"
+            >
+              <TabsTrigger variant="underline" value="all">
+                全部智能体
+              </TabsTrigger>
+              <TabsTrigger variant="underline" value="mine">
+                我负责的
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           <label className="search">
             <Search aria-hidden="true" className="search-icon" />
             <Input
               value={search}
               maxLength={60}
-              aria-label="搜索 Bot"
-              placeholder="搜索 Bot"
+              aria-label="搜索智能体"
+              placeholder="搜索名称、职责或负责人"
               className="search-input"
               onChange={(event) => setFilter('query', event.target.value)}
             />
           </label>
-          <Select
-            aria-label="按负责人筛选"
-            disabled={members.isPending || members.isError}
-            value={owner}
-            onChange={(event) => setFilter('ownerUserId', event.target.value)}
-          >
-            <option value="">全部负责人</option>
-            {members.data?.data.map((member) => (
-              <option key={member.userId} value={member.userId}>
-                {member.name}
-              </option>
-            ))}
-          </Select>
-          {members.isError && (
-            <Button type="button" variant="outline" onClick={() => void members.refetch()}>
-              重试加载负责人
-            </Button>
-          )}
+          {canEdit && newBot}
         </div>
-        {query.isPending ? <DelayedPageSkeleton /> : null}
+      </header>
+      <div className="agent-catalog min-w-0">
+        {query.isPending && <DelayedPageSkeleton />}
         {query.isError && (
           <PageError
-            title="Bot 列表加载失败"
+            title="智能体列表加载失败"
             error={query.error}
             retrying={query.isFetching}
             onRetry={() => void query.refetch()}
@@ -95,9 +98,10 @@ export function BotList({ teamId, userId, canEdit }: BotListProps) {
         )}
         {query.isSuccess &&
           items.length === 0 &&
-          (hasFilter || cursor ? (
+          (filtered ? (
             <EmptyState
-              title="没有符合条件的 Bot"
+              title="没有找到智能体"
+              description="试试其他名称、职责或负责人。"
               icon={<Search />}
               action={
                 <Button variant="outline" onClick={() => setParams({})}>
@@ -107,34 +111,94 @@ export function BotList({ teamId, userId, canEdit }: BotListProps) {
             />
           ) : (
             <EmptyState
-              title="还没有 Bot"
+              title="还没有智能体"
               mascot="orbit"
-              description={canEdit ? '创建团队 Bot，为它分配职责和负责人。' : '团队发布 Bot 后，会显示在这里。'}
+              description={
+                canEdit ? '创建一个智能体，为团队定义职责、模型与可用技能。' : '团队创建的智能体会显示在这里。'
+              }
             />
           ))}
         {items.length > 0 && (
-          <ul className="skill-grid" aria-busy={query.isFetching}>
-            {items.map((bot) => (
-              <li key={bot.id} className="skill-card">
-                <div className="row spread">
-                  <span className="skill-glyph">
-                    <Bot className="size-5" aria-hidden="true" />
-                  </span>
-                  <BotStatus value={bot.availability} />
-                </div>
-                <Link className="skill-title break-words" to={{ pathname: bot.id, search: params.toString() }}>
-                  {bot.name}
-                </Link>
-                <p className="break-words">{bot.responsibility}</p>
-                <div className="skill-meta">
-                  <span>负责人 {bot.ownerName ?? '未找到成员'}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <div className="table-wrap" aria-busy={query.isFetching}>
+            <Table className="table agent-table" aria-label="智能体目录">
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">智能体</TableHead>
+                  <TableHead scope="col">状态</TableHead>
+                  <TableHead scope="col">使用范围</TableHead>
+                  <TableHead scope="col">运行环境</TableHead>
+                  <TableHead scope="col">模型</TableHead>
+                  <TableHead scope="col">最近活跃</TableHead>
+                  <TableHead scope="col">
+                    <span className="sr-only">操作</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((bot) => {
+                  const detail = { pathname: `/capabilities/bots/${bot.id}`, search: params.toString() }
+                  return (
+                    <TableRow key={bot.id} className={bot.id === selectedId ? 'selected' : undefined}>
+                      <TableCell>
+                        <Link
+                          className="agent-name focus-visible:ring-2 focus-visible:ring-ring"
+                          to={detail}
+                          aria-label={`查看${bot.name}详情`}
+                        >
+                          <BotAvatar avatarKey={bot.avatarKey} botId={bot.id} />
+                          <span>
+                            <strong>{bot.name}</strong>
+                            <small>
+                              {bot.responsibility}
+                              {bot.ownerName && <span> · {bot.ownerName}</span>}
+                            </small>
+                          </span>
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <BotStatus value={bot.availability} />
+                      </TableCell>
+                      <TableCell>
+                        <span className="scope-tag">
+                          <UsersRound className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                          独立 Bot
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="runtime-cell">
+                          <SquareTerminal className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                          团队执行器
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="muted small">{bot.modelId ?? '未绑定'}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="quiet small">
+                          {bot.lastActiveAt ? formatRelativeTime(bot.lastActiveAt) : '—'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          type="button"
+                          className="icon-btn"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`管理${bot.name}`}
+                          onClick={() => navigate(detail)}
+                        >
+                          <Ellipsis aria-hidden="true" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
         )}
         {(cursor || nextCursor) && (
-          <div className="flex justify-end gap-2">
+          <div className="mt-3 flex justify-end gap-2">
             {cursor && (
               <Button type="button" variant="outline" onClick={() => setFilter('cursor', '')}>
                 回到第一页

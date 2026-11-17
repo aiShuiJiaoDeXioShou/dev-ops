@@ -61,7 +61,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: botQueryKey })
-      showToast(bot ? 'Bot 已保存' : 'Bot 已创建', 'success')
+      showToast(bot ? '智能体已保存' : '智能体已创建', 'success')
       onClose()
     },
   })
@@ -89,71 +89,79 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
     >
       <DialogContent layout="form">
         <DialogFormHeader>
-          <DialogTitle>{bot ? '编辑 Bot' : '创建 Bot'}</DialogTitle>
-          <DialogDescription>设置 Bot 的职责、负责人和运行指令。</DialogDescription>
+          <DialogTitle>{bot ? '编辑智能体' : '创建智能体'}</DialogTitle>
+          <DialogDescription className="sr-only">设置智能体的职责、负责人和运行指令。</DialogDescription>
         </DialogFormHeader>
         <form className="flex min-h-0 flex-col" onSubmit={save}>
-          <DialogFormBody className="space-y-4">
-            <label className="field" htmlFor={`${id}-name`}>
-              <span>名称</span>
-              <Input
-                id={`${id}-name`}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={60}
-                required
-              />
-            </label>
-            <label className="field" htmlFor={`${id}-owner`}>
-              <span>负责人</span>
-              <Select
-                id={`${id}-owner`}
-                value={ownerUserId}
-                onChange={(event) => setOwnerUserId(event.target.value)}
-                disabled={members.isPending || members.isError}
-                required
-              >
-                {!selectedOwnerActive && (
-                  <option value={ownerUserId}>{members.isPending ? '正在加载成员…' : '请选择有效成员'}</option>
-                )}
-                {owners.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {member.name}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            {members.isError && (
-              <Button type="button" variant="outline" onClick={() => void members.refetch()}>
-                重试加载成员
-              </Button>
-            )}
-            <label className="field" htmlFor={`${id}-responsibility`}>
-              <span>职责</span>
-              <Textarea
-                id={`${id}-responsibility`}
-                value={responsibility}
-                onChange={(event) => setResponsibility(event.target.value)}
-                maxLength={4000}
-                rows={3}
-                required
-              />
-            </label>
-            <label className="field" htmlFor={`${id}-instructions`}>
-              <span>指令（选填）</span>
-              <Textarea
-                id={`${id}-instructions`}
-                value={instructions}
-                onChange={(event) => setInstructions(event.target.value)}
-                maxLength={16000}
-                rows={5}
-              />
-            </label>
-            {mutation.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {describeRequestError(mutation.error).description}
-              </p>
-            )}
+          <DialogFormBody>
+            <div className="form-grid">
+              <label className="field" htmlFor={`${id}-name`}>
+                <span>名称</span>
+                <Input
+                  id={`${id}-name`}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="给你的协作者起个名字"
+                  maxLength={60}
+                  required
+                />
+              </label>
+              <label className="field" htmlFor={`${id}-responsibility`}>
+                <span>职责</span>
+                <Input
+                  id={`${id}-responsibility`}
+                  value={responsibility}
+                  onChange={(event) => setResponsibility(event.target.value)}
+                  maxLength={4000}
+                  placeholder="例如：产品助手"
+                  required
+                />
+              </label>
+              <label className="field" htmlFor={`${id}-owner`}>
+                <span>负责人</span>
+                <Select
+                  id={`${id}-owner`}
+                  value={ownerUserId}
+                  onChange={(event) => setOwnerUserId(event.target.value)}
+                  disabled={members.isPending || members.isError}
+                  required
+                >
+                  {!selectedOwnerActive && (
+                    <option value={ownerUserId}>{members.isPending ? '正在加载成员…' : '请选择有效成员'}</option>
+                  )}
+                  {owners.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              {members.isError && (
+                <Button type="button" variant="outline" onClick={() => void members.refetch()}>
+                  重试加载成员
+                </Button>
+              )}
+              <div className="field">
+                <span>运行环境</span>
+                <span className="runtime-cell">团队执行器</span>
+              </div>
+              <label className="field full" htmlFor={`${id}-instructions`}>
+                <span>职责说明</span>
+                <Textarea
+                  id={`${id}-instructions`}
+                  value={instructions}
+                  onChange={(event) => setInstructions(event.target.value)}
+                  placeholder="描述长期职责、工作方式与输出要求"
+                  maxLength={16000}
+                  rows={5}
+                />
+              </label>
+              {mutation.error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {describeRequestError(mutation.error).description}
+                </p>
+              )}
+            </div>
           </DialogFormBody>
           <DialogFormFooter>
             <Button type="button" variant="outline" disabled={mutation.isPending} onClick={close}>
@@ -163,7 +171,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
               type="submit"
               disabled={mutation.isPending || !selectedOwnerActive || !name.trim() || !responsibility.trim()}
             >
-              {mutation.isPending ? '正在保存…' : bot ? '保存' : '创建'}
+              {mutation.isPending ? '正在保存…' : bot ? '保存配置' : '创建智能体'}
             </Button>
           </DialogFormFooter>
         </form>
@@ -171,7 +179,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, onClose }: BotFormProps) 
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>放弃编辑？</AlertDialogTitle>
-              <AlertDialogDescription>关闭会清除这次尚未保存的 Bot 配置。</AlertDialogDescription>
+              <AlertDialogDescription>关闭会清除这次尚未保存的智能体配置。</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>继续编辑</AlertDialogCancel>

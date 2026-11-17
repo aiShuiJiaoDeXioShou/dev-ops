@@ -1,8 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useLocation } from 'react-router'
-import { ChevronLeft } from 'lucide-react'
+import { Check, Clock, Cpu, Layers, Pencil, Shield, SquareTerminal, User, X } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
@@ -17,12 +16,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/shared/ui/controls/alert-dialog'
-import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
+import { skillListQueryOptions } from '@/features/knowledge/api/queries'
 import { botDetailQueryOptions, botQueryKey, botRunsQueryOptions, type BotRunView } from '../api/queries'
+import { BotAvatar } from './bot-avatar'
 import { BotForm } from './bot-form'
 import { BotStatus } from './bot-status'
 
@@ -39,27 +40,30 @@ function BotRuns({ botId }: { botId: string }) {
   const query = useQuery(botRunsQueryOptions(botId, cursor))
   const records = query.data?.data
   return (
-    <section className="space-y-3" aria-labelledby="bot-runs">
-      <h2 id="bot-runs" className="font-semibold">
-        运行记录
-      </h2>
-      {query.isPending ? <DelayedPageSkeleton /> : null}
+    <div className="run-list">
+      {query.isPending && <DelayedPageSkeleton />}
       {query.isError && <PageError title="运行记录加载失败" error={query.error} onRetry={() => void query.refetch()} />}
-      {records?.items.length === 0 && <p className="quiet">当前可见的会话里暂无运行记录。</p>}
-      {records && records.items.length > 0 && (
-        <ul className="divide-y divide-border" aria-busy={query.isFetching}>
-          {records.items.map((run) => (
-            <li key={run.id} className="py-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={run.status === 'failed' ? 'destructive' : 'outline'}>{runLabels[run.status]}</Badge>
-                <span className="small quiet">{formatDateTime(run.createdAt)}</span>
-                <span className="small quiet">{run.turns} 轮</span>
-              </div>
-              {run.failureMessage && <p className="mt-2 break-words">{run.failureMessage}</p>}
-            </li>
-          ))}
-        </ul>
+      {records?.items.length === 0 && (
+        <div className="empty">
+          <h3>还没有运行记录</h3>
+        </div>
       )}
+      {records?.items.map((run) => (
+        <article key={run.id}>
+          <div className="row">
+            {run.status === 'succeeded' ? (
+              <Check className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+            ) : (
+              <Clock className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+            )}
+            <strong>{runLabels[run.status]}</strong>
+          </div>
+          <p>
+            {formatDateTime(run.createdAt)} · {run.turns} 轮
+          </p>
+          {run.failureMessage && <p className="break-words">{run.failureMessage}</p>}
+        </article>
+      ))}
       {(cursor || records?.nextCursor) && (
         <div className="flex gap-2">
           {cursor && (
@@ -79,7 +83,7 @@ function BotRuns({ botId }: { botId: string }) {
           )}
         </div>
       )}
-    </section>
+    </div>
   )
 }
 
@@ -88,19 +92,34 @@ interface BotDetailProps {
   teamId: string
   userId: string
   canEdit: boolean
+  onClose: () => void
 }
 
-/** 展示 Bot 的配置、模型状态和当前会话权限下的运行记录。 */
-export function BotDetail({ botId, teamId, userId, canEdit }: BotDetailProps) {
-  const { search } = useLocation()
+/** 沿用原型右侧详情栏，保留配置和当前会话权限下的运行记录。 */
+export function BotDetail({ botId, teamId, userId, canEdit, onClose }: BotDetailProps) {
   const query = useQuery(botDetailQueryOptions(botId))
   const bot = query.data?.data
   const [editing, setEditing] = useState(false)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const detailRef = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
   const { showToast } = useToast()
+  const skillQuery = useQuery({
+    ...skillListQueryOptions(teamId, { pageSize: 100 }),
+    enabled: Boolean(bot?.skillIds.length),
+  })
+  const enabledSkills = skillQuery.data?.data.items.filter((skill) => bot?.skillIds.includes(skill.id)) ?? []
+  useEffect(() => {
+    const opener = document.activeElement
+    closeRef.current?.focus()
+    return () => {
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus()
+    }
+  }, [])
+
   const toggle = useMutation({
     mutationFn: () => {
-      if (!bot) throw new Error('Bot 配置尚未加载')
+      if (!bot) throw new Error('智能体配置尚未加载')
       return apiClient.setBotEnabled(
         bot.id,
         bot.status === 'disabled',
@@ -110,123 +129,190 @@ export function BotDetail({ botId, teamId, userId, canEdit }: BotDetailProps) {
     },
     onSuccess: async ({ data }) => {
       await queryClient.invalidateQueries({ queryKey: botQueryKey })
-      showToast(data.status === 'enabled' ? 'Bot 已启用' : 'Bot 已停用', 'success')
+      showToast(data.status === 'enabled' ? '智能体已启用' : '智能体已停用', 'success')
     },
   })
-  const back = (
-    <Link
-      className="flex w-fit items-center gap-1 text-sm text-primary"
-      to={{ pathname: '/capabilities/bots', search }}
-    >
-      <ChevronLeft className="size-4" aria-hidden="true" />
-      返回智能体
-    </Link>
-  )
-  if (query.isPending) return <DelayedPageSkeleton />
-  if (!bot)
-    return (
-      <>
-        {back}
-        <PageError title="Bot 配置加载失败" error={query.error} onRetry={() => void query.refetch()} />
-      </>
-    )
-  if (bot.teamId !== teamId)
-    return (
-      <>
-        {back}
-        <EmptyState title="该 Bot 不在当前团队" description="切换到 Bot 所属团队后查看。" />
-      </>
-    )
 
   return (
-    <>
-      <header className="page-head flex-wrap gap-3">
-        <div className="min-w-0 space-y-2">
-          {back}
-          <h1 className="break-words">{bot.name}</h1>
-        </div>
-        {canEdit && (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={toggle.isPending} onClick={() => setEditing(true)}>
-              编辑配置
-            </Button>
-            {bot.status === 'enabled' ? (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button type="button" variant="outline" disabled={toggle.isPending}>
-                    停用 Bot
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>停用 {bot.name}？</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      已排队的运行会取消，正在执行的运行会收到停止请求。未完成任务会标为受阻，历史记录会保留。
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-destructive text-destructive-foreground"
-                      onClick={() => toggle.mutate()}
-                    >
-                      确认停用
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            ) : (
-              <Button type="button" variant="outline" disabled={toggle.isPending} onClick={() => toggle.mutate()}>
-                启用 Bot
-              </Button>
-            )}
-          </div>
-        )}
-      </header>
-      <div className="catalog space-y-6">
-        {toggle.error && (
-          <p role="alert" className="text-sm text-destructive">
-            {describeRequestError(toggle.error).description}
-          </p>
-        )}
-        <section className="space-y-3" aria-labelledby="bot-config">
-          <h2 id="bot-config" className="font-semibold">
-            配置
-          </h2>
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="small quiet">运行状态</dt>
-              <dd className="mt-1">
-                <BotStatus value={bot.availability} />
-              </dd>
-            </div>
-            <div>
-              <dt className="small quiet">负责人</dt>
-              <dd className="break-words">{bot.ownerName ?? '未找到成员'}</dd>
-            </div>
-            <div>
-              <dt className="small quiet">模型连接</dt>
-              <dd className="break-words">{bot.connectionName ?? '未绑定'}</dd>
-            </div>
-            <div>
-              <dt className="small quiet">模型</dt>
-              <dd className="break-all">{bot.modelId ?? '未绑定'}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="small quiet">职责</dt>
-              <dd className="whitespace-pre-wrap wrap-break-word">{bot.responsibility}</dd>
-            </div>
-            {bot.instructions && (
-              <div className="sm:col-span-2">
-                <dt className="small quiet">指令</dt>
-                <dd className="whitespace-pre-wrap wrap-break-word">{bot.instructions}</dd>
-              </div>
-            )}
-          </dl>
-        </section>
-        <BotRuns key={bot.id} botId={bot.id} />
+    <aside
+      ref={detailRef}
+      className="details agent-details h-dvh min-h-0 bg-background"
+      aria-label="智能体详情"
+      onKeyDown={(event) => {
+        if (event.defaultPrevented || !detailRef.current?.contains(event.target instanceof Node ? event.target : null))
+          return
+        if (event.key === 'Escape') {
+          event.preventDefault()
+          onClose()
+        }
+      }}
+    >
+      <div className="detail-top h-16">
+        <h2>智能体详情</h2>
+        <span className="spacer" />
+        <Button
+          ref={closeRef}
+          type="button"
+          className="icon-btn"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="关闭智能体详情"
+          onClick={onClose}
+        >
+          <X aria-hidden="true" />
+        </Button>
       </div>
-      {editing && <BotForm teamId={teamId} defaultOwnerId={userId} bot={bot} onClose={() => setEditing(false)} />}
-    </>
+      {query.isPending && (
+        <div className="detail-scroll">
+          <DelayedPageSkeleton />
+        </div>
+      )}
+      {!query.isPending && !bot && (
+        <div className="detail-scroll">
+          <PageError title="智能体配置加载失败" error={query.error} onRetry={() => void query.refetch()} />
+        </div>
+      )}
+      {bot && bot.teamId !== teamId && (
+        <div className="detail-scroll">
+          <EmptyState title="该智能体不在当前团队" description="切换到智能体所属团队后查看。" />
+        </div>
+      )}
+      {bot?.teamId === teamId && (
+        <>
+          <div className="agent-profile">
+            <BotAvatar avatarKey={bot.avatarKey} botId={bot.id} large />
+            <div className="min-w-0">
+              <h2 className="wrap-break-word">{bot.name}</h2>
+              <p className="wrap-break-word">{bot.responsibility}</p>
+            </div>
+            <span className="spacer" />
+            <BotStatus value={bot.availability} />
+          </div>
+          <Tabs defaultValue="config" className="min-h-0 flex-1 gap-0">
+            <TabsList
+              className="agent-detail-tabs tabs w-auto gap-6 rounded-none bg-transparent p-0"
+              aria-label="智能体详情内容"
+            >
+              <TabsTrigger value="config" variant="underline">
+                配置
+              </TabsTrigger>
+              <TabsTrigger value="runs" variant="underline">
+                运行记录
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="config" className="detail-scroll">
+              {bot.instructions && (
+                <p className="agent-purpose whitespace-pre-wrap wrap-break-word">{bot.instructions}</p>
+              )}
+              <dl className="properties">
+                <dt>
+                  <User className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                  负责人
+                </dt>
+                <dd>{bot.ownerName ?? '未找到成员'}</dd>
+                <dt>
+                  <SquareTerminal className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                  运行环境
+                </dt>
+                <dd>团队执行器</dd>
+                <dt>
+                  <Cpu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                  模型
+                </dt>
+                <dd className="wrap-break-word">
+                  {bot.modelId ?? '未绑定模型'}
+                  {bot.connectionName && <span className="small quiet block">{bot.connectionName}</span>}
+                </dd>
+                <dt>
+                  <Shield className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                  使用范围
+                </dt>
+                <dd>独立 Bot</dd>
+              </dl>
+              <div className="agent-section">
+                <h3>
+                  可用 Skills <span className="counter">{bot.skillIds.length}</span>
+                </h3>
+                <div className="agent-skills">
+                  {bot.skillIds.length === 0 && <p className="quiet small">尚未配置技能</p>}
+                  {skillQuery.isFetching && bot.skillIds.length > 0 && <p className="quiet small">正在加载技能…</p>}
+                  {skillQuery.isError && (
+                    <Button variant="outline" type="button" onClick={() => void skillQuery.refetch()}>
+                      重试加载技能
+                    </Button>
+                  )}
+                  {enabledSkills.map((skill) => (
+                    <div key={skill.id} className="row py-2 small">
+                      <Layers className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                      <span>{skill.name}</span>
+                      {!skill.enabled && <span className="quiet">已停用</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="runs" className="detail-scroll">
+              <BotRuns key={bot.id} botId={bot.id} />
+            </TabsContent>
+          </Tabs>
+          {toggle.error && (
+            <p role="alert" className="mx-5 text-sm text-destructive">
+              {describeRequestError(toggle.error).description}
+            </p>
+          )}
+          {canEdit && (
+            <div className="agent-detail-actions">
+              <Button
+                type="button"
+                className="btn"
+                variant="outline"
+                disabled={toggle.isPending}
+                onClick={() => setEditing(true)}
+              >
+                <Pencil className="size-4" aria-hidden="true" />
+                编辑配置
+              </Button>
+              {bot.status === 'enabled' ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button type="button" className="btn" variant="outline" disabled={toggle.isPending}>
+                      停用智能体
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>停用 {bot.name}？</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        已排队的运行会取消，正在执行的运行会收到停止请求。未完成任务会标为受阻，历史记录会保留。
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground"
+                        onClick={() => toggle.mutate()}
+                      >
+                        确认停用
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button
+                  type="button"
+                  className="btn"
+                  variant="outline"
+                  disabled={toggle.isPending}
+                  onClick={() => toggle.mutate()}
+                >
+                  启用智能体
+                </Button>
+              )}
+            </div>
+          )}
+          {editing && <BotForm teamId={teamId} defaultOwnerId={userId} bot={bot} onClose={() => setEditing(false)} />}
+        </>
+      )}
+    </aside>
   )
 }

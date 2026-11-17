@@ -27,15 +27,22 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
 
 /**
  * 渲染单个页签触发器。
- * @param props Radix 触发器属性与自定义类名。
+ * @param props Radix 触发器属性与自定义类名；underline 使用目录的下划线样式。
  * @returns 选中态高亮的页签按钮。
  */
-function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
+function TabsTrigger({
+  className,
+  variant = 'default',
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.Trigger> & { variant?: 'default' | 'underline' }) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+        'inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+        variant === 'underline'
+          ? 'tab'
+          : 'rounded-md px-3 py-1 text-sm font-medium hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
         className,
       )}
       {...props}

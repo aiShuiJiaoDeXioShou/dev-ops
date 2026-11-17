@@ -30,6 +30,7 @@ test('[desktop] [mobile] 智能体目录创建、刷新、详情和停用', asyn
     modelId: null,
     skillIds: [],
     updatedAt: '2026-11-17T08:00:00.000Z',
+    lastActiveAt: null,
   }
   let exists = false
   let writes = 0
@@ -74,36 +75,39 @@ test('[desktop] [mobile] 智能体目录创建、刷新、详情和停用', asyn
   })
 
   await page.goto('/capabilities/bots')
-  await expect(page.getByRole('heading', { name: '智能体', exact: true })).toBeVisible()
-  const create = page.getByRole('button', { name: '创建 Bot' })
+  await expect(page.getByRole('tab', { name: '全部智能体' })).toBeVisible()
+  const create = page.getByRole('button', { name: '创建智能体' })
   await create.click()
-  const form = page.getByRole('dialog', { name: '创建 Bot' })
+  const form = page.getByRole('dialog', { name: '创建智能体' })
   await expect(form.getByLabel('名称', { exact: true })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(create).toBeFocused()
   await create.click()
   await form.getByLabel('名称', { exact: true }).fill(fixture.name)
   await form.getByLabel('职责', { exact: true }).fill(fixture.responsibility)
-  await form.getByRole('button', { name: '创建', exact: true }).click()
-  await expect(page.getByRole('link', { name: fixture.name })).toBeVisible()
+  await form.getByRole('button', { name: '创建智能体', exact: true }).click()
+  await expect(page.getByRole('link', { name: `查看${fixture.name}详情` })).toBeVisible()
   expect(writes).toBe(1)
   await page.reload()
-  await expect(page.getByRole('link', { name: fixture.name })).toBeVisible()
+  await expect(page.getByRole('link', { name: `查看${fixture.name}详情` })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('bot-list.png') })
 
-  const search = page.getByRole('textbox', { name: '搜索 Bot' })
+  const search = page.getByRole('textbox', { name: '搜索智能体' })
   await search.fill('无匹配')
-  await expect(page.getByText('没有符合条件的 Bot')).toBeVisible()
+  await expect(page.getByText('没有找到智能体')).toBeVisible()
   await page.getByRole('button', { name: '清除筛选' }).click()
-  await page.getByRole('link', { name: fixture.name }).click()
-  await expect(page.getByRole('heading', { name: '运行记录' })).toBeVisible()
-  await expect(page.getByText('未绑定模型')).toBeVisible()
+  await page.getByRole('link', { name: `查看${fixture.name}详情` }).click()
+  const detail = page.getByRole('complementary', { name: '智能体详情' })
+  await expect(detail).toBeVisible()
+  await expect(detail.getByRole('tab', { name: '运行记录' })).toBeVisible()
+  await expect(detail.getByRole('tab', { name: '项目' })).toHaveCount(0)
+  await expect(detail.getByText('未绑定模型').first()).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('bot-detail.png') })
-  await page.getByRole('button', { name: '停用 Bot' }).click()
+  await page.getByRole('button', { name: '停用智能体' }).click()
   const alert = page.getByRole('alertdialog')
   await expect(alert.getByRole('button', { name: '取消' })).toBeFocused()
   await alert.getByRole('button', { name: '确认停用' }).click()
-  await expect(page.getByText('已停用', { exact: true })).toBeVisible()
+  await expect(detail.getByText('已停用', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 
   const teams = apiFixtures['/api/v1/me/teams']

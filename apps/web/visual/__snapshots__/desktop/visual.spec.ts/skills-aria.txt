@@ -1,9 +1,9 @@
 - main:
-  - navigation "能力导航":
-    - link "技能库":
-      - /url: /capabilities/skills
+  - navigation "团队能力":
     - link "智能体":
       - /url: /capabilities/bots
+    - link "Skills":
+      - /url: /capabilities/skills
   - heading "技能库" [level=1]
   - button "发布 Skill"
   - group "技能分类":

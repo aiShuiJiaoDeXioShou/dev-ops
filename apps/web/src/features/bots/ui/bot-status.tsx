@@ -1,15 +1,21 @@
-import { Badge } from '@/shared/ui/controls/badge'
 import type { BotView } from '../api/queries'
+import { cn } from '@/shared/lib/utils'
 
 const availability = {
-  available: '可运行',
-  disabled: '已停用',
-  model_unbound: '未绑定模型',
-  model_unavailable: '模型不可用',
-  worker_offline: '执行服务离线',
-} satisfies Record<BotView['availability'], string>
+  available: { label: '可用', dot: 'green' },
+  disabled: { label: '已停用', dot: '' },
+  model_unbound: { label: '未绑定模型', dot: 'amber' },
+  model_unavailable: { label: '模型不可用', dot: 'amber' },
+  worker_offline: { label: '环境离线', dot: '' },
+} satisfies Record<BotView['availability'], { label: string; dot: string }>
 
-/** 显示 Bot 的运行可用性，保留停用、模型状态和执行服务状态的含义。 */
+/** 以原型的状态点和文字展示智能体的真实运行可用性。 */
 export function BotStatus({ value }: { value: BotView['availability'] }) {
-  return <Badge variant={value === 'available' ? 'secondary' : 'outline'}>{availability[value]}</Badge>
+  const { label, dot } = availability[value]
+  return (
+    <span className="bot-status">
+      <span className={cn('dot', dot)} aria-hidden="true" />
+      {label}
+    </span>
+  )
 }
