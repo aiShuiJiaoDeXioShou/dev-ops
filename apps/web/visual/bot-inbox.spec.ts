@@ -103,6 +103,7 @@ test('[desktop] [mobile] 待处理链接打开任务并验收结果', async ({ p
         inputs: [],
         runs: [],
         trace: [],
+        handoffs: [],
         results: [result],
         reviews: accepted ? [review] : [],
       }),

@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, ClipboardList, Inbox, Menu, MessagesSquare, Search, X } from 'lucide-react'
+import { Bot, ClipboardList, Inbox, Menu, MessagesSquare, Plus, Search, Settings, X } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { botInboxOptions, taskQueries } from '@/features/bot-tasks/api/queries'
 import { BotInbox } from '@/features/bot-tasks/ui/bot-inbox'
@@ -16,6 +16,8 @@ import {
 } from '@/features/conversations/api/queries'
 import { ConversationComposer } from '@/features/conversations/ui/conversation-composer'
 import { ConversationMessages } from '@/features/conversations/ui/conversation-messages'
+import { GroupSettings } from '@/features/conversations/ui/group-settings'
+import { NewGroupDialog } from '@/features/conversations/ui/new-group-dialog'
 import { useSession } from '@/features/identity/model/session'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
@@ -57,10 +59,12 @@ function ConversationRoom({
   initialTaskId?: string
 }) {
   const client = useQueryClient()
-  const [taskPanelOpen, setTaskPanelOpen] = useState(Boolean(initialTaskId))
+  const [panel, setPanel] = useState<'task' | 'settings' | null>(initialTaskId ? 'task' : null)
+  const taskPanelOpen = panel === 'task'
   const [newTaskOpen, setNewTaskOpen] = useState(false)
   const [taskId, setTaskId] = useState(initialTaskId)
   const taskOpener = useRef<HTMLButtonElement>(null)
+  const settingsOpener = useRef<HTMLButtonElement>(null)
   const newTaskOpener = useRef<HTMLElement>(null)
   const detail = useQuery(conversationOptions(id))
   const messages = useInfiniteQuery({ ...messagesOptions(id), enabled: detail.isSuccess })
@@ -76,7 +80,7 @@ function ConversationRoom({
   const ongoingIds = new Set([...activeRuns.keys(), ...Object.keys(events.data?.progress ?? {})])
   const botMember = room?.members.find((member) => member.kind === 'bot')
   useEffect(() => {
-    if (!taskPanelOpen || newTaskOpen) return
+    if (!panel || newTaskOpen) return
     const closeOnEscape = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented ||
@@ -84,12 +88,13 @@ function ConversationRoom({
         document.querySelector('[role="dialog"], [role="alertdialog"]')
       )
         return
-      setTaskPanelOpen(false)
-      taskOpener.current?.focus()
+      setPanel(null)
+      const opener = panel === 'task' ? taskOpener : settingsOpener
+      opener.current?.focus()
     }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [taskPanelOpen, newTaskOpen])
+  }, [panel, newTaskOpen])
   useEffect(() => {
     if (events.data?.cursor && events.data.cursor !== '0' && taskPanelOpen) {
       void client.invalidateQueries({ queryKey: taskQueries })
@@ -128,7 +133,7 @@ function ConversationRoom({
   })
 
   const closeTasks = () => {
-    setTaskPanelOpen(false)
+    setPanel(null)
     taskOpener.current?.focus()
   }
   return (
@@ -151,7 +156,7 @@ function ConversationRoom({
             </Button>
             <div className="dsh-title">
               <span className="dsh-title-avatar">
-                {botMember ? (
+                {room.kind === 'direct' && botMember ? (
                   <BotAvatar botId={botMember.id} avatarKey={null} />
                 ) : (
                   <MessagesSquare className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
@@ -173,10 +178,24 @@ function ConversationRoom({
                 className="dsh-icon-btn"
                 aria-label="任务列表"
                 aria-pressed={taskPanelOpen}
-                onClick={() => (taskPanelOpen ? closeTasks() : setTaskPanelOpen(true))}
+                onClick={() => (taskPanelOpen ? closeTasks() : setPanel('task'))}
               >
                 <ClipboardList className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
               </Button>
+              {!readOnly && room.kind === 'group' && (
+                <Button
+                  ref={settingsOpener}
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="dsh-icon-btn"
+                  aria-label="会话设置"
+                  aria-pressed={panel === 'settings'}
+                  onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
+                >
+                  <Settings className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                </Button>
+              )}
             </div>
           </div>
           <TabsList className="dsh-tabs w-auto gap-6 rounded-none bg-transparent p-0" aria-label="会话视图">
@@ -314,6 +333,16 @@ function ConversationRoom({
           onChanged={() => void events.refetch()}
         />
       )}
+      {panel === 'settings' && (
+        <GroupSettings
+          room={room}
+          userId={userId}
+          onClose={() => {
+            setPanel(null)
+            settingsOpener.current?.focus()
+          }}
+        />
+      )}
       {newTaskOpen && (
         <NewTaskDialog
           room={room}
@@ -347,6 +376,9 @@ function TeamConversations({
 }) {
   const [filter, setFilter] = useState('')
   const [listOpen, setListOpen] = useState(false)
+  const [newGroupOpen, setNewGroupOpen] = useState(false)
+  const groupOpener = useRef<HTMLButtonElement>(null)
+  const client = useQueryClient()
   const listToggleRef = useRef<HTMLButtonElement>(null)
   const listCloseRef = useRef<HTMLButtonElement>(null)
   const navigate = useNavigate()
@@ -367,7 +399,7 @@ function TeamConversations({
     <div
       className={cn('collab-layout live-conversations', listOpen && 'mobile-rooms-open')}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && listOpen && !event.defaultPrevented) closeList()
+        if (event.key === 'Escape' && listOpen && !newGroupOpen && !event.defaultPrevented) closeList()
       }}
     >
       <h1 className="sr-only">协作</h1>
@@ -394,6 +426,19 @@ function TeamConversations({
               onChange={(event) => setFilter(event.target.value)}
             />
           </label>
+          {!readOnly && (
+            <Button
+              ref={groupOpener}
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="icon-btn"
+              aria-label="新建群组"
+              onClick={() => setNewGroupOpen(true)}
+            >
+              <Plus className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+            </Button>
+          )}
           {listOpen && (
             <Button
               ref={listCloseRef}
@@ -505,6 +550,22 @@ function TeamConversations({
             />
           )}
         </section>
+      )}
+      {newGroupOpen && (
+        <NewGroupDialog
+          teamId={teamId}
+          userId={userId}
+          onClose={() => {
+            setNewGroupOpen(false)
+            requestAnimationFrame(() => groupOpener.current?.focus())
+          }}
+          onCreated={(room) => {
+            setNewGroupOpen(false)
+            closeList()
+            void client.invalidateQueries({ queryKey: conversationsQueryKey })
+            void navigate(`/collaboration/${room.id}`)
+          }}
+        />
       )}
     </div>
   )

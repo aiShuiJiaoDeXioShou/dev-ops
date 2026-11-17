@@ -70,6 +70,10 @@
     min-width: 0;
   }
 
+  .live-conversations .work-task-panel > .form-grid {
+    margin-top: calc(var(--spacing) * 4);
+  }
+
   .live-conversations .dsh-plain-text pre {
     overflow: auto;
     padding: calc(var(--spacing) * 2);

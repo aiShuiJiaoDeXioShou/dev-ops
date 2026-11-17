@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { BotConversation } from '@/features/conversations/api/queries'
@@ -9,6 +9,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
+import { HandoffTaskDialog } from './handoff-task-dialog'
 import { TaskResults } from './task-results'
 import { botTaskOptions, taskQueries, taskStatusLabels, type BotTaskDetail } from '../api/queries'
 
@@ -35,6 +36,8 @@ export function TaskDetails({
   onChanged: () => void
 }) {
   const [extraInput, setExtraInput] = useState('')
+  const [handoffOpen, setHandoffOpen] = useState(false)
+  const handoffOpener = useRef<HTMLButtonElement>(null)
   const client = useQueryClient()
   const query = useQuery(botTaskOptions(taskId))
   const task = query.data?.data
@@ -65,6 +68,11 @@ export function TaskDetails({
   const active = task.runs.some(({ status }) => status === 'queued' || status === 'running')
   const owner = room.members.find(({ id }) => id === task.businessOwnerId)?.name ?? '已离开会话'
   const executor = room.members.find(({ id }) => id === task.executorBotId)?.name ?? '已离开会话'
+  const receivers = room.members.filter((member) => member.kind === 'bot' && member.id !== task.executorBotId)
+  const closeHandoff = () => {
+    setHandoffOpen(false)
+    requestAnimationFrame(() => handoffOpener.current?.focus())
+  }
   return (
     <>
       <div className="task-title">{task.title}</div>
@@ -138,6 +146,45 @@ export function TaskDetails({
         <p role="alert" className="field-error">
           {describeRequestError(action.error).description}
         </p>
+      )}
+      {!readOnly && receivers.length > 0 && ['pending', 'waiting', 'in_progress'].includes(task.status) && (
+        <Button ref={handoffOpener} type="button" variant="outline" onClick={() => setHandoffOpen(true)}>
+          转交任务
+        </Button>
+      )}
+      {handoffOpen && (
+        <HandoffTaskDialog
+          task={task}
+          members={receivers}
+          onClose={closeHandoff}
+          onChanged={() => {
+            closeHandoff()
+            void client.invalidateQueries({ queryKey: taskQueries })
+            onChanged()
+          }}
+        />
+      )}
+      {task.handoffs.length > 0 && (
+        <section>
+          <h3 className="task-section-title">交接记录</h3>
+          <ol className="task-timeline">
+            {task.handoffs.map((entry) => {
+              const memberName = (id: string) =>
+                room.members.find((member) => member.id === id)?.name ?? '已离开会话的智能体'
+              return (
+                <li key={entry.id}>
+                  <strong>
+                    {memberName(entry.fromBotId)} → {memberName(entry.toBotId)}
+                  </strong>
+                  <time dateTime={entry.createdAt}>{formatDateTime(entry.createdAt)}</time>
+                  <p>{entry.reason}</p>
+                  <p>{entry.summary}</p>
+                  {entry.unfinished && <p>{entry.unfinished}</p>}
+                </li>
+              )
+            })}
+          </ol>
+        </section>
       )}
       <TaskResults
         task={task}
