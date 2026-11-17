@@ -2279,6 +2279,68 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 分页读取当前团队的工作标签。 */
+    async listWorkTags(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/work-tags', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/work-tags', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/work-tags`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 新建或复用规范化名称相同的标签。 */
+    async createWorkTag(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/work-tags', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/work-tags', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/work-tags`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 修改标签名称，保留它与相关资源的关联。 */
+    async renameWorkTag(
+      id: string,
+      body: ApiBody<'/api/v1/work-tags/{tagId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/work-tags/{tagId}/update', 'post'>>(
+        `/api/v1/work-tags/${segment(id)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 删除工作标签和其引用关系。 */
+    async removeWorkTag(id: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/work-tags/{tagId}/remove', 'post'>>(
+        `/api/v1/work-tags/${segment(id)}/remove`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 添加或取消对会话或任务的一项标签关联。 */
+    async setWorkTagLink(
+      id: string,
+      linked: boolean,
+      body: ApiBody<'/api/v1/work-tags/{tagId}/link', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/work-tags/{tagId}/link', 'post'>>(
+        `/api/v1/work-tags/${segment(id)}/${linked ? 'link' : 'unlink'}`,
+        'POST',
+        body,
+        options,
+      )
+    },
     /** 读取团队技能列表。 */
     async listSkills(
       teamId: string,
