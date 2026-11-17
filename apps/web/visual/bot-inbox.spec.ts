@@ -21,9 +21,9 @@ test('[desktop] [mobile] 待处理链接打开任务并验收结果', async ({ p
   const room = {
     id: roomId,
     teamId,
-    kind: 'direct',
-    name: '交付助理',
-    leaderBotId: null,
+    kind: 'group',
+    name: '研发协作平台协作组',
+    leaderBotId: botId,
     lastMessageAt: stamp,
     responsibility: '',
     instructions: '',
@@ -31,7 +31,9 @@ test('[desktop] [mobile] 待处理链接打开任务并验收结果', async ({ p
     skillReferences: [],
     members: [
       { id: userId, name: '业务负责人', kind: 'user' },
-      { id: botId, name: '交付助理', kind: 'bot' },
+      { id: botId, name: '交付助理', kind: 'bot', avatarKey: 'orbit' },
+      { id: 'da55aa00-0000-4000-8000-000000000047', name: '实施助理', kind: 'bot', avatarKey: 'prism' },
+      { id: 'da55aa00-0000-4000-8000-000000000048', name: '复核助理', kind: 'bot', avatarKey: 'signal' },
     ],
   }
   const result = {
@@ -71,11 +73,48 @@ test('[desktop] [mobile] 待处理链接打开任务并验收结果', async ({ p
     updatedAt: stamp,
   })
   const path = `**/api/v1/bot-conversations/${roomId}`
+  const messages = [
+    {
+      speakerKind: 'bot',
+      speakerId: botId,
+      speakerName: '交付助理',
+      text: '已创建交付核对任务，结果会在当前会话送验。',
+    },
+    { speakerKind: 'user', speakerId: userId, speakerName: '业务负责人', text: '请保留核对记录和验收证据。' },
+    {
+      speakerKind: 'bot',
+      speakerId: botId,
+      speakerName: '交付助理',
+      text: '已更新任务「核对交付」，请查看当前任务中的结果。',
+    },
+  ].map(({ text, ...message }, index) => ({
+    ...message,
+    id: `da55aa00-0000-4000-8000-00000000008${index}`,
+    sequence: String(index + 1),
+    body: { blocks: [{ type: 'text', text }] },
+    createdAt: stamp,
+    runId: null,
+  }))
   await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) =>
-    route.fulfill({ json: success({ items: [room], nextCursor: null }) }),
+    route.fulfill({
+      json: success({
+        items: [
+          {
+            ...room,
+            botAvatars: room.members.flatMap(({ id, avatarKey }) =>
+              avatarKey ? [{ id, avatarKey, enabled: true }] : [],
+            ),
+            lastMessagePreview: '已更新任务「核对交付」，请查看当前任务中的结果。',
+          },
+        ],
+        nextCursor: null,
+      }),
+    }),
   )
   await page.route(path, (route) => route.fulfill({ json: success(room) }))
-  await page.route(`${path}/messages*`, (route) => route.fulfill({ json: success({ items: [], nextBefore: null }) }))
+  await page.route(`${path}/messages*`, (route) =>
+    route.fulfill({ json: success({ items: messages, nextBefore: null }) }),
+  )
   await page.route(`${path}/events*`, (route) =>
     route.fulfill({ json: success({ items: [], activeRuns: [], cursor: '0', resetRequired: false }) }),
   )
@@ -126,6 +165,20 @@ test('[desktop] [mobile] 待处理链接打开任务并验收结果', async ({ p
   await page.screenshot({ path: testInfo.outputPath('bot-inbox.png') })
   await link.press('Enter')
   const panel = page.getByRole('complementary', { name: '任务面板' })
+  await expect(page.locator('.dsh-title .bot-group-avatar.members-3 img')).toHaveCount(3)
+  await expect(page.getByText('3 位 Bot · Leader 交付助理')).toBeVisible()
+  await expect(panel.getByText('当前任务')).toBeVisible()
+  await expect(page.locator('.dsh-messages article')).toHaveCount(3)
+  if (testInfo.project.name === 'desktop') {
+    const rail = await page.getByRole('complementary', { name: '会话列表' }).boundingBox()
+    expect(rail?.width).toBe(280)
+    const header = await page.locator('.dsh-chat-header').boundingBox()
+    const tasks = await panel.boundingBox()
+    if (!rail || !header || !tasks) throw new Error('协作三栏未完整渲染')
+    expect(header.x).toBeCloseTo(rail.x + rail.width, 0)
+    expect(tasks.x).toBeCloseTo(header.x + header.width, 0)
+  }
+  await page.screenshot({ path: testInfo.outputPath('bot-group-task-panel.png'), animations: 'disabled' })
   await expect(panel.getByText('已核对', { exact: true })).toBeVisible()
   await panel.getByRole('button', { name: '验收通过' }).press('Enter')
   const dialog = page.getByRole('dialog', { name: '验收通过' })

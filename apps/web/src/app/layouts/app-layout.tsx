@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Folder, LayoutGrid, LogOut, Menu, MessagesSquare, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
+import { Folder, LayoutGrid, LogOut, Menu, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
 import { UserAvatar } from '@/shared/ui/user-avatar'
+import { CollaborationNavIcon } from '@/shared/ui/collaboration-nav-icon'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import {
@@ -48,8 +49,13 @@ export function AppLayout() {
     const matched = titles.find(([path]) => location.pathname === path || location.pathname.startsWith(path + '/'))
     document.title = matched ? `${matched[1]} · DevOps` : 'DevOps 项目开发平台'
   }, [isPlatformAdmin, location.pathname])
-  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const menuButtonRef = useRef<HTMLElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
+  const isCollaboration = currentTeam && isReady && /^\/collaboration(?:\/|$)/u.test(location.pathname)
+  const openNavigation = (opener: HTMLElement | null) => {
+    menuButtonRef.current = opener
+    setMenuOpen(true)
+  }
   useEffect(() => {
     if (!menuOpen) return
     // 打开抽屉后把焦点移入第一个可操作项，并把 Tab 限制在抽屉内；Esc/关闭时归还触发按钮。
@@ -84,7 +90,12 @@ export function AppLayout() {
     queryClient.clear()
     navigate('/login', { replace: true })
   }
-  const navIcons = { collaboration: MessagesSquare, folder: Folder, capabilities: LayoutGrid, shield: Shield } as const
+  const navIcons = {
+    collaboration: CollaborationNavIcon,
+    folder: Folder,
+    capabilities: LayoutGrid,
+    shield: Shield,
+  } as const
   const primaryNavItems = [
     { to: '/collaboration', label: '协作', icon: 'collaboration' as const },
     { to: '/projects', label: '项目', icon: 'folder' as const },
@@ -124,6 +135,7 @@ export function AppLayout() {
             <NavLink
               key={item.to}
               to={item.to}
+              data-page={item.icon === 'collaboration' ? 'collaboration' : undefined}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
@@ -201,18 +213,19 @@ export function AppLayout() {
       </aside>
       <div className="surface">
         <main className="main">
-          <Button
-            ref={menuButtonRef}
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="icon-btn mobile-menu"
-            aria-label="打开导航"
-            onClick={() => setMenuOpen(true)}
-          >
-            <Menu className="size-5" aria-hidden="true" />
-          </Button>
-          {isReady ? <Outlet /> : <DelayedPageSkeleton />}
+          {!isCollaboration && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="icon-btn mobile-menu"
+              aria-label="打开导航"
+              onClick={(event) => openNavigation(event.currentTarget)}
+            >
+              <Menu className="size-5" aria-hidden="true" />
+            </Button>
+          )}
+          {isReady ? <Outlet context={openNavigation} /> : <DelayedPageSkeleton />}
           <div id="workspace-detail-host" />
         </main>
       </div>

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ArrowLeft, Plus, X } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import type { BotConversation } from '@/features/conversations/api/queries'
+import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
@@ -35,11 +36,14 @@ export function ConversationTaskPanel({
   return (
     <aside className="work-task-panel" aria-label="任务面板">
       <div className="row">
+        <h3>{taskId ? '当前任务' : '会话任务'}</h3>
+        <span className="spacer" />
         {taskId && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
+            unstyled
             className="icon-btn"
             aria-label="返回任务列表"
             onClick={() => onSelect()}
@@ -47,18 +51,17 @@ export function ConversationTaskPanel({
             <ArrowLeft className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
           </Button>
         )}
-        <h3>{taskId ? '当前任务' : '会话任务'}</h3>
-        <span className="spacer" />
         {!readOnly && !taskId && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
+            unstyled
             className="icon-btn"
             aria-label="新建协作任务"
             onClick={onNew}
           >
-            <Plus className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+            <ConversationIcon name="plus" />
           </Button>
         )}
         <Button
@@ -66,11 +69,12 @@ export function ConversationTaskPanel({
           type="button"
           variant="ghost"
           size="icon"
+          unstyled
           className="icon-btn"
           aria-label="关闭任务面板"
           onClick={onClose}
         >
-          <X className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+          <ConversationIcon name="close" />
         </Button>
       </div>
       {taskId ? (

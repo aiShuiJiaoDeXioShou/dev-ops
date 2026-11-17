@@ -72,7 +72,12 @@ test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ p
   })
   const path = `**/api/v1/bot-conversations/${roomId}`
   await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) =>
-    route.fulfill({ json: success({ items: [room], nextCursor: null }) }),
+    route.fulfill({
+      json: success({
+        items: [{ ...room, botAvatars: [{ id: botId, avatarKey: 'orbit', enabled: true }], lastMessagePreview: null }],
+        nextCursor: null,
+      }),
+    }),
   )
   await page.route(path, (route) => route.fulfill({ json: success(room) }))
   await page.route(`${path}/messages*`, (route) => route.fulfill({ json: success({ items: [], nextBefore: null }) }))

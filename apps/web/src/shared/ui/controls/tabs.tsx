@@ -9,15 +9,19 @@ function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive
 
 /**
  * 渲染页签切换列表。
- * @param props Radix 列表属性与自定义类名。
+ * @param props Radix 列表属性与自定义类名。unstyled 允许页面沿用已有页签布局。
  * @returns 可横向滚动的页签栏。
  */
-function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.List>) {
+function TabsList({
+  className,
+  unstyled = false,
+  ...props
+}: React.ComponentProps<typeof TabsPrimitive.List> & { unstyled?: boolean }) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        'inline-flex w-fit items-center gap-1 rounded-lg bg-secondary p-1 text-muted-foreground',
+        !unstyled && 'inline-flex w-fit items-center gap-1 rounded-lg bg-secondary p-1 text-muted-foreground',
         className,
       )}
       {...props}
@@ -27,22 +31,24 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
 
 /**
  * 渲染单个页签触发器。
- * @param props Radix 触发器属性与自定义类名；underline 使用目录的下划线样式。
+ * @param props Radix 触发器属性与自定义类名；underline 使用目录下划线，unstyled 使用调用者的样式。
  * @returns 选中态高亮的页签按钮。
  */
 function TabsTrigger({
   className,
   variant = 'default',
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Trigger> & { variant?: 'default' | 'underline' }) {
+}: React.ComponentProps<typeof TabsPrimitive.Trigger> & { variant?: 'default' | 'underline' | 'unstyled' }) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
-        variant === 'underline'
-          ? 'tab'
-          : 'rounded-md px-3 py-1 text-sm font-medium hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
+        'outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+        variant !== 'unstyled' &&
+          'inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap transition-colors',
+        variant === 'underline' && 'tab',
+        variant === 'default' &&
+          'rounded-md px-3 py-1 text-sm font-medium hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
         className,
       )}
       {...props}

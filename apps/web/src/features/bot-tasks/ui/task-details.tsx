@@ -76,31 +76,29 @@ export function TaskDetails({
   }
   return (
     <>
-      <div className="task-title">{task.title}</div>
+      <h4 className="task-title">{task.title}</h4>
+      <span className={`work-chip ${task.status === 'completed' ? 'success' : ''}`}>
+        {task.blocked ? '受阻' : taskStatusLabels[task.status]}
+      </span>
       <dl className="work-properties">
-        <div>
-          <dt>状态</dt>
-          <dd>{taskStatusLabels[task.status]}</dd>
-        </div>
-        <div>
-          <dt>业务负责人</dt>
-          <dd>{owner}</dd>
-        </div>
-        <div>
-          <dt>执行者</dt>
-          <dd>{executor}</dd>
-        </div>
-        <div>
-          <dt>验收条件</dt>
-          <dd className="whitespace-pre-wrap wrap-break-word">{task.acceptanceCriteria}</dd>
-        </div>
+        <dt>业务负责人</dt>
+        <dd>{owner}</dd>
+        <dt>执行者</dt>
+        <dd>{executor}</dd>
+        <dt>来源</dt>
+        <dd>{room.name}</dd>
         {task.waitReason && (
-          <div>
+          <>
             <dt>等待原因</dt>
             <dd>{waitLabels[task.waitReason]}</dd>
-          </div>
+          </>
         )}
       </dl>
+      <p className="task-note">
+        <strong>验收条件</strong>
+        <br />
+        {task.acceptanceCriteria}
+      </p>
       {task.inputs.some(({ inputVersion }) => inputVersion > 1) && (
         <section>
           <h3 className="task-section-title">补充要求</h3>
@@ -117,44 +115,49 @@ export function TaskDetails({
         </section>
       )}
       {!readOnly && ['pending', 'in_progress', 'waiting'].includes(task.status) && (
-        <form
-          className="task-actions"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (extraInput.trim()) action.mutate('append')
-          }}
-        >
-          <Textarea
-            aria-label="补充任务要求"
-            maxLength={16000}
-            value={extraInput}
-            onChange={(event) => setExtraInput(event.target.value)}
-          />
-          <Button type="submit" variant="outline" disabled={!extraInput.trim() || action.isPending}>
-            保存补充
-          </Button>
-          {task.status === 'waiting' && !active && (
-            <Button type="button" variant="outline" disabled={action.isPending} onClick={() => action.mutate('rerun')}>
-              重新运行
+        <details className="task-supplement">
+          <summary>补充任务要求</summary>
+          <form
+            className="task-actions"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (extraInput.trim()) action.mutate('append')
+            }}
+          >
+            <Textarea
+              aria-label="补充任务要求"
+              maxLength={16000}
+              value={extraInput}
+              onChange={(event) => setExtraInput(event.target.value)}
+            />
+            <Button type="submit" variant="outline" disabled={!extraInput.trim() || action.isPending}>
+              保存补充
             </Button>
-          )}
-        </form>
+          </form>
+        </details>
       )}
-      {!readOnly && task.status !== 'cancelled' && task.status !== 'completed' && (
-        <Button type="button" variant="outline" disabled={action.isPending} onClick={() => action.mutate('cancel')}>
-          取消任务
-        </Button>
-      )}
-      {action.isError && (
-        <p role="alert" className="field-error">
-          {describeRequestError(action.error).description}
-        </p>
-      )}
-      {!readOnly && receivers.length > 0 && ['pending', 'waiting', 'in_progress'].includes(task.status) && (
-        <Button ref={handoffOpener} type="button" variant="outline" onClick={() => setHandoffOpen(true)}>
-          转交任务
-        </Button>
-      )}
+      <div className="task-actions">
+        {!readOnly && task.status === 'waiting' && !active && (
+          <Button type="button" variant="outline" disabled={action.isPending} onClick={() => action.mutate('rerun')}>
+            重新运行
+          </Button>
+        )}
+        {!readOnly && task.status !== 'cancelled' && task.status !== 'completed' && (
+          <Button type="button" variant="outline" disabled={action.isPending} onClick={() => action.mutate('cancel')}>
+            取消任务
+          </Button>
+        )}
+        {action.isError && (
+          <p role="alert" className="field-error">
+            {describeRequestError(action.error).description}
+          </p>
+        )}
+        {!readOnly && receivers.length > 0 && ['pending', 'waiting', 'in_progress'].includes(task.status) && (
+          <Button ref={handoffOpener} type="button" variant="outline" onClick={() => setHandoffOpen(true)}>
+            转交任务
+          </Button>
+        )}
+      </div>
       {handoffOpen && (
         <HandoffTaskDialog
           task={task}

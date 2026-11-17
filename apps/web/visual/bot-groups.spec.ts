@@ -58,7 +58,20 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
   await page.route(`${routeBase}/bot-inbox`, (route) => route.fulfill({ json: success({ items: [], count: 0 }) }))
   await page.route(`${routeBase}/bot-conversations*`, (route) => {
     if (route.request().method() !== 'POST')
-      return route.fulfill({ json: success({ items: created ? [room] : [], nextCursor: null }) })
+      return route.fulfill({
+        json: success({
+          items: created
+            ? [
+                {
+                  ...room,
+                  botAvatars: [leaderId, helperId].map((id) => ({ id, avatarKey: 'orbit', enabled: true })),
+                  lastMessagePreview: null,
+                },
+              ]
+            : [],
+          nextCursor: null,
+        }),
+      })
     expect(route.request().postDataJSON()).toMatchObject({
       kind: 'group',
       name: '交付群组',
@@ -79,18 +92,21 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
 
   await page.goto('/collaboration')
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).press('Enter')
-  await page.getByRole('button', { name: '新建群组' }).press('Enter')
+  await page.getByRole('button', { name: '新建会话' }).press('Enter')
+  await page.getByRole('menuitem', { name: '新建群组' }).press('Enter')
   const dialog = page.getByRole('dialog', { name: '新建群组' })
   await dialog.getByLabel('群组名称').fill('交付群组')
   await dialog.getByRole('checkbox', { name: '交付助理' }).press('Space')
   await dialog.getByRole('checkbox', { name: '复核助理' }).press('Space')
   await dialog.getByRole('button', { name: '创建群组' }).press('Enter')
   await expect(page.getByText('智能体读取团队资料后，结果对会话全体成员可见。')).toBeVisible()
-  const settings = page.getByRole('button', { name: '会话设置' })
+  const settings = page.getByRole('button', { name: '会话设置', exact: true })
   await settings.click()
   const panel = page.getByRole('complementary', { name: '会话设置' })
-  await expect(panel.getByRole('combobox', { name: 'Leader' })).toHaveValue(leaderId)
+  await expect(panel.getByText('Leader', { exact: true })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('bot-group-settings.png') })
+  await panel.getByRole('button', { name: '编辑', exact: true }).press('Enter')
+  await expect(panel.getByRole('combobox', { name: 'Leader' })).toHaveValue(leaderId)
   await page.keyboard.press('Escape')
   await expect(settings).toBeFocused()
   await expect(panel).toBeHidden()

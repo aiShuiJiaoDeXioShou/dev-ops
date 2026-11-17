@@ -40,7 +40,7 @@ const buttonVariants = cva(
 
 /**
  * 渲染统一按钮，支持将样式交给单个子元素。
- * @param props 原生按钮属性、变体、尺寸及 asChild 组合选项。
+ * @param props 原生按钮属性、变体、尺寸及 asChild 组合选项；unstyled 由调用者提供布局样式并保留键盘焦点。
  * @returns 按钮或组合后的子元素；交互由传入的回调决定。
  */
 function Button({
@@ -48,10 +48,12 @@ function Button({
   variant = 'default',
   size = 'default',
   asChild = false,
+  unstyled = false,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    unstyled?: boolean
   }) {
   const Comp = asChild ? Slot.Root : 'button'
 
@@ -60,7 +62,12 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(
+        unstyled
+          ? 'outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default'
+          : buttonVariants({ variant, size }),
+        className,
+      )}
       {...props}
     />
   )

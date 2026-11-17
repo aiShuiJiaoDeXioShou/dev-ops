@@ -1,406 +1,31 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, ClipboardList, Inbox, Menu, MessagesSquare, Plus, Search, Settings, X } from 'lucide-react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router'
 import { botInboxOptions, taskQueries } from '@/features/bot-tasks/api/queries'
 import { BotInbox } from '@/features/bot-tasks/ui/bot-inbox'
-import { ConversationTaskPanel } from '@/features/bot-tasks/ui/conversation-task-panel'
-import { NewTaskDialog } from '@/features/bot-tasks/ui/new-task-dialog'
-import { BotAvatar } from '@/features/bots/ui/bot-avatar'
-import {
-  conversationEventsOptions,
-  conversationOptions,
-  conversationsOptions,
-  conversationsQueryKey,
-  messagesOptions,
-} from '@/features/conversations/api/queries'
-import { ConversationComposer } from '@/features/conversations/ui/conversation-composer'
-import { ConversationMessages } from '@/features/conversations/ui/conversation-messages'
-import { GroupSettings } from '@/features/conversations/ui/group-settings'
+import { conversationsOptions, conversationsQueryKey } from '@/features/conversations/api/queries'
+import { ConversationAvatar } from '@/features/conversations/ui/conversation-avatar'
+import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
 import { NewGroupDialog } from '@/features/conversations/ui/new-group-dialog'
 import { useSession } from '@/features/identity/model/session'
 import { workTagsOptions } from '@/features/work-tags/api/queries'
 import { WorkTagDialog } from '@/features/work-tags/ui/work-tag-dialog'
-import { WorkTagEditor } from '@/features/work-tags/ui/work-tag-editor'
-import { Select } from '@/shared/ui/controls/select'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/shared/ui/controls/dropdown-menu'
 import { Input } from '@/shared/ui/controls/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
+import { Select } from '@/shared/ui/controls/select'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { ConversationRoom } from './conversation-room'
 import './conversations.css'
 
 const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
-const runStatuses: Record<string, string> = {
-  queued: '排队中',
-  running: '执行中',
-  stopped: '已停止',
-  failed: '执行失败',
-}
-
-function activityText(payload: unknown, key: string): string | undefined {
-  if (!payload || typeof payload !== 'object') return undefined
-  const value: unknown = Reflect.get(payload, key)
-  return typeof value === 'string' ? value : undefined
-}
-
-function ConversationRoom({
-  id,
-  userId,
-  readOnly,
-  listOpen,
-  openList,
-  listToggleRef,
-  initialTaskId,
-  initialSkillId,
-  onSkillUsed,
-}: {
-  id: string
-  userId: string
-  readOnly: boolean
-  listOpen: boolean
-  openList: () => void
-  listToggleRef: React.RefObject<HTMLButtonElement | null>
-  initialTaskId?: string
-  initialSkillId?: string
-  onSkillUsed: () => void
-}) {
-  const client = useQueryClient()
-  const [panel, setPanel] = useState<'task' | 'settings' | null>(initialTaskId ? 'task' : null)
-  const taskPanelOpen = panel === 'task'
-  const [newTaskOpen, setNewTaskOpen] = useState(false)
-  const [taskId, setTaskId] = useState(initialTaskId)
-  const taskOpener = useRef<HTMLButtonElement>(null)
-  const settingsOpener = useRef<HTMLButtonElement>(null)
-  const newTaskOpener = useRef<HTMLElement>(null)
-  const detail = useQuery({ ...conversationOptions(id), refetchInterval: 10000 })
-  const messages = useInfiniteQuery({ ...messagesOptions(id), enabled: detail.isSuccess })
-  const events = useQuery({ ...conversationEventsOptions(client, id), enabled: detail.isSuccess })
-  const room = detail.data?.data
-  const stored =
-    messages.data?.pages
-      .slice()
-      .reverse()
-      .flatMap(({ data }) => data.items) ?? []
-  const finalRuns = new Set(stored.flatMap((item) => (item.speakerKind === 'bot' && item.runId ? [item.runId] : [])))
-  const activeRuns = new Map(events.data?.activeRuns.map((run) => [run.id, run]))
-  const ongoingIds = new Set([...activeRuns.keys(), ...Object.keys(events.data?.progress ?? {})])
-  const botMember = room?.members.find((member) => member.kind === 'bot')
-  useEffect(() => {
-    if (!panel || newTaskOpen) return
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.key !== 'Escape' ||
-        document.querySelector('[role="dialog"], [role="alertdialog"]')
-      )
-        return
-      setPanel(null)
-      const opener = panel === 'task' ? taskOpener : settingsOpener
-      opener.current?.focus()
-    }
-    document.addEventListener('keydown', closeOnEscape)
-    return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [panel, newTaskOpen])
-  useEffect(() => {
-    if (events.data?.cursor && events.data.cursor !== '0' && taskPanelOpen) {
-      void client.invalidateQueries({ queryKey: taskQueries })
-    }
-  }, [client, events.data?.cursor, taskPanelOpen])
-  if (detail.isPending) return <DelayedPageSkeleton />
-  if (detail.isError)
-    return <PageError title="会话加载失败" error={detail.error} onRetry={() => void detail.refetch()} />
-  if (!room) return null
-
-  const items = stored.map((item) => ({
-    id: item.id,
-    name: item.speakerName ?? '会话通知',
-    kind: item.speakerKind,
-    text: item.body.blocks
-      .filter((block) => block.type !== 'tool_activity')
-      .map((block) => block.text)
-      .join('\n\n'),
-    time: item.createdAt,
-  }))
-  const ongoing = [...ongoingIds].flatMap((runId) => {
-    if (finalRuns.has(runId)) return []
-    const active = activeRuns.get(runId)
-    const progress = events.data?.progress[runId]
-    const status = active?.status ?? progress?.status
-    if (!status || !runStatuses[status]) return []
-    const queuePosition = active?.teamQueuePosition
-    const statusDetails = [
-      runStatuses[status],
-      active?.queueReason === 'worker_offline' ? '执行服务离线' : null,
-      queuePosition ? `团队队列第 ${queuePosition} 位` : null,
-      progress?.failureMessage,
-    ]
-    return [
-      {
-        id: runId,
-        name: room.members.find((member) => member.id === active?.botId)?.name ?? botMember?.name ?? room.name,
-        kind: 'bot' as const,
-        text: progress?.text ?? '',
-        status: statusDetails.filter(Boolean).join(' · '),
-      },
-    ]
-  })
-
-  const closeTasks = () => {
-    setPanel(null)
-    taskOpener.current?.focus()
-  }
-  return (
-    <>
-      <Tabs className="conversation-main dsh-chat gap-0" defaultValue="chat" aria-label="当前会话">
-        <header className="dsh-chat-header">
-          <div className="dsh-title-row">
-            <Button
-              ref={listToggleRef}
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="dsh-icon-btn dsh-room-toggle"
-              aria-label="打开会话列表"
-              aria-expanded={listOpen}
-              aria-controls="team-conversations"
-              onClick={openList}
-            >
-              <Menu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-            </Button>
-            <div className="dsh-title">
-              <span className="dsh-title-avatar">
-                {room.kind === 'direct' && botMember ? (
-                  <BotAvatar botId={botMember.id} avatarKey={null} />
-                ) : (
-                  <MessagesSquare className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-                )}
-              </span>
-              <span className="dsh-title-text">
-                <strong>{room.name}</strong>
-                <small>
-                  {room.kind === 'direct' ? '智能体私聊' : '群组'} · {room.members.length} 位成员
-                </small>
-              </span>
-            </div>
-            <div className="dsh-title-actions">
-              <Button
-                ref={taskOpener}
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="dsh-icon-btn"
-                aria-label="任务列表"
-                aria-pressed={taskPanelOpen}
-                onClick={() => (taskPanelOpen ? closeTasks() : setPanel('task'))}
-              >
-                <ClipboardList className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-              </Button>
-              {!readOnly && room.kind === 'group' && (
-                <Button
-                  ref={settingsOpener}
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="dsh-icon-btn"
-                  aria-label="会话设置"
-                  aria-pressed={panel === 'settings'}
-                  onClick={() => setPanel(panel === 'settings' ? null : 'settings')}
-                >
-                  <Settings className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-                </Button>
-              )}
-            </div>
-          </div>
-          <TabsList className="dsh-tabs w-auto gap-6 rounded-none bg-transparent p-0" aria-label="会话视图">
-            <TabsTrigger value="chat" variant="underline" className="dsh-tab">
-              对话
-            </TabsTrigger>
-            <TabsTrigger value="activity" variant="underline" className="dsh-tab">
-              轨迹
-            </TabsTrigger>
-            <TabsTrigger value="context" variant="underline" className="dsh-tab">
-              上下文
-            </TabsTrigger>
-            <TabsTrigger value="members" variant="underline" className="dsh-tab">
-              编队
-            </TabsTrigger>
-          </TabsList>
-        </header>
-        <TabsContent value="chat" className="dsh-scroll-area">
-          {messages.isPending && <DelayedPageSkeleton />}
-          {messages.isError && (
-            <PageError title="消息加载失败" error={messages.error} onRetry={() => void messages.refetch()} />
-          )}
-          {messages.isSuccess && (
-            <ConversationMessages
-              items={[...items, ...ongoing]}
-              roomName={room.name}
-              hasEarlier={messages.hasNextPage}
-              loadingEarlier={messages.isFetchingNextPage}
-              loadEarlier={() => void messages.fetchNextPage()}
-            />
-          )}
-          {events.data?.activity
-            .filter(({ payload }) => activityText(payload, 'state') === 'memory_written')
-            .map((event) => {
-              const action = activityText(event.payload, 'action')
-              return (
-                <details key={event.sequence} className="dsh-note">
-                  <summary>{action === 'remove' ? '已删除记忆' : action === 'patch' ? '已更新记忆' : '已记住'}</summary>
-                  <Link to="/capabilities/memory">查看长期记忆</Link>
-                </details>
-              )
-            })}
-          {events.isError && (
-            <div className="row dsh-readonly-note" role="status">
-              运行状态更新失败
-              <Button variant="ghost" type="button" onClick={() => void events.refetch()}>
-                重试
-              </Button>
-            </div>
-          )}
-          <ConversationComposer
-            room={room}
-            readOnly={readOnly}
-            initialSkillId={initialSkillId}
-            runningId={events.data?.activeRuns.find((run) => run.status === 'running')?.id}
-            onSent={() => {
-              if (initialSkillId) onSkillUsed()
-              void Promise.all([
-                client.invalidateQueries({ queryKey: messagesOptions(id).queryKey }),
-                client.invalidateQueries({ queryKey: conversationsQueryKey }),
-                events.refetch(),
-              ])
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="activity" className="dsh-tab-panel">
-          <div className="dsh-panel-scroll">
-            {events.data?.activity.length ? (
-              <ul className="tool-results">
-                {events.data.activity.map((entry) => {
-                  const name = activityText(entry.payload, 'name') ?? '工具活动'
-                  const state = activityText(entry.payload, 'state')
-                  const path = activityText(entry.payload, 'path')
-                  const method = activityText(entry.payload, 'method')
-                  const code = activityText(entry.payload, 'code')
-                  return (
-                    <li key={entry.sequence} className="tool-result-card">
-                      <details>
-                        <summary>
-                          {name} · <time dateTime={entry.createdAt}>{clock.format(new Date(entry.createdAt))}</time>
-                        </summary>
-                        {path && (
-                          <p className="wrap-break-word">
-                            {method} {path}
-                          </p>
-                        )}
-                        {code && <p>{code}</p>}
-                        {state && <p className="small muted">{state}</p>}
-                      </details>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <EmptyState title="暂无执行轨迹" />
-            )}
-          </div>
-        </TabsContent>
-        <TabsContent value="context" className="dsh-tab-panel">
-          <div className="dsh-panel-scroll">
-            <WorkTagEditor
-              tags={room.tags}
-              teamId={room.teamId}
-              target={{ targetKind: 'conversation', targetId: room.id }}
-              readOnly={readOnly}
-              onChanged={() => {
-                void detail.refetch()
-                void client.invalidateQueries({ queryKey: conversationsQueryKey })
-              }}
-            />
-
-            {room.responsibility || room.instructions ? (
-              <dl className="work-properties">
-                {room.responsibility && (
-                  <div>
-                    <dt>职责</dt>
-                    <dd>{room.responsibility}</dd>
-                  </div>
-                )}
-                {room.instructions && (
-                  <div>
-                    <dt>指令</dt>
-                    <dd>{room.instructions}</dd>
-                  </div>
-                )}
-              </dl>
-            ) : (
-              <EmptyState title="暂无会话上下文" />
-            )}
-          </div>
-        </TabsContent>
-        <TabsContent value="members" className="dsh-tab-panel">
-          <div className="dsh-panel-scroll team-panel">
-            <ul className="team-members">
-              {room.members.map((member) => (
-                <li className="team-member" key={member.id}>
-                  <div className="team-main">
-                    <div className="team-name">{member.name}</div>
-                    <span className="team-role">{member.kind === 'bot' ? '智能体' : '成员'}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </TabsContent>
-      </Tabs>
-      {taskPanelOpen && (
-        <ConversationTaskPanel
-          room={room}
-          taskId={taskId}
-          readOnly={readOnly}
-          onClose={closeTasks}
-          onNew={() => {
-            const active = document.activeElement
-            if (active instanceof HTMLElement) newTaskOpener.current = active
-            setNewTaskOpen(true)
-          }}
-          onSelect={setTaskId}
-          onChanged={() => void events.refetch()}
-        />
-      )}
-      {panel === 'settings' && (
-        <GroupSettings
-          room={room}
-          userId={userId}
-          onClose={() => {
-            setPanel(null)
-            settingsOpener.current?.focus()
-          }}
-        />
-      )}
-      {newTaskOpen && (
-        <NewTaskDialog
-          room={room}
-          userId={userId}
-          onClose={() => {
-            setNewTaskOpen(false)
-            requestAnimationFrame(() => newTaskOpener.current?.focus())
-          }}
-          onCreated={(createdTask) => {
-            setNewTaskOpen(false)
-            setTaskId(createdTask)
-            void client.invalidateQueries({ queryKey: taskQueries })
-            void events.refetch()
-          }}
-        />
-      )}
-    </>
-  )
-}
 
 function TeamConversations({
   teamId,
@@ -419,6 +44,8 @@ function TeamConversations({
   const [tagDialogOpen, setTagDialogOpen] = useState(false)
   const tagOpener = useRef<HTMLButtonElement>(null)
   const [tagId, setTagId] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const shouldShowFilters = filtersOpen || !!tagId
   const tags = useInfiniteQuery(workTagsOptions(teamId))
   const tagItems = tags.data?.pages.flatMap(({ data }) => data.items) ?? []
   const activeTag = tagItems.some(({ id }) => id === tagId) ? tagId : ''
@@ -428,6 +55,7 @@ function TeamConversations({
   const listToggleRef = useRef<HTMLButtonElement>(null)
   const listCloseRef = useRef<HTMLButtonElement>(null)
   const navigate = useNavigate()
+  const openNavigation = useOutletContext<(opener: HTMLElement | null) => void>()
   const inbox = useQuery(botInboxOptions(teamId))
   const [params, setParams] = useSearchParams()
   const isInbox = params.get('view') === 'inbox'
@@ -436,6 +64,11 @@ function TeamConversations({
   const skillSearch = linkedSkill ? `?skill=${encodeURIComponent(linkedSkill)}` : ''
   const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim()), activeTag || undefined))
   const rooms = list.data?.pages.flatMap(({ data }) => data.items) ?? []
+  const defaultId = !isInbox && !linkedSkill && !filter && !activeTag ? rooms[0]?.id : undefined
+  const selectedId = id ?? defaultId
+  useEffect(() => {
+    if (!id && defaultId) void navigate(`/collaboration/${defaultId}`, { replace: true })
+  }, [defaultId, id, navigate])
   const closeList = () => {
     setListOpen(false)
     listToggleRef.current?.focus()
@@ -455,6 +88,7 @@ function TeamConversations({
       {listOpen && (
         <Button
           type="button"
+          unstyled
           className="mobile-rooms-backdrop"
           variant="ghost"
           tabIndex={-1}
@@ -464,10 +98,23 @@ function TeamConversations({
       )}
       <aside className="conversation-list" aria-label="会话列表" id="team-conversations">
         <div className="row conv-tools">
+          <Button
+            unstyled
+            type="button"
+            className="icon-btn mobile-menu"
+            aria-label="打开导航"
+            onClick={() => {
+              setListOpen(false)
+              openNavigation(listToggleRef.current)
+            }}
+          >
+            <ConversationIcon name="menu" />
+          </Button>
           <label className="search">
-            <Search className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+            <ConversationIcon name="search" />
             <Input
               type="search"
+              className="conversation-search-input h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
               aria-label="搜索会话"
               placeholder="搜索会话"
               value={filter}
@@ -476,18 +123,40 @@ function TeamConversations({
             />
           </label>
           {!readOnly && (
-            <Button
-              ref={groupOpener}
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="icon-btn"
-              aria-label="新建群组"
-              onClick={() => setNewGroupOpen(true)}
-            >
-              <Plus className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button unstyled type="button" ref={groupOpener} className="icon-btn" aria-label="新建会话">
+                  <ConversationIcon name="plus" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem asChild>
+                  <Link to="/capabilities/bots">
+                    <ConversationIcon name="chat" />
+                    新建私聊
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setNewGroupOpen(true)}>
+                  <ConversationIcon name="chat" />
+                  新建群组
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
+          <Button
+            unstyled
+            type="button"
+            ref={tagOpener}
+            className="icon-btn room-filter-toggle"
+            aria-label="会话筛选"
+            aria-expanded={shouldShowFilters}
+            onClick={() => {
+              if (tagId) setTagId('')
+              setFiltersOpen(!shouldShowFilters)
+            }}
+          >
+            <ConversationIcon name="more" />
+          </Button>
           {listOpen && (
             <Button
               ref={listCloseRef}
@@ -498,13 +167,14 @@ function TeamConversations({
               aria-label="收起会话列表"
               onClick={closeList}
             >
-              <X className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+              <ConversationIcon name="close" />
             </Button>
           )}
         </div>
         <Button
           type="button"
           variant="ghost"
+          unstyled
           className={cn('inbox-link', isInbox && 'active')}
           aria-pressed={isInbox}
           onClick={() => {
@@ -512,35 +182,37 @@ function TeamConversations({
             void navigate('/collaboration?view=inbox')
           }}
         >
-          <Inbox className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+          <ConversationIcon name="inbox" />
           待你处理
           {inbox.isSuccess && <span className="counter">{inbox.data.data.count}</span>}
         </Button>
-        <div className="row flex-wrap">
-          <Select aria-label="按工作标签筛选" value={activeTag} onChange={(event) => setTagId(event.target.value)}>
-            <option value="">全部标签</option>
-            {tagItems.map(({ id, name }) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </Select>
-          {!readOnly && (
-            <Button ref={tagOpener} type="button" variant="ghost" onClick={() => setTagDialogOpen(true)}>
-              管理标签
-            </Button>
-          )}
-          {tags.hasNextPage && (
-            <Button type="button" variant="ghost" onClick={() => void tags.fetchNextPage()}>
-              更多标签
-            </Button>
-          )}
-          {tags.isError && (
-            <Button type="button" variant="ghost" onClick={() => void tags.refetch()}>
-              重试加载标签
-            </Button>
-          )}
-        </div>
+        {shouldShowFilters && (
+          <div className="row flex-wrap">
+            <Select aria-label="按工作标签筛选" value={activeTag} onChange={(event) => setTagId(event.target.value)}>
+              <option value="">全部标签</option>
+              {tagItems.map(({ id, name }) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+            {!readOnly && (
+              <Button type="button" variant="ghost" onClick={() => setTagDialogOpen(true)}>
+                管理标签
+              </Button>
+            )}
+            {tags.hasNextPage && (
+              <Button type="button" variant="ghost" onClick={() => void tags.fetchNextPage()}>
+                更多标签
+              </Button>
+            )}
+            {tags.isError && (
+              <Button type="button" variant="ghost" onClick={() => void tags.refetch()}>
+                重试加载标签
+              </Button>
+            )}
+          </div>
+        )}
         {list.isPending && <DelayedPageSkeleton />}
         {list.isError && <PageError title="会话列表加载失败" error={list.error} onRetry={() => void list.refetch()} />}
         {list.isSuccess && rooms.length === 0 && (
@@ -550,23 +222,26 @@ function TeamConversations({
           <Button
             key={room.id}
             type="button"
-            className={cn('conversation-item', room.id === id && 'active')}
+            unstyled
+            className={cn('conversation-item', !isInbox && room.id === selectedId && 'active')}
             variant="ghost"
-            aria-pressed={room.id === id}
+            aria-pressed={!isInbox && room.id === selectedId}
             onClick={() => {
               closeList()
               void navigate(`/collaboration/${room.id}${skillSearch}`)
             }}
           >
             <span className="conversation-mark">
-              <Bot className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+              <ConversationAvatar kind={room.kind} bots={room.botAvatars} />
             </span>
             <span className="conversation-summary">
               <span className="conversation-title-row">
                 <strong>{room.name}</strong>
-                <time dateTime={room.lastMessageAt}>{clock.format(new Date(room.lastMessageAt))}</time>
+                {room.lastMessagePreview && (
+                  <time dateTime={room.lastMessageAt}>{clock.format(new Date(room.lastMessageAt))}</time>
+                )}
               </span>
-              <small>{room.kind === 'direct' ? '智能体私聊' : '群组'}</small>
+              <small>{room.lastMessagePreview ?? '还没有消息'}</small>
             </span>
           </Button>
         ))}
@@ -581,10 +256,10 @@ function TeamConversations({
           </Button>
         )}
       </aside>
-      {id && !isInbox ? (
+      {selectedId && !isInbox ? (
         <ConversationRoom
-          key={`${id}:${linkedTask ?? ''}:${linkedSkill ?? ''}`}
-          id={id}
+          key={`${selectedId}:${linkedTask ?? ''}`}
+          id={selectedId}
           initialTaskId={linkedTask}
           initialSkillId={linkedSkill}
           onSkillUsed={() => {
@@ -603,6 +278,7 @@ function TeamConversations({
         <section className="conversation-main dsh-chat">
           <header className="dsh-chat-header">
             <Button
+              unstyled
               ref={listToggleRef}
               type="button"
               variant="ghost"
@@ -613,14 +289,14 @@ function TeamConversations({
               aria-controls="team-conversations"
               onClick={() => setListOpen(true)}
             >
-              <Menu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+              <ConversationIcon name="menu" />
             </Button>
           </header>
           {isInbox ? (
             <BotInbox teamId={teamId} />
           ) : (
             <EmptyState
-              icon={<MessagesSquare />}
+              icon={<ConversationIcon name="chat" />}
               title="选择会话"
               description={
                 linkedSkill

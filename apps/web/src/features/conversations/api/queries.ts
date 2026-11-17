@@ -15,6 +15,12 @@ export type ConversationMessage = ApiSuccessData<
 export type ConversationEvents = ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/events', 'get'>
 type RunProgress = {
   text: string
+  botId?: string
+  createdAt?: string
+  startedAt?: string
+  finishedAt?: string
+  firstOutputAt?: string
+  stopRequested?: boolean
   status?: string
   failureMessage?: string
 }
@@ -58,7 +64,13 @@ export function messagesOptions(id: string) {
   })
 }
 
-function stringProperty(payload: unknown, property: string) {
+/**
+ * 安全读取会话事件的可展示文本。
+ * @param payload 服务端按事件类型返回的载荷。
+ * @param property 需要的字段名。
+ * @returns 字段为文本时返回内容，否则返回 undefined。
+ */
+export function conversationEventText(payload: unknown, property: string) {
   if (!payload || typeof payload !== 'object') return undefined
   const value: unknown = Reflect.get(payload, property)
   return typeof value === 'string' ? value : undefined
@@ -78,15 +90,27 @@ export function conversationEventsOptions(client: QueryClient, id: string) {
       for (const event of data.items) {
         if (event.kind === 'tool_activity') activity.push(event)
         if (event.kind === 'message_committed') {
-          delete progress[event.runId]
+          const run = progress[event.runId]
+          if (run) progress[event.runId] = { ...run, text: '' }
           shouldReloadMessages = true
         }
         if (event.kind === 'run_status' || event.kind === 'output_delta') {
           const entry = progress[event.runId] ?? { text: '' }
+          const status = conversationEventText(event.payload, 'status') ?? entry.status
+          const isFinished = status === 'succeeded' || status === 'failed' || status === 'stopped'
+          const payload = event.payload
+          const stopRequested =
+            payload && typeof payload === 'object' ? Reflect.get(payload, 'stopRequested') : undefined
           progress[event.runId] = {
-            text: entry.text + (stringProperty(event.payload, 'text') ?? ''),
-            status: stringProperty(event.payload, 'status') ?? entry.status,
-            failureMessage: stringProperty(event.payload, 'failureMessage') ?? entry.failureMessage,
+            text: entry.text + (conversationEventText(event.payload, 'text') ?? ''),
+            createdAt: entry.createdAt ?? event.createdAt,
+            startedAt: entry.startedAt ?? (status === 'running' ? event.createdAt : undefined),
+            finishedAt: entry.finishedAt ?? (isFinished ? event.createdAt : undefined),
+            firstOutputAt: entry.firstOutputAt ?? (event.kind === 'output_delta' ? event.createdAt : undefined),
+            botId: conversationEventText(event.payload, 'botId') ?? entry.botId,
+            stopRequested: typeof stopRequested === 'boolean' ? stopRequested : entry.stopRequested,
+            status,
+            failureMessage: conversationEventText(event.payload, 'failureMessage') ?? entry.failureMessage,
           }
         }
       }
