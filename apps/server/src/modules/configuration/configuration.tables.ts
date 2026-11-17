@@ -51,7 +51,7 @@ export const credential = appSchema.table(
   (table) => [
     primaryKey({ name: 'pk_credential_id', columns: [table.id] }),
     unique('uk_credential_team_name').on(table.team_id, table.name),
-    check('ck_credential_kind', sql`${table.kind} in ('api_key', 'account_password', 'ssh_key')`),
+    check('ck_credential_kind', sql`${table.kind} in ('api_key', 'model_api_key', 'account_password', 'ssh_key')`),
     check('ck_credential_status', sql`${table.status} in ('active', 'revoked')`),
     check('ck_credential_current_version', sql`${table.current_version} >= 1`),
     check('ck_credential_name_length', sql`char_length(${table.name}) between 1 and 120`),

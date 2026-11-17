@@ -1,0 +1,2 @@
+ALTER TABLE "app"."credential" DROP CONSTRAINT "ck_credential_kind";--> statement-breakpoint
+ALTER TABLE "app"."credential" ADD CONSTRAINT "ck_credential_kind" CHECK ("app"."credential"."kind" in ('api_key', 'model_api_key', 'account_password', 'ssh_key'));
