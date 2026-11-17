@@ -2444,6 +2444,9 @@ button:disabled,
   background: transparent;
   color: var(--foreground);
 }
+.project-header .tabs {
+  overflow-y: hidden;
+}
 .project-header .tabs .tab {
   height: auto;
   min-height: 0;
@@ -2454,6 +2457,8 @@ button:disabled,
   box-shadow: none;
   color: var(--muted-foreground);
   font-size: 13px;
+  /* 共享按钮按下时会下移 1px，页签需要贴着分隔线，避免撑出纵向滚动。 */
+  translate: none;
 }
 .project-header .tabs .tab:hover {
   background: transparent;
@@ -2462,6 +2467,10 @@ button:disabled,
 .project-header .tabs .tab.active {
   color: var(--foreground);
   font-weight: 500;
+}
+.project-header .tabs .tab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }
 
 /* 侧栏导航复用共享 Button 后回退到原型密度。 */
