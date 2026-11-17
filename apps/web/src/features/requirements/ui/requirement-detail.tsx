@@ -21,9 +21,7 @@ import { WorkItemLinks } from '@/features/collaboration/ui/work-item-links'
 import { WorkItemCodeReferences } from '@/features/code/ui/code-reference-card'
 import { WorkItemOwnerField } from '@/features/collaboration/ui/work-item-owner-field'
 import { WorkItemDetailTabs } from '@/features/collaboration/ui/work-item-detail-tabs'
-import { WorkItemPlanning } from '@/features/collaboration/ui/work-item-planning'
 import { saveWorkItemUpdate } from '@/features/collaboration/api/work-item-update'
-import { workPlanRange } from '@/features/collaboration/model/work-item-plan'
 import { BugForm } from '@/features/bugs/ui/bug-form'
 import { AttachmentList } from '@/features/attachments/ui/attachment-list'
 import { describeAttachmentError } from '@/features/attachments/lib/errors'
@@ -45,7 +43,7 @@ import { RequirementWorkflow } from './requirement-workflow'
 
 const DETAIL_TABS = [
   ['info', '基本信息'],
-  ['submissions', '节点详情'],
+  ['submissions', '提测记录'],
   ['bugs', '缺陷管理'],
   ['comments', '评论'],
   ['activities', '操作记录'],
@@ -128,7 +126,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   }
   const detail = query.data.data
   const scopeEditable = canWrite && isRequirementScopeEditable(detail.status)
-  const range = workPlanRange(detail.plan ?? [])
   const openEdit = (section: RequirementEditSection, trigger: HTMLButtonElement) => {
     actionTrigger.current = trigger
     setEditor({ item: detail, section })
@@ -163,7 +160,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
                 {REQUIREMENT_STATUS_LABELS[detail.status] ?? detail.status}
               </StatusBadge>
               <span>更新 {formatDateTime(detail.updatedAt)}</span>
-              {range && <span>计划 {range.days} 天</span>}
             </div>
           </div>
           {canWrite && (
@@ -220,6 +216,13 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
           onStart={(kind) => direct.mutate(kind)}
           onAction={openAction}
           onOwnerChange={saveOwner}
+          onPlanChange={(plan) =>
+            saveWorkItemUpdate(queryClient, {
+              kind: 'requirement',
+              id: detail.id,
+              body: { version: detail.version, plan },
+            })
+          }
         />
         <WorkItemDetailTabs label="需求详情分区" tabs={DETAIL_TABS}>
           <TabsContent value="info" className="space-y-5">
@@ -344,19 +347,6 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
             <ActivityTimeline target="requirement" targetId={detail.id} />
           </TabsContent>
           <TabsContent value="submissions" className="space-y-5">
-            <WorkItemPlanning
-              kind="requirement"
-              status={detail.status}
-              plan={detail.plan}
-              canWrite={canWrite}
-              onSave={(plan) =>
-                saveWorkItemUpdate(queryClient, {
-                  kind: 'requirement',
-                  id: detail.id,
-                  body: { version: detail.version, plan },
-                })
-              }
-            />
             <h3 className="mb-3 text-sm font-semibold">提测历史</h3>
             {submissions.isPending ? (
               <DelayedLoading pending>

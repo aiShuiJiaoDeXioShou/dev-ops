@@ -8,6 +8,8 @@
     - button "编辑需求"
     - button "更多需求操作"
   - region "需求流程":
+    - paragraph: 总计划工期 未排期
+    - button "新增节点"
     - list "流程节点":
       - listitem:
         - button "待处理，已完成": 待处理
@@ -19,15 +21,21 @@
         - button "测试，已完成": 测试
       - listitem:
         - button "已通过，已完成" [pressed]: 已通过
-    - heading "已通过" [level=3]
-    - text: 已完成
-    - button "更多节点操作"
-    - term: 测试负责人
-    - definition:
-      - button "测试负责人": 管理员
+    - region "当前查看的节点":
+      - heading "已通过" [level=3]
+      - text: 已完成
+      - button "更多节点操作"
+      - term: 测试负责人
+      - definition:
+        - button "测试负责人": 管理员
+      - term: 节点排期
+      - definition: 未设置
+      - heading "全部任务 (0/0)" [level=4]
+      - button "新增任务"
+      - paragraph: 此节点暂无任务。
   - tablist "需求详情分区":
     - tab "基本信息" [selected]
-    - tab "节点详情"
+    - tab "提测记录"
     - tab "缺陷管理"
     - tab "评论"
     - tab "操作记录"

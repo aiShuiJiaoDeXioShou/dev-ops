@@ -1,20 +1,10 @@
-import { useRef, useState } from 'react'
-import { Ellipsis } from 'lucide-react'
 import { Button } from '@/shared/ui/controls/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/ui/controls/dropdown-menu'
-import { StatusBadge } from '@/shared/ui/status-badge'
+import { DropdownMenuItem } from '@/shared/ui/controls/dropdown-menu'
 import { WorkItemOwnerField } from '@/features/collaboration/ui/work-item-owner-field'
-import { WorkItemStageRail } from '@/features/collaboration/ui/work-item-stage-rail'
-import { planNodes, WORK_ITEM_STAGES } from '@/features/collaboration/model/work-item-plan'
+import { WorkItemPlanning } from '@/features/collaboration/ui/work-item-planning'
+import { isWorkflowStage, type WorkItemPlan } from '@/features/collaboration/model/work-item-plan'
 import type { RequirementDetail } from '../model/types'
 import type { RequirementAction } from './requirement-action-dialog'
-
-const STEPS = WORK_ITEM_STAGES.requirement.map(([id]) => id)
 
 type StartAction = 'start-development' | 'start-test'
 type WorkflowAction = { label: string; kind: RequirementAction | StartAction }
@@ -32,14 +22,6 @@ const SECONDARY_ACTIONS: Partial<Record<RequirementDetail['status'], { label: st
   passed: { label: '重新开发', kind: 'reopen-development' },
 }
 
-function stepState(step: number, current: number) {
-  if (step < current) return { label: '已完成', tone: 'success' } as const
-  if (step > current) return { label: '未进入', tone: 'neutral' } as const
-  if (STEPS[step] === 'passed') return { label: '已完成', tone: 'success' } as const
-  if (STEPS[step] === 'pending' || STEPS[step] === 'submitted') return { label: '待开始', tone: 'warning' } as const
-  return { label: '进行中', tone: 'warning' } as const
-}
-
 /**
  * 展示需求的当前流程位置，允许预览节点并在当前节点执行可用动作。
  * @param props 需求、是否可写、提交状态与动作回调。预览节点不会提交状态变更。
@@ -53,6 +35,7 @@ export function RequirementWorkflow({
   onStart,
   onAction,
   onOwnerChange,
+  onPlanChange,
 }: {
   requirement: RequirementDetail
   canWrite: boolean
@@ -61,99 +44,62 @@ export function RequirementWorkflow({
   onStart: (action: StartAction) => void
   onAction: (action: RequirementAction, trigger: HTMLButtonElement | null) => void
   onOwnerChange: (field: 'devOwnerUserId' | 'testOwnerUserId', userId: string | null) => Promise<void>
+  onPlanChange: (next: WorkItemPlan) => Promise<void>
 }) {
   const { status } = requirement
-  const menu = useRef<HTMLButtonElement>(null)
-  const [preview, setPreview] = useState<{ current: RequirementDetail['status']; index: number } | null>(null)
-  const currentIndex = STEPS.findIndex((step) => step === status)
-  const selectedIndex = preview?.current === status ? preview.index : currentIndex
-  const selected = STEPS[selectedIndex] ?? status
-  const titles = planNodes('requirement', requirement.plan)
-    .slice(0, STEPS.length)
-    .map((node) => node.title)
-  const isCurrent = selected === status
-  const primary = canWrite && isCurrent ? PRIMARY_ACTIONS[status] : undefined
-  const secondary = canWrite && isCurrent ? SECONDARY_ACTIONS[status] : undefined
-  const state = status === 'cancelled' ? null : stepState(selectedIndex, currentIndex)
-  const usesTestOwner = selected === 'submitted' || selected === 'in_testing' || selected === 'passed'
-  const owner = usesTestOwner ? requirement.testOwner : requirement.devOwner
+  const primary = canWrite ? PRIMARY_ACTIONS[status] : undefined
+  const secondary = canWrite ? SECONDARY_ACTIONS[status] : undefined
 
   return (
-    <section className="space-y-4" aria-label="需求流程">
-      <WorkItemStageRail
-        titles={titles}
-        current={currentIndex}
-        selected={selectedIndex}
-        currentProgress={stepState(currentIndex, currentIndex).label}
-        onSelect={(index) => setPreview({ current: status, index })}
-      />
-      <div className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold sm:text-base">{titles[selectedIndex] ?? '已取消'}</h3>
-            {state && <StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
-          </div>
-          {(primary || secondary) && (
-            <div className="work-item-flow-actions ml-auto flex items-center gap-2">
-              {primary && (
-                <Button
-                  type="button"
-                  size="lg"
-                  className="min-w-28 sm:min-w-36"
-                  disabled={isStarting}
-                  onClick={(event) => {
-                    const { kind } = primary
-                    if (kind === 'start-development' || kind === 'start-test') onStart(kind)
-                    else onAction(kind, event.currentTarget)
-                  }}
-                >
-                  {isStarting ? '处理中…' : primary.label}
-                </Button>
-              )}
-              {secondary && (
-                <DropdownMenu modal={false}>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      ref={menu}
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="work-item-icon-button"
-                      aria-label="更多节点操作"
-                    >
-                      <Ellipsis aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => onAction(secondary.kind, menu.current)}>
-                      {secondary.label}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          )}
-        </div>
-        {status !== 'cancelled' && (
-          <dl className="rounded-lg border border-border px-3 py-2.5">
-            <WorkItemOwnerField
-              teamId={requirement.teamId}
-              label={usesTestOwner ? '测试负责人' : '研发负责人'}
-              owner={owner}
-              onSave={
-                canWrite && isCurrent
-                  ? (id) => onOwnerChange(usesTestOwner ? 'testOwnerUserId' : 'devOwnerUserId', id)
-                  : undefined
-              }
-            />
-          </dl>
-        )}
-        {startError && (
-          <p role="alert" className="text-sm text-destructive">
-            {startError}
-          </p>
-        )}
-      </div>
-    </section>
+    <WorkItemPlanning
+      kind="requirement"
+      status={status}
+      label="需求流程"
+      plan={requirement.plan}
+      canWrite={canWrite}
+      onSave={onPlanChange}
+      actionError={startError}
+      primaryAction={
+        primary && (
+          <Button
+            type="button"
+            size="lg"
+            className="min-w-28 sm:min-w-36"
+            disabled={isStarting}
+            onClick={(event) => {
+              if (primary.kind === 'start-development' || primary.kind === 'start-test') onStart(primary.kind)
+              else onAction(primary.kind, event.currentTarget)
+            }}
+          >
+            {isStarting ? '处理中…' : primary.label}
+          </Button>
+        )
+      }
+      renderCurrentMenu={
+        secondary
+          ? (trigger) => (
+              <DropdownMenuItem onSelect={() => onAction(secondary.kind, trigger.current)}>
+                {secondary.label}
+              </DropdownMenuItem>
+            )
+          : undefined
+      }
+      renderOwner={(nodeId, isCurrent) => {
+        if (!isWorkflowStage('requirement', nodeId)) return null
+        const usesTestOwner = nodeId === 'submitted' || nodeId === 'in_testing' || nodeId === 'passed'
+        return (
+          <WorkItemOwnerField
+            teamId={requirement.teamId}
+            label={usesTestOwner ? '测试负责人' : '研发负责人'}
+            owner={usesTestOwner ? requirement.testOwner : requirement.devOwner}
+            onSave={
+              canWrite && isCurrent
+                ? (id) => onOwnerChange(usesTestOwner ? 'testOwnerUserId' : 'devOwnerUserId', id)
+                : undefined
+            }
+          />
+        )
+      }}
+    />
   )
 }

@@ -14,9 +14,7 @@ import { WorkItemLinks } from '@/features/collaboration/ui/work-item-links'
 import { WorkItemCodeReferences } from '@/features/code/ui/code-reference-card'
 import { WorkItemOwnerField } from '@/features/collaboration/ui/work-item-owner-field'
 import { WorkItemDetailTabs } from '@/features/collaboration/ui/work-item-detail-tabs'
-import { WorkItemPlanning } from '@/features/collaboration/ui/work-item-planning'
 import { saveWorkItemUpdate } from '@/features/collaboration/api/work-item-update'
-import { workPlanRange } from '@/features/collaboration/model/work-item-plan'
 import { RemoteBugActions } from '@/features/tools/ui/remote-bug-actions'
 import { useSession } from '@/features/identity/model/session'
 import { describeRequestError } from '@/shared/api/errors'
@@ -37,7 +35,7 @@ import type { BugDetail } from '../model/types'
 
 const DETAIL_TABS = [
   ['info', '基本信息'],
-  ['nodes', '节点详情'],
+  ['nodes', '回归记录'],
   ['requirements', '关联需求'],
   ['comments', '评论'],
   ['activities', '操作记录'],
@@ -101,7 +99,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
   }
   const bug = query.data.data
   const scopeEditable = canWrite && isBugScopeEditable(bug.status)
-  const range = workPlanRange(bug.plan ?? [])
   const openEdit = (section: BugEditSection, element: HTMLButtonElement) => {
     trigger.current = element
     setEditor({ item: bug, section })
@@ -136,7 +133,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
             <div className="mt-2 flex flex-wrap gap-2">
               <StatusBadge tone={bugStatusTone(bug.status)}>{BUG_STATUS_LABELS[bug.status] ?? bug.status}</StatusBadge>
               <span className="text-xs text-muted-foreground">更新 {formatDateTime(bug.updatedAt)}</span>
-              {range && <span className="text-xs text-muted-foreground">计划 {range.days} 天</span>}
             </div>
           </div>
           {canWrite && (
@@ -162,6 +158,13 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
           startError={startFix.isError ? describeRequestError(startFix.error).description : ''}
           onStart={() => startFix.mutate()}
           onOwnerChange={saveOwner}
+          onPlanChange={(plan) =>
+            saveWorkItemUpdate(queryClient, {
+              kind: 'bug',
+              id: bug.id,
+              body: { version: bug.version, plan },
+            })
+          }
           onAction={(next, element) => {
             trigger.current = element
             setAction(next)
@@ -277,19 +280,6 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
             <RemoteBugActions projectId={bug.projectId} bugId={bug.id} canWrite={canWrite} />
           </TabsContent>
           <TabsContent value="nodes" className="space-y-5">
-            <WorkItemPlanning
-              kind="bug"
-              status={bug.status}
-              plan={bug.plan}
-              canWrite={canWrite}
-              onSave={(plan) =>
-                saveWorkItemUpdate(queryClient, {
-                  kind: 'bug',
-                  id: bug.id,
-                  body: { version: bug.version, plan },
-                })
-              }
-            />
             <section className="space-y-2">
               <h3 className="text-sm font-semibold">回归历史</h3>
               {bug.regressions.length ? (

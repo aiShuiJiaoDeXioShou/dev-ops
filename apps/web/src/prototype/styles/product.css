@@ -14,21 +14,27 @@
 .work-item-flow-steps {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(max-content, 1fr);
 }
 .work-item-flow-steps > li {
   position: relative;
   display: flex;
   justify-content: center;
+  padding-inline: 0.25rem;
 }
-.work-item-flow-steps > li:not(:last-child)::after {
+.work-item-flow-steps > li:not(:only-child)::after {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-start: 50%;
-  inline-size: 100%;
+  inset-inline: 0;
   border-block-start: 1px solid var(--border);
   content: '';
   pointer-events: none;
+}
+.work-item-flow-steps > li:first-child::after {
+  inset-inline-start: 50%;
+}
+.work-item-flow-steps > li:last-child::after {
+  inset-inline-end: 50%;
 }
 @media (pointer: coarse) {
   .work-item-flow-steps [data-slot='button'],
@@ -36,6 +42,7 @@
   .work-item-detail-tabs [data-slot='tabs-trigger'],
   .work-item-edit-button,
   .work-item-owner-trigger,
+  .work-item-task-check,
   .work-item-icon-button {
     min-block-size: 44px;
   }

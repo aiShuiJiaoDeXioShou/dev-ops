@@ -34,7 +34,7 @@ function envelope(data: unknown) {
 }
 
 for (const kind of ['requirements', 'bugs'] as const) {
-  test(`[desktop] [mobile] ${kind} 详情可维护负责人、节点与可选排期`, async ({ page }, testInfo) => {
+  test(`[desktop] [mobile] ${kind} 点击时间线切换任务并保存节点与可选排期`, async ({ page }, testInfo) => {
     await installApiMocks(page)
     const isRequirement = kind === 'requirements'
     const projectPath = `/projects/${VISUAL_IDS.projectId}/${kind}`
@@ -111,48 +111,75 @@ for (const kind of ['requirements', 'bugs'] as const) {
     await page.getByRole('option', { name: '清除选择' }).click()
     await expect(flow.getByText('未指定')).toBeVisible()
 
-    await sheet.getByRole('tab', { name: '节点详情' }).click()
-    const planning = sheet.getByRole('region', { name: '节点与排期' })
-    await expect(planning.getByText('未排期', { exact: true })).toBeVisible()
-    await planning.getByRole('button', { name: '新增节点' }).click()
-    const addNode = page.getByRole('dialog', { name: '新增节点' })
-    await addNode.getByRole('textbox', { name: /^节点名称/ }).fill('发布核对')
-    await addNode.getByRole('button', { name: '保存', exact: true }).click()
-    await expect(addNode).toBeHidden()
-    await planning.getByRole('button', { name: '编辑节点 发布核对' }).click()
+    const timeline = flow.getByRole('list', { name: '流程节点' })
+    const node = flow.getByRole('region', { name: '当前查看的节点' })
+    const menu = node.getByRole('button', { name: '更多节点操作' })
+    const existingTitle = isRequirement ? '质量验收' : '定位与修复'
+    await menu.click()
+    await page.getByRole('menuitem', { name: '编辑节点' }).click()
     const editNode = page.getByRole('dialog', { name: '编辑节点' })
-    await editNode.getByRole('textbox', { name: /^节点名称/ }).fill('发布验收')
+    await editNode.getByRole('textbox', { name: /^节点名称/ }).fill(existingTitle)
     await editNode.getByRole('button', { name: '保存', exact: true }).click()
     await expect(editNode).toBeHidden()
+    const activeStep = timeline.getByRole('button', { name: existingTitle + '，进行中' })
+    await expect(activeStep).toHaveAttribute('aria-current', 'step')
+    await expect(activeStep).toHaveAttribute('aria-pressed', 'true')
 
-    const node = planning.getByRole('list', { name: '规划节点' }).locator(':scope > li').first()
+    await expect(flow.getByText('未排期', { exact: true })).toBeVisible()
+    const newNodeTrigger = flow.getByRole('button', { name: '新增节点' })
+    await newNodeTrigger.click()
+    const addNode = page.getByRole('dialog', { name: '新增节点' })
+    await addNode.getByRole('textbox', { name: /^节点名称/ }).fill('发布验收')
+    await addNode.getByRole('button', { name: '保存', exact: true }).click()
+    await expect(addNode).toBeHidden()
+    await expect(node.getByRole('heading', { name: '发布验收', exact: true })).toBeVisible()
+    const customStep = timeline.getByRole('button', { name: /^发布验收，/ })
+    await expect(customStep).toHaveAttribute('aria-pressed', 'true')
+    await expect(activeStep).toHaveAttribute('aria-current', 'step')
+    await expect(activeStep).toHaveAttribute('aria-pressed', 'false')
+    const nodeTitles = await timeline
+      .locator('button')
+      .evaluateAll((elements) => elements.map((element) => element.getAttribute('title')))
+    expect(nodeTitles.indexOf('发布验收')).toBe(nodeTitles.indexOf(existingTitle) + 1)
+
+    const newTaskTrigger = node.getByRole('button', { name: '新增任务' })
     for (const name of ['整理验收清单', '核对发布版本']) {
-      await node.getByRole('button', { name: '新增待办' }).click()
-      const addTask = page.getByRole('dialog', { name: '新增待办' })
-      await addTask.getByRole('textbox', { name: /^待办名称/ }).fill(name)
+      await newTaskTrigger.click()
+      const addTask = page.getByRole('dialog', { name: '新增任务' })
+      await addTask.getByRole('textbox', { name: /^任务名称/ }).fill(name)
       await addTask.getByRole('button', { name: '保存', exact: true }).click()
       await expect(addTask).toBeHidden()
     }
-    await expect(planning.getByText('未排期', { exact: true })).toBeVisible()
+    await expect(newTaskTrigger).toBeFocused()
+    await expect(flow.getByText('未排期', { exact: true })).toBeVisible()
     const checklist = node.getByRole('checkbox', { name: '整理验收清单', exact: true })
     await checklist.click()
     await expect(checklist).toBeChecked()
-    await expect(node.getByText('1/2 项完成', { exact: false })).toBeVisible()
+    await expect(node.getByRole('heading', { name: '全部任务 (1/2)' })).toBeVisible()
 
-    await node.getByRole('button', { name: '编辑待办 核对发布版本' }).click()
-    const editTask = page.getByRole('dialog', { name: '编辑待办' })
+    await node.getByRole('button', { name: '编辑任务 核对发布版本' }).click()
+    const editTask = page.getByRole('dialog', { name: '编辑任务' })
     await editTask.getByLabel('开始日期').fill('2026-11-18')
     await editTask.getByLabel('结束日期').fill('2026-11-20')
     await editTask.getByRole('button', { name: '保存', exact: true }).click()
     await expect(editTask).toBeHidden()
-    await expect(planning.getByText('3 天 · 2026-11-18 至 2026-11-20', { exact: true })).toBeVisible()
-    await expect(planning.getByRole('heading', { name: '发布验收' })).toBeAttached()
-    await planning.scrollIntoViewIfNeeded()
-    await page.screenshot({ path: testInfo.outputPath(`${kind}-planning.png`), animations: 'disabled' })
+    await expect(flow.getByText('3 天 · 2026-11-18 至 2026-11-20', { exact: true })).toBeVisible()
+    await flow.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: testInfo.outputPath(kind + '-workflow.png'), animations: 'disabled' })
+
+    if (testInfo.project.name === 'mobile') await activeStep.tap()
+    else await activeStep.press('Enter')
+    await expect(node.getByRole('heading', { name: existingTitle, exact: true })).toBeVisible()
+    await expect(checklist).toHaveCount(0)
+    await expect(node.getByRole('button', { name: isRequirement ? '测试通过' : '提交回归' })).toBeVisible()
 
     await page.reload()
-    await sheet.getByRole('tab', { name: '节点详情' }).click()
-    await expect(planning.getByRole('heading', { name: '发布验收' })).toBeAttached()
-    await expect(node.getByRole('checkbox', { name: '整理验收清单', exact: true })).toBeChecked()
+    await expect(activeStep).toHaveAttribute('aria-pressed', 'true')
+    await customStep.click()
+    await expect(node.getByRole('heading', { name: '发布验收', exact: true })).toBeVisible()
+    await expect(checklist).toBeChecked()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      testInfo.project.name === 'mobile' ? 390 : 1440,
+    )
   })
 }

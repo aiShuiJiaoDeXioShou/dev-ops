@@ -1,7 +1,6 @@
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react'
-import { describeRequestError } from '@/shared/api/errors'
+import { CalendarDays, Ellipsis, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -21,20 +20,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/shared/ui/controls/dropdown-menu'
+import { StatusBadge } from '@/shared/ui/status-badge'
 import { FormField } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
 import { useToast } from '@/shared/ui/toast'
 import {
+  isWorkflowStage,
+  planNodeProgress,
   planNodes,
   workPlanRange,
-  WORK_ITEM_STAGES,
+  WORK_ITEM_NODE_LIMIT,
   type PlanNode,
   type PlanningKind,
   type WorkItemPlan,
 } from '../model/work-item-plan'
+import { WorkItemStageRail } from './work-item-stage-rail'
 
 type Dates = Pick<PlanNode, 'title' | 'startsOn' | 'endsOn'>
-type Target = { nodeId?: string; taskId?: string; type: 'node' | 'task'; source?: WorkItemPlan }
+type Target = { nodeId: string; taskId?: string; type: 'node' | 'task'; source?: WorkItemPlan }
+type PlanSave = { next: WorkItemPlan; source?: WorkItemPlan; selectId?: string }
+const MAX_TASKS = 30
 type Editor = Target & { initial?: Dates; trigger: HTMLButtonElement }
 type Removal = Target & { title: string; trigger: HTMLButtonElement }
 
@@ -65,8 +77,8 @@ function PlanEditorDialog({
   const startId = useId()
   const endId = useId()
   const dateError = startsOn && endsOn && startsOn > endsOn ? '结束日期不能早于开始日期。' : undefined
-  const titleLabel = editor.type === 'node' ? '节点名称' : '待办名称'
-  const dialogTitle = `${editor.initial ? '编辑' : '新增'}${editor.type === 'node' ? '节点' : '待办'}`
+  const titleLabel = editor.type === 'node' ? '节点名称' : '任务名称'
+  const dialogTitle = `${editor.initial ? '编辑' : '新增'}${editor.type === 'node' ? '节点' : '任务'}`
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (pending || !title.trim() || dateError) return
@@ -84,7 +96,10 @@ function PlanEditorDialog({
       >
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
-          <DialogDescription>开始和结束日期都可以留空。</DialogDescription>
+          <DialogDescription>
+            {editor.type === 'node' && !editor.initial && '新节点插入所选节点之后。'}
+            开始和结束日期都可以留空。
+          </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={submit}>
           <FormField label={titleLabel} htmlFor={titleId} required>
@@ -124,41 +139,67 @@ function PlanEditorDialog({
 }
 
 /**
- * 在需求或 Bug 详情中维护本事项的节点、待办和可选排期。
- * @param props 当前事项、已保存的规划、写入权限及带版本校验的保存回调。
- * @returns 节点和待办列表、总工期及就地编辑入口。
+ * 在详情顶部切换和维护事项节点。当前节点的状态动作由业务模块提供。
+ * @param props 事项类型、状态、规划、授权，以及负责人和状态动作的渲染入口。
+ * @returns 一条共享时间线与选中节点的详情，包括本节点的任务和选填排期。
  */
 export function WorkItemPlanning({
   kind,
   status,
+  label,
   plan,
   canWrite,
   onSave,
+  renderOwner,
+  primaryAction,
+  renderCurrentMenu,
+  actionError,
 }: {
   kind: PlanningKind
   status: string
+  label: string
   plan?: WorkItemPlan
   canWrite: boolean
   onSave: (next: WorkItemPlan) => Promise<void>
+  renderOwner: (nodeId: string, isCurrent: boolean) => ReactNode
+  primaryAction?: ReactNode
+  renderCurrentMenu?: (trigger: RefObject<HTMLButtonElement | null>) => ReactNode
+  actionError: string
 }) {
+  const [selection, setSelection] = useState<{ status: string; id: string } | null>(null)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [removal, setRemoval] = useState<Removal | null>(null)
   const addNode = useRef<HTMLButtonElement>(null)
+  const addTask = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLButtonElement>(null)
+  const cardId = useId()
   const { showToast } = useToast()
   const nodes = planNodes(kind, plan)
+  const currentNode = nodes.find((node) => node.id === status)
+  const lastSelected = selection?.status === status ? nodes.find((node) => node.id === selection.id) : undefined
+  const node = lastSelected ?? currentNode ?? nodes[0]
   const range = workPlanRange(nodes)
   const mutation = useMutation({
-    mutationFn: ({ next, source }: { next: WorkItemPlan; source?: WorkItemPlan }) => {
-      if (source !== plan) throw new Error('规划已被其他操作更新，请关闭编辑后重试。')
+    mutationFn: ({ next, source }: PlanSave) => {
+      if (source !== plan) throw new Error('流程节点已被更新，请重新打开编辑后重试。')
       return onSave(next)
     },
-    onSuccess: () => {
+    onSuccess: (_, { selectId }) => {
+      if (selectId) setSelection({ status, id: selectId })
       setEditor(null)
       setRemoval(null)
-      showToast('节点与待办已更新。', 'success')
+      showToast('流程节点已更新。', 'success')
     },
   })
+  const select = (id: string) => setSelection({ status, id })
   const error = mutation.error instanceof Error ? mutation.error.message : null
+
+  if (!node) return null
+  const isCurrent = node.id === status
+  const isBuiltIn = isWorkflowStage(kind, node.id)
+  const progress = planNodeProgress(kind, node, status)
+  const currentMenu = isCurrent ? renderCurrentMenu : undefined
+  const completed = node.tasks.filter((task) => task.done).length
 
   const openEditor = (target: Omit<Editor, 'source'>) => {
     if (mutation.isPending) return
@@ -172,213 +213,251 @@ export function WorkItemPlanning({
   }
   const applyEdit = (draft: Dates) => {
     if (!editor) return
-    if (editor.type === 'node' && !editor.nodeId) {
-      mutation.mutate({ next: [...nodes, { ...draft, id: crypto.randomUUID(), tasks: [] }], source: editor.source })
+    if (editor.type === 'node' && !editor.initial) {
+      const id = crypto.randomUUID()
+      const next = [...nodes]
+      const anchorIndex = nodes.findIndex((entry) => entry.id === editor.nodeId)
+      next.splice(anchorIndex + 1, 0, { ...draft, id, tasks: [] })
+      mutation.mutate({ next, source: editor.source, selectId: id })
       return
     }
-    const next = nodes.map((node) => {
-      if (node.id !== editor.nodeId) return node
-      if (editor.type === 'node') return { ...node, ...draft }
+    const next = nodes.map((entry) => {
+      if (entry.id !== editor.nodeId) return entry
+      if (editor.type === 'node') return { ...entry, ...draft }
       const tasks = editor.taskId
-        ? node.tasks.map((task) => (task.id === editor.taskId ? { ...task, ...draft } : task))
-        : [...node.tasks, { ...draft, id: crypto.randomUUID(), done: false }]
-      return { ...node, tasks }
+        ? entry.tasks.map((task) => (task.id === editor.taskId ? { ...task, ...draft } : task))
+        : [...entry.tasks, { ...draft, id: crypto.randomUUID(), done: false }]
+      return { ...entry, tasks }
     })
     mutation.mutate({ next, source: editor.source })
   }
   const remove = () => {
     if (!removal) return
-    const next =
-      removal.type === 'node'
-        ? nodes.filter((node) => node.id !== removal.nodeId)
-        : nodes.map((node) =>
-            node.id === removal.nodeId
-              ? { ...node, tasks: node.tasks.filter((task) => task.id !== removal.taskId) }
-              : node,
-          )
+    if (removal.type === 'node') {
+      const next = nodes.filter((entry) => entry.id !== removal.nodeId)
+      const removedIndex = nodes.findIndex((entry) => entry.id === removal.nodeId)
+      mutation.mutate({ next, source: removal.source, selectId: next[removedIndex]?.id ?? next.at(-1)?.id })
+      return
+    }
+    const next = nodes.map((entry) =>
+      entry.id === removal.nodeId
+        ? { ...entry, tasks: entry.tasks.filter((task) => task.id !== removal.taskId) }
+        : entry,
+    )
     mutation.mutate({ next, source: removal.source })
   }
 
   return (
-    <section className="space-y-4" aria-label="节点与排期">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/50 p-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <div>
-            <p className="text-xs text-muted-foreground">总计划工期</p>
-            <p className="mt-1 text-sm font-medium">
-              {range ? `${range.days} 天 · ${range.startsOn} 至 ${range.endsOn}` : '未排期'}
-            </p>
-          </div>
-        </div>
-        {canWrite && (
-          <Button
-            ref={addNode}
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={mutation.isPending || nodes.length >= 24}
-            onClick={(event) => openEditor({ type: 'node', trigger: event.currentTarget })}
-          >
-            <Plus aria-hidden="true" />
-            新增节点
-          </Button>
-        )}
-      </div>
-      {mutation.isError && !editor && !removal && (
-        <p role="alert" className="text-sm text-destructive">
-          {error ?? describeRequestError(mutation.error).description}
+    <section className="space-y-3" aria-label={label}>
+      <div className="work-item-flow-actions flex flex-wrap items-center justify-between gap-2">
+        <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <CalendarDays className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <span className="text-muted-foreground">总计划工期</span>
+          <span>{range ? range.days + ' 天 · ' + range.startsOn + ' 至 ' + range.endsOn : '未排期'}</span>
         </p>
-      )}
-      <ol className="space-y-3" aria-label="规划节点">
-        {nodes.map((node) => {
-          const isStage = WORK_ITEM_STAGES[kind].some(([id]) => id === node.id)
-          const dates = planDateLabel(node)
-          const completed = node.tasks.filter((task) => task.done).length
-          return (
-            <li key={node.id} className="space-y-3 rounded-lg border border-border bg-card p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <h4 className="text-sm font-semibold wrap-anywhere">{node.title}</h4>
-                  {(node.id === status || node.tasks.length > 0 || dates) && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {[
-                        node.id === status && '当前节点',
-                        node.tasks.length > 0 && `${completed}/${node.tasks.length} 项完成`,
-                        dates,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  )}
-                </div>
+        <div className="ml-auto flex items-center gap-2">
+          {!currentNode && primaryAction}
+          {canWrite && (
+            <Button
+              ref={addNode}
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={mutation.isPending || nodes.length >= WORK_ITEM_NODE_LIMIT}
+              onClick={(event) => openEditor({ type: 'node', nodeId: node.id, trigger: event.currentTarget })}
+            >
+              <Plus aria-hidden="true" />
+              新增节点
+            </Button>
+          )}
+        </div>
+      </div>
+      <WorkItemStageRail
+        steps={nodes.map((entry) => ({
+          id: entry.id,
+          title: entry.title,
+          progress: planNodeProgress(kind, entry, status),
+        }))}
+        currentId={status}
+        selectedId={node.id}
+        cardId={cardId}
+        onSelect={select}
+      />
+      <section
+        id={cardId}
+        className="space-y-3 rounded-xl border border-border bg-card p-3 sm:p-4"
+        aria-label="当前查看的节点"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h3 className="min-w-0 text-sm font-semibold wrap-anywhere sm:text-base">{node.title}</h3>
+            {progress && (
+              <StatusBadge tone={progress === '已完成' ? 'success' : progress === '未进入' ? 'neutral' : 'warning'}>
+                {progress}
+              </StatusBadge>
+            )}
+          </div>
+          {(canWrite || currentMenu || (isCurrent && primaryAction)) && (
+            <div className="work-item-flow-actions ml-auto flex items-center gap-2">
+              {isCurrent && primaryAction}
+              {(canWrite || currentMenu) && (
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      ref={menu}
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="work-item-icon-button"
+                      aria-label="更多节点操作"
+                      disabled={mutation.isPending}
+                    >
+                      <Ellipsis aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canWrite && (
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          if (menu.current)
+                            openEditor({ type: 'node', nodeId: node.id, initial: node, trigger: menu.current })
+                        }}
+                      >
+                        编辑节点
+                      </DropdownMenuItem>
+                    )}
+                    {canWrite && !isBuiltIn && (
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onSelect={() => {
+                          if (menu.current)
+                            openRemoval({ type: 'node', nodeId: node.id, title: node.title, trigger: menu.current })
+                        }}
+                      >
+                        移除节点
+                      </DropdownMenuItem>
+                    )}
+                    {canWrite && currentMenu && <DropdownMenuSeparator />}
+                    {currentMenu?.(menu)}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
+        </div>
+        <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-border px-3 py-2.5">
+          {renderOwner(node.id, isCurrent)}
+          <div>
+            <dt className="text-xs text-muted-foreground">节点排期</dt>
+            <dd className="mt-1 text-sm">{planDateLabel(node) ?? '未设置'}</dd>
+          </div>
+        </dl>
+        <div className="work-item-flow-actions flex flex-wrap items-center justify-between gap-2">
+          <h4 className="text-sm font-medium">
+            全部任务{' '}
+            <span className="text-muted-foreground">
+              ({completed}/{node.tasks.length})
+            </span>
+          </h4>
+          {canWrite && (
+            <Button
+              ref={addTask}
+              type="button"
+              size="sm"
+              variant="outline"
+              className="text-primary"
+              disabled={mutation.isPending || node.tasks.length >= MAX_TASKS}
+              onClick={(event) => openEditor({ type: 'task', nodeId: node.id, trigger: event.currentTarget })}
+            >
+              <Plus aria-hidden="true" />
+              新增任务
+            </Button>
+          )}
+        </div>
+        {node.tasks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">此节点暂无任务。</p>
+        ) : (
+          <ul className="divide-y divide-border border-t border-border" aria-label="节点任务">
+            {node.tasks.map((task) => (
+              <li key={task.id} className="flex items-center justify-between gap-2 py-1">
+                <label className="work-item-task-check flex min-h-8 min-w-0 flex-1 items-center gap-2 text-sm">
+                  <Checkbox
+                    aria-label={task.title}
+                    checked={task.done}
+                    disabled={!canWrite || mutation.isPending}
+                    onCheckedChange={(done) =>
+                      mutation.mutate({
+                        source: plan,
+                        next: nodes.map((entry) =>
+                          entry.id === node.id
+                            ? {
+                                ...entry,
+                                tasks: entry.tasks.map((item) =>
+                                  item.id === task.id ? { ...item, done: done === true } : item,
+                                ),
+                              }
+                            : entry,
+                        ),
+                      })
+                    }
+                  />
+                  <span className="min-w-0 wrap-anywhere">
+                    <span className={task.done ? 'text-muted-foreground line-through' : undefined}>{task.title}</span>
+                    <span className="block text-xs text-muted-foreground">{planDateLabel(task)}</span>
+                  </span>
+                </label>
                 {canWrite && (
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex shrink-0 gap-1">
                     <Button
                       type="button"
                       size="icon"
                       variant="ghost"
                       className="work-item-icon-button"
-                      aria-label={`编辑节点 ${node.title}`}
+                      aria-label={'编辑任务 ' + task.title}
+                      disabled={mutation.isPending}
                       onClick={(event) =>
-                        openEditor({ type: 'node', nodeId: node.id, initial: node, trigger: event.currentTarget })
+                        openEditor({
+                          type: 'task',
+                          nodeId: node.id,
+                          taskId: task.id,
+                          initial: task,
+                          trigger: event.currentTarget,
+                        })
                       }
                     >
                       <Pencil aria-hidden="true" />
                     </Button>
-                    {!isStage && (
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="work-item-icon-button"
-                        aria-label={`移除节点 ${node.title}`}
-                        onClick={(event) =>
-                          openRemoval({
-                            type: 'node',
-                            nodeId: node.id,
-                            title: node.title,
-                            trigger: event.currentTarget,
-                          })
-                        }
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="work-item-icon-button"
+                      aria-label={'移除任务 ' + task.title}
+                      disabled={mutation.isPending}
+                      onClick={(event) =>
+                        openRemoval({
+                          type: 'task',
+                          nodeId: node.id,
+                          taskId: task.id,
+                          title: task.title,
+                          trigger: event.currentTarget,
+                        })
+                      }
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </Button>
                   </div>
                 )}
-              </div>
-              {node.tasks.length > 0 && (
-                <ul className="divide-y divide-border border-y border-border" aria-label={`${node.title}待办`}>
-                  {node.tasks.map((task) => (
-                    <li key={task.id} className="flex items-center justify-between gap-2 py-1">
-                      <label className="flex min-h-8 min-w-0 items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={task.done}
-                          disabled={!canWrite || mutation.isPending}
-                          onCheckedChange={(done) =>
-                            mutation.mutate({
-                              source: plan,
-                              next: nodes.map((entry) =>
-                                entry.id === node.id
-                                  ? {
-                                      ...entry,
-                                      tasks: entry.tasks.map((item) =>
-                                        item.id === task.id ? { ...item, done: done === true } : item,
-                                      ),
-                                    }
-                                  : entry,
-                              ),
-                            })
-                          }
-                        />
-                        <span className="min-w-0 wrap-anywhere">
-                          <span className={task.done ? 'text-muted-foreground line-through' : undefined}>
-                            {task.title}
-                          </span>
-                          <span className="block text-xs text-muted-foreground">{planDateLabel(task)}</span>
-                        </span>
-                      </label>
-                      {canWrite && (
-                        <div className="flex shrink-0 gap-1">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="work-item-icon-button"
-                            aria-label={`编辑待办 ${task.title}`}
-                            onClick={(event) =>
-                              openEditor({
-                                type: 'task',
-                                nodeId: node.id,
-                                taskId: task.id,
-                                initial: task,
-                                trigger: event.currentTarget,
-                              })
-                            }
-                          >
-                            <Pencil aria-hidden="true" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="work-item-icon-button"
-                            aria-label={`移除待办 ${task.title}`}
-                            onClick={(event) =>
-                              openRemoval({
-                                type: 'task',
-                                nodeId: node.id,
-                                taskId: task.id,
-                                title: task.title,
-                                trigger: event.currentTarget,
-                              })
-                            }
-                          >
-                            <Trash2 aria-hidden="true" />
-                          </Button>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {canWrite && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={node.tasks.length >= 30}
-                  onClick={(event) => openEditor({ type: 'task', nodeId: node.id, trigger: event.currentTarget })}
-                >
-                  <Plus aria-hidden="true" />
-                  新增待办
-                </Button>
-              )}
-            </li>
-          )
-        })}
-      </ol>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {(actionError || (error && !editor && !removal)) && (
+        <p role="alert" className="text-sm text-destructive">
+          {actionError || error}
+        </p>
+      )}
       {editor && (
         <PlanEditorDialog
           editor={editor}
@@ -392,7 +471,8 @@ export function WorkItemPlanning({
         <AlertDialog open onOpenChange={(open) => !open && !mutation.isPending && setRemoval(null)}>
           <AlertDialogContent
             onCloseAutoFocus={(event) => {
-              const target = removal.trigger.isConnected ? removal.trigger : addNode.current
+              const fallback = removal.type === 'node' ? addNode.current : addTask.current
+              const target = removal.trigger.isConnected ? removal.trigger : fallback
               if (!target) return
               event.preventDefault()
               target.focus({ preventScroll: true })
@@ -401,7 +481,7 @@ export function WorkItemPlanning({
             <AlertDialogHeader>
               <AlertDialogTitle>移除「{removal.title}」？</AlertDialogTitle>
               <AlertDialogDescription>
-                {removal.type === 'node' ? '该节点及其中的待办会从规划中移除。' : '该待办会从节点中移除。'}
+                {removal.type === 'node' ? '该节点及其中的任务会从时间线移除。' : '该任务会从节点中移除。'}
               </AlertDialogDescription>
             </AlertDialogHeader>
             {error && (

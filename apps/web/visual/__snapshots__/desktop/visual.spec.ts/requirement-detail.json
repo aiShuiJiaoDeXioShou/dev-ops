@@ -24,7 +24,7 @@
     "产物与版本",
     "环境变量",
     "基本信息",
-    "节点详情",
+    "提测记录",
     "缺陷管理",
     "评论",
     "操作记录"
@@ -47,7 +47,7 @@
     "已完成"
   ],
   "documentOverflow": false,
-  "interactiveCount": 64,
+  "interactiveCount": 66,
   "nonPointerControls": [],
   "smallTargets": [
     "项目",
