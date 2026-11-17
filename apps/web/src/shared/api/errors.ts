@@ -18,9 +18,28 @@ const BUSINESS_MESSAGES: Record<string, string> = {
   GITHUB_REPOSITORY_FORBIDDEN: '你的 GitHub 账号缺少此仓库所需的权限。',
 }
 
+function botUnavailableMessage(data: unknown) {
+  const reason = data && typeof data === 'object' && 'reason' in data ? data.reason : undefined
+  switch (reason) {
+    case 'disabled':
+      return '智能体已停用，请启用后重试。'
+    case 'model_unbound':
+      return '智能体尚未绑定模型，请联系团队管理员配置模型连接并绑定模型。'
+    case 'model_unavailable':
+      return '智能体绑定的模型不可用，请联系团队管理员检查模型连接。'
+    case 'worker_offline':
+      return 'Bot 执行服务离线，请在服务恢复后重试。'
+    default:
+      return '智能体暂时无法运行，请检查智能体配置与执行服务状态。'
+  }
+}
+
 /** 将请求错误转成安全、可展示的说明与请求标识。 */
 export function describeRequestError(error: unknown): { description: string; requestId: string | null } {
   if (error instanceof RequestError) {
+    if (error.serverCode === 'BOT_UNAVAILABLE') {
+      return { description: botUnavailableMessage(error.data), requestId: error.requestId }
+    }
     const mapped = error.serverCode ? BUSINESS_MESSAGES[error.serverCode] : undefined
     // 参数校验保留服务端的具体字段原因；其他业务码继续使用稳定的本地说明。
     const serverMessage = error.message.trim()
