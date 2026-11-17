@@ -31,7 +31,6 @@ flowchart LR
     capability --- m10["M10 Skills、模板与记忆 · V0.3 阶段 A 已交付／V0.5"]
     capability --- m12["M12 连接、执行节点与项目工具 · V0.1 Git／V0.4b 写操作"]
     credential --- m11["M11 凭据与环境配置 · V0.1 Git 凭据保护／V0.5 配置请求"]
-    operation --- m13["M13 变更与发布 · V0.4b"]
     operation --- m14["M14 运行事件与值守 · V0.6"]
 
     classDef root fill:#15324F,color:#FFFFFF,stroke:#15324F
@@ -41,23 +40,20 @@ flowchart LR
     class platform root
     class organization,research,collaboration,capability,credential,operation domain
     class m01,m02,m03,m04,m05,m06,m10,m11,m12 first
-    class m07,m08,m09,m13,m14,m15 later
+    class m07,m08,m09,m14,m15 later
 ```
 
 V0.1 已完成团队、项目、需求、内部 Bug、真实 Git 关联及人工提测回归。服务与环境、完整代码浏览和交付在 V0.2 补齐；内置流水线在 V0.4a 交付。2026-11-10 调整后，V0.4b 先完成流水线部署与产品发布，Bot 协作后移 V0.5，事件值守与外部协作后移 V0.6，V1.0 核对完整 MVP。凭据保护和权限校验随首次接入交付，不等待完整管理页面。
 
-2026-11-10 顺序调整：V0.4b 的发布主链路包含 M13 的变更计划、人工放行、执行与版本验证；运行事件与值守（M14）、外部通知与客户反馈后移 V0.6；Bot 相关模块（M07、M08、M09、M10 阶段 B、M15 站内）后移 V0.5。MVP 范围不变，只是交付顺序调整。
-
 ## 2. 功能分解图
 
-按用户使用入口展开功能。连线表示“包含”，不表示功能自动触发后续动作。一级导航为项目、协作、运维、能力、凭据库；团队与账号位于全局管理入口。功能分组用于阅读，不新增或重排现有页面页签。
+按用户使用入口展开功能。连线表示“包含”，不表示功能自动触发后续动作。一级导航包含项目、协作、能力、凭据库；团队与账号位于全局管理入口。功能分组用于阅读，不新增或重排现有页面页签。
 
 ```mermaid
 flowchart LR
     app["DevOps 功能入口"]
     app --- projects["项目"]
     app --- chats["协作"]
-    app --- operations["运维"]
     app --- capabilities["能力"]
     app --- vault["凭据库"]
     app --- accounts["团队与账号"]
@@ -75,9 +71,6 @@ flowchart LR
     chats --- tasks["任务：显式创建、执行者、交接、运行与验收"]
     chats --- inbox["待处理：待验收、等待配置、阻塞与通知"]
 
-    operations --- events["服务与事件：运行情况、异常聚合、关联 Bug"]
-    operations --- duty["值守：巡检规则、定时触发、自动建单与任务"]
-    operations --- changes["变更：具体计划、人工放行、执行与验证"]
 
     capabilities --- bots["Bot：职责、负责人、模型、环境与项目授权"]
     capabilities --- knowledge["知识：Skills、记忆与交接摘要"]
@@ -94,12 +87,10 @@ flowchart LR
     classDef root fill:#15324F,color:#FFFFFF,stroke:#15324F
     classDef research fill:#DBEAFE,color:#172554,stroke:#3B82F6
     classDef collaboration fill:#EDE9FE,color:#4C1D95,stroke:#8B5CF6
-    classDef operation fill:#FFEDD5,color:#7C2D12,stroke:#F97316
     classDef foundation fill:#CCFBF1,color:#134E4A,stroke:#14B8A6
     class app root
     class projects,projectInfo,requirements,bugs,code,delivery,artifacts,projectChats,variables research
     class chats,conversations,tasks,inbox collaboration
-    class operations,events,duty,changes operation
     class capabilities,bots,knowledge,connectors,vault,secrets,grants,configuration,accounts,invitations,login,members foundation
 ```
 
@@ -125,7 +116,7 @@ flowchart TB
             direction LR
             projectDomain["项目研发 · M02 至 M06"]
             collaborationDomain["会话与任务 · M08、M09（V0.5）"]
-            operationsDomain["变更与值守 · M13（V0.4b）、M14（V0.6）"]
+            operationsDomain["运行事件与值守 · M14（V0.6）"]
         end
 
         subgraph supportZone["共享能力区"]
@@ -159,7 +150,7 @@ flowchart TB
 
     projectDomain -->|"代码关联与交付结果"| adapters
     collaborationDomain -->|"任务与授权工具调用"| adapters
-    operationsDomain -->|"事件接入与已放行操作"| adapters
+    operationsDomain -->|"事件接入"| adapters
     botKnowledge -->|"运行配置与知识"| adapters
     credentials -->|"按当前授权解析引用"| adapters
     notifications -->|"通知发送"| adapters
@@ -190,7 +181,7 @@ flowchart TB
 
 - **提测与流水线独立。** 提测不触发、等待或重试构建部署；流水线结果不自动改写需求和 Bug 的业务进度。
 - **最新产物与运行版本分别记录。** 服务可独立交付；运行版本需有实际依据。
-- **开发验收与发布放行分开。** 变更需绑定具体计划，执行后验证健康与实际版本；数据库变更、服务器清理和云资源调整遵守同一框架，具体连接器另行确认。
+- **开发验收与流水线执行分开。** 有权限的成员直接触发含部署步骤的工作流，并通过运行详情查看结果。
 - **聊天与任务分开。** 普通发言不自动变成任务；项目标签和资源引用不扩大会话、项目或凭据权限。
 - **外部系统保留职责。** Git 系统托管代码；平台解析仓库内 YAML 定义的流水线并在自托管执行节点运行；外部商店与小程序平台由成员人工提审，平台记录审核及发布结果。
 - **已确认规则与待定细节分开。** 邮箱邀请及邮箱密码登录已确定；root 初始化、邀请有效期、资料必填项等继续在 V0.1 文档逐项确认。

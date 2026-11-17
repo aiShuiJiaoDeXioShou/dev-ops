@@ -13,4 +13,3 @@ export type {
   ReviewView,
   ReleaseView,
 } from './delivery.view.ts'
-export { createDeploymentRunVersionWriter, type ApplyDeploymentVersionInput } from './delivery.run-version.public.ts'

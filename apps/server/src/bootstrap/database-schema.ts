@@ -65,12 +65,6 @@ export { gitConnection, gitHubUserAuthorization } from '../modules/integrations/
 export { gitRepository, projectRepository, codeReference } from '../modules/code/code.tables.ts'
 export { projectCapabilityGrant, toolInvocation, codeChange } from '../modules/tools/tools.tables.ts'
 export {
-  changePlan,
-  changePlanApproval,
-  changeExecution,
-  changePlanEvent,
-} from '../modules/operations/operations.tables.ts'
-export {
   pipelineRun,
   pipelineRunStep,
   pipelineRunLog,

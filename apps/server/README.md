@@ -259,23 +259,18 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 - S3 适配器固定 `forcePathStyle: true` 并允许自定义 `endpoint`/`region`；探测通过 `NodeHttpHandler` 设置 `connectionTimeout`/`requestTimeout`（`STORAGE_PROBE_TIMEOUT_MS`），普通对象读写只设置连接超时，避免固定请求超时误杀大文件传输。
 - 每次写操作（创建、更新、测试、设默认、删除）在同一事务内追加 `storage_bucket_event`；平台级事件没有团队归属，不进入团队 `activity` 流。附件记录固化上传时的 `bucket_id`，默认桶切换不影响历史附件下载。
 
-## V0.4b tools 与 operations 模块（2026-11-11）
+## 项目写能力与流水线
 
 - `tools` 路由：
   - `GET /api/v1/projects/{projectId}/tools/capabilities`
   - `GET|POST /api/v1/projects/{projectId}/tools/grants`、`POST /api/v1/projects/{projectId}/tools/grants/{grantId}/revoke`
   - `POST|GET /api/v1/projects/{projectId}/tools/code-changes`、`GET /api/v1/tools/code-changes/{codeChangeId}`、`GET /api/v1/tools/code-changes/{codeChangeId}/diff`、`POST /api/v1/tools/code-changes/{codeChangeId}/cancel`、`POST /api/v1/tools/code-changes/{codeChangeId}/pull-requests`
   - `POST /api/v1/projects/{projectId}/tools/remote-issues`、`POST /api/v1/projects/{projectId}/tools/comments`
-- `operations` 路由：
-  - `POST|GET /api/v1/projects/{projectId}/change-plans`、`GET /api/v1/teams/{teamId}/change-plans`、`GET /api/v1/change-plans/{planId}`
-  - `POST /api/v1/change-plans/{planId}/update|approve|execute|verify|cancel|retry`
-  - `GET /api/v1/change-plans/{planId}/executions|events`
 - 写能力默认关闭，按“用户 × 项目 × 能力”授权；服务端逐次校验，不因角色或项目成员身份自动放行。
-- 放行绑定计划修订与内容快照；计划修改后旧放行失效；同一服务 + 环境只允许一条活动计划。
-- 验证读取节点产出的 `change-verification` 产物，健康与实际版本一致才完成计划并更新运行版本。
-- 新增配置：`CODE_CHANGE_PATCH_MAX_BYTES`、`CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES`、`CODE_CHANGE_TIMEOUT_SECONDS`、`DEPLOY_VERIFY_TIMEOUT_SECONDS`、`CHANGE_PLAN_LIST_MAX_PAGE_SIZE`，说明见 `.env.example`。
-- 新增错误码：`TOOL_CAPABILITY_NOT_GRANTED`、`TOOL_INVOCATION_CONFLICT`、`CODE_CHANGE_*`、`PULL_REQUEST_CONFLICT`、`REMOTE_WRITE_CONFLICT`、`CHANGE_PLAN_*`、`SELF_APPROVAL_FORBIDDEN`、`CHANGE_EXECUTION_*`、`CHANGE_VERIFICATION_MISMATCH`。
-- 未验证：真实 GitHub 写权限、真实 Gitea 写能力现场验收、非本机执行节点、生产部署与外部执行系统连接器。
+- 通过 `POST /api/v1/projects/{projectId}/pipeline-runs` 直接触发仓库工作流。有权限的用户可查看运行状态、日志和产物。部署由工作流步骤执行，运行版本可通过交付接口单独确认。
+- 新增配置：`CODE_CHANGE_PATCH_MAX_BYTES`、`CODE_CHANGE_DIFF_RESPONSE_MAX_BYTES`、`CODE_CHANGE_TIMEOUT_SECONDS`，说明见 `.env.example`。
+- 新增错误码：`TOOL_CAPABILITY_NOT_GRANTED`、`TOOL_INVOCATION_CONFLICT`、`CODE_CHANGE_*`、`PULL_REQUEST_CONFLICT`、`REMOTE_WRITE_CONFLICT`。
+- 未验证：真实 GitHub 写权限、真实 Gitea 写能力现场验收、非本机执行节点。
 
 ## 附件存储与部署（V0.5）
 

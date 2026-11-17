@@ -35,14 +35,20 @@ test('health endpoint responds with the shared success envelope and its own requ
 test('unknown API routes return HTTP 200 with a NOT_FOUND failure envelope', async (t) => {
   const app = createHttpApp(testConfig)
   t.after(() => app.close())
-  const response = await app.inject('/api/v1/missing')
-  assert.equal(response.statusCode, 200)
-  assert.deepEqual(response.json(), {
-    success: false,
-    code: 'NOT_FOUND',
-    message: '接口不存在',
-    requestId: response.headers['x-request-id'],
-  })
+  for (const request of [
+    { method: 'GET', url: '/api/v1/missing' },
+    { method: 'GET', url: '/api/v1/teams/team-id/change-plans' },
+    { method: 'POST', url: '/api/v1/change-plans/plan-id/execute' },
+  ] as const) {
+    const response = await app.inject(request)
+    assert.equal(response.statusCode, 200)
+    assert.deepEqual(response.json(), {
+      success: false,
+      code: 'NOT_FOUND',
+      message: '接口不存在',
+      requestId: response.headers['x-request-id'],
+    })
+  }
 })
 
 test('unexpected errors return an internal error envelope without exposing details', async (t) => {

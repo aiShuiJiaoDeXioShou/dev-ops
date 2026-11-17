@@ -8,7 +8,7 @@ import {
   reconcileCodeChangeFromRun,
   reconcilePendingCodeChanges,
 } from '../../src/modules/tools/tools.code-change.service.ts'
-import { asRecord, expectSuccess, injectJson, items, setupPipelineContext } from '../helpers/operations.ts'
+import { asRecord, expectSuccess, injectJson, items, setupPipelineContext } from './pipeline-harness.ts'
 
 test('T033 运行收口后回填代码变更状态', { timeout: 60_000 }, async (t) => {
   const context = await setupPipelineContext(t)

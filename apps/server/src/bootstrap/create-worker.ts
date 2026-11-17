@@ -7,7 +7,6 @@ import { cleanupExpiredPipelineArtifacts } from '../modules/pipeline/pipeline.re
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import { createAttachmentCleanup } from '../modules/attachments/attachments.cleanup.ts'
 import { reconcileCodeChangeFromRun, reconcilePendingCodeChanges } from '../modules/tools/tools.code-change.service.ts'
-import { reconcileChangeExecutionFromRun } from '../modules/operations/operations.execution.service.ts'
 import { runProjectFileCleanup } from '../modules/projects/projects.file-cleanup.ts'
 import { createProjectDashboardSync } from '../modules/projects/projects.dashboard-sync.ts'
 import { createGitConnectionAdapterFactory } from './create-git-connection-adapter.ts'
@@ -45,10 +44,7 @@ export function createWorker(
     },
     log,
     onRunFinalized: async (runId) => {
-      await Promise.all([
-        reconcileCodeChangeFromRun(database.db, runId),
-        reconcileChangeExecutionFromRun(database.db, runId),
-      ])
+      await reconcileCodeChangeFromRun(database.db, runId)
     },
   })
   const secretCipher = config.GIT_CREDENTIAL_ENCRYPTION_KEY

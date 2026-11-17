@@ -232,6 +232,13 @@
       "when": 1794877261010,
       "tag": "0032_bot_configuration_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794878649468,
+      "tag": "0033_remove_operations",
+      "breakpoints": true
     }
   ]
 }

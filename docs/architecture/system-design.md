@@ -107,7 +107,6 @@ apps/web/
 │   │   ├── projects/             # 项目列表
 │   │   ├── project/              # 项目布局及需求、Bug、代码等子页面
 │   │   ├── collaboration/        # 全局会话、群组、任务、待处理
-│   │   ├── operations/           # 变更、事件与值守页面
 │   │   ├── capabilities/         # Bot、Skills、模板与连接入口
 │   │   ├── credentials/          # 凭据库入口
 │   │   └── settings/             # 个人、团队及成员设置
@@ -125,7 +124,6 @@ apps/web/
 │   │   ├── knowledge/            # Skills、模板与记忆
 │   │   ├── configuration/        # 凭据、环境变量和配置请求
 │   │   ├── integrations/
-│   │   ├── operations/
 │   │   ├── monitoring/
 │   │   └── notifications/
 │   ├── shared/
@@ -233,7 +231,6 @@ apps/server/
 │   │   ├── knowledge/
 │   │   ├── configuration/
 │   │   ├── integrations/
-│   │   ├── operations/
 │   │   ├── monitoring/
 │   │   ├── notifications/
 │   │   └── health/
@@ -298,7 +295,7 @@ routes 调用 service，并把结果转换成受契约约束的响应。service 
 
 “从 Bug 创建 Bot 任务”可以由 workflow 读取 Bug 的公开摘要、调用 tasks 创建任务，并按产品规则写入关联。Bug 和 task 各自维护自己的状态，workflow 负责这一次操作的顺序和共同成功条件。需要原子提交的本地写入共用显式事务上下文，由数据所有者完成各自写入。
 
-Git 读取接口由 code 模块定义，GitHub 和 Gitea 适配器实现该接口。code 使用传入的能力，不直接选择具体实现。integrations 保存连接实例、状态和执行节点配置；业务读取与修改规则继续由 code、tasks、operations 等所属模块维护。
+Git 读取接口由 code 模块定义，GitHub 和 Gitea 适配器实现该接口。code 使用传入的能力，不直接选择具体实现。integrations 保存连接实例、状态和执行节点配置；业务读取与修改规则继续由 code、tasks 等所属模块维护。
 
 连接授权、仓库与变更请求读取、事件和受控 Git 执行分别使用小接口，具体边界及成员、Bot 身份规则见[外部仓库集成架构](external-repositories.md)。GitHub 使用 App 安装授权，Gitea 使用受控服务身份；首批仅实现这两个提供方，GitLab、Gitee、Codeup 后续通过相同契约扩展，不预建插件运行时。
 
@@ -342,7 +339,6 @@ DSH 的包约定区分能力定义、提供方和使用方，并要求扩展依�
 | knowledge | Skills、模板、版本和记忆 | 不成为实时权限或业务状态的来源 |
 | configuration | 凭据、环境变量、使用授权和配置请求 | 与 platform/config 的进程配置分开 |
 | integrations | 连接实例、连接状态、执行节点和工具配置 | 不吸收所有模块的外部业务操作 |
-| operations | 变更计划、人工放行、发布执行和验证 | 任务验收与发布授权分别维护 |
 | monitoring | 事件、聚合规则、值守规则和触发记录 | 通过公开用例创建 Bug 或任务 |
 | notifications | 投递、阅读状态和原记录引用 | 待处理结果由原业务模块决定 |
 
@@ -427,12 +423,11 @@ Worker 进程增加了部署、停机恢复和任务观察的维护成本。出�
 
 Web 登录仍由 Better Auth 邮箱密码/会话负责。业务接口额外接受个人 API Token（`Authorization: Bearer devops_pat_...`），由 identity 模块的 actor 解析统一转换为当前用户；Token 管理接口只接受登录会话，Token 不能自举。CLI 使用 Token 调用现有 API，不直连数据库。详见 002 规格与契约。
 
-## 补充：V0.4b 写能力与运维变更模块（2026-11-11）
+## 项目写能力与流水线
 
 - 新增 `tools` 模块：`project_capability_grant`（按项目 × 用户 × 能力授权）、`tool_invocation`（幂等调用记录）、`code_change`（受控代码修改）。模块只负责授权、幂等与调用编排，Git 读写仍由 `code` 模块与 `adapters/git` 承担。
-- 新增 `operations` 模块：`change_plan`、`change_plan_approval`、`change_execution`、`change_plan_event`。计划为团队级对象，放行绑定修订与快照；同一服务 + 环境通过部分唯一索引保证同时只有一条活动计划。
-- `pipeline` 增加平台运行用例（受控代码修改）与按目标环境解析 secret；`pipeline_run` 新增 `run_kind` 与 `secret_environment`。`delivery` 公开“验证通过后写入运行版本”用例，供 `operations` 与计划完成同事务执行。
-- 依赖方向：`operations` → `pipeline`/`delivery`；`tools` → `code`/`pipeline`；`bootstrap` 负责装配；不新增跨进程边界。
+- `pipeline` 增加平台运行用例（受控代码修改）与按目标环境解析 secret；`pipeline_run` 新增 `run_kind` 与 `secret_environment`。部署步骤随项目工作流执行，`delivery` 负责独立登记运行版本。
+- 依赖方向：`tools` → `code`/`pipeline`；`bootstrap` 负责装配；不新增跨进程边界。
 
 ## 补充：附件与储存桶（006）
 
