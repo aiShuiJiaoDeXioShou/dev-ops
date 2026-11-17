@@ -1954,6 +1954,99 @@ export function createApiClient(options: ApiClientOptions) {
         { ...options, query },
       )
     },
+    /** 读取团队模型连接。 */
+    async listBotConnections(teamId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-model-connections', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-model-connections`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 读取团队可选模型。 */
+    async listBotModelCatalog(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/bot-model-catalog', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-model-catalog', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-model-catalog`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /** 创建团队 API Key 连接。 */
+    async createBotConnection(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-model-connections', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-model-connections', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-model-connections`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 发起订阅登录。 */
+    async startBotOAuthLogin(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-model-connections/oauth-login', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-model-connections/oauth-login', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-model-connections/oauth-login`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 读取订阅授权状态。 */
+    async getBotOAuthLogin(sessionId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-model-login-sessions/{sessionId}', 'get'>>(
+        `/api/v1/bot-model-login-sessions/${segment(sessionId)}`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 提交订阅授权输入。 */
+    async answerBotOAuthLogin(
+      sessionId: string,
+      body: ApiBody<'/api/v1/bot-model-login-sessions/{sessionId}/answer', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-model-login-sessions/{sessionId}/answer', 'post'>>(
+        `/api/v1/bot-model-login-sessions/${segment(sessionId)}/answer`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 取消订阅授权。 */
+    async cancelBotOAuthLogin(sessionId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-model-login-sessions/{sessionId}/cancel', 'post'>>(
+        `/api/v1/bot-model-login-sessions/${segment(sessionId)}/cancel`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 修改模型连接的启用状态。 */
+    async setBotConnectionEnabled(
+      connectionId: string,
+      enabled: boolean,
+      body: ApiBody<'/api/v1/bot-model-connections/{connectionId}/enable', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-model-connections/{connectionId}/enable', 'post'>>(
+        `/api/v1/bot-model-connections/${segment(connectionId)}/${enabled ? 'enable' : 'disable'}`,
+        'POST',
+        body,
+        options,
+      )
+    },
     /** 读取团队技能列表。 */
     async listSkills(
       teamId: string,
