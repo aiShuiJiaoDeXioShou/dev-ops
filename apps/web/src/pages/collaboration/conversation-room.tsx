@@ -335,7 +335,13 @@ export function ConversationRoom({
           <div className="dsh-tabs-row">
             <TabsList unstyled className="dsh-tabs" aria-label="会话视图">
               {tabItems.map(({ id, label }) => (
-                <TabsTrigger key={id} value={id} variant="unstyled" className="dsh-tab" aria-label={label}>
+                <TabsTrigger
+                  key={id}
+                  value={id}
+                  variant="unstyled"
+                  className="dsh-tab rounded-sm focus-visible:ring-inset"
+                  aria-label={label}
+                >
                   <span className="dsh-tab-label">{label}</span>
                   {!!counts[id] && (
                     <span className="dsh-tab-count" aria-hidden="true">
