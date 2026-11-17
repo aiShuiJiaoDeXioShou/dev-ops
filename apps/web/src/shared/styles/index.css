@@ -2731,15 +2731,6 @@ button:disabled,
   flex-wrap: wrap;
 }
 
-/* 单页列表不再展示禁用的上/下页按钮，只用一行轻量计数收尾。 */
-.list-count {
-  margin: 0;
-  padding: 10px 0 0;
-  border-top: 1px solid var(--border);
-  color: var(--quiet);
-  font-size: 11.5px;
-}
-
 /* 环境页签上的配置数量，帮助用户发现非当前环境已有数据。 */
 .segment-count {
   display: inline-grid;

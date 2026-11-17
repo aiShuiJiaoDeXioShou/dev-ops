@@ -184,9 +184,6 @@ export function BugList({ projectId }: { projectId: string }) {
             </Button>
           </div>
         )}
-        {!isEmpty && query.data.data.total <= query.data.data.pageSize && (
-          <p className="list-count">共 {query.data.data.total} 条</p>
-        )}
       </div>
       {state.openId && (
         <BugDetailPane key={state.openId} bugId={state.openId} onClose={() => update({ openId: null })} />

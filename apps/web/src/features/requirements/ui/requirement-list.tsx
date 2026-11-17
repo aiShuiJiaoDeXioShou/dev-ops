@@ -183,9 +183,6 @@ export function RequirementList({ projectId }: { projectId: string }) {
             </Button>
           </div>
         )}
-        {!isEmpty && query.data.data.total <= query.data.data.pageSize && (
-          <p className="list-count">共 {query.data.data.total} 条</p>
-        )}
       </div>
       {state.openId && (
         <RequirementDetailPane
