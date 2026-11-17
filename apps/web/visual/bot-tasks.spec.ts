@@ -9,6 +9,9 @@ function success(data: unknown) {
 test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ page }, testInfo) => {
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
+  await page.route(`**/api/v1/teams/${teamId}/work-tags*`, (route) =>
+    route.fulfill({ json: success({ items: [], nextCursor: null }) }),
+  )
   const stamp = '2026-11-17T08:00:00.000Z'
   const roomId = 'da55aa00-0000-4000-8000-000000000031'
   const botId = 'da55aa00-0000-4000-8000-000000000032'
@@ -23,6 +26,7 @@ test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ p
     lastMessageAt: stamp,
     responsibility: '',
     instructions: '',
+    tags: [],
     members: [
       { id: userId, name: '业务负责人', kind: 'user' },
       { id: botId, name: '交付助理', kind: 'bot' },
@@ -90,7 +94,16 @@ test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ p
   )
   await page.route(`**/api/v1/bot-tasks/${taskId}`, (route) =>
     route.fulfill({
-      json: success({ ...task(), inputs: [], runs: [run()], trace: [], handoffs: [], results: [], reviews: [] }),
+      json: success({
+        ...task(),
+        inputs: [],
+        runs: [run()],
+        trace: [],
+        tags: [],
+        handoffs: [],
+        results: [],
+        reviews: [],
+      }),
     }),
   )
   await page.route(`**/api/v1/bot-runs/${runId}/stop`, (route) => {

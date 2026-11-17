@@ -13,6 +13,12 @@ function success(data: unknown) {
 test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消息', async ({ page }, testInfo) => {
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
+  const tagId = 'da55aa00-0000-4000-8000-000000000090'
+  await page.route(`**/api/v1/teams/${teamId}/work-tags*`, (route) =>
+    route.fulfill({
+      json: success({ items: [{ id: tagId, name: '交付', updatedAt: '2026-11-17T08:00:00.000Z' }], nextCursor: null }),
+    }),
+  )
   const stamp = '2026-11-17T08:00:00.000Z'
   const botId = 'da55aa00-0000-4000-8000-000000000011'
   const runId = 'da55aa00-0000-4000-8000-000000000020'
@@ -25,6 +31,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     lastMessageAt: stamp,
     responsibility: '',
     instructions: '',
+    tags: [],
     members: [
       { id: botId, name: '验收助理', kind: 'bot' },
       { id: userId, name: '负责人', kind: 'user' },
@@ -37,9 +44,10 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   )
   const messagePath = `**/api/v1/bot-conversations/${room.id}/messages`
   const eventsPath = `**/api/v1/bot-conversations/${room.id}/events`
-  await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) =>
-    route.fulfill({ json: success({ items: [room], nextCursor: null }) }),
-  )
+  await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) => {
+    const filtered = new URL(route.request().url()).searchParams.get('tagId') === tagId
+    return route.fulfill({ json: success({ items: filtered ? [] : [room], nextCursor: null }) })
+  })
   await page.route(`**/api/v1/bot-conversations/${room.id}`, (route) => route.fulfill({ json: success(room) }))
   await page.route(`${messagePath}*`, (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: success({ items: list, nextBefore: null }) })
@@ -113,4 +121,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(page.getByText('正在检查', { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('bot-conversations.png') })
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).click()
+  await page.getByRole('combobox', { name: '按工作标签筛选' }).selectOption(tagId)
+  await expect(page.getByText('没有匹配的会话')).toBeVisible()
 })

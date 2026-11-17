@@ -29,11 +29,11 @@ type EventState = {
 export const conversationsQueryKey = ['bot-conversations']
 
 /** 分页列出指定团队中当前成员可见的会话。 */
-export function conversationsOptions(teamId: string, query: string) {
+export function conversationsOptions(teamId: string, query: string, tagId?: string) {
   return infiniteQueryOptions({
-    queryKey: [...conversationsQueryKey, teamId, query],
+    queryKey: [...conversationsQueryKey, teamId, query, tagId],
     queryFn: ({ signal, pageParam }) =>
-      apiClient.listBotConversations(teamId, { query, cursor: pageParam || undefined }, { signal }),
+      apiClient.listBotConversations(teamId, { query, tagId, cursor: pageParam || undefined }, { signal }),
     initialPageParam: '',
     getNextPageParam: ({ data }) => data.nextCursor ?? undefined,
     refetchInterval: POLL_WHILE_IDLE_MS,

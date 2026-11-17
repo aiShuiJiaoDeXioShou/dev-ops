@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { BotConversation } from '@/features/conversations/api/queries'
+import { WorkTagEditor } from '@/features/work-tags/ui/work-tag-editor'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
@@ -186,6 +187,13 @@ export function TaskDetails({
           </ol>
         </section>
       )}
+      <WorkTagEditor
+        tags={task.tags}
+        teamId={room.teamId}
+        target={{ targetKind: 'task', targetId: task.id }}
+        readOnly={readOnly}
+        onChanged={() => void client.invalidateQueries({ queryKey: taskQueries })}
+      />
       <TaskResults
         task={task}
         readOnly={readOnly}

@@ -9,6 +9,9 @@ function success(data: unknown) {
 test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ page }, testInfo) => {
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
+  await page.route(`**/api/v1/teams/${teamId}/work-tags*`, (route) =>
+    route.fulfill({ json: success({ items: [], nextCursor: null }) }),
+  )
   const stamp = '2026-11-17T08:00:00.000Z'
   const roomId = 'da55aa00-0000-4000-8000-000000000051'
   const leaderId = 'da55aa00-0000-4000-8000-000000000052'
@@ -43,6 +46,7 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
     lastMessageAt: stamp,
     responsibility: '',
     instructions: '',
+    tags: [],
     members: [{ id: userId, name: '负责人', kind: 'user' }, ...bots.map(({ id, name }) => ({ id, name, kind: 'bot' }))],
   }
   const routeBase = `**/api/v1/teams/${teamId}`

@@ -19,6 +19,10 @@ import { ConversationMessages } from '@/features/conversations/ui/conversation-m
 import { GroupSettings } from '@/features/conversations/ui/group-settings'
 import { NewGroupDialog } from '@/features/conversations/ui/new-group-dialog'
 import { useSession } from '@/features/identity/model/session'
+import { workTagsOptions } from '@/features/work-tags/api/queries'
+import { WorkTagDialog } from '@/features/work-tags/ui/work-tag-dialog'
+import { WorkTagEditor } from '@/features/work-tags/ui/work-tag-editor'
+import { Select } from '@/shared/ui/controls/select'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
@@ -283,6 +287,17 @@ function ConversationRoom({
         </TabsContent>
         <TabsContent value="context" className="dsh-tab-panel">
           <div className="dsh-panel-scroll">
+            <WorkTagEditor
+              tags={room.tags}
+              teamId={room.teamId}
+              target={{ targetKind: 'conversation', targetId: room.id }}
+              readOnly={readOnly}
+              onChanged={() => {
+                void detail.refetch()
+                void client.invalidateQueries({ queryKey: conversationsQueryKey })
+              }}
+            />
+
             {room.responsibility || room.instructions ? (
               <dl className="work-properties">
                 {room.responsibility && (
@@ -377,6 +392,13 @@ function TeamConversations({
   const [filter, setFilter] = useState('')
   const [listOpen, setListOpen] = useState(false)
   const [newGroupOpen, setNewGroupOpen] = useState(false)
+  const [tagDialogOpen, setTagDialogOpen] = useState(false)
+  const tagOpener = useRef<HTMLButtonElement>(null)
+  const [tagId, setTagId] = useState('')
+  const tags = useInfiniteQuery(workTagsOptions(teamId))
+  const tagItems = tags.data?.pages.flatMap(({ data }) => data.items) ?? []
+  const activeTag = tagItems.some(({ id }) => id === tagId) ? tagId : ''
+
   const groupOpener = useRef<HTMLButtonElement>(null)
   const client = useQueryClient()
   const listToggleRef = useRef<HTMLButtonElement>(null)
@@ -386,7 +408,7 @@ function TeamConversations({
   const [params] = useSearchParams()
   const isInbox = params.get('view') === 'inbox'
   const linkedTask = params.get('task') ?? undefined
-  const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim())))
+  const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim()), activeTag || undefined))
   const rooms = list.data?.pages.flatMap(({ data }) => data.items) ?? []
   const closeList = () => {
     setListOpen(false)
@@ -399,7 +421,8 @@ function TeamConversations({
     <div
       className={cn('collab-layout live-conversations', listOpen && 'mobile-rooms-open')}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && listOpen && !newGroupOpen && !event.defaultPrevented) closeList()
+        if (event.key === 'Escape' && listOpen && !newGroupOpen && !tagDialogOpen && !event.defaultPrevented)
+          closeList()
       }}
     >
       <h1 className="sr-only">协作</h1>
@@ -467,10 +490,35 @@ function TeamConversations({
           待你处理
           {inbox.isSuccess && <span className="counter">{inbox.data.data.count}</span>}
         </Button>
+        <div className="row flex-wrap">
+          <Select aria-label="按工作标签筛选" value={activeTag} onChange={(event) => setTagId(event.target.value)}>
+            <option value="">全部标签</option>
+            {tagItems.map(({ id, name }) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </Select>
+          {!readOnly && (
+            <Button ref={tagOpener} type="button" variant="ghost" onClick={() => setTagDialogOpen(true)}>
+              管理标签
+            </Button>
+          )}
+          {tags.hasNextPage && (
+            <Button type="button" variant="ghost" onClick={() => void tags.fetchNextPage()}>
+              更多标签
+            </Button>
+          )}
+          {tags.isError && (
+            <Button type="button" variant="ghost" onClick={() => void tags.refetch()}>
+              重试加载标签
+            </Button>
+          )}
+        </div>
         {list.isPending && <DelayedPageSkeleton />}
         {list.isError && <PageError title="会话列表加载失败" error={list.error} onRetry={() => void list.refetch()} />}
         {list.isSuccess && rooms.length === 0 && (
-          <p className="small muted">{filter ? '没有匹配的会话' : '还没有会话'}</p>
+          <p className="small muted">{filter || activeTag ? '没有匹配的会话' : '还没有会话'}</p>
         )}
         {rooms.map((room) => (
           <Button
@@ -550,6 +598,20 @@ function TeamConversations({
             />
           )}
         </section>
+      )}
+      {tagDialogOpen && (
+        <WorkTagDialog
+          teamId={teamId}
+          onClose={() => {
+            setTagDialogOpen(false)
+            requestAnimationFrame(() => tagOpener.current?.focus())
+          }}
+          onChanged={() => {
+            void client.invalidateQueries({ queryKey: conversationsQueryKey })
+            void client.invalidateQueries({ queryKey: ['bot-conversation'] })
+            void client.invalidateQueries({ queryKey: taskQueries })
+          }}
+        />
       )}
       {newGroupOpen && (
         <NewGroupDialog
