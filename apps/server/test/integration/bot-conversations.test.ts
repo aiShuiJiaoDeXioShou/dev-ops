@@ -46,6 +46,7 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   const created = await post(`${teamPath}/bots`, devUser, {
     name: '协作助理',
     responsibility: '测试私聊',
+    avatarKey: 'prism',
     ownerUserId: devUser.userId,
   })
   assert.equal(created.code, 'OK', created.message)
@@ -71,7 +72,11 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   assert.equal(repeated.data.id, opened.data.id)
   const roomId = String(opened.data.id)
   const roomPath = `/api/v1/bot-conversations/${roomId}`
-  assert.equal((await get(listPath, devUser)).data.items.length, 1)
+  const initialList = (await get(listPath, devUser)).data.items
+  assert.equal(initialList.length, 1)
+  assert.deepEqual(initialList[0].botAvatars, [{ id: botId, avatarKey: 'prism', enabled: true }])
+  assert.equal(initialList[0].lastMessagePreview, null)
+  assert.deepEqual((await get(listPath, adminUser)).data.items, [])
   assert.equal((await get(roomPath, adminUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
   await db.insert(platformAdmin).values({ user_id: otherUser.userId })
   assert.equal((await get(roomPath, otherUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
@@ -89,8 +94,12 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
     (await post(messagePath, devUser, { ...message, clientRequestId: randomUUID(), mentionBotId: randomUUID() })).code,
     'BOT_NOT_FOUND',
   )
-  const second = await post(messagePath, devUser, { text: '第二条消息', clientRequestId: randomUUID() })
+  const second = await post(messagePath, devUser, {
+    text: '**第二条消息**\n\n```ts\nconst ignored = true\n```',
+    clientRequestId: randomUUID(),
+  })
   assert.equal(second.code, 'OK')
+  assert.equal((await get(listPath, devUser)).data.items[0].lastMessagePreview, '第二条消息')
   const page = await get(`${messagePath}?limit=1`, devUser)
   assert.equal(page.data.items[0].id, second.data.message.id)
   assert.equal(

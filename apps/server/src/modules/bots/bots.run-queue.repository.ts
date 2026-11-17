@@ -58,6 +58,7 @@ async function writeRunState(tx: BotRunTransaction, run: BotRunRecord, actorId?:
       kind: 'run_status',
       payload: {
         runId: run.id,
+        botId: run.bot_id,
         status: run.status,
         failureKind: run.failure_kind,
         failureMessage: run.failure_message,

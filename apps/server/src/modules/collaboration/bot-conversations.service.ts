@@ -102,6 +102,9 @@ async function readMembers(db: ReadDb, conversation: ConversationRow): Promise<C
       kind: botConversationMember.member_kind,
       userName: authUser.name,
       botName: bot.name,
+      avatarKey: bot.avatar_key,
+      responsibility: bot.responsibility,
+      status: bot.status,
     })
     .from(botConversationMember)
     .leftJoin(
@@ -126,9 +129,79 @@ async function readMembers(db: ReadDb, conversation: ConversationRow): Promise<C
     .orderBy(asc(botConversationMember.created_at), asc(botConversationMember.id))
     .limit(200)
   return rows.map((row) => {
-    if (row.kind === 'bot') return { id: row.id, kind: row.kind, name: row.botName ?? '智能体' }
+    if (row.kind === 'bot') {
+      return {
+        id: row.id,
+        kind: row.kind,
+        name: row.botName ?? '智能体',
+        avatarKey: row.avatarKey,
+        responsibility: row.responsibility ?? '',
+        enabled: row.status === 'enabled',
+      }
+    }
     if (row.kind === 'user') return { id: row.id, kind: row.kind, name: row.userName ?? '成员' }
     throw new Error('数据库中的会话成员类型不合法')
+  })
+}
+
+async function listConversationPreviews(db: ReadDb, teamId: string, rooms: ConversationRow[]) {
+  if (rooms.length === 0) return []
+  const ids = rooms.map(({ id }) => id)
+  const latest = db
+    .select({ body: botMessage.body })
+    .from(botMessage)
+    .where(and(eq(botMessage.team_id, teamId), eq(botMessage.conversation_id, botConversation.id)))
+    .orderBy(desc(botMessage.sequence))
+    .limit(1)
+    .as('latest_message')
+  const [members, messages] = await Promise.all([
+    db
+      .select({
+        roomId: botConversationMember.conversation_id,
+        id: bot.id,
+        avatarKey: bot.avatar_key,
+        status: bot.status,
+      })
+      .from(botConversationMember)
+      .innerJoin(bot, and(eq(bot.id, botConversationMember.member_id), eq(bot.team_id, teamId)))
+      .where(
+        and(
+          eq(botConversationMember.team_id, teamId),
+          inArray(botConversationMember.conversation_id, ids),
+          eq(botConversationMember.member_kind, 'bot'),
+          isNull(botConversationMember.removed_at),
+        ),
+      )
+      .orderBy(asc(botConversationMember.created_at), asc(botConversationMember.id)),
+    db
+      .select({ roomId: botConversation.id, body: latest.body })
+      .from(botConversation)
+      .leftJoinLateral(latest, sql`true`)
+      .where(and(eq(botConversation.team_id, teamId), inArray(botConversation.id, ids))),
+  ])
+  const latestByRoom = new Map(messages.map(({ roomId, body }) => [roomId, body]))
+  return rooms.map((room) => {
+    const body = latestByRoom.get(room.id)
+    const preview = Check(botMessageBodySchema, body)
+      ? body.blocks
+          .flatMap((block) => (block.type === 'tool_activity' ? [] : [block.text]))
+          .join(' ')
+          .replace(/```[\s\S]*?```/gu, ' ')
+          .replace(/[#>*_`|~]/gu, ' ')
+          .replace(/\s+/gu, ' ')
+          .trim()
+          .slice(0, 72)
+      : ''
+    const bots = members.filter(({ roomId }) => roomId === room.id)
+    const leader = bots.find(({ id }) => id === room.leader_bot_id)
+    const ordered = leader ? [leader, ...bots.filter(({ id }) => id !== leader.id)] : bots
+    return {
+      ...viewOf(room),
+      botAvatars: ordered
+        .slice(0, 4)
+        .map(({ id, avatarKey, status }) => ({ id, avatarKey, enabled: status === 'enabled' })),
+      lastMessagePreview: preview || (body ? '消息' : null),
+    }
   })
 }
 
@@ -261,7 +334,11 @@ export function createBotConversationsService(db: Database) {
         )
         .orderBy(desc(botConversation.last_message_at), desc(botConversation.id))
         .limit(LIST_PAGE_SIZE + 1)
-      const items = rows.slice(0, LIST_PAGE_SIZE).map(({ row }) => viewOf(row))
+      const items = await listConversationPreviews(
+        db,
+        teamId,
+        rows.slice(0, LIST_PAGE_SIZE).map(({ row }) => row),
+      )
       return { items, nextCursor: rows.length > LIST_PAGE_SIZE ? (items.at(-1)?.id ?? null) : null }
     },
     /** 创建或复用当前人和同团队 Bot 的唯一私聊，锁定 Bot 防止重复创建。 */

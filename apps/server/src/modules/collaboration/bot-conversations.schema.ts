@@ -21,6 +21,9 @@ const member = Type.Object({
   id: uuid,
   kind: Type.Union([Type.Literal('user'), Type.Literal('bot')]),
   name: Type.String(),
+  avatarKey: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  responsibility: Type.Optional(Type.String()),
+  enabled: Type.Optional(Type.Boolean()),
 })
 const message = Type.Object({
   id: uuid,
@@ -86,7 +89,15 @@ export const sendBotMessageBody = Type.Object(
 
 export const conversationListResponse = apiResponseSchema(
   Type.Object({
-    items: Type.Array(conversation),
+    items: Type.Array(
+      Type.Object({
+        ...conversation.properties,
+        botAvatars: Type.Array(
+          Type.Object({ id: uuid, avatarKey: Type.Union([Type.String(), Type.Null()]), enabled: Type.Boolean() }),
+        ),
+        lastMessagePreview: Type.Union([Type.String(), Type.Null()]),
+      }),
+    ),
     nextCursor: nullableId,
   }),
 )
