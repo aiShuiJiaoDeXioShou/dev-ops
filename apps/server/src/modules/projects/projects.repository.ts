@@ -47,7 +47,7 @@ export async function findProjectContext(executor: ProjectExecutor, projectId: s
 /** 在事务中锁定项目行。 */
 export async function lockProject(tx: TransactionDatabase, projectId: string) {
   const [row] = await tx
-    .select()
+    .select({ id: project.id, team_id: project.team_id, work_item_templates: project.work_item_templates })
     .from(project)
     .where(and(eq(project.id, projectId), isNull(project.deleted_at)))
     .for('update')
@@ -224,6 +224,7 @@ export async function updateProject(
     description?: string | null
     ownerUserId?: string
     status?: string
+    workItemTemplates?: typeof project.$inferSelect.work_item_templates
   },
 ) {
   const [row] = await tx
@@ -233,6 +234,7 @@ export async function updateProject(
       ...(values.description === undefined ? {} : { description: values.description }),
       ...(values.ownerUserId === undefined ? {} : { owner_user_id: values.ownerUserId }),
       ...(values.status === undefined ? {} : { status: values.status }),
+      ...(values.workItemTemplates === undefined ? {} : { work_item_templates: values.workItemTemplates }),
       version: sql`${project.version} + 1`,
       updated_at: new Date(),
     })

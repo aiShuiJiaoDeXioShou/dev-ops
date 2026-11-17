@@ -13,12 +13,13 @@
   "tabs": [
     "基本资料",
     "代码仓库",
-    "项目服务"
+    "项目服务",
+    "流程模板"
   ],
   "rows": 0,
   "statusTexts": [],
   "documentOverflow": false,
-  "interactiveCount": 38,
+  "interactiveCount": 39,
   "nonPointerControls": [],
   "smallTargets": [
     "[audit] 权限测试项目",

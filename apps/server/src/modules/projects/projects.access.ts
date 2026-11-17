@@ -1,6 +1,7 @@
 import type { Database } from '../../platform/database/client.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
+import type { WorkItemTemplates } from '../collaboration/work-item-plan.ts'
 import { findProjectContext, lockProject, type ProjectExecutor } from './projects.repository.ts'
 
 type TransactionDatabase = Parameters<Parameters<Database['transaction']>[0]>[0]
@@ -28,11 +29,14 @@ export async function getProjectContext(
  * 在事务中锁定项目行并返回项目上下文，用于串行化项目内的编号分配与写入。
  * @param tx 事务连接。
  * @param projectId 项目标识。
- * @returns 项目上下文。
+ * @returns 项目上下文及锁内读取的事项流程模板。
  * @throws 项目不存在时抛出 NOT_FOUND。
  */
-export async function lockProjectForWrite(tx: TransactionDatabase, projectId: string): Promise<ProjectContext> {
+export async function lockProjectForWrite(
+  tx: TransactionDatabase,
+  projectId: string,
+): Promise<ProjectContext & { workItemTemplates: WorkItemTemplates }> {
   const row = await lockProject(tx, projectId)
   if (!row) throw new ApiError(ERROR_CODES.NOT_FOUND, '项目不存在')
-  return { id: row.id, teamId: row.team_id }
+  return { id: row.id, teamId: row.team_id, workItemTemplates: row.work_item_templates }
 }

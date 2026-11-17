@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
-import { check, index, integer, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
+import { check, index, integer, jsonb, primaryKey, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core'
 import { appSchema } from '../../platform/database/namespace.ts'
+import type { WorkItemTemplates } from '../collaboration/work-item-plan.ts'
 
 /** 项目：团队内的业务容器，负责人表示责任而非额外授权。 */
 export const project = appSchema.table(
@@ -12,6 +13,7 @@ export const project = appSchema.table(
     description: text('description'),
     owner_user_id: uuid('owner_user_id').notNull(),
     status: text('status').notNull().default('active'),
+    work_item_templates: jsonb('work_item_templates').$type<WorkItemTemplates>().notNull().default({}),
     version: integer('version').notNull().default(1),
     deleted_at: timestamp('deleted_at', { withTimezone: true, mode: 'date' }),
     deleted_by_user_id: uuid('deleted_by_user_id'),

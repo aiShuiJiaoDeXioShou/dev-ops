@@ -246,6 +246,13 @@
       "when": 1794879519982,
       "tag": "0034_remove_operations",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794879845012,
+      "tag": "0035_work_item_templates",
+      "breakpoints": true
     }
   ]
 }

@@ -13,7 +13,11 @@ import {
   type PageResult,
 } from '../collaboration/collaboration.service.ts'
 import { findActiveTeamMemberIds, isActiveTeamMember } from '../identity/identity.repository.ts'
-import { validateWorkItemPlan, type WorkItemPlan } from '../collaboration/work-item-plan.ts'
+import {
+  instantiateWorkItemTemplate,
+  validateWorkItemPlan,
+  type WorkItemPlan,
+} from '../collaboration/work-item-plan.ts'
 import { loadOwnerRefs } from '../identity/identity.display.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
@@ -221,7 +225,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     const attachmentIds = [...new Set(input.attachmentIds ?? [])]
     const requirementId = randomUUID()
     const row = await db.transaction(async (tx) => {
-      await lockProjectForWrite(tx, projectId)
+      const { workItemTemplates } = await lockProjectForWrite(tx, projectId)
       const number = await nextRequirementNumber(tx, projectId)
       const created = await insertRequirement(tx, {
         id: requirementId,
@@ -236,6 +240,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         acceptanceCriteria: acceptance && acceptance.length > 0 ? acceptance : null,
         devOwnerUserId: input.devOwnerUserId ?? null,
         testOwnerUserId: input.testOwnerUserId ?? null,
+        plan: instantiateWorkItemTemplate(workItemTemplates.requirement),
         createdByUserId: actor.id,
       })
       if (collaborators.length > 0) {

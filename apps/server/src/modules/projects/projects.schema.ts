@@ -1,6 +1,7 @@
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 import { avatarImageSchema } from '../identity/identity.avatar.ts'
+import { workItemKindSchema, workItemTemplateSchema, workItemTemplatesSchema } from '../collaboration/work-item-plan.ts'
 
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const projectSchema = Type.Object({
@@ -20,6 +21,7 @@ const projectSchema = Type.Object({
   version: Type.Integer(),
   createdAt: Type.String(),
   updatedAt: Type.String(),
+  workItemTemplates: Type.Optional(workItemTemplatesSchema),
 })
 const projectListSchema = Type.Object({
   items: Type.Array(projectSchema),
@@ -84,6 +86,9 @@ export const updateProjectBodySchema = Type.Object(
     ownerUserId: Type.Optional(uuidSchema),
     status: Type.Optional(Type.Union([Type.Literal('active'), Type.Literal('paused'), Type.Literal('ended')])),
     statusReason: Type.Optional(Type.String({ minLength: 1, maxLength: 2000 })),
+    workItemTemplate: Type.Optional(
+      Type.Object({ kind: workItemKindSchema, nodes: workItemTemplateSchema }, { additionalProperties: false }),
+    ),
   },
   { additionalProperties: false },
 )

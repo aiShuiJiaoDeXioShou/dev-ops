@@ -4,6 +4,8 @@ import { isUniqueViolation } from '../../platform/database/errors.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
+import { validateWorkItemTemplate } from '../collaboration/work-item-plan.ts'
+import type { UpdateProjectBody } from './projects.schema.ts'
 import { isActiveTeamMember } from '../identity/identity.repository.ts'
 import { toTeamRole } from '../identity/identity.rules.ts'
 import { loadOwnerRefs, ownerRefOf, type OwnerRef } from '../identity/identity.display.ts'
@@ -294,21 +296,13 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
   async function getProject(actor: SessionUser, projectId: string) {
     const row = await requireProjectAccess(actor, projectId)
     const [counts, owner] = await Promise.all([countsFor([projectId]), ownerRefFor(row.team_id, row.owner_user_id)])
-    return toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 }, owner)
+    return {
+      ...toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 }, owner),
+      workItemTemplates: row.work_item_templates,
+    }
   }
 
-  async function updateProjectDetails(
-    actor: SessionUser,
-    projectId: string,
-    input: {
-      version: number
-      name?: string
-      description?: string | null
-      ownerUserId?: string
-      status?: string
-      statusReason?: string
-    },
-  ) {
+  async function updateProjectDetails(actor: SessionUser, projectId: string, input: UpdateProjectBody) {
     if (!Number.isSafeInteger(input.version) || input.version < 1) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '版本参数不合法')
     }
@@ -325,7 +319,14 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '项目负责人不是正常团队成员')
     }
 
+    const template = input.workItemTemplate
+      ? {
+          kind: input.workItemTemplate.kind,
+          nodes: validateWorkItemTemplate(input.workItemTemplate.kind, input.workItemTemplate.nodes),
+        }
+      : undefined
     const changes: Record<string, unknown> = {}
+    if (template) changes.workItemTemplate = { kind: template.kind, nodeCount: template.nodes.length }
     if (name !== undefined && name !== current.name) changes.name = [current.name, name]
     if (description !== undefined && description !== current.description)
       changes.description = [current.description, description]
@@ -335,8 +336,9 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
     if (status !== undefined && status !== current.status) changes.status = [current.status, status]
 
     const row = await db.transaction(async (tx) => {
-      await lockProjectForWrite(tx, projectId)
+      const { workItemTemplates } = await lockProjectForWrite(tx, projectId)
       const updated = await updateProject(tx, projectId, input.version, {
+        workItemTemplates: template ? { ...workItemTemplates, [template.kind]: template.nodes } : undefined,
         name,
         description,
         ownerUserId: input.ownerUserId,
@@ -358,7 +360,10 @@ export function createProjectsService(deps: ProjectsServiceDeps) {
       return updated
     })
     const [counts, owner] = await Promise.all([countsFor([projectId]), ownerRefFor(row.team_id, row.owner_user_id)])
-    return toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 }, owner)
+    return {
+      ...toView(row, counts.get(projectId) ?? { openRequirements: 0, openBugs: 0 }, owner),
+      workItemTemplates: row.work_item_templates,
+    }
   }
 
   async function getStats(actor: SessionUser, projectId: string): Promise<ProjectCounts> {
