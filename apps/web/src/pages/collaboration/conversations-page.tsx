@@ -66,6 +66,16 @@ function TeamConversations({
   const rooms = list.data?.pages.flatMap(({ data }) => data.items) ?? []
   const defaultId = !isInbox && !linkedSkill && !filter && !activeTag ? rooms[0]?.id : undefined
   const selectedId = id ?? defaultId
+  const showListErrorInMain = !isInbox && !selectedId && rooms.length === 0 && list.isError
+  const hasNoConversations = list.isSuccess && rooms.length === 0 && !filter && !activeTag
+  let emptyDescription = '从会话列表继续对话，或从智能体目录打开私聊。'
+  if (hasNoConversations) {
+    emptyDescription = readOnly
+      ? '加入会话后，可在这里查看对话。'
+      : '从智能体目录打开私聊，或使用会话列表中的加号新建群组。'
+  } else if (linkedSkill) {
+    emptyDescription = '选择已配置这项技能的会话，技能会带入输入框。'
+  }
   useEffect(() => {
     if (!id && defaultId) void navigate(`/collaboration/${defaultId}`, { replace: true })
   }, [defaultId, id, navigate])
@@ -214,7 +224,20 @@ function TeamConversations({
           </div>
         )}
         {list.isPending && <DelayedPageSkeleton />}
-        {list.isError && <PageError title="会话列表加载失败" error={list.error} onRetry={() => void list.refetch()} />}
+        {list.isError && !showListErrorInMain && (
+          <div className="row flex-wrap small muted" role="status">
+            会话列表加载失败
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={list.isFetching}
+              onClick={() => void list.refetch()}
+            >
+              {list.isFetching ? '正在重试…' : '重试'}
+            </Button>
+          </div>
+        )}
         {list.isSuccess && rooms.length === 0 && (
           <p className="small muted">{filter || activeTag ? '没有匹配的会话' : '还没有会话'}</p>
         )}
@@ -294,15 +317,20 @@ function TeamConversations({
           </header>
           {isInbox ? (
             <BotInbox teamId={teamId} />
+          ) : showListErrorInMain ? (
+            <PageError
+              title="会话列表加载失败"
+              error={list.error}
+              retrying={list.isFetching}
+              onRetry={() => void list.refetch()}
+            />
+          ) : list.isPending ? (
+            <DelayedPageSkeleton />
           ) : (
             <EmptyState
               icon={<ConversationIcon name="chat" />}
-              title="选择会话"
-              description={
-                linkedSkill
-                  ? '选择已配置这项技能的会话，技能会带入输入框。'
-                  : '从会话列表继续对话，或从智能体目录打开私聊。'
-              }
+              title={hasNoConversations ? '还没有会话' : '选择会话'}
+              description={emptyDescription}
               action={
                 <Button asChild variant="outline">
                   <Link to="/capabilities/bots">查看智能体</Link>
