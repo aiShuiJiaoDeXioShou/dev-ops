@@ -10,7 +10,6 @@ import type { TeamRole } from '@/prototype/data/types'
 const primaryNavigation: Array<{ page: string; label: string; icon: PrototypeIconName; to: string }> = [
   { page: 'projects', label: '项目', icon: 'folder', to: '/prototype/projects' },
   { page: 'collaboration', label: '协作', icon: 'bot-live', to: '/prototype/collaboration' },
-  { page: 'operations', label: '运维', icon: 'activity', to: '/prototype/operations' },
   { page: 'capabilities', label: '能力', icon: 'capabilities', to: '/prototype/capabilities/bots' },
   { page: 'vault', label: '凭据库', icon: 'lock', to: '/prototype/vault' },
 ]
@@ -30,7 +29,7 @@ export function usePrototypeMenu() {
 
 /**
  * 渲染原型应用外壳：侧栏、团队切换、设置与移动端导航。
- * @returns 与 HTML 原型一致的 shell 布局；页面内容由子路由提供。
+ * @returns 原型工作区外壳，页面内容由子路由提供。
  * @remarks 侧栏顺序、底部团队信息与设置入口对齐原型，不额外插入通知入口。
  */
 export function PrototypeShell() {

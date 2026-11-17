@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Activity, Folder, LayoutGrid, LogOut, Menu, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
+import { Folder, LayoutGrid, LogOut, Menu, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
@@ -32,7 +32,6 @@ export function AppLayout() {
     const titles: Array<[string, string]> = [
       ['/projects/', '项目工作区'],
       ['/projects', '项目'],
-      ['/operations/changes', '变更与发布'],
       ['/capabilities/skills', '团队 Skills'],
       ['/capabilities/bots', '智能体'],
       ['/capabilities', '能力'],
@@ -82,10 +81,9 @@ export function AppLayout() {
     queryClient.clear()
     navigate('/login', { replace: true })
   }
-  const navIcons = { folder: Folder, activity: Activity, capabilities: LayoutGrid, shield: Shield } as const
+  const navIcons = { folder: Folder, capabilities: LayoutGrid, shield: Shield } as const
   const primaryNavItems = [
     { to: '/projects', label: '项目', icon: 'folder' as const },
-    { to: '/operations/changes', label: '运维', icon: 'activity' as const },
     { to: '/capabilities', label: '能力', icon: 'capabilities' as const },
     ...(role !== 'viewer' ? [{ to: '/vault', label: '凭据库', icon: 'shield' as const }] : []),
   ]

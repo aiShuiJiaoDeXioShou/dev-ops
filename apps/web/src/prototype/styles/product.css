@@ -716,12 +716,6 @@
 .capability-nav + .agent-page-header {
   padding-top: 12px;
 }
-.operations-content {
-  padding-top: 16px;
-}
-.operations-toolbar {
-  margin-bottom: 12px;
-}
 .keychain-detail {
   display: flex;
   flex-direction: column;

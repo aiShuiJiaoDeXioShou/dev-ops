@@ -11,13 +11,6 @@ const cases = [
     retryLabel: '重新加载',
     heading: '项目',
   },
-  {
-    path: '/operations/changes',
-    endpoint: `${teamPath}/change-plans`,
-    title: '变更计划读取失败',
-    retryLabel: '重新检查',
-    heading: '变更',
-  },
 ]
 
 for (const { path, endpoint, title, retryLabel, heading } of cases) {

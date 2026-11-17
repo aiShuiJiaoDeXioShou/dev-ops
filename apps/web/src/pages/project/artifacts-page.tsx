@@ -228,7 +228,7 @@ export function Component() {
                             <div className="run-version-actions">
                               {item.source === 'deployment_receipt' && item.evidenceUrl ? (
                                 <a className="text-btn" href={item.evidenceUrl} target="_blank" rel="noreferrer">
-                                  变更计划
+                                  查看证据
                                 </a>
                               ) : null}
                               {canManage ? (
