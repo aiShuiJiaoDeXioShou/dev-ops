@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Clock, Cpu, Layers, Pencil, Shield, SquareTerminal, User, X } from 'lucide-react'
+import { Check, Clock, Cpu, Layers, MessageSquare, Pencil, Shield, SquareTerminal, User, X } from 'lucide-react'
+import { useNavigate } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
@@ -107,6 +108,13 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
   const detailRef = useRef<HTMLElement>(null)
   const queryClient = useQueryClient()
   const { showToast } = useToast()
+  const navigate = useNavigate()
+  const openConversation = useMutation({
+    mutationFn: () =>
+      apiClient.createBotConversation(teamId, { kind: 'direct', botId }, { idempotencyKey: createIdempotencyKey() }),
+    onSuccess: ({ data }) => void navigate(`/collaboration/${data.id}`),
+    onError: (error) => showToast(describeRequestError(error).description, 'error'),
+  })
   const skillQuery = useQuery({
     ...skillListQueryOptions(teamId, { pageSize: 100 }),
     enabled: Boolean(bot?.skillIds.length),
@@ -276,6 +284,15 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
           )}
           {canEdit && (
             <div className="agent-detail-actions">
+              <Button
+                type="button"
+                className="btn"
+                disabled={openConversation.isPending}
+                onClick={() => openConversation.mutate()}
+              >
+                <MessageSquare className="size-4" aria-hidden="true" />
+                打开对话
+              </Button>
               <Button
                 type="button"
                 className="btn"

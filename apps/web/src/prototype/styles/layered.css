@@ -5,5 +5,6 @@
 @import './styles.css' layer(prototype);
 @import './workspace.css' layer(prototype);
 @import './product.css' layer(prototype);
+@import './ai-chat.css' layer(prototype);
 @import './markdown.css' layer(prototype);
 @import './v01.css' layer(prototype);

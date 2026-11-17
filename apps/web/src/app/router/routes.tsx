@@ -46,6 +46,11 @@ export function createAppRoutes(): RouteObject[] {
           children: [
             { index: true, element: <Navigate to="/projects" replace /> },
             {
+              path: 'collaboration/:conversationId?',
+              lazy: () => import('@/pages/collaboration/conversations-page'),
+              HydrateFallback: DelayedPageSkeleton,
+            },
+            {
               path: 'projects',
               lazy: () => import('@/pages/projects/project-list-page'),
               HydrateFallback: DelayedPageSkeleton,

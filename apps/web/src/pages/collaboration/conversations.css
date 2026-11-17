@@ -1,0 +1,86 @@
+@layer components {
+  .live-conversations,
+  .live-conversations .conversation-list {
+    background: var(--background);
+  }
+
+  .live-conversations .dsh-chat {
+    --dsh-ink: var(--foreground);
+    --dsh-secondary: var(--muted-foreground);
+    --dsh-tertiary: var(--muted-foreground);
+    --dsh-caption: var(--muted-foreground);
+    --dsh-line-1: var(--border);
+    --dsh-line-2: var(--border);
+    --dsh-line-3: var(--border);
+    --dsh-soft: var(--muted);
+    --dsh-hover: var(--accent);
+    --dsh-blue: var(--primary);
+    --dsh-blue-soft: var(--accent);
+    background: var(--background);
+  }
+
+  .live-conversations .dsh-chat {
+    min-width: 0;
+  }
+
+  .live-conversations .dsh-user-bubble {
+    color: var(--foreground);
+    background: var(--muted);
+  }
+
+  .live-conversations .dsh-chat-header,
+  .live-conversations .dsh-composer {
+    background: var(--background);
+  }
+
+  .live-conversations .dsh-tabs {
+    width: auto;
+    justify-content: start;
+    border-radius: 0;
+    background: transparent;
+    padding-block: 0;
+  }
+
+  .live-conversations .dsh-tab.tab {
+    border: 0;
+    background: transparent;
+  }
+
+  .live-conversations .dsh-tab[data-state='active'] {
+    color: var(--primary);
+  }
+
+  .live-conversations .dsh-tab[data-state='active']::after {
+    background: var(--primary);
+  }
+
+  .live-conversations .dsh-composer-input {
+    background-image: none;
+  }
+
+  .live-conversations .conversation-item {
+    height: auto;
+    justify-content: start;
+    text-align: left;
+  }
+
+  .live-conversations .conversation-item .conversation-summary,
+  .live-conversations .dsh-title-text {
+    min-width: 0;
+  }
+
+  .live-conversations .dsh-plain-text pre {
+    overflow: auto;
+    padding: calc(var(--spacing) * 2);
+    background: var(--muted);
+  }
+
+  @media (width > 700px) {
+    .live-conversations .dsh-room-toggle,
+    .live-conversations .mobile-rooms-backdrop,
+    .live-conversations .conv-tools [aria-label='收起会话列表'] {
+      position: absolute;
+      visibility: hidden;
+    }
+  }
+}

@@ -149,3 +149,7 @@ Dialog
 - 间距：分组 24px、组内 16px；控件高 36px、文本域 88–120px；桌面宽 720px，窄屏左右 16px。
 - 状态：loading/empty/no-match/error/read-only/pending 必须齐全；只读时保留已填内容并说明原因。
 - 参考实现：`features/requirements/ui/requirement-form.tsx`、`features/bugs/ui/bug-form.tsx`。
+
+## 协作会话
+
+桌面沿用原型的会话侧栏、会话标题、页签和正文。窄屏将会话列表收进抽屉。通过智能体详情打开私聊时，当前会话写入 URL，刷新后继续展示同一会话。消息按会话序号排序并可向上加载历史，模型输出与普通用户消息使用原型中的独立版式。
