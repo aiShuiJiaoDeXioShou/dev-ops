@@ -12,8 +12,8 @@ import type { SessionUser } from '../identity/identity.session.ts'
 import { teamMember } from '../identity/identity.tables.ts'
 import { readBotInbox } from './bot-inbox.read.ts'
 import { readTaskReviews, reviewBotTask } from './bot-tasks.review.service.ts'
-import type { AppendBotTaskInput, CreateBotTaskInput, TaskTraceView } from './bot-tasks.schema.ts'
-import { botTask, botTaskInput } from './bot-tasks.tables.ts'
+import type { AppendBotTaskInput, BotTaskHandoffInput, CreateBotTaskInput, TaskTraceView } from './bot-tasks.schema.ts'
+import { botTask, botTaskHandoff, botTaskInput } from './bot-tasks.tables.ts'
 import { botTaskView, taskRunView } from './bot-tasks.view.ts'
 
 const TASK_PAGE_SIZE = 30
@@ -56,6 +56,7 @@ async function activeTaskRuns(tx: BotRunTransaction, row: TaskRow) {
     )
     .orderBy(asc(botRun.id))
     .limit(20)
+    .for('update')
 }
 
 async function enqueueTask(tx: BotRunTransaction, row: TaskRow, actor: SessionUser) {
@@ -233,7 +234,7 @@ export function createBotTasksService(db: Database) {
       const row = await taskRowFor(db, taskId)
       const room = await requireBotConversation(db, actor, row.conversation_id)
       if (room.team_id !== row.team_id) taskMissing()
-      const [inputs, runs] = await Promise.all([
+      const [inputs, runs, handoffs] = await Promise.all([
         db
           .select()
           .from(botTaskInput)
@@ -246,6 +247,12 @@ export function createBotTasksService(db: Database) {
           .where(and(eq(botRun.team_id, row.team_id), eq(botRun.task_id, row.id)))
           .orderBy(desc(botRun.created_at), desc(botRun.id))
           .limit(50),
+        db
+          .select()
+          .from(botTaskHandoff)
+          .where(and(eq(botTaskHandoff.team_id, row.team_id), eq(botTaskHandoff.task_id, row.id)))
+          .orderBy(desc(botTaskHandoff.created_at), desc(botTaskHandoff.id))
+          .limit(50),
       ])
       return {
         ...botTaskView(row),
@@ -257,6 +264,16 @@ export function createBotTasksService(db: Database) {
           createdAt: created_at.toISOString(),
         })),
         runs: runs.map(taskRunView),
+        handoffs: handoffs.map((item) => ({
+          id: item.id,
+          fromBotId: item.from_bot_id,
+          toBotId: item.to_bot_id,
+          reason: item.reason,
+          summary: item.summary,
+          unfinished: item.unfinished,
+          createdAt: item.created_at.toISOString(),
+          createdBy: item.created_by,
+        })),
         ...(await readTaskReviews(db, row)),
         trace: await loadTaskTrace(
           db,
@@ -288,6 +305,67 @@ export function createBotTasksService(db: Database) {
           created_by: actor.id,
         })
         return botTaskView(updated)
+      })
+    },
+    /** 转交给会话内可用的另一位智能体，同时追加交接和新输入。 */
+    async handoff(actor: SessionUser, taskId: string, input: BotTaskHandoffInput) {
+      const reason = redactChatContent(input.reason.trim())
+      const summary = redactChatContent(input.summary.trim())
+      const unfinished = redactChatContent(input.unfinished.trim())
+      if (!reason || !summary) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '请输入转交原因和交接摘要')
+      return db.transaction(async (tx) => {
+        const { row, room } = await taskInWritableConversation(tx, actor, taskId)
+        compareVersion(row, input.version)
+        if (!['pending', 'waiting', 'in_progress'].includes(row.status)) stateConflict('任务当前阶段不可转交')
+        if (row.executor_bot_id === input.toBotId)
+          throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '请选择另一位执行者')
+        const [receiver] = await tx
+          .select({ id: botConversationMember.id })
+          .from(botConversationMember)
+          .where(
+            and(
+              eq(botConversationMember.team_id, room.team_id),
+              eq(botConversationMember.conversation_id, room.id),
+              eq(botConversationMember.member_kind, 'bot'),
+              eq(botConversationMember.member_id, input.toBotId),
+              isNull(botConversationMember.removed_at),
+            ),
+          )
+        if (!receiver) throw new ApiError(ERROR_CODES.BOT_NOT_FOUND, '执行者须是当前会话成员')
+        await requireRunnableBot(tx, room.team_id, input.toBotId)
+        for (const run of await activeTaskRuns(tx, row)) await requestBotRunStop(tx, run.id, actor.id, false)
+        const [updated] = await tx
+          .update(botTask)
+          .set({
+            executor_bot_id: input.toBotId,
+            status: 'pending',
+            wait_reason: null,
+            blocked: false,
+            input_version: row.input_version + 1,
+            version: row.version + 1,
+            updated_at: sql`clock_timestamp()`,
+          })
+          .where(and(eq(botTask.id, row.id), eq(botTask.team_id, row.team_id), eq(botTask.version, input.version)))
+          .returning()
+        if (!updated) stateConflict('任务状态已变化，请刷新后重试')
+        await tx.insert(botTaskHandoff).values({
+          team_id: row.team_id,
+          task_id: row.id,
+          from_bot_id: row.executor_bot_id,
+          to_bot_id: input.toBotId,
+          reason,
+          summary,
+          unfinished,
+          created_by: actor.id,
+        })
+        await tx.insert(botTaskInput).values({
+          team_id: row.team_id,
+          task_id: row.id,
+          input_version: updated.input_version,
+          content: `转交原因：${reason}\n交接摘要：${summary}\n未完成事项：${unfinished}`,
+          created_by: actor.id,
+        })
+        return enqueueTask(tx, updated, actor)
       })
     },
     /** 让等待中的任务使用当前输入版本进入队列，已有运行时拒绝重复入队。 */

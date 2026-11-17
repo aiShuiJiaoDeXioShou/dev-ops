@@ -91,6 +91,16 @@ export const taskCreateBody = Type.Object(
   },
   { additionalProperties: false },
 )
+export const taskHandoffBody = Type.Object(
+  {
+    version,
+    toBotId: id,
+    reason: Type.String({ minLength: 1, maxLength: 4000 }),
+    summary: Type.String({ minLength: 1, maxLength: 8000 }),
+    unfinished: Type.String({ maxLength: 8000 }),
+  },
+  { additionalProperties: false },
+)
 export const taskAppendBody = Type.Object(
   { version, content: Type.String({ minLength: 1, maxLength: 16000 }) },
   { additionalProperties: false },
@@ -108,6 +118,18 @@ export const taskDetailResponse = apiResponseSchema(
     trace: Type.Array(trace),
     results: Type.Array(taskResultSchema),
     reviews: Type.Array(taskReviewSchema),
+    handoffs: Type.Array(
+      Type.Object({
+        id,
+        fromBotId: id,
+        toBotId: id,
+        reason: Type.String(),
+        summary: Type.String(),
+        unfinished: Type.String(),
+        createdAt: Type.String(),
+        createdBy: id,
+      }),
+    ),
   }),
 )
 export const taskResponse = apiResponseSchema(task)
@@ -119,3 +141,4 @@ export type TaskRunView = Static<typeof run>
 export type TaskTraceView = Static<typeof trace>
 export type CreateBotTaskInput = Static<typeof taskCreateBody>
 export type AppendBotTaskInput = Static<typeof taskAppendBody>
+export type BotTaskHandoffInput = Static<typeof taskHandoffBody>

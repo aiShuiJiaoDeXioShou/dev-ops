@@ -36,6 +36,7 @@ import { botsRoutes } from '../modules/bots/bots.routes.ts'
 import { botConnectionsRoutes } from '../modules/bots/bots.connections.routes.ts'
 import { botConversationsRoutes } from '../modules/collaboration/bot-conversations.routes.ts'
 import { createBotConversationsService } from '../modules/collaboration/bot-conversations.service.ts'
+import { createBotGroupsService } from '../modules/collaboration/bot-groups.service.ts'
 import { botTaskRoutes } from '../modules/tasks/bot-tasks.routes.ts'
 import { createBotTasksService } from '../modules/tasks/bot-tasks.service.ts'
 import { createBotConnectionsService } from '../modules/bots/bots.connections.service.ts'
@@ -147,6 +148,7 @@ export function createHttpApp(
   app.register(botConversationsRoutes, {
     prefix: '/api/v1',
     service: createBotConversationsService(services.database.db),
+    groups: createBotGroupsService(services.database.db),
   })
   app.register(botTaskRoutes, { prefix: '/api/v1', service: createBotTasksService(services.database.db) })
   app.register(healthRoutes, { prefix: '/api/v1', checkDatabase: services.database.check })

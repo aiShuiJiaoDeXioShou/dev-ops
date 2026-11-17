@@ -10,6 +10,7 @@ import {
   taskAppendBody,
   taskCreateBody,
   taskDetailResponse,
+  taskHandoffBody,
   taskListQuery,
   taskListResponse,
   taskParams,
@@ -76,6 +77,22 @@ export const botTaskRoutes: FastifyPluginAsyncTypebox<{ service: BotTasksService
     },
     async (request) =>
       success(await service.append(await requireActor(request), request.params.taskId, request.body), request.id),
+  )
+  app.post(
+    '/bot-tasks/:taskId/handoff',
+    {
+      schema: {
+        summary: '转交任务给会话中可用的智能体',
+        params: taskParams,
+        body: taskHandoffBody,
+        response: { 200: taskRunResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.handoff(await requireSessionActor(request, '转交任务'), request.params.taskId, request.body),
+        request.id,
+      ),
   )
   app.post(
     '/bot-tasks/:taskId/rerun',

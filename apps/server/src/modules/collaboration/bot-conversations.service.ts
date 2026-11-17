@@ -131,6 +131,25 @@ async function readMembers(db: ReadDb, conversation: ConversationRow): Promise<C
   })
 }
 
+/**
+ * 将已获授权的会话与成员关系组装为公开详情。
+ * @param db 数据库或当前事务。
+ * @param row 业务用例已校验的会话。
+ * @returns 当前成员与会话配置。
+ */
+export async function readBotConversationView(db: ReadDb, row: ConversationRow) {
+  return { ...viewOf(row), members: await readMembers(db, row) }
+}
+
+function mentionedBotNames(text: string, members: ConversationMemberView[]): string[] {
+  return members.flatMap(({ id, name, kind }) => {
+    if (kind !== 'bot') return []
+    const safeName = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+    const pattern = new RegExp(`(?:^|\\s)@${safeName}(?=$|[\\s，。,.!?；;:：、！？])`, 'iu')
+    return pattern.test(text) ? [id] : []
+  })
+}
+
 function membershipQuery(db: ReadDb, actor: SessionUser) {
   return db
     .select({ row: botConversation, role: teamMember.role })
@@ -267,7 +286,7 @@ export function createBotConversationsService(db: Database) {
             ),
           )
           .limit(1)
-        if (existing) return { ...viewOf(existing.row), members: await readMembers(tx, existing.row) }
+        if (existing) return readBotConversationView(tx, existing.row)
         const [created] = await tx
           .insert(botConversation)
           .values({
@@ -288,13 +307,13 @@ export function createBotConversationsService(db: Database) {
           },
           { team_id: teamId, conversation_id: created.id, member_kind: 'bot', member_id: botId, added_by: actor.id },
         ])
-        return { ...viewOf(created), members: await readMembers(tx, created) }
+        return readBotConversationView(tx, created)
       })
     },
     /** 读取会话与当前成员。 */
     async get(actor: SessionUser, conversationId: string) {
       const row = await requireBotConversation(db, actor, conversationId)
-      return { ...viewOf(row), members: await readMembers(db, row) }
+      return readBotConversationView(db, row)
     },
     /** 按序号读取消息并返回更早一页的游标。 */
     async messages(actor: SessionUser, conversationId: string, before?: string, limit = 50) {
@@ -347,14 +366,32 @@ export function createBotConversationsService(db: Database) {
           return { message, runId: same.run_id }
         }
         const members = await readMembers(tx, conversation)
+        const mentioned = new Set(input.mentionBotId ? [input.mentionBotId] : [])
+        if (conversation.kind === 'group') {
+          for (const id of mentionedBotNames(text, members)) mentioned.add(id)
+        }
+        if (mentioned.size > 1) throw new ApiError(ERROR_CODES.BOT_MENTION_AMBIGUOUS, '每条消息只能指定一个智能体')
+        const explicit = [...mentioned][0]
         const targetId =
-          input.mentionBotId ??
+          explicit ??
           (conversation.kind === 'group' ? conversation.leader_bot_id : members.find(({ kind }) => kind === 'bot')?.id)
         if (!targetId) throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '没有可用的智能体承接这条消息')
         if (!members.some((member) => member.kind === 'bot' && member.id === targetId)) {
           throw new ApiError(ERROR_CODES.BOT_NOT_FOUND, '引用的智能体不是当前会话成员')
         }
-        await requireRunnableBot(tx, conversation.team_id, targetId)
+        try {
+          await requireRunnableBot(tx, conversation.team_id, targetId)
+        } catch (error) {
+          if (
+            !explicit &&
+            conversation.kind === 'group' &&
+            error instanceof ApiError &&
+            error.code === ERROR_CODES.BOT_UNAVAILABLE
+          ) {
+            throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '当前 Leader 无法承接，请 @ 一个可用的智能体')
+          }
+          throw error
+        }
         if (input.skillIds?.length) {
           const skills = await tx
             .select({ id: skill.id })

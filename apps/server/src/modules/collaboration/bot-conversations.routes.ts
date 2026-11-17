@@ -1,3 +1,4 @@
+import { Type } from 'typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
 import { requireActor } from '../identity/identity.actor.ts'
@@ -16,6 +17,8 @@ import {
   sendBotMessageBody,
 } from './bot-conversations.schema.ts'
 import type { BotConversationsService } from './bot-conversations.service.ts'
+import { botGroupMemberBody, createBotGroupBody, updateBotGroupBody } from './bot-groups.schema.ts'
+import type { BotGroupsService } from './bot-groups.service.ts'
 
 /**
  * 注册平台 Bot 私聊、消息与运行事件接口。
@@ -23,10 +26,10 @@ import type { BotConversationsService } from './bot-conversations.service.ts'
  * @param options 会话用例。
  * @returns 注册完成，访问范围由会话成员关系决定。
  */
-export const botConversationsRoutes: FastifyPluginAsyncTypebox<{ service: BotConversationsService }> = async (
-  app,
-  { service },
-) => {
+export const botConversationsRoutes: FastifyPluginAsyncTypebox<{
+  service: BotConversationsService
+  groups: BotGroupsService
+}> = async (app, { service, groups }) => {
   app.get(
     '/teams/:teamId/bot-conversations',
     {
@@ -44,18 +47,56 @@ export const botConversationsRoutes: FastifyPluginAsyncTypebox<{ service: BotCon
     '/teams/:teamId/bot-conversations',
     {
       schema: {
-        summary: '创建或打开 Bot 私聊',
+        summary: '创建 Bot 群组或打开私聊',
         params: conversationTeamParams,
-        body: createDirectConversationBody,
+        body: Type.Union([createDirectConversationBody, createBotGroupBody]),
+        response: { 200: conversationResponse },
+      },
+    },
+    async (request) => {
+      const actor = await requireActor(request)
+      const teamId = request.params.teamId
+      const data =
+        request.body.kind === 'direct'
+          ? await service.createDirect(actor, teamId, request.body.botId)
+          : await groups.create(actor, teamId, request.body)
+      return success(data, request.id)
+    },
+  )
+  app.post(
+    '/bot-conversations/:conversationId/update',
+    {
+      schema: {
+        summary: '更新 Bot 群组设置',
+        params: conversationParams,
+        body: updateBotGroupBody,
         response: { 200: conversationResponse },
       },
     },
     async (request) =>
       success(
-        await service.createDirect(await requireActor(request), request.params.teamId, request.body.botId),
+        await groups.update(await requireActor(request), request.params.conversationId, request.body),
         request.id,
       ),
   )
+  for (const action of ['add', 'remove'] as const) {
+    app.post(
+      `/bot-conversations/:conversationId/members/${action}`,
+      {
+        schema: {
+          summary: action === 'add' ? '添加 Bot 会话成员' : '移出 Bot 会话成员',
+          params: conversationParams,
+          body: botGroupMemberBody,
+          response: { 200: conversationResponse },
+        },
+      },
+      async (request) =>
+        success(
+          await groups[action](await requireActor(request), request.params.conversationId, request.body),
+          request.id,
+        ),
+    )
+  }
   app.get(
     '/bot-conversations/:conversationId',
     {
