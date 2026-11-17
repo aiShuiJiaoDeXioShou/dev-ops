@@ -427,3 +427,9 @@ packages/bots-client/  从 Bots OpenAPI 生成的客户端
 首批应保留有界执行步数、模型用量和运行时限。预算耗尽时保存检查点并明确任务阻塞；运行失败、节点离线和来源不可用均不得展示成功。生产动作进入平台具体变更计划，批准绑定版本、环境和操作参数，任务验收不能替代该授权。
 
 本文的需求和源码事实集中在第 2 章，第三方依据集中在第 3 章；其余章节为建议设计。评审首先收敛独立应用边界、运行时版本与能力实验、记忆生命周期及验收路径，再将第 10 章拆为具体开发任务。
+
+## V0.5.0 实现入口
+
+[HTTP 服务](../../apps/server/src/bootstrap/create-http-app.ts)负责团队、模型连接、会话、任务、标签与记忆接口，执行进程由 [Bot Worker](../../apps/server/src/bootstrap/create-bot-worker.ts)领取队列。运行期间以 PostgreSQL 租约代次处理停止和恢复，使用游标读取资源与运行事件。
+
+[平台接口目录](../../tooling/scripts/generate-bot-api-catalog.mjs)从注册路由的 OpenAPI 生成，内部调用按触发人的当前团队和资源权限执行。执行记录追踪来源、幂等键与状态。记忆使用 PostgreSQL `pg_trgm` 检索，常驻正文总预算为 4096 字节。每次领取运行保存已配置 Skills 的版本，`skill_view` 按需读当次可用的版本。

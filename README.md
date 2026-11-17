@@ -96,3 +96,7 @@ pnpm test:db
 `pnpm build` 只执行契约生成和全部构建。单独检查某个应用前先执行 `pnpm prepare:clients`；运行端到端测试 `pnpm test:e2e` 前先完成 `pnpm build`。
 
 后端配置和接口见[后端说明](apps/server/README.md)。PostgreSQL 默认监听 `127.0.0.1:5433`，部署配置位于 [deploy](deploy/README.md)，数据和迁移操作见[数据库说明](docs/architecture/database.md)。共享客户端与工程工具分别见 [API 客户端](packages/api-client/README.md)和[工程工具](tooling/README.md)。
+
+## V0.5.0 Bot 协作
+
+登录后从「协作」进入私聊、群组、任务和待处理，从「能力」维护智能体、Skills、长期记忆与模型连接。启动后端时同时运行 HTTP 服务、调度 Worker 和 [Bot 执行服务](apps/server/README.md#bot-执行服务)。它们共享 [PostgreSQL 迁移与数据](docs/architecture/database.md#v05-bot-协作)。

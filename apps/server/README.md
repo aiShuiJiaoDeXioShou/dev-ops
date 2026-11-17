@@ -312,3 +312,9 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 项目详情接口 `GET /api/v1/projects/:projectId` 返回 `workItemTemplates`。需求和 Bug 分别保存一套有序节点，未配置时采用系统默认节点。团队管理员和开发者可调用 `POST /api/v1/projects/:projectId/update`，提交当前 `version` 和 `workItemTemplate: { kind, nodes }`。每次请求只保存指定类型，节点格式为 `{ id, title }`。
 
 保留默认节点的标识与相对顺序。校验失败返回 `VALIDATION_ERROR`，项目版本不一致返回 `VERSION_CONFLICT`，都使用 HTTP 200 响应信封。创建需求或 Bug 时，在项目写锁内将对应模板复制到事项规划，日期为空、任务列表为空。已创建的事项独立保存节点、日期与任务。
+
+## V0.5 Bot 协作接口
+
+团队的 `/api/v1/teams/:teamId` 路径下提供 `bots`、`bot-model-connections`、`bot-model-catalog`、`bot-conversations`、`bot-inbox`、`work-tags` 和 `bot-memories`。会话、任务、运行写操作通过各自的动作路径提交，读取事件用 `GET /api/v1/bot-conversations/:conversationId/events?after=`。游标失效时响应包含 `resetRequired`，页面重新读取消息。排队中的运行返回团队队列位置 `teamQueuePosition`；执行服务离线时，`queueReason` 为 `worker_offline`，运行仍保留在队列。
+
+模型 API Key 由管理员保存在团队凭据库。使用本地 `.env` 的 `DEEPSEEK_API_KEY` 验收时，先构建工程，再从根目录运行 `DEVOPS_BOT_LIVE_TEST=1 node --test tests/e2e/bot-collaboration.test.mjs`。通过订阅登录连接模型时，授权由发起连接的管理员亲自完成。
