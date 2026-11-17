@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
+import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation } from '@tanstack/react-query'
-import { Plus, Send } from 'lucide-react'
+import { Plus, Send, Square } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
@@ -19,10 +20,12 @@ function stringWithMention(text: string, name: string) {
 export function ConversationComposer({
   room,
   readOnly,
+  runningId,
   onSent,
 }: {
   room: BotConversation
   readOnly: boolean
+  runningId?: string
   onSent: () => void
 }) {
   const [draft, setDraft] = useState('')
@@ -58,6 +61,10 @@ export function ConversationComposer({
       onSent()
       input.current?.focus()
     },
+  })
+  const stop = useMutation({
+    mutationFn: (runId: string) => apiClient.stopBotRun(runId, { idempotencyKey: createIdempotencyKey() }),
+    onSuccess: onSent,
   })
   const change = (value: string) => {
     setDraft(value)
@@ -127,6 +134,11 @@ export function ConversationComposer({
           {describeRequestError(send.error).description}
         </p>
       )}
+      {stop.isError && (
+        <p className="field-error" role="alert">
+          {describeRequestError(stop.error).description}
+        </p>
+      )}
       <div className="dsh-composer-bar">
         <Button
           type="button"
@@ -143,6 +155,18 @@ export function ConversationComposer({
           <Plus className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
         </Button>
         <span className="spacer" />
+        {runningId && (
+          <Button
+            type="button"
+            className="dsh-send dsh-stop"
+            size="icon"
+            aria-label="停止生成"
+            disabled={stop.isPending || stop.data?.data.id === runningId}
+            onClick={() => stop.mutate(runningId)}
+          >
+            <Square className="icon fill-current stroke-current" aria-hidden="true" />
+          </Button>
+        )}
         <Button
           type="submit"
           className="dsh-send"

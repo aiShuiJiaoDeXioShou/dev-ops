@@ -1,7 +1,10 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, Menu, MessagesSquare, Search, X } from 'lucide-react'
+import { Bot, ClipboardList, Menu, MessagesSquare, Search, X } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
+import { taskQueries } from '@/features/bot-tasks/api/queries'
+import { ConversationTaskPanel } from '@/features/bot-tasks/ui/conversation-task-panel'
+import { NewTaskDialog } from '@/features/bot-tasks/ui/new-task-dialog'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import {
   conversationEventsOptions,
@@ -31,18 +34,25 @@ const runStatuses: Record<string, string> = {
 
 function ConversationRoom({
   id,
+  userId,
   readOnly,
   listOpen,
   openList,
   listToggleRef,
 }: {
   id: string
+  userId: string
   readOnly: boolean
   listOpen: boolean
   openList: () => void
   listToggleRef: React.RefObject<HTMLButtonElement | null>
 }) {
   const client = useQueryClient()
+  const [taskPanelOpen, setTaskPanelOpen] = useState(false)
+  const [newTaskOpen, setNewTaskOpen] = useState(false)
+  const [taskId, setTaskId] = useState<string>()
+  const taskOpener = useRef<HTMLButtonElement>(null)
+  const newTaskOpener = useRef<HTMLElement>(null)
   const detail = useQuery(conversationOptions(id))
   const messages = useInfiniteQuery({ ...messagesOptions(id), enabled: detail.isSuccess })
   const events = useQuery({ ...conversationEventsOptions(client, id), enabled: detail.isSuccess })
@@ -56,6 +66,26 @@ function ConversationRoom({
   const activeRuns = new Map(events.data?.activeRuns.map((run) => [run.id, run]))
   const ongoingIds = new Set([...activeRuns.keys(), ...Object.keys(events.data?.progress ?? {})])
   const botMember = room?.members.find((member) => member.kind === 'bot')
+  useEffect(() => {
+    if (!taskPanelOpen || newTaskOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.key !== 'Escape' ||
+        document.querySelector('[role="dialog"], [role="alertdialog"]')
+      )
+        return
+      setTaskPanelOpen(false)
+      taskOpener.current?.focus()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [taskPanelOpen, newTaskOpen])
+  useEffect(() => {
+    if (events.data?.cursor && events.data.cursor !== '0' && taskPanelOpen) {
+      void client.invalidateQueries({ queryKey: taskQueries })
+    }
+  }, [client, events.data?.cursor, taskPanelOpen])
   if (detail.isPending) return <DelayedPageSkeleton />
   if (detail.isError)
     return <PageError title="会话加载失败" error={detail.error} onRetry={() => void detail.refetch()} />
@@ -88,145 +118,207 @@ function ConversationRoom({
     ]
   })
 
+  const closeTasks = () => {
+    setTaskPanelOpen(false)
+    taskOpener.current?.focus()
+  }
   return (
-    <Tabs className="conversation-main dsh-chat gap-0" defaultValue="chat" aria-label="当前会话">
-      <header className="dsh-chat-header">
-        <div className="dsh-title-row">
-          <Button
-            ref={listToggleRef}
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="dsh-icon-btn dsh-room-toggle"
-            aria-label="打开会话列表"
-            aria-expanded={listOpen}
-            aria-controls="team-conversations"
-            onClick={openList}
-          >
-            <Menu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-          </Button>
-          <div className="dsh-title">
-            <span className="dsh-title-avatar">
-              {botMember ? (
-                <BotAvatar botId={botMember.id} avatarKey={null} />
-              ) : (
-                <MessagesSquare className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-              )}
-            </span>
-            <span className="dsh-title-text">
-              <strong>{room.name}</strong>
-              <small>
-                {room.kind === 'direct' ? '智能体私聊' : '群组'} · {room.members.length} 位成员
-              </small>
-            </span>
-          </div>
-        </div>
-        <TabsList className="dsh-tabs w-auto gap-6 rounded-none bg-transparent p-0" aria-label="会话视图">
-          <TabsTrigger value="chat" variant="underline" className="dsh-tab">
-            对话
-          </TabsTrigger>
-          <TabsTrigger value="activity" variant="underline" className="dsh-tab">
-            轨迹
-          </TabsTrigger>
-          <TabsTrigger value="context" variant="underline" className="dsh-tab">
-            上下文
-          </TabsTrigger>
-          <TabsTrigger value="members" variant="underline" className="dsh-tab">
-            编队
-          </TabsTrigger>
-        </TabsList>
-      </header>
-      <TabsContent value="chat" className="dsh-scroll-area">
-        {messages.isPending && <DelayedPageSkeleton />}
-        {messages.isError && (
-          <PageError title="消息加载失败" error={messages.error} onRetry={() => void messages.refetch()} />
-        )}
-        {messages.isSuccess && (
-          <ConversationMessages
-            items={[...items, ...ongoing]}
-            roomName={room.name}
-            hasEarlier={messages.hasNextPage}
-            loadingEarlier={messages.isFetchingNextPage}
-            loadEarlier={() => void messages.fetchNextPage()}
-          />
-        )}
-        {events.isError && (
-          <div className="row dsh-readonly-note" role="status">
-            运行状态更新失败
-            <Button variant="ghost" type="button" onClick={() => void events.refetch()}>
-              重试
+    <>
+      <Tabs className="conversation-main dsh-chat gap-0" defaultValue="chat" aria-label="当前会话">
+        <header className="dsh-chat-header">
+          <div className="dsh-title-row">
+            <Button
+              ref={listToggleRef}
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="dsh-icon-btn dsh-room-toggle"
+              aria-label="打开会话列表"
+              aria-expanded={listOpen}
+              aria-controls="team-conversations"
+              onClick={openList}
+            >
+              <Menu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
             </Button>
+            <div className="dsh-title">
+              <span className="dsh-title-avatar">
+                {botMember ? (
+                  <BotAvatar botId={botMember.id} avatarKey={null} />
+                ) : (
+                  <MessagesSquare className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                )}
+              </span>
+              <span className="dsh-title-text">
+                <strong>{room.name}</strong>
+                <small>
+                  {room.kind === 'direct' ? '智能体私聊' : '群组'} · {room.members.length} 位成员
+                </small>
+              </span>
+            </div>
+            <div className="dsh-title-actions">
+              <Button
+                ref={taskOpener}
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="dsh-icon-btn"
+                aria-label="任务列表"
+                aria-pressed={taskPanelOpen}
+                onClick={() => (taskPanelOpen ? closeTasks() : setTaskPanelOpen(true))}
+              >
+                <ClipboardList className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+              </Button>
+            </div>
           </div>
-        )}
-        <ConversationComposer
-          room={room}
-          readOnly={readOnly}
-          onSent={() => {
-            void Promise.all([
-              client.invalidateQueries({ queryKey: messagesOptions(id).queryKey }),
-              client.invalidateQueries({ queryKey: conversationsQueryKey }),
-              events.refetch(),
-            ])
-          }}
-        />
-      </TabsContent>
-      <TabsContent value="activity" className="dsh-tab-panel">
-        <div className="dsh-panel-scroll">
-          {events.data?.activity.length ? (
-            <ul className="tool-results">
-              {events.data.activity.map((entry) => (
-                <li key={entry.sequence} className="tool-result-card">
-                  <time dateTime={entry.createdAt}>{clock.format(new Date(entry.createdAt))}</time>
-                  <strong>工具活动</strong>
+          <TabsList className="dsh-tabs w-auto gap-6 rounded-none bg-transparent p-0" aria-label="会话视图">
+            <TabsTrigger value="chat" variant="underline" className="dsh-tab">
+              对话
+            </TabsTrigger>
+            <TabsTrigger value="activity" variant="underline" className="dsh-tab">
+              轨迹
+            </TabsTrigger>
+            <TabsTrigger value="context" variant="underline" className="dsh-tab">
+              上下文
+            </TabsTrigger>
+            <TabsTrigger value="members" variant="underline" className="dsh-tab">
+              编队
+            </TabsTrigger>
+          </TabsList>
+        </header>
+        <TabsContent value="chat" className="dsh-scroll-area">
+          {messages.isPending && <DelayedPageSkeleton />}
+          {messages.isError && (
+            <PageError title="消息加载失败" error={messages.error} onRetry={() => void messages.refetch()} />
+          )}
+          {messages.isSuccess && (
+            <ConversationMessages
+              items={[...items, ...ongoing]}
+              roomName={room.name}
+              hasEarlier={messages.hasNextPage}
+              loadingEarlier={messages.isFetchingNextPage}
+              loadEarlier={() => void messages.fetchNextPage()}
+            />
+          )}
+          {events.isError && (
+            <div className="row dsh-readonly-note" role="status">
+              运行状态更新失败
+              <Button variant="ghost" type="button" onClick={() => void events.refetch()}>
+                重试
+              </Button>
+            </div>
+          )}
+          <ConversationComposer
+            room={room}
+            readOnly={readOnly}
+            runningId={events.data?.activeRuns.find((run) => run.status === 'running')?.id}
+            onSent={() => {
+              void Promise.all([
+                client.invalidateQueries({ queryKey: messagesOptions(id).queryKey }),
+                client.invalidateQueries({ queryKey: conversationsQueryKey }),
+                events.refetch(),
+              ])
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="activity" className="dsh-tab-panel">
+          <div className="dsh-panel-scroll">
+            {events.data?.activity.length ? (
+              <ul className="tool-results">
+                {events.data.activity.map((entry) => (
+                  <li key={entry.sequence} className="tool-result-card">
+                    <time dateTime={entry.createdAt}>{clock.format(new Date(entry.createdAt))}</time>
+                    <strong>工具活动</strong>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="暂无执行轨迹" />
+            )}
+          </div>
+        </TabsContent>
+        <TabsContent value="context" className="dsh-tab-panel">
+          <div className="dsh-panel-scroll">
+            {room.responsibility || room.instructions ? (
+              <dl className="work-properties">
+                {room.responsibility && (
+                  <div>
+                    <dt>职责</dt>
+                    <dd>{room.responsibility}</dd>
+                  </div>
+                )}
+                {room.instructions && (
+                  <div>
+                    <dt>指令</dt>
+                    <dd>{room.instructions}</dd>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <EmptyState title="暂无会话上下文" />
+            )}
+          </div>
+        </TabsContent>
+        <TabsContent value="members" className="dsh-tab-panel">
+          <div className="dsh-panel-scroll team-panel">
+            <ul className="team-members">
+              {room.members.map((member) => (
+                <li className="team-member" key={member.id}>
+                  <div className="team-main">
+                    <div className="team-name">{member.name}</div>
+                    <span className="team-role">{member.kind === 'bot' ? '智能体' : '成员'}</span>
+                  </div>
                 </li>
               ))}
             </ul>
-          ) : (
-            <EmptyState title="暂无执行轨迹" />
-          )}
-        </div>
-      </TabsContent>
-      <TabsContent value="context" className="dsh-tab-panel">
-        <div className="dsh-panel-scroll">
-          {room.responsibility || room.instructions ? (
-            <dl className="work-properties">
-              {room.responsibility && (
-                <div>
-                  <dt>职责</dt>
-                  <dd>{room.responsibility}</dd>
-                </div>
-              )}
-              {room.instructions && (
-                <div>
-                  <dt>指令</dt>
-                  <dd>{room.instructions}</dd>
-                </div>
-              )}
-            </dl>
-          ) : (
-            <EmptyState title="暂无会话上下文" />
-          )}
-        </div>
-      </TabsContent>
-      <TabsContent value="members" className="dsh-tab-panel">
-        <div className="dsh-panel-scroll team-panel">
-          <ul className="team-members">
-            {room.members.map((member) => (
-              <li className="team-member" key={member.id}>
-                <div className="team-main">
-                  <div className="team-name">{member.name}</div>
-                  <span className="team-role">{member.kind === 'bot' ? '智能体' : '成员'}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </TabsContent>
-    </Tabs>
+          </div>
+        </TabsContent>
+      </Tabs>
+      {taskPanelOpen && (
+        <ConversationTaskPanel
+          room={room}
+          taskId={taskId}
+          readOnly={readOnly}
+          onClose={closeTasks}
+          onNew={() => {
+            const active = document.activeElement
+            if (active instanceof HTMLElement) newTaskOpener.current = active
+            setNewTaskOpen(true)
+          }}
+          onSelect={setTaskId}
+          onChanged={() => void events.refetch()}
+        />
+      )}
+      {newTaskOpen && (
+        <NewTaskDialog
+          room={room}
+          userId={userId}
+          onClose={() => {
+            setNewTaskOpen(false)
+            requestAnimationFrame(() => newTaskOpener.current?.focus())
+          }}
+          onCreated={(createdTask) => {
+            setNewTaskOpen(false)
+            setTaskId(createdTask)
+            void client.invalidateQueries({ queryKey: taskQueries })
+            void events.refetch()
+          }}
+        />
+      )}
+    </>
   )
 }
 
-function TeamConversations({ teamId, id, readOnly }: { teamId: string; id?: string; readOnly: boolean }) {
+function TeamConversations({
+  teamId,
+  id,
+  userId,
+  readOnly,
+}: {
+  teamId: string
+  id?: string
+  userId: string
+  readOnly: boolean
+}) {
   const [filter, setFilter] = useState('')
   const [listOpen, setListOpen] = useState(false)
   const listToggleRef = useRef<HTMLButtonElement>(null)
@@ -330,6 +422,7 @@ function TeamConversations({ teamId, id, readOnly }: { teamId: string; id?: stri
         <ConversationRoom
           key={id}
           id={id}
+          userId={userId}
           readOnly={readOnly}
           listOpen={listOpen}
           openList={() => setListOpen(true)}
@@ -370,11 +463,17 @@ function TeamConversations({ teamId, id, readOnly }: { teamId: string; id?: stri
 
 /** 查看当前团队的协作会话及消息，切换团队时清理当前会话的本地交互状态。 */
 export function Component() {
-  const { currentTeam, role, isReady } = useSession()
+  const { currentTeam, user, role, isReady } = useSession()
   const { conversationId } = useParams()
   if (!isReady) return <DelayedPageSkeleton />
   if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
   return (
-    <TeamConversations key={currentTeam.id} teamId={currentTeam.id} id={conversationId} readOnly={role === 'viewer'} />
+    <TeamConversations
+      key={currentTeam.id}
+      teamId={currentTeam.id}
+      id={conversationId}
+      userId={user.id}
+      readOnly={role === 'viewer'}
+    />
   )
 }

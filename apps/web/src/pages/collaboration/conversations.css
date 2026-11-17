@@ -1,6 +1,7 @@
 @layer components {
   .live-conversations,
-  .live-conversations .conversation-list {
+  .live-conversations .conversation-list,
+  .live-conversations .work-task-panel {
     background: var(--background);
   }
 
