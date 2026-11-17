@@ -2060,7 +2060,7 @@ export function createApiClient(options: ApiClientOptions) {
         { ...options, query },
       )
     },
-    /** 创建或打开私聊。 */
+    /** 创建 Bot 群组或打开现有私聊。 */
     async createBotConversation(
       teamId: string,
       body: ApiBody<'/api/v1/teams/{teamId}/bot-conversations', 'post'>,
@@ -2068,6 +2068,33 @@ export function createApiClient(options: ApiClientOptions) {
     ) {
       return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-conversations', 'post'>>(
         `/api/v1/teams/${segment(teamId)}/bot-conversations`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 更新群组名称、Leader、职责和指令。 */
+    async updateBotConversation(
+      conversationId: string,
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/update', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 添加或移出一位群组成员，返回更新后的会话。 */
+    async updateBotConversationMember(
+      conversationId: string,
+      action: 'add' | 'remove',
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/members/add', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/members/add', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/members/${action}`,
         'POST',
         body,
         options,
@@ -2164,6 +2191,19 @@ export function createApiClient(options: ApiClientOptions) {
     ) {
       return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/append', 'post'>>(
         `/api/v1/bot-tasks/${segment(taskId)}/append`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /** 将任务转交给另一位会话内智能体。 */
+    async handoffBotTask(
+      taskId: string,
+      body: ApiBody<'/api/v1/bot-tasks/{taskId}/handoff', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/handoff', 'post'>>(
+        `/api/v1/bot-tasks/${segment(taskId)}/handoff`,
         'POST',
         body,
         options,
