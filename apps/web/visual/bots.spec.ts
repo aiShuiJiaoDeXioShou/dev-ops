@@ -9,7 +9,7 @@ function success(data: unknown) {
   return { success: true, code: 'OK', message: 'OK', requestId: 'bot-visual-test', data }
 }
 
-test('[desktop] [mobile] 智能体目录创建、刷新、详情和停用', async ({ page }, testInfo) => {
+test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情和停用', async ({ page }, testInfo) => {
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
   const fixtureId = 'da55aa00-0000-4000-8000-000000000011'
@@ -32,8 +32,46 @@ test('[desktop] [mobile] 智能体目录创建、刷新、详情和停用', asyn
     updatedAt: '2026-11-17T08:00:00.000Z',
     lastActiveAt: null,
   }
+  const room = {
+    id: 'da55aa00-0000-4000-8000-000000000012',
+    teamId,
+    kind: 'direct',
+    name: fixture.name,
+    responsibility: '',
+    instructions: '',
+    leaderBotId: null,
+    lastMessageAt: fixture.updatedAt,
+    members: [
+      { kind: 'bot', id: fixture.id, name: fixture.name, responsibility: fixture.responsibility },
+      { kind: 'user', id: userId, name: '负责人' },
+    ],
+    tags: [],
+    skillReferences: [],
+  } satisfies ApiSuccessData<'/api/v1/bot-conversations/{conversationId}', 'get'>
   let exists = false
   let writes = 0
+  let hasConversation = false
+  await page.route(`**/api/v1/teams/${teamId}/bot-inbox`, (route) =>
+    route.fulfill({ json: success({ items: [], count: 0 }) }),
+  )
+  await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) => {
+    if (route.request().method() === 'POST') {
+      expect(route.request().postDataJSON()).toEqual({ kind: 'direct', botId: fixtureId })
+      hasConversation = true
+      return route.fulfill({ json: success(room) })
+    }
+    const item = { ...room, botAvatars: [{ id: fixtureId, avatarKey: null, enabled: true }], lastMessagePreview: null }
+    return route.fulfill({ json: success({ items: hasConversation ? [item] : [], nextCursor: null }) })
+  })
+  const roomPath = `**/api/v1/bot-conversations/${room.id}`
+  await page.route(roomPath, (route) => route.fulfill({ json: success(room) }))
+  await page.route(`${roomPath}/messages*`, (route) =>
+    route.fulfill({ json: success({ items: [], nextBefore: null }) }),
+  )
+  await page.route(`${roomPath}/events*`, (route) =>
+    route.fulfill({ json: success({ items: [], cursor: '0', resetRequired: false, activeRuns: [] }) }),
+  )
+  await page.route(`${roomPath}/tasks*`, (route) => route.fulfill({ json: success({ items: [], nextCursor: null }) }))
   await page.route(`**/api/v1/teams/${teamId}/members`, (route) =>
     route.fulfill({
       json: success([
@@ -74,7 +112,9 @@ test('[desktop] [mobile] 智能体目录创建、刷新、详情和停用', asyn
     return route.fulfill({ json: success(fixture) })
   })
 
-  await page.goto('/capabilities/bots')
+  await page.goto('/collaboration')
+  await expect(page.getByRole('heading', { name: '还没有会话' })).toBeVisible({ timeout: 15_000 })
+  await page.getByRole('link', { name: '查看智能体' }).click()
   await expect(page.getByRole('tab', { name: '全部智能体' })).toBeVisible()
   const create = page.getByRole('button', { name: '创建智能体' })
   await create.click()
@@ -88,6 +128,29 @@ test('[desktop] [mobile] 智能体目录创建、刷新、详情和停用', asyn
   await form.getByRole('button', { name: '创建智能体', exact: true }).click()
   await expect(page.getByRole('link', { name: `查看${fixture.name}详情` })).toBeVisible()
   expect(writes).toBe(1)
+  await page.getByRole('link', { name: `查看${fixture.name}详情` }).click()
+  // 缓存中仍是刚离开的空列表，私聊成功后必须在下一次轮询前更新。
+  await page.getByRole('button', { name: '打开对话' }).click()
+  const chat = page.getByRole('tabpanel', { name: '对话' })
+  const intro = chat.getByRole('heading', { name: fixture.name })
+  const scroll = chat.locator('.dsh-chat-scroll')
+  await expect(intro).toBeVisible()
+  const messageArea = await scroll.boundingBox()
+  const welcome = await chat.locator('.dsh-hero').boundingBox()
+  const title = await intro.boundingBox()
+  if (!messageArea || !welcome || !title) throw new Error('未找到空会话布局')
+  expect(Math.abs(welcome.y + welcome.height / 2 - (messageArea.y + messageArea.height / 2))).toBeLessThan(2)
+  expect(Math.abs(title.x + title.width / 2 - (messageArea.x + messageArea.width / 2))).toBeLessThan(2)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).click()
+  const roomItem = page
+    .getByRole('complementary', { name: '会话列表' })
+    .getByRole('button', { name: `${fixture.name} 还没有消息` })
+  await expect(roomItem).toHaveAttribute('aria-pressed', 'true', { timeout: 4000 })
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '收起会话列表' }).click()
+  await page.screenshot({ path: testInfo.outputPath('bot-direct-empty.png'), animations: 'disabled' })
+  await page.goBack()
+  await page.goBack()
   await page.reload()
   await expect(page.getByRole('link', { name: `查看${fixture.name}详情` })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('bot-list.png') })

@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/t
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
+import { conversationOptions, conversationsQueryKey } from '@/features/conversations/api/queries'
 import { skillListQueryOptions } from '@/features/knowledge/api/queries'
 import { botDetailQueryOptions, botQueryKey, botRunsQueryOptions, type BotRunView } from '../api/queries'
 import { BotAvatar } from './bot-avatar'
@@ -128,7 +129,11 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
   const openConversation = useMutation({
     mutationFn: () =>
       apiClient.createBotConversation(teamId, { kind: 'direct', botId }, { idempotencyKey: createIdempotencyKey() }),
-    onSuccess: ({ data }) => void navigate(`/collaboration/${data.id}`),
+    onSuccess: async (response) => {
+      queryClient.setQueryData(conversationOptions(response.data.id).queryKey, response)
+      await queryClient.invalidateQueries({ queryKey: [...conversationsQueryKey, teamId], refetchType: 'none' })
+      void navigate(`/collaboration/${response.data.id}`)
+    },
     onError: (error) => showToast(describeRequestError(error).description, 'error'),
   })
   const skillQuery = useQuery({
@@ -307,7 +312,7 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
                 onClick={() => openConversation.mutate()}
               >
                 <MessageSquare className="size-4" aria-hidden="true" />
-                打开对话
+                {openConversation.isPending ? '正在打开…' : '打开对话'}
               </Button>
               <Button
                 type="button"

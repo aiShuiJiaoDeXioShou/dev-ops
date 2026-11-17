@@ -101,6 +101,21 @@
     display: none;
   }
 
+  .live-conversations .dsh-chat-scroll.is-empty {
+    display: flex;
+    flex-direction: column;
+    padding-block: 16px;
+  }
+
+  .live-conversations .dsh-chat-scroll.is-empty .dsh-hero {
+    width: 100%;
+    margin: auto;
+    padding: 0;
+    align-items: center;
+    text-align: center;
+    overflow-wrap: anywhere;
+  }
+
   .live-conversations .dsh-tabs-row {
     display: flex;
     align-items: end;

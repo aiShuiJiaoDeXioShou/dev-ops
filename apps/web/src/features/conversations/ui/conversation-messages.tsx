@@ -81,6 +81,7 @@ export function ConversationMessages({
   const follow = useRef(true)
   const historyOffset = useRef<number | null>(null)
   const last = items.at(-1)
+  const isEmpty = !last && !hasEarlier
 
   useLayoutEffect(() => {
     const box = scrollBox.current
@@ -88,12 +89,12 @@ export function ConversationMessages({
     if (historyOffset.current !== null && !loadingEarlier) {
       box.scrollTop = box.scrollHeight - historyOffset.current
       historyOffset.current = null
-    } else if (follow.current) box.scrollTop = box.scrollHeight
+    } else if (follow.current && last?.id) box.scrollTop = box.scrollHeight
   }, [items.length, last?.id, last?.text, last?.status, loadingEarlier, isVisible])
 
   return (
     <div
-      className="dsh-chat-scroll"
+      className={cn('dsh-chat-scroll', isEmpty && 'is-empty')}
       ref={scrollBox}
       onScroll={(event) => {
         const box = event.currentTarget
