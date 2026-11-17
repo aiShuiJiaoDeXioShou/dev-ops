@@ -1,0 +1,129 @@
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import { test } from 'node:test'
+import { and, eq, lte } from 'drizzle-orm'
+import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
+import { publishBotModelCatalog } from '../../src/modules/bots/bots.catalog.ts'
+import { claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { createPgRunSink } from '../../src/modules/bots/runtime/run-sink.ts'
+import { botEvent } from '../../src/modules/collaboration/bot-conversations.tables.ts'
+import { platformAdmin, teamMember } from '../../src/modules/identity/identity.tables.ts'
+import { createBotTestDatabase } from '../support/bot-database.ts'
+import { seedKnowledgeFixture } from '../support/knowledge-fixtures.ts'
+
+test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增量读取', async (t) => {
+  const { db, config, cleanup } = await createBotTestDatabase(t)
+  const app = createHttpApp({ ...config, GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 23).toString('base64') })
+  cleanup.push(() => app.close())
+  const { adminUser, devUser, viewerUser, otherUser, teamId } = await seedKnowledgeFixture(app)
+  const teamPath = `/api/v1/teams/${teamId}`
+  async function get(url: string, user: { cookie: string }) {
+    const response = await app.inject({ url, headers: { cookie: user.cookie } })
+    assert.equal(response.statusCode, 200)
+    return response.json()
+  }
+  async function post(url: string, user: { cookie: string }, payload: object, key = randomUUID()) {
+    const response = await app.inject({
+      url,
+      payload,
+      method: 'POST',
+      headers: { cookie: user.cookie, 'idempotency-key': key },
+    })
+    assert.equal(response.statusCode, 200)
+    return response.json()
+  }
+
+  await publishBotModelCatalog(db, [
+    {
+      providerId: 'fixture',
+      modelId: 'test-chat',
+      displayName: '测试模型',
+      authTypes: ['api_key'],
+      contextWindow: 8192,
+    },
+  ])
+  const created = await post(`${teamPath}/bots`, devUser, {
+    name: '协作助理',
+    responsibility: '测试私聊',
+    ownerUserId: devUser.userId,
+  })
+  assert.equal(created.code, 'OK', created.message)
+  const botId = String(created.data.id)
+  const connection = await post(`${teamPath}/bot-model-connections`, adminUser, {
+    name: '测试连接',
+    providerId: 'fixture',
+    apiKey: 'fixture-only',
+  })
+  assert.equal(connection.code, 'OK', connection.message)
+  const binding = await post(`/api/v1/bots/${botId}/bind-model`, adminUser, {
+    configVersion: 1,
+    connectionId: connection.data.id,
+    modelId: 'test-chat',
+  })
+  assert.equal(binding.code, 'OK', binding.message)
+
+  const listPath = `${teamPath}/bot-conversations`
+  const input = { kind: 'direct', botId }
+  assert.equal((await post(listPath, viewerUser, input)).code, 'FORBIDDEN')
+  const [opened, repeated] = await Promise.all([post(listPath, devUser, input), post(listPath, devUser, input)])
+  assert.equal(opened.code, 'OK', opened.message)
+  assert.equal(repeated.data.id, opened.data.id)
+  const roomId = String(opened.data.id)
+  const roomPath = `/api/v1/bot-conversations/${roomId}`
+  assert.equal((await get(listPath, devUser)).data.items.length, 1)
+  assert.equal((await get(roomPath, adminUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
+  await db.insert(platformAdmin).values({ user_id: otherUser.userId })
+  assert.equal((await get(roomPath, otherUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
+
+  const messagePath = `${roomPath}/messages`
+  const message = { text: '第一条消息', clientRequestId: randomUUID() }
+  const [first, duplicate] = await Promise.all([
+    post(messagePath, devUser, message, message.clientRequestId),
+    post(messagePath, devUser, message, message.clientRequestId),
+  ])
+  assert.equal(first.code, 'OK', first.message)
+  assert.equal(first.data.runId, duplicate.data.runId)
+  assert.equal((await post(messagePath, devUser, { ...message, mentionBotId: botId })).code, 'IDEMPOTENCY_CONFLICT')
+  assert.equal(
+    (await post(messagePath, devUser, { ...message, clientRequestId: randomUUID(), mentionBotId: randomUUID() })).code,
+    'BOT_NOT_FOUND',
+  )
+  const second = await post(messagePath, devUser, { text: '第二条消息', clientRequestId: randomUUID() })
+  assert.equal(second.code, 'OK')
+  const page = await get(`${messagePath}?limit=1`, devUser)
+  assert.equal(page.data.items[0].id, second.data.message.id)
+  assert.equal(
+    (await get(`${messagePath}?before=${page.data.nextBefore}`, devUser)).data.items[0].id,
+    first.data.message.id,
+  )
+
+  const claimed = await claimBotRun(db, 'chat-test', { global: 5, perTeam: 5, ttlSeconds: 30 })
+  assert.ok(claimed)
+  assert.equal(claimed.id, first.data.runId)
+  assert.equal(await claimBotRun(db, 'chat-test-2', { global: 5, perTeam: 5, ttlSeconds: 30 }), null)
+  const eventsPath = `${roomPath}/events`
+  const events = await get(eventsPath, devUser)
+  assert.deepEqual(
+    events.data.activeRuns.map((run: { status: string }) => run.status),
+    ['running', 'queued'],
+  )
+  const sink = createPgRunSink(db, claimed, { id: claimed.id, owner: 'chat-test', epoch: claimed.lease_epoch }, () => {
+    assert.fail('运行事件写入失败')
+  })
+  const delta = { type: 'output_delta', seq: 1, payload: { text: '回复片段' } } as const
+  await sink.emit(delta)
+  await sink.emit(delta)
+  await sink.flush()
+  const incremental = await get(`${eventsPath}?after=${events.data.cursor}`, devUser)
+  assert.equal(incremental.data.items.length, 1)
+  assert.equal(incremental.data.items[0].payload.text, '回复片段')
+  await db.delete(botEvent).where(and(eq(botEvent.conversation_id, roomId), lte(botEvent.sequence, 2n)))
+  const stale = await get(`${eventsPath}?after=1`, devUser)
+  assert.equal(stale.data.resetRequired, true)
+  assert.equal((await get(`${eventsPath}?after=9999999999999999999`, devUser)).code, 'VALIDATION_ERROR')
+
+  await db.update(teamMember).set({ role: 'viewer' }).where(eq(teamMember.user_id, devUser.userId))
+  assert.equal((await get(messagePath, devUser)).code, 'OK')
+  assert.equal((await post(messagePath, devUser, { ...message, clientRequestId: randomUUID() })).code, 'FORBIDDEN')
+  assert.equal((await get(eventsPath, otherUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
+})

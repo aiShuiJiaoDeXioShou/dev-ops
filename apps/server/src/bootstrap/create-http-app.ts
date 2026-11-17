@@ -34,6 +34,8 @@ import { createIdempotencyHooks } from '../platform/http/idempotency-hooks.ts'
 import { resolveActor } from '../modules/identity/identity.actor.ts'
 import { botsRoutes } from '../modules/bots/bots.routes.ts'
 import { botConnectionsRoutes } from '../modules/bots/bots.connections.routes.ts'
+import { botConversationsRoutes } from '../modules/collaboration/bot-conversations.routes.ts'
+import { createBotConversationsService } from '../modules/collaboration/bot-conversations.service.ts'
 import { createBotConnectionsService } from '../modules/bots/bots.connections.service.ts'
 import { createBotLoginService } from '../modules/bots/bots.login.service.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
@@ -138,6 +140,10 @@ export function createHttpApp(
     prefix: '/api/v1',
     connections: createBotConnectionsService(services.database.db, botCipher),
     login: createBotLoginService(services.database.db, botCipher),
+  })
+  app.register(botConversationsRoutes, {
+    prefix: '/api/v1',
+    service: createBotConversationsService(services.database.db),
   })
   app.register(healthRoutes, { prefix: '/api/v1', checkDatabase: services.database.check })
   app.register(identityAuthRoutes, { prefix: '/api/v1', auth: services.auth, origin: config.APP_ORIGIN })
