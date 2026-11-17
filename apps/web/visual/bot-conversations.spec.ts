@@ -80,7 +80,17 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
       { sequence: '3', kind: 'message_committed', runId, payload: {}, createdAt: stamp },
     ]
     const cursor = { empty: 0, queued: 1, running: 2, complete: 3 }[stage]
-    const activeRuns = stage === 'empty' || stage === 'complete' ? [] : [{ id: runId, botId, status: stage }]
+    const activeRuns =
+      stage === 'empty' || stage === 'complete'
+        ? []
+        : [
+            {
+              id: runId,
+              botId,
+              status: stage,
+              ...(stage === 'queued' ? { queueReason: 'worker_offline', teamQueuePosition: 2 } : {}),
+            },
+          ]
     return route.fulfill({
       json: success({
         items: allEvents.slice(after, cursor),
@@ -95,7 +105,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(page.getByRole('tab', { name: '对话' })).toBeVisible()
   if (testInfo.project.name === 'mobile') {
     const toggle = page.getByRole('button', { name: '打开会话列表' })
-    await toggle.click()
+    await toggle.press('Enter')
     await expect(page.getByRole('searchbox', { name: '搜索会话' })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(toggle).toBeFocused()
@@ -106,8 +116,10 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await composer.press('Enter')
   await expect(composer).toHaveValue('@验收助理 ')
   await composer.fill('@验收助理 检查结果')
-  await page.getByRole('button', { name: '发送消息' }).click()
-  await expect(page.getByText('排队中', { exact: true })).toBeVisible({ timeout: 3000 })
+  await page.getByRole('button', { name: '发送消息' }).press('Enter')
+  await expect(page.getByText('排队中 · 执行服务离线 · 团队队列第 2 位', { exact: true })).toBeVisible({
+    timeout: 3000,
+  })
   stage = 'running'
   await expect(page.getByText('正在检查', { exact: true })).toBeVisible()
   list.push({
@@ -125,7 +137,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(page.getByText('正在检查', { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('bot-conversations.png') })
-  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).click()
+  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).press('Enter')
   await page.getByRole('combobox', { name: '按工作标签筛选' }).selectOption(tagId)
   await expect(page.getByText('没有匹配的会话')).toBeVisible()
   await page.goto(`/collaboration/${room.id}?skill=${skillId}`)

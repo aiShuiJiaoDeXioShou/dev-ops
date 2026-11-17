@@ -116,7 +116,7 @@ export function TaskDetails({
           </ol>
         </section>
       )}
-      {!readOnly && task.status === 'waiting' && !active && (
+      {!readOnly && ['pending', 'in_progress', 'waiting'].includes(task.status) && (
         <form
           className="task-actions"
           onSubmit={(event) => {
@@ -133,9 +133,11 @@ export function TaskDetails({
           <Button type="submit" variant="outline" disabled={!extraInput.trim() || action.isPending}>
             保存补充
           </Button>
-          <Button type="button" variant="outline" disabled={action.isPending} onClick={() => action.mutate('rerun')}>
-            重新运行
-          </Button>
+          {task.status === 'waiting' && !active && (
+            <Button type="button" variant="outline" disabled={action.isPending} onClick={() => action.mutate('rerun')}>
+              重新运行
+            </Button>
+          )}
         </form>
       )}
       {!readOnly && task.status !== 'cancelled' && task.status !== 'completed' && (

@@ -129,13 +129,20 @@ function ConversationRoom({
     const progress = events.data?.progress[runId]
     const status = active?.status ?? progress?.status
     if (!status || !runStatuses[status]) return []
+    const queuePosition = active?.teamQueuePosition
+    const statusDetails = [
+      runStatuses[status],
+      active?.queueReason === 'worker_offline' ? '执行服务离线' : null,
+      queuePosition ? `团队队列第 ${queuePosition} 位` : null,
+      progress?.failureMessage,
+    ]
     return [
       {
         id: runId,
         name: room.members.find((member) => member.id === active?.botId)?.name ?? botMember?.name ?? room.name,
         kind: 'bot' as const,
         text: progress?.text ?? '',
-        status: progress?.failureMessage ? `${runStatuses[status]} · ${progress.failureMessage}` : runStatuses[status],
+        status: statusDetails.filter(Boolean).join(' · '),
       },
     ]
   })
