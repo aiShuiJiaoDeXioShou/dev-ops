@@ -97,6 +97,11 @@ export function createAppRoutes(): RouteObject[] {
                   lazy: () => import('@/pages/capabilities/skills-page'),
                   HydrateFallback: DelayedPageSkeleton,
                 },
+                {
+                  path: 'bots/:botId?',
+                  lazy: () => import('@/pages/capabilities/bots-page'),
+                  HydrateFallback: DelayedPageSkeleton,
+                },
               ],
             },
             {

@@ -34,6 +34,7 @@ export function AppLayout() {
       ['/projects', '项目'],
       ['/operations/changes', '变更与发布'],
       ['/capabilities/skills', '团队 Skills'],
+      ['/capabilities/bots', '智能体'],
       ['/capabilities', '能力'],
       ['/vault', '凭据库'],
       ['/settings/pipeline-nodes', '执行节点'],

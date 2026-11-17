@@ -1,8 +1,21 @@
-import { Outlet } from 'react-router'
+import { NavLink, Outlet } from 'react-router'
+import { cn } from '@/shared/lib/utils'
 
-/** 能力模块外壳：各页面自行渲染原型式页头与内容，快照页复用同一路由层级。 */
+/** 保持能力页的组内导航，正文仍由技能和 Bot 各自的页面负责。 */
 export function Component() {
-  return <Outlet />
+  return (
+    <>
+      <nav className="flex flex-wrap gap-2 border-b border-border px-4 py-2 sm:px-6" aria-label="能力导航">
+        <NavLink to="skills" className={({ isActive }) => cn('btn quiet', isActive && 'text-primary')}>
+          技能库
+        </NavLink>
+        <NavLink to="bots" className={({ isActive }) => cn('btn quiet', isActive && 'text-primary')}>
+          智能体
+        </NavLink>
+      </nav>
+      <Outlet />
+    </>
+  )
 }
 
 export default Component
