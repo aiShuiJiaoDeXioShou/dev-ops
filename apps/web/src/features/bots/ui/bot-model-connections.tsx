@@ -5,7 +5,6 @@ import { Link2, Plus } from 'lucide-react'
 import { botConnectionsOptions, connectionQueryKey, type BotConnection } from '@/features/bots/api/connections'
 import { botQueryKey } from '@/features/bots/api/queries'
 import { BotConnectionForm } from '@/features/bots/ui/bot-connection-form'
-import { useSession } from '@/features/identity/model/session'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import {
@@ -31,7 +30,13 @@ const reasons: Record<string, string> = {
   auth_expired: '订阅授权已失效',
 }
 
-function ConnectionsList({ teamId, canManage }: { teamId: string; canManage: boolean }) {
+/**
+ * 展示团队模型连接，并按权限提供创建、启用与停用操作。
+ * @param props.teamId 当前团队标识。
+ * @param props.canManage 当前用户是否可以管理模型连接。
+ * @returns 模型连接列表和创建弹窗；操作失败时保留列表并展示错误反馈。
+ */
+export function BotModelConnections({ teamId, canManage }: { teamId: string; canManage: boolean }) {
   const [createOpen, setCreateOpen] = useState(false)
   const query = useQuery(botConnectionsOptions(teamId))
   const queryClient = useQueryClient()
@@ -56,10 +61,7 @@ function ConnectionsList({ teamId, canManage }: { teamId: string; canManage: boo
   const items = query.data?.data ?? []
   return (
     <>
-      <header className="work-page-head compact-page-head without-tools">
-        <h1 className="sr-only">连接与节点</h1>
-      </header>
-      <div className="work-padding">
+      <section aria-label="模型配置">
         <div className="row spread mb-4">
           <h2>模型连接</h2>
           {canManage && (
@@ -131,16 +133,8 @@ function ConnectionsList({ teamId, canManage }: { teamId: string; canManage: boo
             ))}
           </div>
         )}
-      </div>
+      </section>
       {createOpen && <BotConnectionForm teamId={teamId} onClose={() => setCreateOpen(false)} />}
     </>
   )
-}
-
-/** 「能力 → 连接与节点」下的团队模型连接。 */
-export function Component() {
-  const { currentTeam, role, isReady } = useSession()
-  if (!isReady) return <DelayedPageSkeleton />
-  if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
-  return <ConnectionsList key={currentTeam.id} teamId={currentTeam.id} canManage={role === 'admin'} />
 }

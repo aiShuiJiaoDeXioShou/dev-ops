@@ -6,8 +6,6 @@
       - /url: /capabilities/skills
     - link "记忆":
       - /url: /capabilities/memory
-    - link "连接与节点":
-      - /url: /capabilities/connections
   - heading "技能库" [level=1]
   - button "发布 Skill"
   - group "技能分类":

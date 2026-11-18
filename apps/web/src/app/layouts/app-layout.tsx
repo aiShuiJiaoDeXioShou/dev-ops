@@ -20,7 +20,10 @@ import {
 
 const ROLE_LABELS = { admin: '管理员', developer: '开发者', viewer: '浏览者' } as const
 
-/** 渲染工作区外壳：侧栏、团队切换、用户与导航。 */
+/**
+ * 渲染工作区侧栏、团队切换、用户入口和业务页面。
+ * @returns 已认证工作区；随路由更新文档标题，退出登录后清理缓存并跳转登录页。
+ */
 export function AppLayout() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -36,7 +39,6 @@ export function AppLayout() {
       ['/projects', '项目'],
       ['/capabilities/skills', '团队 Skills'],
       ['/capabilities/bots', '智能体'],
-      ['/capabilities/connections', '连接与节点'],
       ['/capabilities/memory', '记忆'],
       ['/capabilities', '能力'],
       ['/vault', '凭据库'],

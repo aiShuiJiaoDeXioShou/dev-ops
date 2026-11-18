@@ -156,6 +156,33 @@ describe('工作区路由与数据状态', () => {
     expect(await screen.findByRole('button', { name: '新建储存桶' })).toBeVisible()
   })
 
+  it.each(['/settings/team?tab=models', '/capabilities/connections'])(
+    '模型配置地址 %s 打开团队管理的模型页签',
+    async (path) => {
+      server.use(http.get('*/api/v1/teams/:teamId/bot-model-connections', () => success([])))
+      const router = renderApplication(path)
+
+      expect(await screen.findByRole('heading', { name: '团队管理', level: 1 })).toBeVisible()
+      expect(await screen.findByText('还没有模型连接')).toBeVisible()
+      expect(screen.getByRole('tab', { name: '模型配置' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('button', { name: '添加模型连接' })).toBeVisible()
+      expect(router.state.location.pathname).toBe('/settings/team')
+      expect(router.state.location.search).toBe('?tab=models')
+      expect(document.title).toBe('团队管理 · DevOps')
+    },
+  )
+
+  it.each(['developer', 'viewer'])('模型配置对 %s 保留只读内容', async (role) => {
+    server.use(
+      http.get('*/api/v1/me/teams', () => success({ teams: [{ ...teamFixture, role }], isPlatformAdmin: false })),
+      http.get('*/api/v1/teams/:teamId/bot-model-connections', () => success([])),
+    )
+    renderApplication('/settings/team?tab=models')
+
+    expect(await screen.findByText('可用模型连接由团队管理员配置。')).toBeVisible()
+    expect(screen.queryByRole('button', { name: '添加模型连接' })).not.toBeInTheDocument()
+  })
+
   it('导航到系统状态复用缓存，支持返回与直接访问深链接', async () => {
     let requests = 0
     server.use(

@@ -64,7 +64,7 @@ export function BotModelFields({
         </Select>
       </label>
       {connections.isSuccess && available.length === 0 && (
-        <p className="full quiet small">在「连接与节点」添加可用模型连接。</p>
+        <p className="full quiet small">在「团队管理 → 模型配置」添加可用模型连接。</p>
       )}
       {canSelectModel && models.length === 0 && <p className="full quiet small">所选连接暂无可用模型。</p>}
       {(connections.isError || catalog.isError) && (

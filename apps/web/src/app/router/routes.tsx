@@ -114,8 +114,7 @@ export function createAppRoutes(): RouteObject[] {
                 },
                 {
                   path: 'connections',
-                  lazy: () => import('@/pages/capabilities/bot-connections-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  element: <Navigate to="/settings/team?tab=models" replace />,
                 },
               ],
             },

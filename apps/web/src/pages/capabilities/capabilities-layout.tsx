@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { cn } from '@/shared/lib/utils'
 
-/** 能力中心沿用原型子导航与右侧详情栏。 */
+/**
+ * 渲染智能体、Skills 与记忆的能力中心导航和右侧详情宿主。
+ * @returns 能力页面布局；子路由通过 Outlet 上下文使用详情宿主。
+ */
 export function Component() {
   const [detailHost, setDetailHost] = useState<HTMLDivElement | null>(null)
   return (
@@ -17,9 +20,6 @@ export function Component() {
           </NavLink>
           <NavLink to="memory" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
             记忆
-          </NavLink>
-          <NavLink to="connections" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
-            连接与节点
           </NavLink>
         </nav>
         <Outlet context={detailHost} />

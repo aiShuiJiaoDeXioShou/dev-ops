@@ -8,6 +8,7 @@
   - tablist "团队设置分组":
     - tab "成员与权限"
     - tab "连接与节点" [selected]
+    - tab "模型配置"
   - tabpanel "连接与节点":
     - heading "Git 连接" [level=3]
     - button "添加 GitHub 连接"

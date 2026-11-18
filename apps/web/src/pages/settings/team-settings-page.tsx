@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { Plus, ShieldAlert } from 'lucide-react'
+import { BotModelConnections } from '@/features/bots/ui/bot-model-connections'
 import { TeamGitConnections } from '@/features/code/ui/team-git-connections'
 import { pipelineNodesQueryOptions } from '@/features/pipeline/api/nodes'
 import { CreateTeamDialog } from '@/features/identity/ui/create-team-dialog'
@@ -13,22 +14,26 @@ import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { EmptyState } from '@/shared/ui/page-state'
 
-const TAB_VALUES = ['members', 'connections'] as const
+const TAB_VALUES = ['members', 'connections', 'models'] as const
 type TabValue = (typeof TAB_VALUES)[number]
 
 /** 判断 URL 页签参数是否为允许的团队设置分组。 */
 function isTabValue(value: string | null): value is TabValue {
-  return value !== null && (TAB_VALUES as readonly string[]).includes(value)
+  return TAB_VALUES.some((tab) => tab === value)
 }
 
-/** 团队设置页：团队资料在页头维护，成员与连接分成两个页签。 */
+/**
+ * 渲染团队管理，按 URL 页签展示成员、代码连接与节点、模型配置。
+ * @returns 当前团队的管理页；未加入团队时提供创建团队入口。
+ */
 export function Component() {
   const { currentTeam, role } = useSession()
   const [createOpen, setCreateOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
-  const tab: TabValue = isTabValue(searchParams.get('tab')) ? (searchParams.get('tab') as TabValue) : 'members'
+  const tabParameter = searchParams.get('tab')
+  const tab = isTabValue(tabParameter) ? tabParameter : 'members'
   const changeTab = (value: string) => {
     const next = new URLSearchParams(searchParams)
     next.set('tab', value)
@@ -83,6 +88,7 @@ export function Component() {
         <TabsList aria-label="团队设置分组">
           <TabsTrigger value="members">成员与权限</TabsTrigger>
           <TabsTrigger value="connections">连接与节点</TabsTrigger>
+          <TabsTrigger value="models">模型配置</TabsTrigger>
         </TabsList>
         <TabsContent value="members">
           {canManage ? (
@@ -103,6 +109,9 @@ export function Component() {
             authorizationResult={searchParams.get('git')}
           />
           <NodeManagementEntry teamId={currentTeam.id} canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="models">
+          <BotModelConnections key={currentTeam.id} teamId={currentTeam.id} canManage={canManage} />
         </TabsContent>
       </Tabs>
       <InviteMemberDialog teamId={currentTeam.id} open={inviteOpen} onOpenChange={setInviteOpen} />
