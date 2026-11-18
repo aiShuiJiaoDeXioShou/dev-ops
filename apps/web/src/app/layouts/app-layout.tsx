@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { Folder, LayoutGrid, LogOut, Menu, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
+import { Folder, LayoutGrid, LogOut, Menu, PanelLeft, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
@@ -17,11 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
+import './app-layout.css'
 
 const ROLE_LABELS = { admin: '管理员', developer: '开发者', viewer: '浏览者' } as const
 
 /**
- * 渲染工作区侧栏、团队切换、用户入口和业务页面。
+ * 渲染支持收纳的工作区主导航、团队切换、用户入口和业务页面。
  * @returns 已认证工作区；随路由更新文档标题，退出登录后清理缓存并跳转登录页。
  */
 export function AppLayout() {
@@ -29,6 +30,7 @@ export function AppLayout() {
   const queryClient = useQueryClient()
   const { user, teams, currentTeam, role, setCurrentTeam, isReady, isPlatformAdmin } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [navigationCollapsed, setNavigationCollapsed] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const location = useLocation()
   useEffect(() => {
@@ -105,10 +107,11 @@ export function AppLayout() {
     ...(role !== 'viewer' ? [{ to: '/vault', label: '凭据库', icon: 'shield' as const }] : []),
   ]
   return (
-    <div className={cn('shell', menuOpen && 'menu-open')}>
+    <div className={cn('shell workspace-shell', menuOpen && 'menu-open', navigationCollapsed && 'is-nav-collapsed')}>
       {menuOpen ? <div className="nav-scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" /> : null}
       <aside
         ref={sidebarRef}
+        id="workspace-navigation"
         className="sidebar"
         {...(menuOpen ? { role: 'dialog', 'aria-modal': true, 'aria-label': '工作区导航' } : {})}
       >
@@ -127,16 +130,32 @@ export function AppLayout() {
             <XIcon className="size-4" aria-hidden="true" />
           </Button>
         ) : null}
-        <Link className="brand" to="/collaboration" aria-label="协作首页">
-          <img src="/prototype/brand.svg" width={29} height={29} alt="" />
-          DevOps
-        </Link>
+        <div className="workspace-sidebar-head">
+          <Link className="brand" to="/collaboration" aria-label="协作首页">
+            <img src="/prototype/brand.svg" width={29} height={29} alt="" />
+            DevOps
+          </Link>
+          <Button
+            unstyled
+            type="button"
+            className="workspace-sidebar-toggle"
+            aria-label={navigationCollapsed ? '展开主导航' : '收起主导航'}
+            title={navigationCollapsed ? '展开主导航' : '收起主导航'}
+            aria-expanded={!navigationCollapsed}
+            aria-controls="workspace-navigation"
+            onClick={() => setNavigationCollapsed(!navigationCollapsed)}
+          >
+            <PanelLeft className="size-4" strokeWidth={1.5} aria-hidden="true" />
+          </Button>
+        </div>
         <div className="nav-label">工作台</div>
         <nav className="nav" aria-label="主导航">
           {primaryNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
+              aria-label={item.label}
+              title={item.label}
               data-page={item.icon === 'collaboration' ? 'collaboration' : undefined}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
@@ -145,7 +164,7 @@ export function AppLayout() {
                 const Icon = navIcons[item.icon]
                 return <Icon className="size-4.5" aria-hidden="true" />
               })()}
-              {item.label}
+              <span className="workspace-nav-label">{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -154,25 +173,30 @@ export function AppLayout() {
           {isPlatformAdmin && (
             <NavLink
               to="/platform"
+              aria-label="平台管理"
+              title="平台管理"
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
               <Settings2 className="size-4.5" aria-hidden="true" />
-              平台管理
+              <span className="workspace-nav-label">平台管理</span>
             </NavLink>
           )}
           {(!currentTeam || role === 'admin') && (
             <NavLink
               to="/settings/team"
+              aria-label="团队管理"
+              title="团队管理"
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) => cn('nav-btn', isActive && 'active')}
             >
               <Users className="size-4.5" aria-hidden="true" />
-              团队管理
+              <span className="workspace-nav-label">团队管理</span>
             </NavLink>
           )}
           <Link
             className="user"
+            title={user.name}
             to="/settings/profile"
             aria-label={`打开${user.name}的个人页面`}
             onClick={() => setMenuOpen(false)}
@@ -189,9 +213,16 @@ export function AppLayout() {
             </span>
             <span className="badge">{ROLE_LABELS[role]}</span>
           </Link>
-          <Button type="button" variant="ghost" className="nav-btn logout-btn" onClick={() => setLogoutOpen(true)}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="nav-btn logout-btn"
+            aria-label="退出登录"
+            title="退出登录"
+            onClick={() => setLogoutOpen(true)}
+          >
             <LogOut className="size-4.5" aria-hidden="true" />
-            退出登录
+            <span className="workspace-nav-label">退出登录</span>
           </Button>
           {teams.length > 1 && (
             <div className="team-switcher" aria-label="切换团队">

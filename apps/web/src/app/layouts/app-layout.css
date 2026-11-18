@@ -1,0 +1,79 @@
+/* 侧栏存量样式尚未分层，局部覆盖保持同一优先级，避免收纳时账号和退出入口继续占用文字列。 */
+.workspace-shell {
+  transition: grid-template-columns 200ms ease;
+}
+
+.workspace-shell .workspace-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  gap: 8px;
+}
+
+.workspace-shell .workspace-sidebar-head .brand {
+  min-width: 0;
+  padding: 0 0 0 8px;
+}
+
+.workspace-shell .workspace-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-sm);
+}
+
+.workspace-shell .workspace-sidebar-toggle:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+@media (width > 700px) {
+  .workspace-shell.is-nav-collapsed {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .workspace-shell.is-nav-collapsed .workspace-sidebar-head {
+    justify-content: center;
+  }
+
+  .workspace-shell.is-nav-collapsed .workspace-sidebar-head .brand,
+  .workspace-shell.is-nav-collapsed .workspace-nav-label,
+  .workspace-shell.is-nav-collapsed .sidebar .nav-label,
+  .workspace-shell.is-nav-collapsed .sidebar .user-copy,
+  .workspace-shell.is-nav-collapsed .sidebar .user .badge {
+    display: none;
+  }
+
+  .workspace-shell.is-nav-collapsed .sidebar .nav-btn,
+  .workspace-shell.is-nav-collapsed .sidebar .user {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    width: 100%;
+    padding-inline: 0;
+  }
+
+  .workspace-shell.is-nav-collapsed .sidebar .team-switcher {
+    flex-direction: column;
+    align-items: center;
+    padding-inline: 0;
+  }
+}
+
+@media (width <= 700px) {
+  .workspace-shell .workspace-sidebar-toggle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell {
+    transition: none;
+  }
+}
