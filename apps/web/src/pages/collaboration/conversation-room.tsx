@@ -10,7 +10,9 @@ import {
   conversationOptions,
   conversationsQueryKey,
   messagesOptions,
+  type ConversationMessage,
 } from '@/features/conversations/api/queries'
+import type { ConversationRun } from '@/features/conversations/model/conversation-trace'
 import { ConversationAvatar } from '@/features/conversations/ui/conversation-avatar'
 import { ConversationComposer } from '@/features/conversations/ui/conversation-composer'
 import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
@@ -21,7 +23,6 @@ import {
   runElapsed,
   runLabels,
   useRunClock,
-  type ConversationRun,
 } from '@/features/conversations/ui/conversation-trajectory'
 import { ConversationSettings } from '@/features/conversations/ui/conversation-settings'
 import { Button } from '@/shared/ui/controls/button'
@@ -131,19 +132,24 @@ export function ConversationRoom({
       .slice()
       .reverse()
       .flatMap(({ data }) => data.items) ?? []
-  const finalRuns = new Set(stored.flatMap((item) => (item.speakerKind === 'bot' && item.runId ? [item.runId] : [])))
+  const inputs = new Map<string, ConversationMessage>()
+  const replies = new Map<string, ConversationMessage>()
+  for (const message of stored) {
+    if (!message.runId) continue
+    if (message.speakerKind === 'user') inputs.set(message.runId, message)
+    if (message.speakerKind === 'bot') replies.set(message.runId, message)
+  }
   const progress = events.data?.progress ?? {}
   const active = new Map(events.data?.activeRuns.map((run) => [run.id, run]))
   const activity = events.data?.activity ?? []
-  const runs = [...new Set([...Object.keys(progress), ...active.keys()])].map<ConversationRun>((runId) => {
+  const runIds = new Set([...Object.keys(progress), ...active.keys(), ...inputs.keys(), ...replies.keys()])
+  const runs = [...runIds].map<ConversationRun>((runId) => {
     const live = active.get(runId)
     const saved = progress[runId]
-    const botId =
-      live?.botId ??
-      saved?.botId ??
-      stored.find((item) => item.runId === runId && item.speakerKind === 'bot')?.speakerId ??
-      leader?.id
-    const status = live?.status ?? saved?.status
+    const input = inputs.get(runId)
+    const reply = replies.get(runId)
+    const botId = live?.botId ?? saved?.botId ?? reply?.speakerId ?? leader?.id
+    const status = live?.status ?? (reply ? 'succeeded' : saved?.status)
     const reason = live?.queueReason === 'worker_offline' ? '执行服务离线' : undefined
     const position = live?.teamQueuePosition ? `团队队列第 ${live.teamQueuePosition} 位` : undefined
     const label = saved?.stopRequested && status === 'running' ? '正在停止…' : runLabels[status ?? '']
@@ -151,10 +157,13 @@ export function ConversationRoom({
       ...saved,
       id: runId,
       botId,
-      name: bots.find(({ id }) => id === botId)?.name ?? room.name,
+      name: reply?.speakerName ?? bots.find(({ id }) => id === botId)?.name ?? room.name,
       status,
+      createdAt: input?.createdAt ?? saved?.createdAt ?? reply?.createdAt,
       statusText: [label, reason, position, saved?.failureMessage].filter(Boolean).join(' · '),
       text: saved?.text ?? '',
+      input,
+      reply,
     }
   })
   const runsById = new Map(runs.map((run) => [run.id, run]))
@@ -191,7 +200,7 @@ export function ConversationRoom({
     }
   })
   const ongoing = runs.flatMap<MessageView>((run) => {
-    if (!run.status || finalRuns.has(run.id) || run.status === 'succeeded') return []
+    if (!run.status || run.reply || run.status === 'succeeded') return []
     return [
       {
         id: run.id,
@@ -404,16 +413,19 @@ export function ConversationRoom({
           />
         </TabsContent>
         <TabsContent value="activity" className="dsh-tab-panel">
-          <div className="dsh-panel-scroll">
-            {events.isPending ? (
+          <div className="dsh-panel-scroll conversation-trace-scroll">
+            {runs.length === 0 && (events.isPending || messages.isPending) ? (
               <DelayedPageSkeleton />
-            ) : events.isError ? (
-              <PageError title="轨迹加载失败" error={events.error} onRetry={() => void events.refetch()} />
+            ) : runs.length === 0 && (events.isError || messages.isError) ? (
+              <PageError
+                title="轨迹加载失败"
+                error={events.error ?? messages.error}
+                onRetry={() => void Promise.all([events.refetch(), messages.refetch()])}
+              />
             ) : (
               <ConversationTrajectory
-                key={traceId}
-                runs={runs.slice().reverse()}
-                events={activity}
+                conversationId={id}
+                runs={runs.slice().sort((a, b) => Date.parse(b.createdAt ?? '') - Date.parse(a.createdAt ?? ''))}
                 selectedId={traceId}
                 onSelect={setTraceId}
                 now={now}

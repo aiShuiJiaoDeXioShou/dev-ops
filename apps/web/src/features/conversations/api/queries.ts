@@ -131,3 +131,34 @@ export function conversationEventsOptions(client: QueryClient, id: string) {
     },
   })
 }
+
+/**
+ * 按所选运行增量读取轨迹，逐页补齐长运行的历史。
+ * @param client 会话查询缓存。
+ * @param conversationId 当前会话。
+ * @param runId 要查看的运行。
+ * @returns 仅在此运行活动或仍有历史待加载时继续轮询的查询。
+ */
+export function conversationTraceOptions(client: QueryClient, conversationId: string, runId: string) {
+  const queryKey = ['bot-conversation-trace', conversationId, runId]
+  return queryOptions({
+    queryKey,
+    queryFn: async ({ signal }): Promise<ConversationEvents & { hasMore: boolean }> => {
+      const cached = client.getQueryData<ConversationEvents>(queryKey)
+      const { data } = await apiClient.listBotConversationEvents(
+        conversationId,
+        { runId, after: cached?.cursor },
+        { signal },
+      )
+      return {
+        ...data,
+        items: [...(data.resetRequired ? [] : (cached?.items ?? [])), ...data.items],
+        hasMore: data.items.length >= EVENT_PAGE_SIZE,
+      }
+    },
+    refetchInterval: ({ state }) => {
+      if (state.data?.hasMore) return POLL_EVENT_BACKLOG_MS
+      return state.data?.activeRuns.some(({ id }) => id === runId) ? POLL_WHILE_ACTIVE_MS : false
+    },
+  })
+}
