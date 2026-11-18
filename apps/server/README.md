@@ -291,6 +291,8 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 
 从仓库根目录运行 `pnpm --dir apps/server dev:bot-worker` 启动执行服务，编译后也可以运行 `pnpm --dir apps/server start:bot-worker`。执行服务和 HTTP 进程共享 PostgreSQL。调度 Worker 收口过期的运行租约。
 
+默认提示词引导 Bot 用 `get_current_context` 按需读取当前团队名称、`teamId`、触发人的 `userId` 和团队角色。该工具无需参数，从有效运行租约确定团队和用户。Bot 可用中文关键词在平台接口目录中查找 `GET /api/v1/me/teams`、`GET /api/v1/teams/:teamId/members` 和 `GET /api/v1/teams/:teamId/projects`，接口调用仍按触发人的当前权限校验。
+
 | 业务错误码                         | 含义                               |
 | ---------------------------------- | ---------------------------------- |
 | `BOT_NOT_FOUND`                    | Bot 不存在或不可见                 |

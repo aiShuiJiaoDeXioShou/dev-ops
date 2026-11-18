@@ -38,7 +38,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/me/teams',
     {
-      schema: { response: { 200: myTeamsResponseSchema } },
+      schema: { summary: '读取我的团队列表', response: { 200: myTeamsResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -78,7 +78,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/teams/:teamId/members',
     {
-      schema: { params: teamParamsSchema, response: { 200: memberListResponseSchema } },
+      schema: { summary: '读取团队成员列表', params: teamParamsSchema, response: { 200: memberListResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)

@@ -19,7 +19,7 @@ import {
   botEvent,
   botMessage,
 } from '../../src/modules/collaboration/bot-conversations.tables.ts'
-import { authUser, teamMember } from '../../src/modules/identity/identity.tables.ts'
+import { authUser, team, teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { botTask } from '../../src/modules/tasks/bot-tasks.tables.ts'
 import { createDatabase } from '../../src/platform/database/client.ts'
 import { createBotTestDatabase } from '../support/bot-database.ts'
@@ -105,6 +105,7 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
   const userId = randomUUID()
   const teamId = randomUUID()
   await db.insert(authUser).values({ id: userId, name: '测试成员', email: 'bot-fixture@example.test' })
+  await db.insert(team).values({ id: teamId, name: '测试团队', created_by_user_id: userId })
   await db
     .insert(teamMember)
     .values({ id: randomUUID(), team_id: teamId, user_id: userId, role: 'developer', status: 'active' })
@@ -174,6 +175,14 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
   const worker = createBotWorker(
     config,
     async (options) => {
+      const guidance = options.context.systemSections.find(({ title }) => title === '查询团队与用户数据')
+      assert.match(guidance?.body ?? '', /get_current_context/)
+      const currentContext = options.tools.find(({ name }) => name === 'get_current_context')
+      assert.ok(currentContext)
+      assert.equal((await currentContext.execute({ teamId: randomUUID() }, options.signal)).isError, true)
+      const result = await currentContext.execute({}, options.signal)
+      assert.equal(result.isError, undefined)
+      assert.deepEqual(JSON.parse(result.text), { teamName: '测试团队', teamId, userId, role: 'developer' })
       for (const name of ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls', 'powershell']) {
         assert.ok(
           options.tools.some((tool) => tool.name === name),

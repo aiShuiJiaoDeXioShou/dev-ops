@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
+import { openApiTools } from '@dev-ops/devops-bot'
 import { testApiInvoker } from '@dev-ops/devops-bot/testing'
 import { and, eq } from 'drizzle-orm'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
@@ -57,6 +58,17 @@ test('平台 API 委托使用团队范围与当前成员角色，写入只执行
   const createInvoker = (current = lease) =>
     createBotApiInvoker({ app, db, lease: current, delegation, teamId, conversationId: roomId, botId, catalog })
   const api = createInvoker()
+  const search = openApiTools(catalog, api).find(({ name }) => name === 'platform_api_search')
+  assert.ok(search)
+  const signal = new AbortController().signal
+  for (const [query, path] of [
+    ['团队列表', '/api/v1/me/teams'],
+    ['团队成员', '/api/v1/teams/{teamId}/members'],
+    ['团队 项目', '/api/v1/teams/{teamId}/projects'],
+  ]) {
+    const result = await search.execute({ query }, signal)
+    assert.ok(result.text.includes(`"path":"${path}"`), result.text)
+  }
   const path = `/api/v1/projects/${own.data.id}/requirements`
   assert.equal((await api.invoke({ method: 'GET', path })).ok, true)
   assert.equal((await api.invoke({ method: 'GET', path: `/api/v1${otherPath}` })).code, 'BOT_API_FORBIDDEN')

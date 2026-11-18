@@ -16,6 +16,7 @@ import { finishBotRun, renewBotRunLease, type BotRunLease, type BotRunRecord } f
 import type { BotCallLog } from './api-invoker.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
+import { createCurrentContextTool } from './current-context-tool.ts'
 import { createPgMemoryStore } from './memory-store.ts'
 import { fetchBotPublicPage } from './public-page.ts'
 import { createSkillViewTool } from './skill-tool.ts'
@@ -137,6 +138,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         ],
       },
       tools: [
+        createCurrentContextTool(db, lease),
         ...tools,
         ...memoryTools(memory),
         ...(input.skillVersions.some(({ status }) => status === 'available')

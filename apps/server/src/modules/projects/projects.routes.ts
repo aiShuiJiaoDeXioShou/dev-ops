@@ -52,6 +52,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/teams/:teamId/projects',
     {
       schema: {
+        summary: '读取团队项目列表和项目数量',
         params: projectTeamParamsSchema,
         querystring: projectListQuerySchema,
         response: { 200: projectListResponseSchema },
