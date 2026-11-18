@@ -39,15 +39,16 @@ interface BotFormProps {
   bot?: BotView
   defaultOwnerId: string
   canBindModel?: boolean
+  inline?: boolean
   onClose: () => void
 }
 
 /**
- * 创建或编辑 Bot。调用方仅在弹窗打开时挂载，关闭后重新初始化草稿。
- * @param props 团队、负责人、可选的待编辑 Bot、是否允许创建时绑定模型及关闭回调。
- * @returns 智能体表单弹窗。
+ * 创建或编辑 Bot。调用方在打开编辑器时挂载，关闭后重新初始化草稿。
+ * @param props 团队、负责人、待编辑 Bot、模型绑定权限、是否内嵌到侧栏及关闭回调。
+ * @returns 复用校验与保存逻辑的侧栏表单或弹窗，失败保留草稿。
  */
-export function BotForm({ teamId, bot, defaultOwnerId, canBindModel = false, onClose }: BotFormProps) {
+export function BotForm({ teamId, bot, defaultOwnerId, canBindModel = false, inline = false, onClose }: BotFormProps) {
   const id = useId()
   const queryClient = useQueryClient()
   const { showToast } = useToast()
@@ -98,19 +99,169 @@ export function BotForm({ teamId, bot, defaultOwnerId, canBindModel = false, onC
     event.preventDefault()
     if (!mutation.isPending && canSave) mutation.mutate()
   }
+  const hasEdits =
+    name !== (bot?.name ?? '') ||
+    responsibility !== (bot?.responsibility ?? '') ||
+    instructions !== (bot?.instructions ?? '') ||
+    ownerUserId !== defaultOwner ||
+    !!modelSelection.connectionId ||
+    changedSkills
+
   function close() {
     if (mutation.isPending) return
-    const hasEdits =
-      name !== (bot?.name ?? '') ||
-      responsibility !== (bot?.responsibility ?? '') ||
-      instructions !== (bot?.instructions ?? '') ||
-      ownerUserId !== defaultOwner ||
-      !!modelSelection.connectionId ||
-      changedSkills
     if (hasEdits) setDiscardOpen(true)
     else onClose()
   }
 
+  const Body = inline ? 'div' : DialogFormBody
+  const Footer = inline ? 'div' : DialogFormFooter
+  const form = (
+    <form
+      data-settings-dirty={(inline && hasEdits) || undefined}
+      data-settings-pending={(inline && mutation.isPending) || undefined}
+      className={inline ? 'grid gap-4' : 'flex min-h-0 flex-col'}
+      onSubmit={save}
+    >
+      <Body>
+        <div className={inline ? 'grid gap-3' : 'form-grid'}>
+          <label className="field" htmlFor={`${id}-name`}>
+            <span>名称</span>
+            <Input
+              id={`${id}-name`}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="给你的协作者起个名字"
+              maxLength={60}
+              required
+            />
+          </label>
+          <label className="field" htmlFor={`${id}-responsibility`}>
+            <span>职责</span>
+            <Input
+              id={`${id}-responsibility`}
+              value={responsibility}
+              onChange={(event) => setResponsibility(event.target.value)}
+              maxLength={4000}
+              placeholder="例如：产品助手"
+              required
+            />
+          </label>
+          <label className="field" htmlFor={`${id}-owner`}>
+            <span>负责人</span>
+            <Select
+              id={`${id}-owner`}
+              value={ownerUserId}
+              onChange={(event) => setOwnerUserId(event.target.value)}
+              disabled={members.isPending || members.isError}
+              required
+            >
+              {!selectedOwnerActive && (
+                <option value={ownerUserId}>{members.isPending ? '正在加载成员…' : '请选择有效成员'}</option>
+              )}
+              {owners.map((member) => (
+                <option key={member.userId} value={member.userId}>
+                  {member.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+          {members.isError && (
+            <Button type="button" variant="outline" onClick={() => void members.refetch()}>
+              重试加载成员
+            </Button>
+          )}
+          <div className="field">
+            <span>运行环境</span>
+            <span className="runtime-cell">团队执行器</span>
+          </div>
+          {canSelectModel && <BotModelFields selection={modelSelection} isOptional isSaving={mutation.isPending} />}
+          <label className="field full" htmlFor={`${id}-instructions`}>
+            <span>职责说明</span>
+            <Textarea
+              id={`${id}-instructions`}
+              value={instructions}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder="描述长期职责、工作方式与输出要求"
+              maxLength={16000}
+              rows={5}
+            />
+          </label>
+          <fieldset className="field full">
+            <legend>Skills</legend>
+            {skillCatalog.isPending && <p className="small muted">正在加载技能…</p>}
+            {skillCatalog.isError && (
+              <Button type="button" variant="outline" onClick={() => void skillCatalog.refetch()}>
+                重试加载技能
+              </Button>
+            )}
+            {skillCatalog.isSuccess && !selectableSkills.length && <p className="small muted">暂无已启用的技能</p>}
+            <div className="work-checks">
+              {selectableSkills.map((skill) => (
+                <label className="row" key={skill.id}>
+                  <Checkbox
+                    checked={selectedSkills.includes(skill.id)}
+                    onCheckedChange={(checked) => {
+                      setSelectedSkills((previous) =>
+                        checked === true ? [...previous, skill.id] : previous.filter((id) => id !== skill.id),
+                      )
+                    }}
+                  />
+                  <span>
+                    {skill.name}
+                    {!skill.enabled && '（已停用）'}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {skillCatalog.hasNextPage && (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={skillCatalog.isFetchingNextPage}
+                onClick={() => void skillCatalog.fetchNextPage()}
+              >
+                加载更多技能
+              </Button>
+            )}
+          </fieldset>
+          {mutation.error && (
+            <p role="alert" className="text-sm text-destructive">
+              {describeRequestError(mutation.error).description}
+            </p>
+          )}
+        </div>
+      </Body>
+      <Footer className={inline ? 'row justify-end' : undefined}>
+        <Button type="button" variant="outline" disabled={mutation.isPending} onClick={close}>
+          取消
+        </Button>
+        <Button type="submit" disabled={mutation.isPending || !canSave}>
+          {mutation.isPending ? '正在保存…' : bot ? '保存配置' : '创建智能体'}
+        </Button>
+      </Footer>
+    </form>
+  )
+  const discardDialog = (
+    <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>放弃编辑？</AlertDialogTitle>
+          <AlertDialogDescription>关闭会清除这次尚未保存的智能体配置。</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>继续编辑</AlertDialogCancel>
+          <AlertDialogAction onClick={onClose}>放弃修改</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+  if (inline)
+    return (
+      <div className="grid gap-3">
+        {form}
+        {discardDialog}
+      </div>
+    )
   return (
     <Dialog
       open
@@ -123,137 +274,8 @@ export function BotForm({ teamId, bot, defaultOwnerId, canBindModel = false, onC
           <DialogTitle>{bot ? '编辑智能体' : '创建智能体'}</DialogTitle>
           <DialogDescription className="sr-only">设置智能体的职责、负责人和运行指令。</DialogDescription>
         </DialogFormHeader>
-        <form className="flex min-h-0 flex-col" onSubmit={save}>
-          <DialogFormBody>
-            <div className="form-grid">
-              <label className="field" htmlFor={`${id}-name`}>
-                <span>名称</span>
-                <Input
-                  id={`${id}-name`}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="给你的协作者起个名字"
-                  maxLength={60}
-                  required
-                />
-              </label>
-              <label className="field" htmlFor={`${id}-responsibility`}>
-                <span>职责</span>
-                <Input
-                  id={`${id}-responsibility`}
-                  value={responsibility}
-                  onChange={(event) => setResponsibility(event.target.value)}
-                  maxLength={4000}
-                  placeholder="例如：产品助手"
-                  required
-                />
-              </label>
-              <label className="field" htmlFor={`${id}-owner`}>
-                <span>负责人</span>
-                <Select
-                  id={`${id}-owner`}
-                  value={ownerUserId}
-                  onChange={(event) => setOwnerUserId(event.target.value)}
-                  disabled={members.isPending || members.isError}
-                  required
-                >
-                  {!selectedOwnerActive && (
-                    <option value={ownerUserId}>{members.isPending ? '正在加载成员…' : '请选择有效成员'}</option>
-                  )}
-                  {owners.map((member) => (
-                    <option key={member.userId} value={member.userId}>
-                      {member.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              {members.isError && (
-                <Button type="button" variant="outline" onClick={() => void members.refetch()}>
-                  重试加载成员
-                </Button>
-              )}
-              <div className="field">
-                <span>运行环境</span>
-                <span className="runtime-cell">团队执行器</span>
-              </div>
-              {canSelectModel && <BotModelFields selection={modelSelection} isOptional isSaving={mutation.isPending} />}
-              <label className="field full" htmlFor={`${id}-instructions`}>
-                <span>职责说明</span>
-                <Textarea
-                  id={`${id}-instructions`}
-                  value={instructions}
-                  onChange={(event) => setInstructions(event.target.value)}
-                  placeholder="描述长期职责、工作方式与输出要求"
-                  maxLength={16000}
-                  rows={5}
-                />
-              </label>
-              <fieldset className="field full">
-                <legend>Skills</legend>
-                {skillCatalog.isPending && <p className="small muted">正在加载技能…</p>}
-                {skillCatalog.isError && (
-                  <Button type="button" variant="outline" onClick={() => void skillCatalog.refetch()}>
-                    重试加载技能
-                  </Button>
-                )}
-                {skillCatalog.isSuccess && !selectableSkills.length && <p className="small muted">暂无已启用的技能</p>}
-                <div className="work-checks">
-                  {selectableSkills.map((skill) => (
-                    <label className="row" key={skill.id}>
-                      <Checkbox
-                        checked={selectedSkills.includes(skill.id)}
-                        onCheckedChange={(checked) => {
-                          setSelectedSkills((previous) =>
-                            checked === true ? [...previous, skill.id] : previous.filter((id) => id !== skill.id),
-                          )
-                        }}
-                      />
-                      <span>
-                        {skill.name}
-                        {!skill.enabled && '（已停用）'}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-                {skillCatalog.hasNextPage && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={skillCatalog.isFetchingNextPage}
-                    onClick={() => void skillCatalog.fetchNextPage()}
-                  >
-                    加载更多技能
-                  </Button>
-                )}
-              </fieldset>
-              {mutation.error && (
-                <p role="alert" className="text-sm text-destructive">
-                  {describeRequestError(mutation.error).description}
-                </p>
-              )}
-            </div>
-          </DialogFormBody>
-          <DialogFormFooter>
-            <Button type="button" variant="outline" disabled={mutation.isPending} onClick={close}>
-              取消
-            </Button>
-            <Button type="submit" disabled={mutation.isPending || !canSave}>
-              {mutation.isPending ? '正在保存…' : bot ? '保存配置' : '创建智能体'}
-            </Button>
-          </DialogFormFooter>
-        </form>
-        <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>放弃编辑？</AlertDialogTitle>
-              <AlertDialogDescription>关闭会清除这次尚未保存的智能体配置。</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>继续编辑</AlertDialogCancel>
-              <AlertDialogAction onClick={onClose}>放弃修改</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {form}
+        {discardDialog}
       </DialogContent>
     </Dialog>
   )

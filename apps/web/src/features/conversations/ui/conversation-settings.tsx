@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
 import { createIdempotencyKey } from '@dev-ops/api-client'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { BotToolAccess } from '@/features/bots/ui/bot-tool-access'
+import { BotSettingsPanel } from '@/features/bots/ui/bot-settings-panel'
+import { botDetailQueryOptions } from '@/features/bots/api/queries'
 import { taskQueries } from '@/features/bot-tasks/api/queries'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
@@ -26,11 +27,12 @@ import { Textarea } from '@/shared/ui/controls/textarea'
 import { useGroupMemberChoices } from '../api/group-members'
 import { ConversationIcon } from './conversation-icon'
 import { conversationOptions, conversationsQueryKey, type BotConversation } from '../api/queries'
+import './conversation-settings.css'
 
 type Membership = { action: 'add' | 'remove'; memberId: string; kind: 'user' | 'bot' }
 
 /**
- * 按原型展示会话设置，维护工作标签与工具权限；群组还可修改基本配置与成员。
+ * 在会话侧栏展示简介与紧凑标签，就地维护智能体配置、长期记忆、工具权限及群组成员。
  * @param props 已加载的会话、当前用户、会话头像和关闭回调。
  * @returns 右侧设置面板，挂载时聚焦关闭按钮。
  */
@@ -47,11 +49,45 @@ export function ConversationSettings({
 }) {
   const client = useQueryClient()
   const close = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLElement>(null)
+  const [discardOpen, setDiscardOpen] = useState(false)
+  const requestClose = () => {
+    // 汇总内嵌表单的草稿和提交标记，不让关闭侧栏丢失输入或掩盖进行中的保存。
+    if (panel.current?.querySelector('[data-settings-pending="true"]')) return
+    if (panel.current?.querySelector('[data-settings-dirty="true"]')) setDiscardOpen(true)
+    else onClose()
+  }
+  const bots = room.members.filter((member) => member.kind === 'bot')
+  const primary = room.kind === 'direct' ? bots[0] : undefined
+  const botQuery = useQuery(botDetailQueryOptions(primary?.id ?? ''))
+  const bot = botQuery.data?.data
+  const introduction =
+    room.kind === 'direct' ? bot?.instructions || bot?.responsibility : room.instructions || room.responsibility
+  const refreshRoom = () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey }),
+      client.invalidateQueries({ queryKey: [...conversationsQueryKey, room.teamId] }),
+    ])
   useEffect(() => {
     close.current?.focus()
   }, [])
   return (
-    <aside className="chat-settings-panel work-task-panel" aria-label="会话设置">
+    <aside
+      ref={panel}
+      className="chat-settings-panel work-task-panel conversation-settings-panel"
+      aria-label="会话设置"
+      onKeyDownCapture={(event) => {
+        if (
+          event.key === 'Escape' &&
+          !event.defaultPrevented &&
+          !document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
+        ) {
+          event.preventDefault()
+          event.stopPropagation()
+          requestClose()
+        }
+      }}
+    >
       <div className="row">
         <h3>会话设置</h3>
         <span className="spacer" />
@@ -63,57 +99,62 @@ export function ConversationSettings({
           size="icon"
           className="icon-btn"
           aria-label="关闭会话设置"
-          onClick={onClose}
+          onClick={requestClose}
         >
           <ConversationIcon name="close" />
         </Button>
       </div>
       <div className="settings-room-identity">
         {avatar}
-        <strong>{room.name}</strong>
-      </div>
-      {room.kind === 'group' && <GroupSettingsFields room={room} userId={userId} onSaved={onClose} />}
-      <section className="settings-section" aria-label="工具权限">
-        <strong>工具权限</strong>
-        {room.members
-          .filter((member) => member.kind === 'bot')
-          .map((member) => (
-            <BotToolAccess key={member.id} botId={member.id} name={member.name} />
-          ))}
-      </section>
-      <section className="settings-section" aria-label="智能体配置与记忆">
-        <strong>智能体配置与记忆</strong>
-        {room.members
-          .filter((member) => member.kind === 'bot')
-          .map((member) => (
-            <div className="work-gap" key={member.id}>
-              <span className="small quiet">{member.name}</span>
-              <div className="row flex-wrap">
-                <Button asChild variant="outline">
-                  <Link to={`/capabilities/bots/${member.id}`}>编辑配置</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link to={`/capabilities/memory?botId=${member.id}`}>管理记忆</Link>
-                </Button>
-              </div>
-            </div>
-          ))}
-      </section>
-      <section className="settings-section">
+        <strong>{bot?.name ?? room.name}</strong>
         <WorkTagEditor
+          compact
           teamId={room.teamId}
           tags={room.tags}
           target={{ targetKind: 'conversation', targetId: room.id }}
           readOnly={false}
-          onChanged={() =>
-            Promise.all([
-              client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey }),
-              client.invalidateQueries({ queryKey: [...conversationsQueryKey, room.teamId] }),
-            ])
-          }
+          onChanged={refreshRoom}
         />
+      </div>
+      {introduction && <BotIntroduction text={introduction} />}
+      {room.kind === 'group' && <GroupSettingsFields room={room} userId={userId} onSaved={onClose} />}
+      <section className="settings-section" aria-label="工具权限">
+        <strong>工具权限</strong>
+        {bots.map((member) => (
+          <BotToolAccess key={member.id} botId={member.id} name={member.name} />
+        ))}
       </section>
+      {bots.map((member) => (
+        <BotSettingsPanel key={member.id} botId={member.id} userId={userId} onChanged={() => void refreshRoom()} />
+      ))}
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>放弃尚未保存的修改？</AlertDialogTitle>
+            <AlertDialogDescription>关闭会清除侧栏中尚未保存的配置和记忆内容。</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>继续编辑</AlertDialogCancel>
+            <AlertDialogAction onClick={onClose}>放弃修改</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
+  )
+}
+
+function BotIntroduction({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const hasMore = text.length > 100
+  return (
+    <div className="settings-bot-introduction">
+      <p>{hasMore && !expanded ? `${text.slice(0, 100).trimEnd()}…` : text}</p>
+      {hasMore && (
+        <Button type="button" variant="ghost" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+          {expanded ? '收起介绍' : '展开介绍'}
+        </Button>
+      )}
+    </div>
   )
 }
 

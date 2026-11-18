@@ -20,10 +20,18 @@ import { BotModelFields } from './bot-model-fields'
 
 /**
  * 允许团队管理员用目录中的可用模型更新智能体绑定。
- * @param props 待更新的智能体和关闭弹窗的回调。
- * @returns 模型绑定弹窗，保存失败时保留当前选择。
+ * @param props 待更新的智能体、是否内嵌侧栏与关闭回调。
+ * @returns 模型绑定表单或弹窗，保存失败时保留当前选择。
  */
-export function BotModelForm({ bot, onClose }: { bot: BotView; onClose: () => void }) {
+export function BotModelForm({
+  bot,
+  inline = false,
+  onClose,
+}: {
+  bot: BotView
+  inline?: boolean
+  onClose: () => void
+}) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
   const selection = useBotModelSelection(bot.teamId, true, bot.modelConnectionId ?? '', bot.modelId ?? '')
@@ -47,6 +55,35 @@ export function BotModelForm({ bot, onClose }: { bot: BotView; onClose: () => vo
     if (selection.binding && !mutation.isPending) mutation.mutate(selection.binding)
   }
 
+  const hasEdits = selection.connectionId !== (bot.modelConnectionId ?? '') || selection.modelId !== (bot.modelId ?? '')
+  const Body = inline ? 'div' : DialogFormBody
+  const Footer = inline ? 'div' : DialogFormFooter
+  const form = (
+    <form
+      data-settings-dirty={(inline && hasEdits) || undefined}
+      data-settings-pending={(inline && mutation.isPending) || undefined}
+      className={inline ? 'grid gap-4' : 'flex min-h-0 flex-col'}
+      onSubmit={submit}
+    >
+      <Body className={inline ? 'grid gap-3' : 'space-y-4'}>
+        <BotModelFields selection={selection} isSaving={mutation.isPending} />
+        {mutation.error && (
+          <p role="alert" className="text-sm text-destructive">
+            {describeRequestError(mutation.error).description}
+          </p>
+        )}
+      </Body>
+      <Footer className={inline ? 'row justify-end' : undefined}>
+        <Button type="button" variant="outline" disabled={mutation.isPending} onClick={onClose}>
+          取消
+        </Button>
+        <Button type="submit" disabled={mutation.isPending || !selection.binding}>
+          {mutation.isPending ? '正在保存…' : '保存配置'}
+        </Button>
+      </Footer>
+    </form>
+  )
+  if (inline) return form
   return (
     <Dialog
       open
@@ -54,29 +91,12 @@ export function BotModelForm({ bot, onClose }: { bot: BotView; onClose: () => vo
         if (!open && !mutation.isPending) onClose()
       }}
     >
-      <DialogContent layout="form">
+      <DialogContent className="dialog-w-md">
         <DialogFormHeader>
           <DialogTitle>绑定模型</DialogTitle>
           <DialogDescription>从团队现有连接和提供方模型目录中选择。</DialogDescription>
         </DialogFormHeader>
-        <form className="flex min-h-0 flex-col" onSubmit={submit}>
-          <DialogFormBody className="space-y-4">
-            <BotModelFields selection={selection} isSaving={mutation.isPending} />
-            {mutation.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {describeRequestError(mutation.error).description}
-              </p>
-            )}
-          </DialogFormBody>
-          <DialogFormFooter>
-            <Button type="button" variant="outline" disabled={mutation.isPending} onClick={onClose}>
-              取消
-            </Button>
-            <Button type="submit" disabled={mutation.isPending || !selection.binding}>
-              {mutation.isPending ? '正在保存…' : '保存配置'}
-            </Button>
-          </DialogFormFooter>
-        </form>
+        {form}
       </DialogContent>
     </Dialog>
   )

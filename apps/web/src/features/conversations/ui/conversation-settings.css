@@ -1,0 +1,21 @@
+.conversation-settings-panel .settings-room-identity {
+  gap: 8px;
+  padding-bottom: 12px;
+}
+
+.conversation-settings-panel .work-tag-compact {
+  width: 100%;
+}
+
+.conversation-settings-panel .settings-bot-introduction {
+  padding-bottom: 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.conversation-settings-panel .field-error {
+  color: var(--destructive);
+}
