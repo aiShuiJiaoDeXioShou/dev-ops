@@ -2,31 +2,20 @@ import { useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router'
 import ReactMarkdown from 'react-markdown'
 import rehypeSanitize from 'rehype-sanitize'
+import remarkGfm from 'remark-gfm'
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/shared/ui/controls/table'
+import { AnswerFooter } from './answer-footer'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
-import type { ConversationMessage } from '../api/queries'
-
-export type MessageView = {
-  id: string
-  runId?: string
-  name: string
-  kind: ConversationMessage['speakerKind']
-  text: string
-  time?: string
-  bot?: { id: string; avatarKey?: string | null; enabled?: boolean }
-  status?: string
-  statusText?: string
-  elapsed?: string
-  memoryChanges?: string[]
-}
+import type { MessageView } from './conversation-message.view'
 
 const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
 const FOLLOW_DISTANCE_PX = 72
 
 /**
  * 以原型的消息流显示对话、输出进度和历史状态。
- * @param props 消息视图、空会话信息、历史加载及查看轨迹入口。
+ * @param props 消息视图、空会话信息、历史加载、会话标识和权限。
  * @returns 可独立滚动的消息区。追加正文时仅跟随已经靠近底部的用户。
  */
 export function ConversationMessages({
@@ -37,7 +26,8 @@ export function ConversationMessages({
   hasEarlier,
   loadingEarlier,
   loadEarlier,
-  onTrace,
+  conversationId,
+  readOnly,
   isVisible,
 }: {
   items: MessageView[]
@@ -47,11 +37,13 @@ export function ConversationMessages({
   hasEarlier: boolean
   loadingEarlier: boolean
   loadEarlier: () => void
-  onTrace: (runId: string) => void
+  conversationId: string
+  readOnly: boolean
   isVisible: boolean
 }) {
   const scrollBox = useRef<HTMLDivElement>(null)
   const follow = useRef(true)
+  const linkedMessage = useRef<string | null>(null)
   const historyOffset = useRef<number | null>(null)
   const last = items.at(-1)
   const isEmpty = !last && !hasEarlier
@@ -59,6 +51,14 @@ export function ConversationMessages({
   useLayoutEffect(() => {
     const box = scrollBox.current
     if (!box || !isVisible) return
+    const targetId = window.location.hash.slice(1)
+    const target = targetId.startsWith('message-') ? document.getElementById(targetId) : null
+    if (target && box.contains(target) && linkedMessage.current !== targetId) {
+      linkedMessage.current = targetId
+      follow.current = false
+      target.scrollIntoView({ block: 'center' })
+      return
+    }
     if (historyOffset.current !== null && !loadingEarlier) {
       box.scrollTop = box.scrollHeight - historyOffset.current
       historyOffset.current = null
@@ -109,6 +109,7 @@ export function ConversationMessages({
             return (
               <article
                 key={message.id}
+                id={`message-${message.id}`}
                 className={cn(
                   'dsh-message',
                   message.kind === 'user' ? 'dsh-user' : 'dsh-assistant',
@@ -132,13 +133,19 @@ export function ConversationMessages({
                         />
                       )}
                       <span className="dsh-author">{message.name}</span>
-                      {time}
                     </div>
                     {message.text && message.runId ? (
                       <div className="md-body dsh-markdown">
                         <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
                           rehypePlugins={[rehypeSanitize]}
                           components={{
+                            table: ({ children }) => <Table>{children}</Table>,
+                            thead: ({ children }) => <TableHeader>{children}</TableHeader>,
+                            tbody: ({ children }) => <TableBody>{children}</TableBody>,
+                            tr: ({ children }) => <TableRow>{children}</TableRow>,
+                            th: ({ children }) => <TableHead scope="col">{children}</TableHead>,
+                            td: ({ children }) => <TableCell>{children}</TableCell>,
                             p: ({ children, node }) => (
                               <p>
                                 {children}
@@ -156,29 +163,19 @@ export function ConversationMessages({
                       message.text && <div className="dsh-plain-text">{message.text}</div>
                     )}
                     {running && !message.text && <p className="dsh-waiting">正在准备回复…</p>}
-                    {(message.statusText || message.elapsed || message.runId) && (
-                      <div className="dsh-message-foot">
+                    {message.status && ['running', 'queued', 'stopped', 'failed'].includes(message.status) && (
+                      <div className="dsh-message-foot" role="status">
                         {running && <span className="dsh-pulse" aria-hidden="true" />}
                         {message.statusText && (
                           <span className={message.status === 'stopped' ? 'dsh-stopped' : undefined}>
                             {message.statusText}
                           </span>
                         )}
-                        {message.elapsed && <span>{message.elapsed}</span>}
                         {message.status === 'stopped' && message.text && <span>已保留部分结果</span>}
-                        {message.runId && (
-                          <Button
-                            unstyled
-                            type="button"
-                            className="dsh-link"
-                            onClick={() => {
-                              if (message.runId) onTrace(message.runId)
-                            }}
-                          >
-                            查看轨迹
-                          </Button>
-                        )}
                       </div>
+                    )}
+                    {message.text && message.runId && !['running', 'queued'].includes(message.status ?? '') && (
+                      <AnswerFooter message={message} conversationId={conversationId} readOnly={readOnly} />
                     )}
                     {message.memoryChanges?.map((action, index) => (
                       <details key={index} className="dsh-note">

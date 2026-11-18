@@ -14,7 +14,8 @@ import {
 import { ConversationAvatar } from '@/features/conversations/ui/conversation-avatar'
 import { ConversationComposer } from '@/features/conversations/ui/conversation-composer'
 import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
-import { ConversationMessages, type MessageView } from '@/features/conversations/ui/conversation-messages'
+import { ConversationMessages } from '@/features/conversations/ui/conversation-messages'
+import type { MessageView } from '@/features/conversations/ui/conversation-message.view'
 import {
   ConversationTrajectory,
   runElapsed,
@@ -184,6 +185,8 @@ export function ConversationRoom({
       runId: message.speakerKind === 'bot' && message.runId ? message.runId : undefined,
       status: run?.status,
       elapsed: run ? runElapsed(run, now) : undefined,
+      metrics: message.body.metrics,
+      feedback: message.feedback,
       memoryChanges: message.speakerKind === 'bot' && message.runId ? memoryFor(message.runId) : undefined,
     }
   })
@@ -205,10 +208,6 @@ export function ConversationRoom({
       },
     ]
   })
-  function showTrace(runId: string) {
-    setTraceId(runId)
-    setTab('activity')
-  }
   function openTask() {
     if (taskPanelOpen) {
       closePanel()
@@ -350,7 +349,8 @@ export function ConversationRoom({
               hasEarlier={messages.hasNextPage}
               loadingEarlier={messages.isFetchingNextPage}
               loadEarlier={() => void messages.fetchNextPage()}
-              onTrace={showTrace}
+              conversationId={room.id}
+              readOnly={readOnly}
               isVisible={tab === 'chat'}
             />
           )}
@@ -381,9 +381,6 @@ export function ConversationRoom({
                 </>
               )}
               <span className="spacer" />
-              <Button unstyled type="button" className="dsh-link" onClick={() => showTrace(liveRun.id)}>
-                查看轨迹
-              </Button>
             </div>
           )}
           <ConversationComposer

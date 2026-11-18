@@ -90,7 +90,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     })
   })
   await page.route(`**/api/v1/bot-conversations/${room.id}`, (route) => route.fulfill({ json: success(room) }))
-  const bot = {
+  const bot: ApiSuccessData<'/api/v1/bots/{botId}', 'get'> = {
     id: botId,
     teamId,
     name: room.name,
@@ -101,6 +101,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     ownerName: '负责人',
     status: 'enabled',
     availability: 'available',
+    accessMode: 'sandbox',
     configVersion: 1,
     modelConnectionId: null,
     connectionName: null,
@@ -109,6 +110,13 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     lastActiveAt: null,
     skillIds: [skillId],
   } satisfies ApiSuccessData<'/api/v1/bots/{botId}', 'get'>
+  await page.route(`**/api/v1/bots/${botId}`, (route) => route.fulfill({ json: success(bot) }))
+  await page.route(`**/api/v1/bots/${botId}/set-access`, (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({ configVersion: bot.configVersion, accessMode: 'full' })
+    bot.accessMode = 'full'
+    bot.configVersion++
+    return route.fulfill({ json: success(bot) })
+  })
   await page.route(`**/api/v1/teams/${teamId}/bots*`, (route) =>
     route.fulfill({
       json: success({
@@ -180,6 +188,12 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     })
   })
 
+  await page.route(`${messagePath}/*/feedback`, (route) => {
+    const value = route.request().postDataJSON().rating
+    const message = list.at(-1)
+    if (message) message.feedback = value
+    return route.fulfill({ json: success({ id: message?.id, rating: value }) })
+  })
   await page.goto(`/collaboration/${room.id}`)
   const tabs = page.getByRole('tablist', { name: '会话视图' })
   await expect(tabs.getByRole('tab')).toHaveCount(2)
@@ -236,13 +250,57 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     speakerKind: 'bot',
     speakerId: botId,
     speakerName: '验收助理',
-    body: { blocks: [{ type: 'text', text: '**验收结果**：已检查。' }] },
+    body: {
+      metrics: {
+        inputTokens: 1000,
+        outputTokens: 200,
+        cacheReadTokens: 50,
+        cacheWriteTokens: 0,
+        costUsd: 0.001,
+        turns: 2,
+        durationMs: 8600,
+      },
+      blocks: [
+        {
+          type: 'text',
+          text: '**验收结果**：已检查。\n\n| 方法 | 路径 | 用途 |\n| --- | --- | --- |\n| GET | `/api/v1/projects` | 查看项目 |',
+        },
+      ],
+    },
     runId,
     createdAt: stamp,
   })
   stage = 'complete'
   await expect(page.getByText('验收结果', { exact: true })).toBeVisible()
   await expect(page.getByText('正在检查', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('查看轨迹', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Enter 发送 · Shift+Enter 换行', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('table').getByRole('columnheader')).toHaveCount(3)
+  await expect(page.getByRole('table').getByRole('cell', { name: '查看项目' })).toBeVisible()
+  const footer = page.getByRole('group', { name: '回答操作' })
+  if (testInfo.project.name === 'desktop') {
+    await page.mouse.move(0, 0)
+    await expect(footer.locator('.dsh-answer-controls')).toHaveCSS('opacity', '0')
+    await footer.hover()
+  }
+  await expect(footer.locator('.dsh-answer-controls')).toHaveCSS('opacity', '1')
+  await footer.getByRole('button', { name: '回答有帮助', exact: true }).click()
+  await expect(footer.getByRole('button', { name: '回答有帮助', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await footer.getByRole('button', { name: '回答有帮助', exact: true }).click()
+  await expect(footer.getByRole('button', { name: '回答有帮助', exact: true })).toHaveAttribute('aria-pressed', 'false')
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+  await footer.getByRole('button', { name: '复制回答', exact: true }).click()
+  await expect(footer.getByRole('button', { name: '已复制回答', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('| 方法 | 路径 | 用途 |')
+  await footer.getByRole('button', { name: '复制回答链接', exact: true }).click()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    `/collaboration/${room.id}#message-da55aa00-0000-4000-8000-000000000022`,
+  )
+  await footer.getByRole('button', { name: '回答详情', exact: true }).press('Enter')
+  await expect(page.getByText('输入 Token', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(footer.getByRole('button', { name: '回答详情', exact: true })).toBeFocused()
+  await page.screenshot({ path: testInfo.outputPath('bot-answer-footer.png'), animations: 'disabled' })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('bot-conversations.png') })
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).press('Enter')
@@ -259,6 +317,11 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   const settings = page.getByRole('button', { name: '会话设置', exact: true })
   await settings.press('Enter')
   const settingsPanel = page.getByRole('complementary', { name: '会话设置' })
+  const access = settingsPanel.getByRole('combobox', { name: /工具访问权限/ })
+  await expect(access).toHaveValue('sandbox')
+  await access.selectOption('full')
+  await expect(access).toHaveValue('full')
+  await expect(settingsPanel.getByText('允许工具访问执行主机上的其他目录。')).toBeVisible()
   const manageTags = settingsPanel.getByRole('button', { name: '管理工作标签' })
   await expect(manageTags).toHaveAttribute('aria-expanded', 'false')
   await manageTags.press('Enter')

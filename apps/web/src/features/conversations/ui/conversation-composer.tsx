@@ -322,13 +322,9 @@ export function ConversationComposer({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <span className={cn('dsh-composer-hint', room.kind === 'group' && 'is-required')}>
-          {supplement
-            ? '任务补充'
-            : room.kind === 'group'
-              ? '智能体读取团队资料后，结果对会话全体成员可见。'
-              : 'Enter 发送 · Shift+Enter 换行'}
-        </span>
+        {room.kind === 'group' && (
+          <span className="dsh-composer-hint is-required">智能体读取团队资料后，结果对会话全体成员可见。</span>
+        )}
         <span className="spacer" />
         {runningId ? (
           <Button

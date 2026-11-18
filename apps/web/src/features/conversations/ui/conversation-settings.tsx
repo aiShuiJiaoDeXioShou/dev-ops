@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
+import { BotToolAccess } from '@/features/bots/ui/bot-tool-access'
 import { taskQueries } from '@/features/bot-tasks/api/queries'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
@@ -28,7 +29,7 @@ import { conversationOptions, conversationsQueryKey, type BotConversation } from
 type Membership = { action: 'add' | 'remove'; memberId: string; kind: 'user' | 'bot' }
 
 /**
- * 按原型展示会话设置。私聊可维护工作标签，群组还可修改基本配置与成员。
+ * 按原型展示会话设置，维护工作标签与工具权限；群组还可修改基本配置与成员。
  * @param props 已加载的会话、当前用户、会话头像和关闭回调。
  * @returns 右侧设置面板，挂载时聚焦关闭按钮。
  */
@@ -71,6 +72,14 @@ export function ConversationSettings({
         <strong>{room.name}</strong>
       </div>
       {room.kind === 'group' && <GroupSettingsFields room={room} userId={userId} onSaved={onClose} />}
+      <section className="settings-section" aria-label="工具权限">
+        <strong>工具权限</strong>
+        {room.members
+          .filter((member) => member.kind === 'bot')
+          .map((member) => (
+            <BotToolAccess key={member.id} botId={member.id} name={member.name} />
+          ))}
+      </section>
       <section className="settings-section">
         <WorkTagEditor
           teamId={room.teamId}
