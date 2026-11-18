@@ -433,3 +433,5 @@ packages/bots-client/  从 Bots OpenAPI 生成的客户端
 [HTTP 服务](../../apps/server/src/bootstrap/create-http-app.ts)负责团队、模型连接、会话、任务、标签与记忆接口，执行进程由 [Bot Worker](../../apps/server/src/bootstrap/create-bot-worker.ts)领取队列。运行期间以 PostgreSQL 租约代次处理停止和恢复，使用游标读取资源与运行事件。
 
 [平台接口目录](../../tooling/scripts/generate-bot-api-catalog.mjs)从注册路由的 OpenAPI 生成，内部调用按触发人的当前团队和资源权限执行。执行记录追踪来源、幂等键与状态。记忆使用 PostgreSQL `pg_trgm` 检索，常驻正文总预算为 4096 字节。每次领取运行保存已配置 Skills 的版本，`skill_view` 按需读当次可用的版本。
+
+执行过程的 Web 入口统一为会话「轨迹」，由 [ConversationTrajectory](../../apps/web/src/features/conversations/ui/conversation-trajectory.tsx) 按运行增量读取会话事件，展示状态、耗时、真实用量、分类步骤、时间线和步骤详情。智能体详情仅展示配置与模型连接状态，不再请求或展示独立运行记录列表。`bot_run`、配置快照和事件仍保留，支撑调度、停止、恢复、权限校验与轨迹；移除界面入口不删除历史数据。

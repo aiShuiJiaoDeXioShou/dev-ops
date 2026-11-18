@@ -206,7 +206,7 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
   await page.getByRole('link', { name: `查看${fixture.name}详情` }).click()
   const detail = page.getByRole('complementary', { name: '智能体详情' })
   await expect(detail).toBeVisible()
-  await expect(detail.getByRole('tab', { name: '运行记录' })).toBeVisible()
+  await expect(detail.getByRole('tab', { name: '运行记录' })).toHaveCount(0)
   await expect(detail.getByRole('tab', { name: '项目' })).toHaveCount(0)
   await expect(detail.getByRole('definition').filter({ hasText: modelId })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('bot-detail.png') })

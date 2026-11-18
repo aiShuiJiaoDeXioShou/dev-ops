@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Clock, Cpu, Layers, MessageSquare, Pencil, Shield, SquareTerminal, User, X } from 'lucide-react'
+import { Cpu, Layers, MessageSquare, Pencil, Shield, SquareTerminal, User, X } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
-import { formatDateTime } from '@/shared/lib/format'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,93 +16,16 @@ import {
   AlertDialogTrigger,
 } from '@/shared/ui/controls/alert-dialog'
 import { Button } from '@/shared/ui/controls/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { useOpenDirectConversation } from '@/features/conversations/api/open-direct'
 import { skillListQueryOptions } from '@/features/knowledge/api/queries'
-import { botDetailQueryOptions, botQueryKey, botRunsQueryOptions, type BotRunView } from '../api/queries'
+import { botDetailQueryOptions, botQueryKey } from '../api/queries'
 import { BotAvatar } from './bot-avatar'
 import { BotForm } from './bot-form'
 import { BotModelForm } from './bot-model-form'
 import { BotStatus } from './bot-status'
-
-const runLabels = {
-  queued: '排队中',
-  running: '执行中',
-  succeeded: '已完成',
-  failed: '失败',
-  stopped: '已停止',
-} satisfies Record<BotRunView['status'], string>
-
-function BotRuns({ botId }: { botId: string }) {
-  const [cursor, setCursor] = useState<string>()
-  const query = useQuery(botRunsQueryOptions(botId, cursor))
-  const records = query.data?.data
-  return (
-    <div className="run-list">
-      {query.isPending && <DelayedPageSkeleton />}
-      {query.isError && <PageError title="运行记录加载失败" error={query.error} onRetry={() => void query.refetch()} />}
-      {records?.items.length === 0 && (
-        <div className="empty">
-          <h3>还没有运行记录</h3>
-        </div>
-      )}
-      {records?.items.map((run) => (
-        <article key={run.id}>
-          <div className="row">
-            {run.status === 'succeeded' ? (
-              <Check className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-            ) : (
-              <Clock className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-            )}
-            <strong>{runLabels[run.status]}</strong>
-          </div>
-          <p>
-            {formatDateTime(run.createdAt)} · {run.turns} 轮
-          </p>
-          <details className="small">
-            <summary>技能版本</summary>
-            {run.skillVersions === null ? (
-              <p>版本未知</p>
-            ) : !run.skillVersions.length ? (
-              <p>未使用技能</p>
-            ) : (
-              <ul>
-                {run.skillVersions.map((skill) => (
-                  <li key={skill.skillId}>
-                    {skill.name} · {skill.status === 'unavailable' ? '不可用' : (skill.version ?? '版本未知')}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </details>
-          {run.failureMessage && <p className="break-words">{run.failureMessage}</p>}
-        </article>
-      ))}
-      {(cursor || records?.nextCursor) && (
-        <div className="flex gap-2">
-          {cursor && (
-            <Button variant="outline" type="button" onClick={() => setCursor(undefined)}>
-              回到第一页
-            </Button>
-          )}
-          {records?.nextCursor && (
-            <Button
-              variant="outline"
-              type="button"
-              disabled={query.isFetching}
-              onClick={() => setCursor(records.nextCursor ?? undefined)}
-            >
-              下一页
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 interface BotDetailProps {
   botId: string
@@ -114,7 +36,11 @@ interface BotDetailProps {
   onClose: () => void
 }
 
-/** 沿用原型右侧详情栏，保留配置和当前会话权限下的运行记录。 */
+/**
+ * 在智能体详情侧栏查看配置、绑定模型、启停或打开对话；执行过程统一在会话轨迹中查看。
+ * @param props 智能体与团队标识、当前用户、编辑和绑定权限及关闭回调。
+ * @returns 具有加载、失败、重试与只读状态的详情侧栏；关闭后归还打开入口的焦点。
+ */
 export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClose }: BotDetailProps) {
   const query = useQuery(botDetailQueryOptions(botId))
   const bot = query.data?.data
@@ -209,84 +135,68 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
             <span className="spacer" />
             <BotStatus value={bot.availability} />
           </div>
-          <Tabs defaultValue="config" className="min-h-0 flex-1 gap-0">
-            <TabsList
-              className="agent-detail-tabs tabs w-auto gap-6 rounded-none bg-transparent p-0"
-              aria-label="智能体详情内容"
-            >
-              <TabsTrigger value="config" variant="underline">
-                配置
-              </TabsTrigger>
-              <TabsTrigger value="runs" variant="underline">
-                运行记录
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="config" className="detail-scroll">
-              {bot.instructions && (
-                <p className="agent-purpose whitespace-pre-wrap wrap-break-word">{bot.instructions}</p>
-              )}
-              <dl className="properties">
-                <dt>
-                  <User className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-                  负责人
-                </dt>
-                <dd>{bot.ownerName ?? '未找到成员'}</dd>
-                <dt>
-                  <SquareTerminal className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-                  运行环境
-                </dt>
-                <dd>团队执行器</dd>
-                <dt>
-                  <Cpu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-                  模型
-                </dt>
-                <dd className="wrap-break-word">
-                  {bot.modelId ?? '未绑定模型'}
-                  {bot.connectionName && <span className="small quiet block">{bot.connectionName}</span>}
-                  {canBindModel && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => setBindingModel(true)}
-                    >
-                      绑定模型
-                    </Button>
-                  )}
-                </dd>
-                <dt>
-                  <Shield className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-                  使用范围
-                </dt>
-                <dd>独立 Bot</dd>
-              </dl>
-              <div className="agent-section">
-                <h3>
-                  可用 Skills <span className="counter">{bot.skillIds.length}</span>
-                </h3>
-                <div className="agent-skills">
-                  {bot.skillIds.length === 0 && <p className="quiet small">尚未配置技能</p>}
-                  {skillQuery.isFetching && bot.skillIds.length > 0 && <p className="quiet small">正在加载技能…</p>}
-                  {skillQuery.isError && (
-                    <Button variant="outline" type="button" onClick={() => void skillQuery.refetch()}>
-                      重试加载技能
-                    </Button>
-                  )}
-                  {enabledSkills.map((skill) => (
-                    <div key={skill.id} className="row py-2 small">
-                      <Layers className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
-                      <span>{skill.name}</span>
-                      {!skill.enabled && <span className="quiet">已停用</span>}
-                    </div>
-                  ))}
-                </div>
+          <div className="detail-scroll">
+            {bot.instructions && (
+              <p className="agent-purpose whitespace-pre-wrap wrap-break-word">{bot.instructions}</p>
+            )}
+            <dl className="properties">
+              <dt>
+                <User className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                负责人
+              </dt>
+              <dd>{bot.ownerName ?? '未找到成员'}</dd>
+              <dt>
+                <SquareTerminal className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                运行环境
+              </dt>
+              <dd>团队执行器</dd>
+              <dt>
+                <Cpu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                模型
+              </dt>
+              <dd className="wrap-break-word">
+                {bot.modelId ?? '未绑定模型'}
+                {bot.connectionName && <span className="small quiet block">{bot.connectionName}</span>}
+                {canBindModel && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setBindingModel(true)}
+                  >
+                    绑定模型
+                  </Button>
+                )}
+              </dd>
+              <dt>
+                <Shield className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                使用范围
+              </dt>
+              <dd>独立 Bot</dd>
+            </dl>
+            <div className="agent-section">
+              <h3>
+                可用 Skills <span className="counter">{bot.skillIds.length}</span>
+              </h3>
+              <div className="agent-skills">
+                {bot.skillIds.length === 0 && <p className="quiet small">尚未配置技能</p>}
+                {skillQuery.isFetching && bot.skillIds.length > 0 && <p className="quiet small">正在加载技能…</p>}
+                {skillQuery.isError && (
+                  <Button variant="outline" type="button" onClick={() => void skillQuery.refetch()}>
+                    重试加载技能
+                  </Button>
+                )}
+                {enabledSkills.map((skill) => (
+                  <div key={skill.id} className="row py-2 small">
+                    <Layers className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
+                    <span>{skill.name}</span>
+                    {!skill.enabled && <span className="quiet">已停用</span>}
+                  </div>
+                ))}
               </div>
-            </TabsContent>
-            <TabsContent value="runs" className="detail-scroll">
-              <BotRuns key={bot.id} botId={bot.id} />
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
           {toggle.error && (
             <p role="alert" className="mx-5 text-sm text-destructive">
               {describeRequestError(toggle.error).description}

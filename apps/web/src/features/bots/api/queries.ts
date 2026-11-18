@@ -3,7 +3,6 @@ import type { ApiQuery, ApiSuccessData } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 
 export type BotView = ApiSuccessData<'/api/v1/bots/{botId}', 'get'>
-export type BotRunView = ApiSuccessData<'/api/v1/bots/{botId}/runs', 'get'>['items'][number]
 export type BotFilters = ApiQuery<'/api/v1/teams/{teamId}/bots', 'get'>
 
 export const botQueryKey = ['bots']
@@ -23,15 +22,6 @@ export function botDetailQueryOptions(botId: string) {
     queryKey: [...botQueryKey, 'detail', botId],
     queryFn: ({ signal }) => apiClient.getBot(botId, { signal }),
     enabled: Boolean(botId),
-  })
-}
-
-/** 查询当前用户可见会话中的运行记录。 */
-export function botRunsQueryOptions(botId: string, cursor?: string) {
-  return queryOptions({
-    queryKey: [...botQueryKey, 'runs', botId, cursor],
-    queryFn: ({ signal }) => apiClient.listBotRuns(botId, { cursor }, { signal }),
-    placeholderData: keepPreviousData,
   })
 }
 
