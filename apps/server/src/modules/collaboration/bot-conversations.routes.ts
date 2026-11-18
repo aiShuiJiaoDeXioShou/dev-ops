@@ -181,7 +181,7 @@ export const botConversationsRoutes: FastifyPluginAsyncTypebox<{
     },
     async (request) =>
       success(
-        await service.events(await requireActor(request), request.params.conversationId, request.query.after),
+        await service.events(await requireActor(request), request.params.conversationId, request.query),
         request.id,
       ),
   )

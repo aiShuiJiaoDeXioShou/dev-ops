@@ -127,6 +127,17 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   const incremental = await get(`${eventsPath}?after=${events.data.cursor}`, devUser)
   assert.equal(incremental.data.items.length, 1)
   assert.equal(incremental.data.items[0].payload.text, '回复片段')
+  const firstTrace = await get(`${eventsPath}?runId=${claimed.id}`, devUser)
+  assert.deepEqual(
+    firstTrace.data.items.map(({ runId }: { runId: string }) => runId),
+    [claimed.id, claimed.id, claimed.id],
+  )
+  assert.deepEqual(firstTrace.data.activeRuns, [{ id: claimed.id, botId, status: 'running' }])
+  const secondTrace = await get(`${eventsPath}?runId=${second.data.runId}&after=1`, devUser)
+  assert.equal(secondTrace.data.items.length, 1)
+  assert.equal(secondTrace.data.items[0].runId, second.data.runId)
+  assert.equal(secondTrace.data.resetRequired, false)
+  assert.equal((await get(`${eventsPath}?runId=${claimed.id}`, otherUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
   await db.delete(botEvent).where(and(eq(botEvent.conversation_id, roomId), lte(botEvent.sequence, 2n)))
   const stale = await get(`${eventsPath}?after=1`, devUser)
   assert.equal(stale.data.resetRequired, true)

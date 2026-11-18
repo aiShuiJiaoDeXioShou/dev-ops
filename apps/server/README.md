@@ -321,6 +321,8 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 
 会话列表仅返回当前成员可见的会话。`botAvatars` 最多返回四位当前 Bot，群聊优先返回 Leader。`lastMessagePreview` 是最新消息的纯文本摘要，没有消息时为 `null`。运行状态事件的 `botId` 标识当前执行者。
 
+轨迹按运行分页读取同一事件接口，可传入 `runId` 筛选会话内的运行并继续使用返回的 `cursor`。需要同时满足会话成员权限和运行归属范围。
+
 团队管理员可在 `POST /api/v1/teams/:teamId/bots` 的请求中传入 `modelBinding: { connectionId, modelId }`，在创建 Bot 的同一事务中绑定团队模型连接与模型。常规创建允许省略该字段，已有 Bot 通过 `POST /api/v1/bots/:botId/bind-model` 更新绑定。
 
 模型 API Key 由管理员保存在团队凭据库。使用本地 `.env` 的 `DEEPSEEK_API_KEY` 验收时，先构建工程，再从根目录运行 `DEVOPS_BOT_LIVE_TEST=1 node --test tests/e2e/bot-collaboration.test.mjs`。通过订阅登录连接模型时，授权由发起连接的管理员亲自完成。

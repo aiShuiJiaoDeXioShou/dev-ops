@@ -77,7 +77,10 @@ export const conversationMessagesQuery = Type.Object(
   },
   { additionalProperties: false },
 )
-export const conversationEventsQuery = Type.Object({ after: Type.Optional(sequence) }, { additionalProperties: false })
+export const conversationEventsQuery = Type.Object(
+  { after: Type.Optional(sequence), runId: Type.Optional(uuid) },
+  { additionalProperties: false },
+)
 export const createDirectConversationBody = Type.Object(
   { kind: Type.Literal('direct'), botId: uuid },
   { additionalProperties: false },

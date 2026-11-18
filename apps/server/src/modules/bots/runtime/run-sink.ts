@@ -15,16 +15,16 @@ function safeText(text: string): string {
 }
 
 function savedEvent(event: Exclude<RunEvent, { type: 'turn_finished' }>) {
-  const run_sequence = event.seq
+  const order = { run_sequence: event.seq, created_at: new Date() }
   switch (event.type) {
     case 'output_delta':
-      return { run_sequence, kind: 'output_delta', payload: { text: safeText(event.payload.text) } }
+      return { ...order, kind: 'output_delta', payload: { text: safeText(event.payload.text) } }
     case 'tool_started':
-      return { run_sequence, kind: 'tool_activity', payload: { state: 'started', ...event.payload } }
+      return { ...order, kind: 'tool_activity', payload: { state: 'started', ...event.payload } }
     case 'tool_finished':
-      return { run_sequence, kind: 'tool_activity', payload: { state: 'finished', ...event.payload } }
+      return { ...order, kind: 'tool_activity', payload: { state: 'finished', ...event.payload } }
     case 'memory_written':
-      return { run_sequence, kind: 'tool_activity', payload: { state: 'memory_written', ...event.payload } }
+      return { ...order, kind: 'tool_activity', payload: { state: 'memory_written', ...event.payload } }
   }
 }
 

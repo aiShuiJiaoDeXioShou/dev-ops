@@ -592,10 +592,16 @@ export function createBotConversationsService(db: Database) {
         return { message: messageView({ ...message, run_id: run.id }, actor.name), runId: run.id }
       })
     },
-    /** 查询增量事件和当前在途运行；过旧游标提示重新同步。 */
-    async events(actor: SessionUser, conversationId: string, after?: string) {
+    /**
+     * 查询增量事件和当前在途运行，可限定为会话内的一次运行。
+     * @param actor 当前会话成员。
+     * @param conversationId 会话标识。
+     * @param filters 会话事件游标和可选的运行标识。
+     * @returns 按序号排列的事件、游标和在途运行；过旧游标提示重新同步。
+     */
+    async events(actor: SessionUser, conversationId: string, filters: { after?: string; runId?: string }) {
       const conversation = await requireBotConversation(db, actor, conversationId)
-      const cursor = sequenceOf(after)
+      const cursor = sequenceOf(filters.after)
       const eventScope = and(eq(botEvent.team_id, conversation.team_id), eq(botEvent.conversation_id, conversationId))
       const [oldest] = await db
         .select({ sequence: botEvent.sequence })
@@ -607,7 +613,13 @@ export function createBotConversationsService(db: Database) {
       const rows = await db
         .select()
         .from(botEvent)
-        .where(and(eventScope, cursor !== undefined && !resetRequired ? gt(botEvent.sequence, cursor) : undefined))
+        .where(
+          and(
+            eventScope,
+            cursor !== undefined && !resetRequired ? gt(botEvent.sequence, cursor) : undefined,
+            filters.runId ? eq(botEvent.run_id, filters.runId) : undefined,
+          ),
+        )
         .orderBy(asc(botEvent.sequence))
         .limit(EVENT_PAGE_SIZE)
       const queued = alias(botRun, 'queued_run')
@@ -636,6 +648,7 @@ export function createBotConversationsService(db: Database) {
           and(
             eq(botRun.team_id, conversation.team_id),
             eq(botRun.conversation_id, conversationId),
+            filters.runId ? eq(botRun.id, filters.runId) : undefined,
             inArray(botRun.status, ['queued', 'running']),
           ),
         )
