@@ -11,7 +11,7 @@ function success(data: unknown) {
   return { success: true, code: 'OK', message: 'OK', requestId: 'trajectory-visual-test', data }
 }
 
-test('[desktop] [mobile] 切换历史运行并在时间线上查看模型和工具步骤', async ({ page }, testInfo) => {
+test('[desktop] [mobile] 自动展示最近一次运行并在时间线上查看模型和工具步骤', async ({ page }, testInfo) => {
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
   const botId = 'da55bb00-0000-4000-8000-000000000011'
@@ -35,8 +35,8 @@ test('[desktop] [mobile] 切换历史运行并在时间线上查看模型和工�
     ],
   }
   const runs = [
-    { id: oldRun, offset: 0, text: '我当前有多少个项目？在 devop 团队当中？', reply: '团队共有 4 个项目。' },
-    { id: latestRun, offset: 12_000, text: '查一下团队成员', reply: '团队共有 3 位成员。' },
+    { id: oldRun, offset: 0, text: '查一下团队成员', reply: '团队共有 3 位成员。' },
+    { id: latestRun, offset: 12_000, text: '我当前有多少个项目？在 devop 团队当中？', reply: '团队共有 4 个项目。' },
   ]
   const messages = runs.flatMap<Message>((run, index) => [
     {
@@ -87,8 +87,8 @@ test('[desktop] [mobile] 切换历史运行并在时间线上查看模型和工�
       callId: 'context',
       ok: true,
     })
-    // 让较早的运行跨越一页真实的事件上限，检查第二页与第一条工具均可查看。
-    if (id === oldRun) {
+    // 让最近的运行跨越一页真实的事件上限，检查第二页与第一条工具均可查看。
+    if (id === latestRun) {
       for (let index = 0; index < 102; index++) {
         add(id, offset + 1_200 + index, 'output_delta', { text: index === 0 ? '已确认团队，准备查询。' : ' ' })
       }
@@ -99,7 +99,7 @@ test('[desktop] [mobile] 切换历史运行并在时间线上查看模型和工�
       name: 'platform_api_call',
       callId: 'audit',
       method: 'GET',
-      path: id === oldRun ? '/api/v1/teams/{teamId}/projects' : '/api/v1/teams/{teamId}/members',
+      path: id === latestRun ? '/api/v1/teams/{teamId}/projects' : '/api/v1/teams/{teamId}/members',
       code: 'OK',
     })
     add(id, offset + 2_700, 'tool_activity', { state: 'finished', name: 'platform_api_call', callId: 'api', ok: true })
@@ -120,12 +120,12 @@ test('[desktop] [mobile] 切换历史运行并在时间线上查看模型和工�
     route.fulfill({ json: success({ items: messages, nextBefore: null }) }),
   )
   await page.route(`${path}/tasks*`, (route) => route.fulfill({ json: success({ items: [], nextCursor: null }) }))
-  let loadedOldTail = false
+  let loadedLatestTail = false
   await page.route(`${path}/events*`, (route) => {
     const query = new URL(route.request().url()).searchParams
     const after = Number(query.get('after') ?? '0')
     const runId = query.get('runId')
-    if (runId === oldRun && after >= 100) loadedOldTail = true
+    if (runId === latestRun && after >= 100) loadedLatestTail = true
     const items = events
       .filter((event) => Number(event.sequence) > after && (!runId || event.runId === runId))
       .slice(0, 100)
@@ -136,16 +136,21 @@ test('[desktop] [mobile] 切换历史运行并在时间线上查看模型和工�
 
   await page.goto(`/collaboration/${room.id}`)
   await page.getByRole('tab', { name: '轨迹' }).click()
-  const picker = page.getByRole('combobox', { name: '运行记录' })
-  await expect(picker).toHaveValue(latestRun)
-  await picker.selectOption(oldRun)
+  await expect(page.getByRole('combobox', { name: '运行记录' })).toHaveCount(0)
   const stepList = page.getByRole('list', { name: '运行步骤' })
   const apiStep = stepList.getByRole('button', { name: /platform_api_call/ })
   await expect(apiStep).toContainText('/api/v1/teams/{teamId}/projects')
-  expect(loadedOldTail).toBe(true)
+  expect(loadedLatestTail).toBe(true)
   await expect(stepList.getByRole('button', { name: /get_current_context/ })).toHaveCount(1)
   await expect(apiStep).toHaveCount(1)
   await expect(stepList.getByRole('button', { name: /模型输出/ })).toHaveCount(3)
+  await expect(stepList.getByText('查一下团队成员')).toHaveCount(0)
+  const filters = page.getByRole('group', { name: '步骤类型' })
+  const toolFilter = filters.getByRole('button', { name: '工具调用' })
+  await toolFilter.press('Enter')
+  await expect(toolFilter).toHaveAttribute('aria-pressed', 'true')
+  await expect(stepList.getByRole('button')).toHaveCount(2)
+  await filters.getByRole('button', { name: '全部' }).press('Enter')
 
   await apiStep.press('Enter')
   const detail =
@@ -165,9 +170,7 @@ test('[desktop] [mobile] 切换历史运行并在时间线上查看模型和工�
   await expect(apiStep).toBeFocused()
 
   const search = page.getByRole('searchbox', { name: '搜索运行轨迹' })
-  await expect
-    .poll(() => search.evaluate((element) => parseFloat(getComputedStyle(element).paddingLeft)))
-    .toBeGreaterThan(26)
+  await expect(search).toBeVisible()
   await search.fill('找不到的内容')
   await expect(page.getByText('没有匹配的步骤')).toBeVisible()
   await page.getByRole('button', { name: '清除筛选' }).click()

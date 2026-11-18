@@ -65,7 +65,6 @@ export function ConversationRoom({
 }) {
   const client = useQueryClient()
   const [tab, setTab] = useState('chat')
-  const [traceId, setTraceId] = useState<string>()
   const [panel, setPanel] = useState<'task' | 'settings' | null>(initialTaskId ? 'task' : null)
   const [newTaskOpen, setNewTaskOpen] = useState(false)
   const [taskId, setTaskId] = useState(initialTaskId)
@@ -168,6 +167,7 @@ export function ConversationRoom({
   })
   const runsById = new Map(runs.map((run) => [run.id, run]))
   const liveRun = running && runsById.get(running.id)
+  const traceRun = liveRun ?? runs.slice().sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0]
   const stopping = !!running && (liveRun?.stopRequested === true || stop.isPending || stop.data?.data.id === running.id)
   const liveTools = activity.filter(
     ({ runId, payload }) => runId === running?.id && conversationEventText(payload, 'state') === 'finished',
@@ -334,11 +334,6 @@ export function ConversationRoom({
                 aria-label={label}
               >
                 <span className="dsh-tab-label">{label}</span>
-                {id === 'activity' && runs.length > 0 && (
-                  <span className="dsh-tab-count" aria-hidden="true">
-                    {runs.length}
-                  </span>
-                )}
                 {id === 'activity' && liveRun && <span className="dsh-tab-pulse" aria-hidden="true" />}
               </TabsTrigger>
             ))}
@@ -414,9 +409,9 @@ export function ConversationRoom({
         </TabsContent>
         <TabsContent value="activity" className="dsh-tab-panel">
           <div className="dsh-panel-scroll conversation-trace-scroll">
-            {runs.length === 0 && (events.isPending || messages.isPending) ? (
+            {!traceRun && (events.isPending || messages.isPending) ? (
               <DelayedPageSkeleton />
-            ) : runs.length === 0 && (events.isError || messages.isError) ? (
+            ) : !traceRun && (events.isError || messages.isError) ? (
               <PageError
                 title="轨迹加载失败"
                 error={events.error ?? messages.error}
@@ -425,9 +420,7 @@ export function ConversationRoom({
             ) : (
               <ConversationTrajectory
                 conversationId={id}
-                runs={runs.slice().sort((a, b) => Date.parse(b.createdAt ?? '') - Date.parse(a.createdAt ?? ''))}
-                selectedId={traceId}
-                onSelect={setTraceId}
+                run={traceRun}
                 now={now}
                 onStop={!readOnly && running && !stopping ? (runId) => stop.mutate(runId) : undefined}
                 stopError={stop.isError ? describeRequestError(stop.error).description : undefined}

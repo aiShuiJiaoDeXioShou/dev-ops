@@ -5,7 +5,6 @@
     padding: 0;
   }
 
-  .conversation-trace,
   .trace-run-detail {
     display: flex;
     flex: 1;
@@ -14,7 +13,6 @@
     flex-direction: column;
   }
 
-  .trace-run-picker,
   .trace-controls,
   .trace-filters {
     display: flex;
@@ -26,26 +24,12 @@
     border-bottom: 1px solid var(--border);
   }
 
-  .trace-run-picker {
-    padding-block: 12px;
-  }
-
-  .trace-run-picker > strong {
-    font-size: var(--text-sm);
-    white-space: nowrap;
-  }
-
-  .trace-run-picker > span:has(select) {
-    width: min(19rem, 100%);
-  }
-
   .trace-controls {
     justify-content: space-between;
     background: var(--secondary);
   }
 
   .trace-run-meta,
-  .trace-filters-group,
   .trace-refresh {
     display: flex;
     align-items: center;
@@ -93,43 +77,48 @@
 
   .trace-filters {
     justify-content: space-between;
+    margin: 0;
   }
 
   .trace-filters-group {
-    gap: 4px;
+    display: inline-flex;
+    max-width: 100%;
+    gap: 2px;
+    border-radius: var(--radius-md);
+    background: var(--secondary);
   }
 
   .trace-filter {
     min-height: 32px;
-    padding: 4px 8px;
-    border-radius: var(--radius-md);
+    padding-inline: 10px;
+    border-radius: var(--radius-sm);
     color: var(--muted-foreground);
     font-size: var(--text-xs);
     white-space: nowrap;
   }
 
-  .trace-filter:hover,
+  @media (hover: hover) {
+    .trace-filter:not([aria-pressed='true']):hover {
+      background: var(--muted);
+      color: var(--foreground);
+    }
+  }
+
   .trace-filter[aria-pressed='true'] {
-    background: var(--muted);
+    background: var(--accent);
     color: var(--foreground);
+    font-weight: 600;
   }
 
-  .trace-filter[aria-pressed='true'] {
-    box-shadow: inset 0 -2px var(--primary);
-  }
-
-  .trace-search {
-    position: relative;
-    display: flex;
-    align-items: center;
-    width: min(13rem, 100%);
+  .trace-filters .trace-search {
+    flex: 0 1 13rem;
+    min-width: 9rem;
+    margin: 0;
     color: var(--muted-foreground);
   }
 
   .trace-search > svg {
-    position: absolute;
-    inset-inline-start: 10px;
-    pointer-events: none;
+    flex-shrink: 0;
   }
 
   .trace-timeline {
@@ -409,20 +398,24 @@
   }
 
   @media (width < 768px) {
-    .trace-run-picker,
     .trace-controls,
     .trace-filters,
     .trace-timeline {
       padding-inline: 12px;
     }
 
-    .trace-run-picker > span:has(select) {
-      order: 1;
-      width: 100%;
+    .trace-filters-group {
+      flex: 1 1 100%;
     }
 
-    .trace-search {
-      width: 100%;
+    .trace-filter {
+      flex: 1 1 auto;
+      padding-inline: 6px;
+    }
+
+    .trace-filters .trace-search {
+      flex: 1 1 100%;
+      max-width: none;
     }
 
     .trace-lane,
@@ -448,6 +441,7 @@
 
   @media (pointer: coarse) {
     .trace-filter,
+    .trace-filters .trace-search,
     .trace-lane-track,
     .trace-detail-tabs > [role='tab'] {
       min-height: 44px;

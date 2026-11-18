@@ -3,7 +3,6 @@ import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/shared/ui/controls/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
@@ -387,7 +386,7 @@ function TraceRun({
       </DelayedLoading>
       {trace.data && (
         <>
-          <div className="trace-filters">
+          <div className="filters trace-filters">
             <div className="trace-filters-group" role="group" aria-label="步骤类型">
               {(['all', ...lanes] as const).map((kind) => (
                 <Button
@@ -405,10 +404,10 @@ function TraceRun({
                 </Button>
               ))}
             </div>
-            <label className="trace-search">
+            <label className="search trace-search">
               <Search size={16} aria-hidden="true" />
               <Input
-                className="pl-10"
+                className="h-full border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                 type="search"
                 aria-label="搜索运行轨迹"
                 placeholder="搜索步骤"
@@ -544,28 +543,23 @@ function TraceRun({
 }
 
 /**
- * 展示会话中的运行选择、按真实事件构建的时间线及步骤详情。
- * @param props 会话、可查看的运行和停止生成所需状态。
+ * 展示当前会话运行的时间线及步骤详情。
+ * @param props 会话、执行中或最近一次运行和停止生成所需状态。
  * @returns 运行轨迹区域或尚无运行的空状态。
  */
 export function ConversationTrajectory({
   conversationId,
-  runs,
-  selectedId,
-  onSelect,
+  run,
   now,
   onStop,
   stopError,
 }: {
   conversationId: string
-  runs: ConversationRun[]
-  selectedId?: string
-  onSelect: (id: string) => void
+  run?: ConversationRun
   now: number
   onStop?: (runId: string) => void
   stopError?: string
 }) {
-  const run = runs.find(({ id }) => id === selectedId) ?? runs[0]
   if (!run) {
     return (
       <EmptyState title="还没有执行轨迹" description="发送消息后，可在这里查看运行步骤和工具调用。" mascot="signal" />
@@ -573,32 +567,6 @@ export function ConversationTrajectory({
   }
 
   return (
-    <div className="conversation-trace">
-      <div className="trace-run-picker">
-        <strong>执行轨迹</strong>
-        <Select aria-label="运行记录" value={run.id} onChange={(event) => onSelect(event.target.value)}>
-          {runs.map((item) => (
-            <option key={item.id} value={item.id}>
-              {[
-                item.createdAt && clockTime(item.createdAt),
-                item.name,
-                item.status === 'running' ? '运行中' : runLabels[item.status ?? ''],
-              ]
-                .filter(Boolean)
-                .join(' · ')}
-            </option>
-          ))}
-        </Select>
-        <span className="trace-muted">{runs.length} 次运行</span>
-      </div>
-      <TraceRun
-        key={run.id}
-        run={run}
-        conversationId={conversationId}
-        now={now}
-        onStop={onStop}
-        stopError={stopError}
-      />
-    </div>
+    <TraceRun key={run.id} run={run} conversationId={conversationId} now={now} onStop={onStop} stopError={stopError} />
   )
 }
