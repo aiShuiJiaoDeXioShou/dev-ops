@@ -197,7 +197,7 @@ export function TaskDetails({
         teamId={room.teamId}
         target={{ targetKind: 'task', targetId: task.id }}
         readOnly={readOnly}
-        onChanged={() => void client.invalidateQueries({ queryKey: taskQueries })}
+        onChanged={() => client.invalidateQueries({ queryKey: taskQueries })}
       />
       <TaskResults
         task={task}

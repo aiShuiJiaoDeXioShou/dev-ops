@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
-import { Select } from '@/shared/ui/controls/select'
+import { Combobox } from '@/shared/ui/controls/combobox'
 import { workTagsOptions, type WorkTag, type WorkTagTarget } from '../api/queries'
 
 /**
- * 展示会话或任务关联的标签，写权限用户可关联已有标签或取消关联。
+ * 展示会话或任务标签，选择即关联、点击移除即取消关联。
  * @param props 标签、所属团队、目标、写权限、是否折叠编辑控件，以及更改后的刷新回调。
- * @returns 标签列表与适用的编辑控件。
+ * @returns 可搜索的标签选择器与标签列表；保存及刷新期间阻止重复操作，失败保留选择供重试。
  */
 export function WorkTagEditor({
   tags,
@@ -26,24 +26,25 @@ export function WorkTagEditor({
   target: WorkTagTarget
   readOnly: boolean
   collapsible?: boolean
-  onChanged: () => void
+  onChanged: () => void | Promise<unknown>
 }) {
-  const [selected, setSelected] = useState('')
   const [editing, setEditing] = useState(false)
   const canEdit = !readOnly && (!collapsible || editing)
-  const client = useQueryClient()
   const list = useInfiniteQuery({ ...workTagsOptions(teamId), enabled: canEdit })
   const linked = new Set(tags.map(({ id }) => id))
-  const remaining = (list.data?.pages.flatMap(({ data }) => data.items) ?? []).filter(({ id }) => !linked.has(id))
+  const available = list.data?.pages.flatMap(({ data }) => data.items) ?? []
+  const remaining = available.filter(({ id }) => !linked.has(id))
   const save = useMutation({
     mutationFn: ({ id, link }: { id: string; link: boolean }) =>
       apiClient.setWorkTagLink(id, link, target, { idempotencyKey: createIdempotencyKey() }),
-    onSuccess: () => {
-      setSelected('')
-      void client.invalidateQueries({ queryKey: workTagsOptions(teamId).queryKey })
-      onChanged()
+    onSuccess: async () => {
+      await onChanged()
     },
   })
+  const selected = (save.isPending || save.isError) && save.variables?.link ? save.variables.id : ''
+  const failedChange = save.isError ? save.variables : undefined
+  const isEmpty = list.isSuccess && available.length === 0 && !list.hasNextPage
+  const isFullyLinked = list.isSuccess && available.length > 0 && remaining.length === 0 && !list.hasNextPage
   return (
     <div className="work-gap">
       {collapsible ? (
@@ -55,12 +56,12 @@ export function WorkTagEditor({
               unstyled
               type="button"
               className="text-btn"
-              aria-label={editing ? '收起工作标签管理' : '管理工作标签'}
+              aria-label={editing ? '完成工作标签管理' : '管理工作标签'}
               aria-expanded={editing}
               disabled={save.isPending}
               onClick={() => setEditing(!editing)}
             >
-              {editing ? '收起' : '管理'}
+              {editing ? '完成' : '管理'}
             </Button>
           )}
         </div>
@@ -74,7 +75,7 @@ export function WorkTagEditor({
             {canEdit && (
               <Button
                 type="button"
-                size="icon-xs"
+                size="icon"
                 variant="ghost"
                 aria-label={`移除标签${name}`}
                 disabled={save.isPending}
@@ -88,26 +89,26 @@ export function WorkTagEditor({
         {tags.length === 0 && <span className="small muted">暂无标签</span>}
       </div>
       {canEdit && (
-        <div className="row flex-wrap">
-          <label className="field">
-            <span>添加工作标签</span>
-            <Select value={selected} disabled={list.isPending} onChange={(event) => setSelected(event.target.value)}>
-              <option value="">{list.isPending ? '正在加载…' : '选择标签'}</option>
-              {remaining.map(({ id, name }) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!selected || save.isPending}
-            onClick={() => save.mutate({ id: selected, link: true })}
-          >
-            添加
-          </Button>
+        <div className="grid gap-2">
+          <Combobox
+            aria-label="添加工作标签"
+            value={selected}
+            options={remaining.map(({ id, name }) => ({ value: id, label: name }))}
+            placeholder={list.isPending ? '正在加载标签…' : '选择标签，立即添加'}
+            searchPlaceholder="搜索工作标签"
+            emptyMessage="没有匹配的标签"
+            disabled={list.isPending || save.isPending || remaining.length === 0}
+            onValueChange={(id) => {
+              if (!save.isPending && !linked.has(id)) save.mutate({ id, link: true })
+            }}
+          />
+          {isEmpty && <p className="small muted">团队暂无工作标签，可在会话列表的「管理标签」中创建。</p>}
+          {isFullyLinked && <p className="small muted">全部标签已添加。</p>}
+          {save.isPending && (
+            <p className="small muted" role="status">
+              {save.variables?.link ? '正在添加标签…' : '正在移除标签…'}
+            </p>
+          )}
           {list.hasNextPage && (
             <Button
               type="button"
@@ -115,20 +116,30 @@ export function WorkTagEditor({
               disabled={list.isFetchingNextPage}
               onClick={() => void list.fetchNextPage()}
             >
-              更多标签
+              {list.isFetchingNextPage ? '正在加载…' : '加载更多标签'}
             </Button>
           )}
           {list.isError && (
-            <Button type="button" variant="ghost" onClick={() => void list.refetch()}>
-              重试加载标签
-            </Button>
+            <>
+              <p className="field-error" role="alert">
+                {describeRequestError(list.error).description}
+              </p>
+              <Button type="button" variant="ghost" disabled={list.isFetching} onClick={() => void list.refetch()}>
+                重试加载标签
+              </Button>
+            </>
           )}
         </div>
       )}
-      {save.isError && (
-        <p role="alert" className="field-error">
-          {describeRequestError(save.error).description}
-        </p>
+      {failedChange && (
+        <>
+          <p role="alert" className="field-error">
+            {describeRequestError(save.error).description}
+          </p>
+          <Button type="button" variant="outline" onClick={() => save.mutate(failedChange)}>
+            {failedChange.link ? '重试添加标签' : '重试移除标签'}
+          </Button>
+        </>
       )}
     </div>
   )

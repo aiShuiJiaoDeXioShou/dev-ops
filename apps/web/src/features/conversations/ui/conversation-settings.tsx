@@ -87,10 +87,12 @@ export function ConversationSettings({
           target={{ targetKind: 'conversation', targetId: room.id }}
           readOnly={false}
           collapsible
-          onChanged={() => {
-            void client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey })
-            void client.invalidateQueries({ queryKey: [...conversationsQueryKey, room.teamId] })
-          }}
+          onChanged={() =>
+            Promise.all([
+              client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey }),
+              client.invalidateQueries({ queryKey: [...conversationsQueryKey, room.teamId] }),
+            ])
+          }
         />
       </section>
     </aside>
