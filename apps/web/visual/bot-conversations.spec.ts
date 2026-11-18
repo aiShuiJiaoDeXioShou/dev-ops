@@ -15,9 +15,16 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   const { teamId, userId } = VISUAL_IDS
   const tagId = 'da55aa00-0000-4000-8000-000000000090'
   const tag = { id: tagId, name: '交付', updatedAt: '2026-11-17T08:00:00.000Z' }
-  await page.route(`**/api/v1/teams/${teamId}/work-tags*`, (route) =>
-    route.fulfill({ json: success({ items: [tag], nextCursor: null }) }),
-  )
+  const teamTags = [tag]
+  await page.route(`**/api/v1/teams/${teamId}/work-tags*`, (route) => {
+    if (route.request().method() === 'POST') {
+      const name = route.request().postDataJSON().name
+      const created = { ...tag, id: 'da55aa00-0000-4000-8000-000000000091', name }
+      teamTags.push(created)
+      return route.fulfill({ json: success(created) })
+    }
+    return route.fulfill({ json: success({ items: teamTags, nextCursor: null }) })
+  })
   const stamp = '2026-11-17T08:00:00.000Z'
   const botId = 'da55aa00-0000-4000-8000-000000000011'
   const skillId = 'da55aa00-0000-4000-8000-000000000014'
@@ -133,10 +140,18 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     route.fulfill({ json: success({ items: [skill], page: 1, pageSize: 20, total: 1 }) }),
   )
   await page.route(`**/api/v1/skills/${skillId}`, (route) => route.fulfill({ json: success(skill) }))
-  await page.route(`**/api/v1/work-tags/${tagId}/link`, (route) => {
+  await page.route('**/api/v1/work-tags/*/link', (route) => {
     expect(route.request().postDataJSON()).toEqual({ targetKind: 'conversation', targetId: room.id })
-    room.tags = [tag]
-    return route.fulfill({ json: success({ id: tagId }) })
+    const id = new URL(route.request().url()).pathname.split('/').at(-2)
+    const selected = teamTags.find((item) => item.id === id)
+    if (!selected) throw new Error('测试标签不存在')
+    room.tags = [...room.tags.filter((item) => item.id !== id), selected]
+    return route.fulfill({ json: success({ id }) })
+  })
+  await page.route('**/api/v1/work-tags/*/unlink', (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').at(-2)
+    room.tags = room.tags.filter((item) => item.id !== id)
+    return route.fulfill({ json: success({ id }) })
   })
   await page.route(`${messagePath}*`, (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: success({ items: list, nextBefore: null }) })
@@ -322,12 +337,19 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await access.selectOption('full')
   await expect(access).toHaveValue('full')
   await expect(settingsPanel.getByText('允许工具访问执行主机上的其他目录。')).toBeVisible()
-  const manageTags = settingsPanel.getByRole('button', { name: '管理工作标签' })
-  await expect(manageTags).toHaveAttribute('aria-expanded', 'false')
-  await manageTags.press('Enter')
-  await settingsPanel.getByRole('combobox', { name: '添加工作标签' }).press('Enter')
+  await settingsPanel.getByRole('combobox', { name: '选择已有工作标签' }).press('Enter')
   await page.getByRole('option', { name: '交付', exact: true }).click()
   await expect(settingsPanel.getByRole('button', { name: '移除标签交付' })).toBeVisible()
+  await settingsPanel.getByRole('textbox', { name: '新建工作标签' }).fill('排障')
+  await settingsPanel.getByRole('textbox', { name: '新建工作标签' }).press('Enter')
+  await expect(settingsPanel.getByRole('button', { name: '移除标签排障' })).toBeEnabled()
+  await settingsPanel.getByRole('button', { name: '移除标签排障' }).click()
+  await expect(settingsPanel.getByRole('button', { name: '移除标签排障' })).toHaveCount(0)
+  await expect(settingsPanel.getByRole('link', { name: '管理记忆' })).toHaveAttribute(
+    'href',
+    `/capabilities/memory?botId=${botId}`,
+  )
+
   await page.screenshot({ path: testInfo.outputPath('bot-direct-settings.png'), animations: 'disabled' })
   await page.keyboard.press('Escape')
   await expect(settings).toBeFocused()

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
@@ -80,13 +81,30 @@ export function ConversationSettings({
             <BotToolAccess key={member.id} botId={member.id} name={member.name} />
           ))}
       </section>
+      <section className="settings-section" aria-label="智能体配置与记忆">
+        <strong>智能体配置与记忆</strong>
+        {room.members
+          .filter((member) => member.kind === 'bot')
+          .map((member) => (
+            <div className="work-gap" key={member.id}>
+              <span className="small quiet">{member.name}</span>
+              <div className="row flex-wrap">
+                <Button asChild variant="outline">
+                  <Link to={`/capabilities/bots/${member.id}`}>编辑配置</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to={`/capabilities/memory?botId=${member.id}`}>管理记忆</Link>
+                </Button>
+              </div>
+            </div>
+          ))}
+      </section>
       <section className="settings-section">
         <WorkTagEditor
           teamId={room.teamId}
           tags={room.tags}
           target={{ targetKind: 'conversation', targetId: room.id }}
           readOnly={false}
-          collapsible
           onChanged={() =>
             Promise.all([
               client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey }),

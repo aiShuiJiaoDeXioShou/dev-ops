@@ -29,7 +29,11 @@ import { workTagsOptions, type WorkTag } from '../api/queries'
 
 type TagEdit = { action: 'save'; name: string; id?: string } | { action: 'remove'; id: string }
 
-/** 管理团队标签目录，在明确确认后移除标签及其关联。 */
+/**
+ * 管理团队标签目录，在明确确认后删除标签及其全部关联。
+ * @param props 团队标识、关闭回调与目录变更后的刷新回调。
+ * @returns 标签创建、改名与删除弹窗；失败保留输入，保存和刷新期间阻止重复提交。
+ */
 export function WorkTagDialog({
   teamId,
   onClose,
@@ -37,7 +41,7 @@ export function WorkTagDialog({
 }: {
   teamId: string
   onClose: () => void
-  onChanged: () => void
+  onChanged: () => void | Promise<unknown>
 }) {
   const [editing, setEditing] = useState<WorkTag>()
   const [name, setName] = useState('')
@@ -51,11 +55,10 @@ export function WorkTagDialog({
       else if (input.id) await apiClient.renameWorkTag(input.id, { name: input.name }, options)
       else await apiClient.createWorkTag(teamId, { name: input.name }, options)
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setEditing(undefined)
       setName('')
-      void client.invalidateQueries({ queryKey: workTagsOptions(teamId).queryKey })
-      onChanged()
+      await Promise.all([client.invalidateQueries({ queryKey: workTagsOptions(teamId).queryKey }), onChanged()])
     },
   })
   return (

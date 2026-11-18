@@ -2,7 +2,7 @@ import { useDeferredValue, useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Brain, Plus, Search } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { botMemoryKey, botMemoryOptions, type BotMemory } from '@/features/bots/api/memories'
 import { botChoicesOptions } from '@/features/bots/api/queries'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
@@ -31,7 +31,8 @@ import { EmptyState, PageError } from '@/shared/ui/page-state'
 function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: boolean; isAdmin: boolean }) {
   const client = useQueryClient()
   const [query, setQuery] = useState('')
-  const [botId, setBotId] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const botId = searchParams.get('botId') ?? ''
   const [scope, setScope] = useState<BotMemory['scope'] | undefined>()
   const [editing, setEditing] = useState<BotMemory | 'new'>()
   const opener = useRef<HTMLElement>(null)
@@ -70,7 +71,22 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
             placeholder="搜索记忆"
           />
         </label>
-        <Select aria-label="筛选智能体" value={botId} onChange={(event) => setBotId(event.target.value)}>
+        <Select
+          aria-label="筛选智能体"
+          value={botId}
+          onChange={(event) => {
+            const value = event.target.value
+            setSearchParams(
+              (previous) => {
+                const next = new URLSearchParams(previous)
+                if (value) next.set('botId', value)
+                else next.delete('botId')
+                return next
+              },
+              { replace: true },
+            )
+          }}
+        >
           <option value="">全部智能体</option>
           {bots.map(({ id, name }) => (
             <option key={id} value={id}>
