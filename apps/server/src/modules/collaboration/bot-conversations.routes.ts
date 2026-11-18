@@ -15,6 +15,9 @@ import {
   conversationTeamParams,
   createDirectConversationBody,
   sendBotMessageBody,
+  messageFeedbackParams,
+  messageFeedbackBody,
+  messageFeedbackResponse,
 } from './bot-conversations.schema.ts'
 import type { BotConversationsService } from './bot-conversations.service.ts'
 import { botGroupMemberBody, createBotGroupBody, updateBotGroupBody } from './bot-groups.schema.ts'
@@ -144,6 +147,27 @@ export const botConversationsRoutes: FastifyPluginAsyncTypebox<{
     },
     async (request) =>
       success(await service.send(await requireActor(request), request.params.conversationId, request.body), request.id),
+  )
+  app.post(
+    '/bot-conversations/:conversationId/messages/:messageId/feedback',
+    {
+      schema: {
+        summary: '评价 Bot 回复',
+        params: messageFeedbackParams,
+        body: messageFeedbackBody,
+        response: { 200: messageFeedbackResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.feedback(
+          await requireActor(request),
+          request.params.conversationId,
+          request.params.messageId,
+          request.body.rating,
+        ),
+        request.id,
+      ),
   )
   app.get(
     '/bot-conversations/:conversationId/events',

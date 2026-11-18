@@ -322,3 +322,9 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 团队管理员可在 `POST /api/v1/teams/:teamId/bots` 的请求中传入 `modelBinding: { connectionId, modelId }`，在创建 Bot 的同一事务中绑定团队模型连接与模型。常规创建允许省略该字段，已有 Bot 通过 `POST /api/v1/bots/:botId/bind-model` 更新绑定。
 
 模型 API Key 由管理员保存在团队凭据库。使用本地 `.env` 的 `DEEPSEEK_API_KEY` 验收时，先构建工程，再从根目录运行 `DEVOPS_BOT_LIVE_TEST=1 node --test tests/e2e/bot-collaboration.test.mjs`。通过订阅登录连接模型时，授权由发起连接的管理员亲自完成。
+
+Bot 默认启用 pi 的全部本地工具，`accessMode` 默认 `sandbox`。`BOT_WORKSPACE_DIR`（默认 `./bot-data`，相对执行服务工作目录）下按团队 ID / Bot ID 隔离文件。macOS 使用 `sandbox-exec`，Linux 执行主机须安装 `bubblewrap`；`grep` / `find` 需要 `rg` / `fd`，PowerShell 需要 `pwsh`。工具不继承模型或数据库凭据；沙盒不开放业务目录外的文件及直接网络访问，Node、pi 和系统运行库作为只读执行资源开放。联网工具继续通过平台原有的公网读取与审计路径执行。
+
+会话右侧「会话设置 → 工具权限」可切换为完全访问。管理员或开发者调用 `POST /api/v1/bots/:botId/set-access`，提交 `{ configVersion, accessMode: "sandbox" | "full" }`；版本冲突返回 `VERSION_CONFLICT`。切换会停止排队运行，并要求执行中的运行在心跳取消时退出。该配置作用于 Bot 的所有会话，后续运行使用新的配置快照。
+
+成功回复的消息体包含 `metrics`（真实 Token、缓存用量、费用、轮次和耗时）；旧消息可不包含。`POST /api/v1/bot-conversations/:conversationId/messages/:messageId/feedback` 接收 `{ rating: "helpful" | "unhelpful" | null }`，仅允许有写权限的当前会话成员评价 Bot 回复；`null` 取消评价。消息读取返回当前用户的 `feedback`，不同用户的评价相互隔离。两个新增接口都使用 HTTP 200 和统一业务响应信封。

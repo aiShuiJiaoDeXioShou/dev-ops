@@ -19,6 +19,7 @@ const configSnapshotSchema = Type.Object({
   modelConnectionId: Type.String(),
   modelId: Type.String(),
   status: Type.Literal('enabled'),
+  accessMode: Type.Optional(Type.Union([Type.Literal('sandbox'), Type.Literal('full')])),
 })
 
 const HISTORY_MESSAGE_LIMIT = 24
@@ -98,6 +99,7 @@ export async function loadBotRunContext(
   connectionId: string
   skillVersions: BotSkillVersion[]
   hasUnavailableSkillReference: boolean
+  accessMode: 'sandbox' | 'full'
 } | null> {
   const snapshot = run.config_snapshot
   if (!Check(configSnapshotSchema, snapshot)) return null
@@ -211,6 +213,7 @@ export async function loadBotRunContext(
   ].filter(({ body }) => body.trim())
   return {
     connectionId: snapshot.modelConnectionId,
+    accessMode: snapshot.accessMode ?? 'sandbox',
     skillVersions,
     hasUnavailableSkillReference,
     model: { providerId: connection.provider, modelId: snapshot.modelId },

@@ -16,6 +16,7 @@ import {
   botConversationMember,
   botEvent,
   botMessage,
+  botMessageFeedback,
   workTagLink,
 } from './bot-conversations.tables.ts'
 import type {
@@ -408,8 +409,16 @@ export function createBotConversationsService(db: Database) {
       const row = await requireBotConversation(db, actor, conversationId)
       const previous = sequenceOf(before)
       const messages = await db
-        .select({ message: botMessage, userName: authUser.name, botName: bot.name })
+        .select({ message: botMessage, userName: authUser.name, botName: bot.name, rating: botMessageFeedback.rating })
         .from(botMessage)
+        .leftJoin(
+          botMessageFeedback,
+          and(
+            eq(botMessageFeedback.message_id, botMessage.id),
+            eq(botMessageFeedback.user_id, actor.id),
+            eq(botMessageFeedback.team_id, row.team_id),
+          ),
+        )
         .leftJoin(authUser, and(eq(authUser.id, botMessage.speaker_id), eq(botMessage.speaker_kind, 'user')))
         .leftJoin(
           bot,
@@ -424,8 +433,63 @@ export function createBotConversationsService(db: Database) {
         )
         .orderBy(desc(botMessage.sequence))
         .limit(limit + 1)
-      const page = messages.slice(0, limit).map((item) => messageView(item.message, item.userName ?? item.botName))
+      const page = messages.slice(0, limit).map((item): ConversationMessage => {
+        if (item.rating !== null && item.rating !== 'helpful' && item.rating !== 'unhelpful')
+          throw new Error('数据库中的消息评价不合法')
+        return { ...messageView(item.message, item.userName ?? item.botName), feedback: item.rating }
+      })
       return { nextBefore: messages.length > limit ? (page.at(-1)?.sequence ?? null) : null, items: page.reverse() }
+    },
+    /**
+     * 保存当前成员对 Bot 回复的评价，重复选择由客户端提交 null 取消。
+     * @param actor 当前用户。
+     * @param conversationId 会话标识。
+     * @param messageId Bot 回复标识。
+     * @param rating 好评、差评或取消。
+     * @returns 消息标识及保存后的选择。
+     * @throws 无会话访问权限、只读角色或目标非 Bot 回复时返回业务错误。
+     */
+    async feedback(
+      actor: SessionUser,
+      conversationId: string,
+      messageId: string,
+      rating: 'helpful' | 'unhelpful' | null,
+    ) {
+      return db.transaction(async (tx) => {
+        const room = await lockWritableBotConversation(tx, actor, conversationId)
+        const [message] = await tx
+          .select({ kind: botMessage.speaker_kind })
+          .from(botMessage)
+          .where(
+            and(
+              eq(botMessage.id, messageId),
+              eq(botMessage.conversation_id, room.id),
+              eq(botMessage.team_id, room.team_id),
+            ),
+          )
+        if (message?.kind !== 'bot') throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '只能评价当前会话的 Bot 回复')
+        const scope = and(
+          eq(botMessageFeedback.message_id, messageId),
+          eq(botMessageFeedback.user_id, actor.id),
+          eq(botMessageFeedback.team_id, room.team_id),
+        )
+        if (rating === null) await tx.delete(botMessageFeedback).where(scope)
+        else
+          await tx
+            .insert(botMessageFeedback)
+            .values({
+              team_id: room.team_id,
+              conversation_id: room.id,
+              message_id: messageId,
+              user_id: actor.id,
+              rating,
+            })
+            .onConflictDoUpdate({
+              target: [botMessageFeedback.message_id, botMessageFeedback.user_id],
+              set: { rating, updated_at: sql`clock_timestamp()` },
+            })
+        return { id: messageId, rating }
+      })
     },
     /** 发送消息并排队；重复请求复用已保存的同一次运行。 */
     async send(actor: SessionUser, conversationId: string, input: SendBotMessageInput) {

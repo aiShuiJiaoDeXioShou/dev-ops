@@ -145,7 +145,47 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
     { id: whileOffline.data.runId, botId, status: 'queued', teamQueuePosition: 2, queueReason: 'worker_offline' },
   ])
 
+  const usage = { inputTokens: 32, outputTokens: 12, cacheReadTokens: 8, cacheWriteTokens: 0, costUsd: 0.001 }
+  assert.equal(
+    await sink.finish({
+      status: 'succeeded',
+      turns: 1,
+      usage,
+      finalMessage: { role: 'assistant', blocks: [{ type: 'text', text: '最终回复' }] },
+    }),
+    true,
+  )
+  const saved = (await get(messagePath, devUser)).data.items.find(
+    (item: { speakerKind: string }) => item.speakerKind === 'bot',
+  )
+  assert.ok(saved)
+  assert.equal(saved.body.metrics.inputTokens, 32)
+  assert.equal(saved.body.metrics.turns, 1)
+  const feedbackPath = `${messagePath}/${saved.id}/feedback`
+  assert.equal((await post(feedbackPath, adminUser, { rating: 'helpful' })).code, 'BOT_CONVERSATION_NOT_FOUND')
+  assert.equal(
+    (await post(`${messagePath}/${first.data.message.id}/feedback`, devUser, { rating: 'helpful' })).code,
+    'VALIDATION_ERROR',
+  )
+  const votes = await Promise.all([
+    post(feedbackPath, devUser, { rating: 'helpful' }),
+    post(feedbackPath, devUser, { rating: 'helpful' }),
+  ])
+  assert.ok(votes.every((vote) => vote.code === 'OK'))
+  assert.equal(
+    (await get(messagePath, devUser)).data.items.find((item: { id: string }) => item.id === saved.id).feedback,
+    'helpful',
+  )
+  assert.equal((await post(feedbackPath, devUser, { rating: 'unhelpful' })).data.rating, 'unhelpful')
+  assert.equal((await post(feedbackPath, devUser, { rating: null })).data.rating, null)
+  assert.equal(
+    (await get(messagePath, devUser)).data.items.find((item: { id: string }) => item.id === saved.id).feedback,
+    null,
+  )
+  assert.equal(saved.body.metrics.outputTokens, 12)
+
   await db.update(teamMember).set({ role: 'viewer' }).where(eq(teamMember.user_id, devUser.userId))
+  assert.equal((await post(feedbackPath, devUser, { rating: 'helpful' })).code, 'FORBIDDEN')
   assert.equal((await get(messagePath, devUser)).code, 'OK')
   assert.equal((await post(messagePath, devUser, { ...message, clientRequestId: randomUUID() })).code, 'FORBIDDEN')
   assert.equal((await get(eventsPath, otherUser)).code, 'BOT_CONVERSATION_NOT_FOUND')

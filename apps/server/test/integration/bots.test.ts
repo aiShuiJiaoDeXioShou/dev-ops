@@ -168,4 +168,16 @@ test('Bot 配置满足团队和角色约束，停用阻止新运行并收口现�
     db.transaction((tx) => requireRunnableBot(tx, teamId, botId)),
     (error) => error instanceof ApiError && error.code === 'BOT_UNAVAILABLE',
   )
+  assert.equal(created.data.accessMode, 'sandbox')
+  const access = { configVersion: disabled.data.configVersion, accessMode: 'full' }
+  assert.equal((await post(`${detail}/set-access`, viewerUser, access)).code, 'BOT_NOT_FOUND')
+  const changedAccess = await post(`${detail}/set-access`, devUser, access)
+  assert.equal(changedAccess.code, 'OK', changedAccess.message)
+  assert.equal(changedAccess.data.accessMode, 'full')
+  assert.equal((await post(`${detail}/set-access`, devUser, access)).code, 'VERSION_CONFLICT')
+  const sandboxed = await post(`${detail}/set-access`, devUser, {
+    configVersion: changedAccess.data.configVersion,
+    accessMode: 'sandbox',
+  })
+  assert.equal(sandboxed.data.accessMode, 'sandbox')
 })

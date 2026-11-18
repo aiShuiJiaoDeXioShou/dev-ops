@@ -30,6 +30,7 @@ specs
 .tmp/
 pipeline-data/
 attachment-data/
+bot-data/
 .secrets/
 canvas/
 test-results/

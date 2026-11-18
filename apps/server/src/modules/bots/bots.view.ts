@@ -34,6 +34,8 @@ export function botAvailability(row: BotViewRecord): BotView['availability'] {
 export function toBotView(row: BotViewRecord, skillIds: string[]): BotView {
   const { record } = row
   if (record.status !== 'enabled' && record.status !== 'disabled') throw new Error('数据库中的 Bot 状态不合法')
+  if (record.access_mode !== 'sandbox' && record.access_mode !== 'full')
+    throw new Error('数据库中的 Bot 访问模式不合法')
   return {
     id: record.id,
     teamId: record.team_id,
@@ -49,6 +51,7 @@ export function toBotView(row: BotViewRecord, skillIds: string[]): BotView {
     modelConnectionId: record.model_connection_id,
     connectionName: row.connectionName,
     modelId: record.model_id,
+    accessMode: record.access_mode,
     updatedAt: record.updated_at.toISOString(),
     lastActiveAt: row.lastActiveAt?.toISOString() ?? null,
     skillIds,

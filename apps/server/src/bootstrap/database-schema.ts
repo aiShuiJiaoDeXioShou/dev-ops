@@ -27,6 +27,7 @@ export {
   botConversationMember,
   botEvent,
   botMessage,
+  botMessageFeedback,
   workTag,
   workTagLink,
 } from '../modules/collaboration/bot-conversations.tables.ts'

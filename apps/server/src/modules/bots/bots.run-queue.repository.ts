@@ -146,6 +146,7 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
           select jsonb_build_object(
             'name', ${bot.name}, 'responsibility', ${bot.responsibility}, 'instructions', ${bot.instructions},
             'modelConnectionId', ${bot.model_connection_id}, 'modelId', ${bot.model_id}, 'status', ${bot.status},
+            'accessMode', ${bot.access_mode},
             'skillVersions', ${JSON.stringify(skillVersions)}::jsonb
           )
           from ${bot}

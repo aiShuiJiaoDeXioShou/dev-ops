@@ -7,6 +7,10 @@ const uuid = Type.String({ pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{
 const kind = Type.Union([Type.Literal('direct'), Type.Literal('group')])
 const nullableId = Type.Union([uuid, Type.Null()])
 const sequence = Type.String({ pattern: '^(?:0|[1-9][0-9]{0,18})$' })
+const feedbackRating = Type.Union([Type.Literal('helpful'), Type.Literal('unhelpful'), Type.Null()])
+export const messageFeedbackParams = Type.Object({ conversationId: uuid, messageId: uuid })
+export const messageFeedbackBody = Type.Object({ rating: feedbackRating }, { additionalProperties: false })
+export const messageFeedbackResponse = apiResponseSchema(Type.Object({ id: uuid, rating: feedbackRating }))
 const conversation = Type.Object({
   id: uuid,
   teamId: uuid,
@@ -34,6 +38,7 @@ const message = Type.Object({
   body: botMessageBodySchema,
   runId: nullableId,
   createdAt: Type.String(),
+  feedback: Type.Optional(feedbackRating),
 })
 const event = Type.Object({
   sequence,

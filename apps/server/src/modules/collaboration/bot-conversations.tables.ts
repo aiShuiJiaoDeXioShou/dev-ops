@@ -133,6 +133,23 @@ export const workTag = appSchema.table(
   ],
 )
 
+/** 成员对 Bot 回复的评价，每个成员对同一消息只保留当前选择。 */
+export const botMessageFeedback = appSchema.table(
+  'bot_message_feedback',
+  {
+    ...teamAuditColumns(),
+    conversation_id: uuid('conversation_id').notNull(),
+    message_id: uuid('message_id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    rating: text('rating').notNull(),
+  },
+  (table) => [
+    primaryKey({ name: 'pk_bot_message_feedback_id', columns: [table.id] }),
+    unique('uk_bot_message_feedback_message_user').on(table.message_id, table.user_id),
+    check('ck_bot_message_feedback_rating', sql`${table.rating} in ('helpful', 'unhelpful')`),
+  ],
+)
+
 /** 标签与会话或任务的关联。 */
 export const workTagLink = appSchema.table(
   'work_tag_link',

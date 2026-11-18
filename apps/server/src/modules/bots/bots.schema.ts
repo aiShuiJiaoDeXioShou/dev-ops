@@ -10,6 +10,7 @@ const instructions = Type.String({ maxLength: 16_000 })
 const skillIds = Type.Array(uuid, { maxItems: 50, uniqueItems: true })
 const dateTime = Type.String()
 const nullableId = Type.Union([uuid, Type.Null()])
+const accessMode = Type.Union([Type.Literal('sandbox'), Type.Literal('full')])
 const modelBinding = Type.Object(
   { connectionId: uuid, modelId: Type.String({ minLength: 1, maxLength: 200 }) },
   { additionalProperties: false },
@@ -54,6 +55,7 @@ export const updateBotBody = Type.Object(
 )
 
 export const botVersionBody = Type.Object({ configVersion: version }, { additionalProperties: false })
+export const botAccessBody = Type.Object({ configVersion: version, accessMode }, { additionalProperties: false })
 export const bindBotModelBody = Type.Object(
   {
     configVersion: version,
@@ -85,6 +87,7 @@ const botViewSchema = Type.Object({
   skillIds: Type.Array(uuid),
   modelConnectionId: nullableId,
   modelId: Type.Union([Type.String(), Type.Null()]),
+  accessMode: Type.Optional(accessMode),
   connectionName: Type.Union([Type.String(), Type.Null()]),
   updatedAt: dateTime,
   lastActiveAt: Type.Union([dateTime, Type.Null()]),
@@ -127,4 +130,5 @@ export type BotRunSummary = Static<typeof botRunSummarySchema>
 export type CreateBotInput = Static<typeof createBotBody>
 export type UpdateBotInput = Static<typeof updateBotBody>
 export type BindBotModelInput = Static<typeof bindBotModelBody>
+export type BotAccessInput = Static<typeof botAccessBody>
 export type BotListFilters = Static<typeof botListQuery>

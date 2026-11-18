@@ -170,9 +170,27 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
   )
 
   const failures: string[] = []
-  const worker = createBotWorker(config, createFauxBotRunner('验证通过'), (level, message) => {
-    if (level === 'error') failures.push(message)
-  })
+  const faux = createFauxBotRunner('验证通过')
+  const worker = createBotWorker(
+    config,
+    async (options) => {
+      for (const name of ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls', 'powershell']) {
+        assert.ok(
+          options.tools.some((tool) => tool.name === name),
+          `默认工具缺少 ${name}`,
+        )
+      }
+      assert.ok(
+        options.context.systemSections.some(
+          (section) => section.title === '本地工作目录' && section.body.includes('沙盒'),
+        ),
+      )
+      return faux(options)
+    },
+    (level, message) => {
+      if (level === 'error') failures.push(message)
+    },
+  )
   cleanup.push(worker.close)
   await worker.pollOnce()
   let status = 'running'
@@ -188,7 +206,10 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
     .from(botMessage)
     .where(and(eq(botMessage.conversation_id, conversation.id), eq(botMessage.run_id, run.id)))
   assert.equal(reply?.sequence, 2n)
-  assert.deepEqual(reply.body, { blocks: [{ type: 'text', text: '验证通过' }] })
+  assert.ok(reply)
+  assert.ok(typeof reply.body === 'object' && reply.body !== null && 'blocks' in reply.body && 'metrics' in reply.body)
+  assert.deepEqual(reply.body.blocks, [{ type: 'text', text: '验证通过' }])
+  assert.ok(reply.body.metrics)
   const events = await db.select().from(botEvent).where(eq(botEvent.run_id, run.id)).orderBy(botEvent.sequence)
   const state = await db
     .select({ status: botRun.status, turns: botRun.turns, usage: botRun.usage })

@@ -1,4 +1,5 @@
 import {
+  localTools,
   memoryTools,
   openApiTools,
   runBot,
@@ -7,6 +8,7 @@ import {
   type PlatformApiOperation,
   type RunOutcome,
 } from '@dev-ops/devops-bot'
+import { resolve } from 'node:path'
 import type { Database } from '../../../platform/database/client.ts'
 import type { AppConfig } from '../../../platform/config/env.ts'
 import type { SecretCipher } from '../../configuration/configuration.crypto.ts'
@@ -104,10 +106,38 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
     })
     const api = options.platformApi?.(lease, run)
     const memory = createPgMemoryStore(db, run, lease)
+    const directory = resolve(config.BOT_WORKSPACE_DIR, run.team_id, run.bot_id)
+    const tools = (await localTools({ directory, access: input.accessMode })).map((tool) => ({
+      ...tool,
+      /**
+       * 执行本地工具前重查租约，防止已经切换权限的旧运行继续启动工具。
+       * @param args 模型生成的工具参数。
+       * @param toolSignal 运行取消信号。
+       * @returns 本地执行结果；租约失效或已要求停止时返回失败。
+       */
+      async execute(args: unknown, toolSignal: AbortSignal) {
+        const state = await renewBotRunLease(db, lease, config.BOT_LEASE_TTL_SECONDS)
+        if (!state || state.stopRequested || toolSignal.aborted) {
+          cancellation.abort()
+          return { text: '运行已停止，请在新权限下重新发送消息', isError: true }
+        }
+        return tool.execute(args, toolSignal)
+      },
+    }))
     const outcome = await options.execute({
       model: input.model,
-      context: input.context,
+      context: {
+        ...input.context,
+        systemSections: [
+          ...input.context.systemSections,
+          {
+            title: '本地工作目录',
+            body: `工作目录为 ${directory}。当前访问模式为 ${input.accessMode === 'full' ? '完全访问' : '沙盒，仅可访问工作目录中的文件'}。使用 read、write、edit、bash、grep、find、ls 或 powershell 处理本地文件。`,
+          },
+        ],
+      },
       tools: [
+        ...tools,
         ...memoryTools(memory),
         ...(input.skillVersions.some(({ status }) => status === 'available')
           ? [createSkillViewTool(db, run, lease, input.skillVersions)]

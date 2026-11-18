@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
 import { requireActor } from '../identity/identity.actor.ts'
 import {
+  botAccessBody,
   bindBotModelBody,
   botCursorQuery,
   botListQuery,
@@ -86,6 +87,19 @@ export const botsRoutes: FastifyPluginAsyncTypebox<{ service: BotsService }> = a
     },
     async (request) =>
       success(await service.bind(await requireActor(request), request.params.botId, request.body), request.id),
+  )
+  app.post(
+    '/bots/:botId/set-access',
+    {
+      schema: {
+        summary: '设置 Bot 本地工具访问范围',
+        params: botParams,
+        body: botAccessBody,
+        response: { 200: botResponse },
+      },
+    },
+    async (request) =>
+      success(await service.setAccess(await requireActor(request), request.params.botId, request.body), request.id),
   )
   for (const enabled of [true, false]) {
     app.post(

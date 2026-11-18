@@ -97,6 +97,11 @@ export function createPgRunSink(db: Database, run: BotRunRecord, lease: BotRunLe
           .orderBy(desc(botMessage.sequence))
           .limit(1)
         const body: BotMessageBody = {
+          metrics: {
+            ...outcome.usage,
+            turns: outcome.turns,
+            durationMs: Math.max(0, Date.now() - (run.started_at ?? run.created_at).getTime()),
+          },
           blocks: outcome.finalMessage.blocks.flatMap<BotMessageBody['blocks'][number]>((block) => {
             if (block.type !== 'text') return []
             return [{ type: 'text', text: safeText(block.text) }]

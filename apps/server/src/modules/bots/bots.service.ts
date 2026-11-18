@@ -12,7 +12,14 @@ import { authUser, teamMember } from '../identity/identity.tables.ts'
 import { skill } from '../knowledge/knowledge.tables.ts'
 import { botTask } from '../tasks/bot-tasks.tables.ts'
 import { stopRunsForBot, type BotRunTransaction } from './bots.run-queue.repository.ts'
-import type { BindBotModelInput, BotListFilters, BotView, CreateBotInput, UpdateBotInput } from './bots.schema.ts'
+import type {
+  BindBotModelInput,
+  BotAccessInput,
+  BotListFilters,
+  BotView,
+  CreateBotInput,
+  UpdateBotInput,
+} from './bots.schema.ts'
 import { bot, botModelCatalog, botModelConnection, botRun, botSkill } from './bots.tables.ts'
 import { redactChatContent } from './runtime/content.ts'
 import { botAvailability, toBotRunSummary, toBotView, type BotViewRecord } from './bots.view.ts'
@@ -191,6 +198,7 @@ async function addActivity(tx: BotRunTransaction, row: BotRow, userId: string, a
       ownerUserId: row.owner_user_id,
       modelConnectionId: row.model_connection_id,
       modelId: row.model_id,
+      accessMode: row.access_mode,
     },
   })
 }
@@ -439,6 +447,27 @@ export function createBotsService(db: Database) {
         ['admin'],
         (tx, previous) => requireModelBinding(tx, previous.team_id, input),
         (tx, row) => addActivity(tx, row, actor.id, 'bot_model_bound'),
+      )
+    },
+    /**
+     * 修改 Bot 本地工具的目录权限，生效前停止已排队及正在运行的旧权限调用。
+     * @param actor 发起修改的团队成员。
+     * @param id Bot 标识。
+     * @param input 当前配置版本与目标访问模式。
+     * @returns 更新后的 Bot 配置。
+     * @throws 成员无权限或配置版本冲突时返回业务错误。
+     */
+    async setAccess(actor: SessionUser, id: string, input: BotAccessInput) {
+      return checkedUpdate(
+        actor,
+        id,
+        input.configVersion,
+        BOT_EDIT_ROLES,
+        async () => ({ access_mode: input.accessMode }),
+        async (tx, row) => {
+          await stopRunsForBot(tx, row.team_id, row.id)
+          await addActivity(tx, row, actor.id, 'bot_access_changed')
+        },
       )
     },
     /** 更改开关，停用时停止运行并将未完成任务标记为受阻。 */

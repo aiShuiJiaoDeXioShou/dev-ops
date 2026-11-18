@@ -56,6 +56,7 @@ const environmentSchema = Type.Object({
   ATTACHMENT_TEMP_TTL_HOURS: Type.Integer({ minimum: 1, maximum: 168, default: 24 }),
   STORAGE_PROBE_TIMEOUT_MS: Type.Integer({ minimum: 1_000, maximum: 60_000, default: 10_000 }),
   BOT_GLOBAL_CONCURRENCY: Type.Integer({ minimum: 1, maximum: 100, default: 4 }),
+  BOT_WORKSPACE_DIR: Type.String({ minLength: 1, default: './bot-data' }),
   BOT_TEAM_CONCURRENCY: Type.Integer({ minimum: 1, maximum: 100, default: 2 }),
   BOT_RUN_TIMEOUT_SECONDS: Type.Integer({ minimum: 1, maximum: 3_600, default: 600 }),
   BOT_RUN_MAX_TURNS: Type.Integer({ minimum: 1, maximum: 100, default: 8 }),
