@@ -1,0 +1,95 @@
+/* 只在开发原型外壳生效，正式页面不加载此样式。 */
+.prototype-shell {
+  transition: grid-template-columns 200ms ease;
+}
+
+.prototype-shell .prototype-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  gap: 8px;
+}
+
+.prototype-shell .prototype-sidebar-head .brand {
+  min-width: 0;
+  padding: 0 0 0 8px;
+}
+
+.prototype-shell .prototype-sidebar-toggle,
+.prototype-shell .prototype-sidebar-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  border-radius: var(--radius-sm);
+}
+
+.prototype-shell .prototype-sidebar-toggle:hover,
+.prototype-shell .prototype-sidebar-close:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.prototype-shell .prototype-sidebar-close {
+  display: none;
+}
+
+@media (width > 700px) {
+  .prototype-shell.is-nav-collapsed {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .prototype-shell.is-nav-collapsed .prototype-sidebar-head {
+    justify-content: center;
+  }
+
+  .prototype-shell.is-nav-collapsed .prototype-sidebar-head .brand,
+  .prototype-shell.is-nav-collapsed .prototype-nav-label,
+  .prototype-shell.is-nav-collapsed .sidebar .demo-mark,
+  .prototype-shell.is-nav-collapsed .sidebar .user .badge,
+  .prototype-shell.is-nav-collapsed .sidebar .user .spacer {
+    display: none;
+  }
+
+  .prototype-shell.is-nav-collapsed .sidebar .nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    width: 100%;
+    padding: 10px 0;
+  }
+
+  .prototype-shell.is-nav-collapsed .sidebar .user {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .prototype-shell.is-nav-collapsed .sidebar .team-switcher {
+    flex-direction: column;
+    align-items: center;
+    padding-inline: 0;
+  }
+}
+
+@media (width <= 700px) {
+  .prototype-shell .prototype-sidebar-toggle {
+    display: none;
+  }
+
+  .prototype-shell .prototype-sidebar-close {
+    display: inline-flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prototype-shell {
+    transition: none;
+  }
+}

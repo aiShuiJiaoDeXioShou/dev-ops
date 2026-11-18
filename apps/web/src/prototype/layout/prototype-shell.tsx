@@ -1,11 +1,14 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
+import { PanelLeft, X } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
+import { Button } from '@/shared/ui/controls/button'
 import { PrototypeDialog } from '@/prototype/components/prototype-dialog'
 import { PrototypeIcon } from '@/prototype/icons/icon'
 import type { PrototypeIconName } from '@/prototype/icons/icon'
 import { usePrototype } from '@/prototype/data/store'
 import type { TeamRole } from '@/prototype/data/types'
+import './prototype-shell.css'
 
 const primaryNavigation: Array<{ page: string; label: string; icon: PrototypeIconName; to: string }> = [
   { page: 'projects', label: '项目', icon: 'folder', to: '/prototype/projects' },
@@ -28,7 +31,7 @@ export function usePrototypeMenu() {
 }
 
 /**
- * 渲染原型应用外壳：侧栏、团队切换、设置与移动端导航。
+ * 渲染原型应用外壳，演示主导航收纳、团队切换、设置与移动端导航。
  * @returns 原型工作区外壳，页面内容由子路由提供。
  * @remarks 侧栏顺序、底部团队信息与设置入口对齐原型，不额外插入通知入口。
  */
@@ -37,6 +40,7 @@ export function PrototypeShell() {
   const navigate = useNavigate()
   const { data, currentTeam, currentRole, setCurrentTeam, persistenceWarning } = usePrototype()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [navigationCollapsed, setNavigationCollapsed] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
@@ -57,23 +61,50 @@ export function PrototypeShell() {
 
   return (
     <PrototypeMenuContext.Provider value={{ openMenu: () => setMenuOpen(true) }}>
-      <div className={cn('shell', menuOpen && 'menu-open')}>
-        <aside className="sidebar">
-          <div className="brand">
-            <img src="/prototype/brand.svg" width={29} height={29} alt="" />
-            DevOps
+      <div className={cn('shell prototype-shell', menuOpen && 'menu-open', navigationCollapsed && 'is-nav-collapsed')}>
+        <aside className="sidebar" id="prototype-navigation" aria-label="工作区导航">
+          <div className="prototype-sidebar-head">
+            <div className="brand">
+              <img src="/prototype/brand.svg" width={29} height={29} alt="" />
+              DevOps
+            </div>
+            <Button
+              unstyled
+              type="button"
+              className="prototype-sidebar-toggle"
+              title={navigationCollapsed ? '展开主导航' : '收起主导航'}
+              aria-label={navigationCollapsed ? '展开主导航' : '收起主导航'}
+              aria-expanded={!navigationCollapsed}
+              aria-controls="prototype-navigation"
+              onClick={() => setNavigationCollapsed(!navigationCollapsed)}
+            >
+              <PanelLeft className="size-4" strokeWidth={1.5} aria-hidden="true" />
+            </Button>
+            <Button
+              unstyled
+              type="button"
+              className="prototype-sidebar-close"
+              aria-label="关闭导航"
+              onClick={() => setMenuOpen(false)}
+            >
+              <X className="size-4" aria-hidden="true" />
+            </Button>
           </div>
           <nav className="nav" aria-label="主导航">
             {primaryNavigation.map((item) => (
-              <button
+              <Button
+                unstyled
                 key={item.page}
                 type="button"
                 className={cn('nav-btn', isActive(item.to) && 'active')}
+                aria-label={item.label}
+                aria-current={isActive(item.to) ? 'page' : undefined}
+                title={item.label}
                 onClick={() => navigate(item.to)}
               >
                 <PrototypeIcon name={item.icon} className={item.icon === 'bot-live' ? 'nav-bot' : undefined} />
-                {item.label}
-              </button>
+                <span className="prototype-nav-label">{item.label}</span>
+              </Button>
             ))}
           </nav>
           <div className="side-bottom">
@@ -82,25 +113,40 @@ export function PrototypeShell() {
               交互原型 · 本地演示
             </div>
             {currentRole === '管理员' && (
-              <button type="button" className="nav-btn" onClick={() => navigate('/prototype/team-admin')}>
+              <Button
+                unstyled
+                type="button"
+                className="nav-btn"
+                aria-label="团队管理"
+                title="团队管理"
+                onClick={() => navigate('/prototype/team-admin')}
+              >
                 <PrototypeIcon name="users" />
-                团队管理
-              </button>
+                <span className="prototype-nav-label">团队管理</span>
+              </Button>
             )}
-            <button type="button" className="nav-btn" onClick={() => setSettingsOpen(true)}>
+            <Button
+              unstyled
+              type="button"
+              className="nav-btn"
+              aria-label="设置"
+              title="设置"
+              onClick={() => setSettingsOpen(true)}
+            >
               <PrototypeIcon name="settings" />
-              设置
-            </button>
+              <span className="prototype-nav-label">设置</span>
+            </Button>
             <div className="user">
               <span className="avatar">林</span>
-              <span>林然</span>
+              <span className="prototype-nav-label">林然</span>
               <span className="spacer" />
               <span className="badge">{currentRole}</span>
             </div>
             {data.teams.length > 1 && (
               <div className="team-switcher" aria-label="切换团队">
                 {data.teams.map((team) => (
-                  <button
+                  <Button
+                    unstyled
                     key={team.id}
                     type="button"
                     className={cn('team-token', team.id === currentTeam.id && 'active')}
@@ -110,11 +156,18 @@ export function PrototypeShell() {
                     onClick={() => setCurrentTeam(team.id)}
                   >
                     <span>{team.initial}</span>
-                  </button>
+                  </Button>
                 ))}
-                <button type="button" className="team-more" aria-label="团队选项" onClick={() => setSettingsOpen(true)}>
+                <Button
+                  unstyled
+                  type="button"
+                  className="team-more"
+                  aria-label="团队选项"
+                  title="团队选项"
+                  onClick={() => setSettingsOpen(true)}
+                >
                   ···
-                </button>
+                </Button>
               </div>
             )}
           </div>
