@@ -1900,6 +1900,25 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /**
+     * 设置 Bot 的本地工具访问范围。
+     * @param id Bot 标识。
+     * @param body 配置版本与沙盒或完全访问模式。
+     * @param options 幂等键与请求选项。
+     * @returns 更新后的配置；权限和版本错误通过统一信封抛出。
+     */
+    async setBotAccess(
+      id: string,
+      body: ApiBody<'/api/v1/bots/{botId}/set-access', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bots/{botId}/set-access', 'post'>>(
+        `/api/v1/bots/${segment(id)}/set-access`,
+        'POST',
+        body,
+        options,
+      )
+    },
     /** 读取 Bot 配置。 */
     async getBot(id: string, options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/bots/{botId}', 'get'>>(
@@ -2058,6 +2077,29 @@ export function createApiClient(options: ApiClientOptions) {
         'GET',
         undefined,
         { ...options, query },
+      )
+    },
+    /**
+     * 保存或取消当前成员对 Bot 回复的评价。
+     * @param conversationId 来源会话。
+     * @param messageId Bot 回复标识。
+     * @param body 好评、差评或取消选择。
+     * @param options 幂等键与请求选项。
+     * @returns 保存后的选择；不可见或只读会话抛出业务错误。
+     */
+    async rateBotMessage(
+      conversationId: string,
+      messageId: string,
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/messages/{messageId}/feedback', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/messages/{messageId}/feedback', 'post'>
+      >(
+        `/api/v1/bot-conversations/${segment(conversationId)}/messages/${segment(messageId)}/feedback`,
+        'POST',
+        body,
+        options,
       )
     },
     /** 创建 Bot 群组或打开现有私聊。 */
