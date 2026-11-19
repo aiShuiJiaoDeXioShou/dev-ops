@@ -6,6 +6,7 @@ import { BotInbox } from '@/features/bot-tasks/ui/bot-inbox'
 import { conversationsOptions, conversationsQueryKey } from '@/features/conversations/api/queries'
 import { ConversationAvatar } from '@/features/conversations/ui/conversation-avatar'
 import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
+import { DirectConversationPicker } from '@/features/conversations/ui/direct-conversation-picker'
 import { NewGroupDialog } from '@/features/conversations/ui/new-group-dialog'
 import { useSession } from '@/features/identity/model/session'
 import { workTagsOptions } from '@/features/work-tags/api/queries'
@@ -40,6 +41,7 @@ function TeamConversations({
 }) {
   const [filter, setFilter] = useState('')
   const [listOpen, setListOpen] = useState(false)
+  const [newDirectOpen, setNewDirectOpen] = useState(false)
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [tagDialogOpen, setTagDialogOpen] = useState(false)
   const tagOpener = useRef<HTMLButtonElement>(null)
@@ -50,7 +52,7 @@ function TeamConversations({
   const tagItems = tags.data?.pages.flatMap(({ data }) => data.items) ?? []
   const activeTag = tagItems.some(({ id }) => id === tagId) ? tagId : ''
 
-  const groupOpener = useRef<HTMLButtonElement>(null)
+  const conversationOpener = useRef<HTMLButtonElement>(null)
   const client = useQueryClient()
   const listToggleRef = useRef<HTMLButtonElement>(null)
   const listCloseRef = useRef<HTMLButtonElement>(null)
@@ -68,11 +70,9 @@ function TeamConversations({
   const selectedId = id ?? defaultId
   const showListErrorInMain = !isInbox && !selectedId && rooms.length === 0 && list.isError
   const hasNoConversations = list.isSuccess && rooms.length === 0 && !filter && !activeTag
-  let emptyDescription = '从会话列表继续对话，或从智能体目录打开私聊。'
+  let emptyDescription = '从会话列表选择要继续的对话。'
   if (hasNoConversations) {
-    emptyDescription = readOnly
-      ? '加入会话后，可在这里查看对话。'
-      : '从智能体目录打开私聊，或使用会话列表中的加号新建群组。'
+    emptyDescription = readOnly ? '加入会话后，可在这里查看对话。' : '使用会话列表中的加号新建私聊或群组。'
   } else if (linkedSkill) {
     emptyDescription = '选择已配置这项技能的会话，技能会带入输入框。'
   }
@@ -90,7 +90,14 @@ function TeamConversations({
     <div
       className={cn('collab-layout live-conversations', listOpen && 'mobile-rooms-open')}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && listOpen && !newGroupOpen && !tagDialogOpen && !event.defaultPrevented)
+        if (
+          event.key === 'Escape' &&
+          listOpen &&
+          !newDirectOpen &&
+          !newGroupOpen &&
+          !tagDialogOpen &&
+          !event.defaultPrevented
+        )
           closeList()
       }}
     >
@@ -135,16 +142,14 @@ function TeamConversations({
           {!readOnly && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button unstyled type="button" ref={groupOpener} className="icon-btn" aria-label="新建会话">
+                <Button unstyled type="button" ref={conversationOpener} className="icon-btn" aria-label="新建会话">
                   <ConversationIcon name="plus" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem asChild>
-                  <Link to="/capabilities/bots">
-                    <ConversationIcon name="chat" />
-                    新建私聊
-                  </Link>
+                <DropdownMenuItem onSelect={() => setNewDirectOpen(true)}>
+                  <ConversationIcon name="chat" />
+                  新建私聊
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setNewGroupOpen(true)}>
                   <ConversationIcon name="chat" />
@@ -355,13 +360,30 @@ function TeamConversations({
           }}
         />
       )}
+      {newDirectOpen && (
+        <DirectConversationPicker
+          teamId={teamId}
+          onClose={() => setNewDirectOpen(false)}
+          onOpened={() => {
+            setNewDirectOpen(false)
+            setListOpen(false)
+          }}
+          onRestoreFocus={() => {
+            requestAnimationFrame(() => {
+              const opener = conversationOpener.current
+              opener?.focus()
+              if (document.activeElement !== opener) listToggleRef.current?.focus()
+            })
+          }}
+        />
+      )}
       {newGroupOpen && (
         <NewGroupDialog
           teamId={teamId}
           userId={userId}
           onClose={() => {
             setNewGroupOpen(false)
-            requestAnimationFrame(() => groupOpener.current?.focus())
+            requestAnimationFrame(() => conversationOpener.current?.focus())
           }}
           onCreated={(room) => {
             setNewGroupOpen(false)

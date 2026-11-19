@@ -19,9 +19,10 @@ export function useOpenDirectConversation(teamId: string, skillId?: string) {
     onSuccess: async (response) => {
       const { id } = response.data
       client.setQueryData(conversationOptions(id).queryKey, response)
-      await client.invalidateQueries({ queryKey: [...conversationsQueryKey, teamId], refetchType: 'none' })
+      void client.invalidateQueries({ queryKey: [...conversationsQueryKey, teamId] })
       const search = skillId ? `?${new URLSearchParams({ skill: skillId })}` : ''
-      void navigate(`/collaboration/${id}${search}`)
+      // 先切换到目标会话，再关闭选择弹窗并把焦点交还给可见入口。
+      await navigate(`/collaboration/${id}${search}`, { flushSync: true })
     },
   })
 }

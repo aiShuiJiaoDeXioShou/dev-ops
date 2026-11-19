@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Copy, Download, PackageOpen, Pencil, Power } from 'lucide-react'
+import { DirectConversationPicker } from '@/features/conversations/ui/direct-conversation-picker'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/model/session'
@@ -26,7 +27,6 @@ import { copyText, downloadTextFile } from '../lib/files'
 import { SKILL_CATEGORY_LABELS } from '../model/labels'
 import type { SkillDetail } from '../model/types'
 import { ActivityTimeline } from './activity-timeline'
-import { SkillBotPicker } from './skill-bot-picker'
 import { SkillForm } from './skill-form'
 import { VersionHistory } from './version-history'
 
@@ -221,7 +221,7 @@ export function SkillDetailDialog({
         )}
         {editOpen && skill && <SkillForm teamId={teamId} open={editOpen} onOpenChange={setEditOpen} skill={skill} />}
         {botPickerOpen && canWrite && skill?.enabled && (
-          <SkillBotPicker teamId={teamId} skill={skill} onClose={() => setBotPickerOpen(false)} />
+          <DirectConversationPicker teamId={teamId} skill={skill} onClose={() => setBotPickerOpen(false)} />
         )}
       </DialogContent>
     </Dialog>
