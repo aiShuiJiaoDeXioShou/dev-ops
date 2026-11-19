@@ -55,7 +55,7 @@ interface ActivityBarometerProps {
  * 项目首页活动晴雨表：严格沿用原型的热力图、来源筛选、月份/星期刻度与日期弹窗。
  * 查询由项目列表页统一持有，筛选变化时用旧数据静默替换，避免整块重复请求与闪烁。
  * @param props 晴雨表结果、加载/错误状态与受控的活动来源。
- * @returns 过去一年 UTC 日历热力图；来源未知时在文案中标注，不伪造为 0。
+ * @returns 过去一年 UTC 日历热力图及按天查看活动的入口。
  */
 export function ActivityBarometer({
   result,
@@ -94,7 +94,6 @@ export function ActivityBarometer({
     )
   }
   if (!result) return null
-  const data = result
   // API 默认窗口从周日开始；把当前周剩余日期补成 future 占位，保持 53×7 网格。
   const lastDate = days.at(-1)?.date
   if (lastDate) {
@@ -127,8 +126,6 @@ export function ActivityBarometer({
         <strong>项目晴雨表</strong>
         <span className="small quiet">过去一年 · {total} 次活动</span>
         <span className="spacer" />
-        {data.sourceStatus.code !== 'ok' ? <span className="tag">代码未同步</span> : null}
-        {data.sourceStatus.pullRequest !== 'ok' ? <span className="tag">PR 未同步</span> : null}
         <Select
           className="activity-source"
           aria-label="活动来源"
