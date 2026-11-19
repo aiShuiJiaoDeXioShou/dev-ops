@@ -9,7 +9,6 @@ import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
 import { ConversationMessageActions } from './conversation-message-actions'
-import './conversation-runtime.css'
 import type { MessageView } from './conversation-message.view'
 
 const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
@@ -187,11 +186,13 @@ export function ConversationMessages({
                       </div>
                     )}
                     {message.text && message.runId && !['running', 'queued'].includes(message.status ?? '') && (
-                      <AnswerFooter message={message} conversationId={conversationId} readOnly={readOnly} />
+                      <AnswerFooter message={message} conversationId={conversationId} readOnly={readOnly} busy={busy} />
                     )}
-                    {!readOnly && message.isStored && (
-                      <ConversationMessageActions message={message} conversationId={conversationId} busy={busy} />
-                    )}
+                    {!readOnly &&
+                      message.isStored &&
+                      !(message.text && message.runId && !['running', 'queued'].includes(message.status ?? '')) && (
+                        <ConversationMessageActions message={message} conversationId={conversationId} busy={busy} />
+                      )}
                     {message.memoryChanges?.map((action, index) => (
                       <details key={index} className="dsh-note">
                         <summary>

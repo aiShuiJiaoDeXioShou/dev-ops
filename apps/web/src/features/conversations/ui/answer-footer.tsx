@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/controls/popover'
 import { useToast } from '@/shared/ui/toast'
 import { messagesOptions } from '../api/queries'
+import { ConversationMessageActions } from './conversation-message-actions'
 import type { MessageView } from './conversation-message.view'
 
 const timestamp = new Intl.DateTimeFormat('zh-CN', {
@@ -21,17 +22,19 @@ const tokens = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFrac
 
 /**
  * 按参考样式展示回答操作与真实用量，鼠标移入或键盘聚焦时显示。
- * @param props 当前回复、来源会话和只读状态。
- * @returns 复制、评价、详情和会话内链接，以及模型用量和时间。
+ * @param props 当前回复、来源会话、只读状态和会话运行状态。
+ * @returns 复制、评价、消息分叉、详情和会话内链接，以及模型用量和时间。
  */
 export function AnswerFooter({
   message,
   conversationId,
   readOnly,
+  busy,
 }: {
   message: MessageView
   conversationId: string
   readOnly: boolean
+  busy: boolean
 }) {
   const [copied, setCopied] = useState(false)
   const client = useQueryClient()
@@ -85,6 +88,9 @@ export function AnswerFooter({
               {value === 'helpful' ? <ThumbsUp /> : <ThumbsDown />}
             </Button>
           ))}
+        {!readOnly && message.isStored && (
+          <ConversationMessageActions message={message} conversationId={conversationId} busy={busy} />
+        )}
         <Popover>
           <PopoverTrigger asChild>
             <Button unstyled type="button" className="dsh-answer-action" title="回答详情" aria-label="回答详情">

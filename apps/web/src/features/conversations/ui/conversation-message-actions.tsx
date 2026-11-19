@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, GitFork, MoreHorizontal, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, GitFork, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
@@ -14,18 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/ui/controls/dropdown-menu'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { conversationEventsOptions, conversationOptions, conversationsQueryKey, messagesOptions } from '../api/queries'
 import type { MessageView } from './conversation-message.view'
 
 /**
- * 提供已提交消息的分支导航、编辑重发和分叉操作。
+ * 提供已提交消息的分支导航、编辑重发和图标式分叉操作，可嵌入回答操作栏。
  * @param props 消息、所属会话和当前是否有运行。
  * @returns 消息操作入口、版本位置与确认对话框。
  */
@@ -95,7 +89,7 @@ export function ConversationMessageActions({
   }
   const error = mutation.isError ? describeRequestError(mutation.error).description : undefined
   return (
-    <div className="row flex-wrap gap-1">
+    <div className="contents">
       {branch && (
         <>
           <Button
@@ -123,36 +117,36 @@ export function ConversationMessageActions({
           </Button>
         </>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            ref={opener}
-            className="dsh-message-menu"
-            aria-label="更多消息操作"
-            disabled={mutation.isPending}
-          >
-            <MoreHorizontal className="size-4" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          onCloseAutoFocus={(event) => {
-            if (mode) event.preventDefault()
+      {message.canEdit && (
+        <Button
+          unstyled
+          type="button"
+          className="dsh-answer-action"
+          aria-label="编辑并重新发送"
+          title="编辑并重新发送"
+          disabled={busy || mutation.isPending}
+          onClick={(event) => {
+            opener.current = event.currentTarget
+            open('edit')
           }}
         >
-          {message.canEdit && (
-            <DropdownMenuItem disabled={busy} onSelect={() => open('edit')}>
-              <Pencil className="size-4" aria-hidden="true" /> 编辑并重新发送
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onSelect={() => open('fork')}>
-            <GitFork className="size-4" aria-hidden="true" /> 从这里分叉
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <Pencil className="size-4" aria-hidden="true" />
+        </Button>
+      )}
+      <Button
+        unstyled
+        type="button"
+        className="dsh-answer-action"
+        aria-label="从这里分叉"
+        title="从这里分叉"
+        disabled={mutation.isPending}
+        onClick={(event) => {
+          opener.current = event.currentTarget
+          open('fork')
+        }}
+      >
+        <GitFork className="size-4" aria-hidden="true" />
+      </Button>
       {!mode && error && (
         <p className="field-error" role="alert">
           {error}

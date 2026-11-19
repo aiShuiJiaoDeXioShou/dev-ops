@@ -312,6 +312,15 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
     `/collaboration/${room.id}#message-da55aa00-0000-4000-8000-000000000022`,
   )
+  const fork = footer.getByRole('button', { name: '从这里分叉', exact: true })
+  await expect(fork).toHaveText('')
+  const buttons = await footer.getByRole('button').all()
+  const labels = await Promise.all(buttons.map((button) => button.getAttribute('aria-label')))
+  expect(labels.indexOf('从这里分叉')).toBe(labels.indexOf('回答无帮助') + 1)
+  await fork.press('Enter')
+  await expect(page.getByRole('dialog', { name: '从这里分叉' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(fork).toBeFocused()
   await footer.getByRole('button', { name: '回答详情', exact: true }).press('Enter')
   await expect(page.getByText('输入 Token', { exact: true })).toBeVisible()
   await page.keyboard.press('Escape')
