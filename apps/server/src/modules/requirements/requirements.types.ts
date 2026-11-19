@@ -21,6 +21,8 @@ export interface RequirementListItem {
   title: string
   status: RequirementStatus
   devOwner: OwnerRef | null
+  devOwners?: OwnerRef[]
+  testOwners?: OwnerRef[]
   testOwner: OwnerRef | null
   version: number
   updatedAt: string

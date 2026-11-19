@@ -126,7 +126,7 @@ apps/server/
 
 ## V0.1 已实现模块与路由
 
-`POST /api/v1/requirements/:requirementId/update` 与 `POST /api/v1/bugs/:bugId/update` 使用版本号保存局部字段。标题、派工和协作人可按权限维护。需求提测后以及 Bug 提交回归后，需通过相应流程动作回到可改范围的阶段再修订正文、复现或附件清单。当前回归负责人的调整从撤回回归开始。
+`POST /api/v1/requirements/:requirementId/update` 与 `POST /api/v1/bugs/:bugId/update` 使用版本号保存局部字段。标题、派工和协作人可按权限维护。需求描述在各状态均可编辑；提测后验收标准和附件清单仍锁定。Bug 提交回归后，需通过相应流程动作回到可改范围的阶段再修订复现或附件清单。当前回归负责人的调整从撤回回归开始。
 
 详情返回的 `plan` 保存本事项的规划节点和待办。同一更新接口可传入完整 `plan` 替换当前规划。节点和待办的 `startsOn`、`endsOn` 均允许设为 `null`。规划写入增加事项版本并记录操作历史。
 
@@ -383,3 +383,5 @@ Worker 使用 Pi 内存会话，按会话与 Bot 将脱敏条目、分支叶子�
 | `BOT_MEMORY_CONSOLIDATION_INTERVAL_MINUTES` | 10     | Worker 检查整理记忆资格的间隔   |
 
 远程 MCP 按 Bot 授权，只允许连接到通过公网地址校验的 HTTPS 服务。团队凭据库只提供授权时所需的凭据引用，密钥由 Worker 在连接时读取并写入请求头。
+
+需求创建与更新支持 `devOwnerUserIds`、`testOwnerUserIds`，分别最多 20 名团队正常成员；传空数组清空该类负责人。集合与旧单负责人字段同时传入时，以集合首位作为流程兼容的主负责人。详情返回 `devOwners`、`testOwners`，旧数据从单负责人字段回填。提测接口支持可选的 `testOwnerUserIds`，历史提测记录继续保存当次主负责人快照。

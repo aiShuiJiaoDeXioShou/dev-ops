@@ -27,6 +27,8 @@ const requirementItemSchema = Type.Object({
   title: Type.String(),
   status: statusSchema,
   devOwner: Type.Union([ownerSchema, Type.Null()]),
+  devOwners: Type.Optional(Type.Array(ownerSchema)),
+  testOwners: Type.Optional(Type.Array(ownerSchema)),
   testOwner: Type.Union([ownerSchema, Type.Null()]),
   version: Type.Integer(),
   updatedAt: Type.String(),
@@ -130,6 +132,9 @@ export const createRequirementBodySchema = Type.Object(
     externalUrl: Type.Optional(Type.Union([Type.String({ maxLength: 2048 }), Type.Null()])),
     externalSummary: Type.Optional(Type.Union([Type.String({ maxLength: 2000 }), Type.Null()])),
     acceptanceCriteria: Type.Optional(Type.Union([Type.String({ maxLength: 20000 }), Type.Null()])),
+
+    devOwnerUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20, uniqueItems: true })),
+    testOwnerUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20, uniqueItems: true })),
     devOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     testOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
@@ -146,6 +151,9 @@ export const updateRequirementBodySchema = Type.Object(
     externalUrl: Type.Optional(Type.Union([Type.String({ maxLength: 2048 }), Type.Null()])),
     externalSummary: Type.Optional(Type.Union([Type.String({ maxLength: 2000 }), Type.Null()])),
     acceptanceCriteria: Type.Optional(Type.Union([Type.String({ maxLength: 20000 }), Type.Null()])),
+
+    devOwnerUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20, uniqueItems: true })),
+    testOwnerUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20, uniqueItems: true })),
     devOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     testOwnerUserId: Type.Optional(Type.Union([uuidSchema, Type.Null()])),
     collaboratorUserIds: Type.Optional(Type.Array(uuidSchema, { maxItems: 20 })),
@@ -175,6 +183,7 @@ export const submitTestBodySchema = Type.Object(
   {
     version: Type.Integer({ minimum: 1 }),
     testOwnerUserId: uuidSchema,
+    testOwnerUserIds: Type.Optional(Type.Array(uuidSchema, { minItems: 1, maxItems: 20, uniqueItems: true })),
     scopeNote: Type.String({ minLength: 1, maxLength: 20000 }),
     selfTestResult: Type.Union([
       Type.Literal('passed'),

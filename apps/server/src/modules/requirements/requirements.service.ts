@@ -49,7 +49,13 @@ import {
   type RequirementRow,
 } from './requirements.repository.ts'
 import type { RequirementBugReader, RequirementCodeReferenceReader, RequirementDetail } from './requirements.types.ts'
-import { toRequirementDetail, toRequirementListItem, toTestSubmissionView } from './requirements.view.ts'
+import { findRequirementOwners, replaceRequirementOwners } from './requirements.owners.ts'
+import {
+  toRequirementOwners,
+  toRequirementDetail,
+  toRequirementListItem,
+  toTestSubmissionView,
+} from './requirements.view.ts'
 
 export interface RequirementsServiceDeps {
   db: Database
@@ -108,13 +114,15 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       deps.codeReferences ? deps.codeReferences('requirement', row.id) : Promise.resolve([]),
       attachmentBinding.listAttachmentsForTarget(db, 'requirement', row.id),
     ])
+    const owners = await findRequirementOwners(db, row.id)
     const ownerUserIds = [
+      ...owners.map((owner) => owner.userId),
       ...(row.dev_owner_user_id === null ? [] : [row.dev_owner_user_id]),
       ...(row.test_owner_user_id === null ? [] : [row.test_owner_user_id]),
       ...collaboratorRows.map((item) => item.userId),
     ]
     const refs = await loadOwnerRefs(db, row.team_id, ownerUserIds, { includeImage: true })
-    return toRequirementDetail({
+    const detail = toRequirementDetail({
       row,
       collaborators: collaboratorRows,
       attachments,
@@ -123,6 +131,19 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       linkedCodeReferences,
       refs,
     })
+    return {
+      ...detail,
+      devOwners: toRequirementOwners(
+        detail.devOwner,
+        owners.filter((owner) => owner.role === 'development').map((owner) => owner.userId),
+        refs,
+      ),
+      testOwners: toRequirementOwners(
+        detail.testOwner,
+        owners.filter((owner) => owner.role === 'test').map((owner) => owner.userId),
+        refs,
+      ),
+    }
   }
 
   async function validateOwners(
@@ -175,21 +196,39 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       page,
       pageSize,
     })
+    const owners = await findRequirementOwners(
+      db,
+      rows.map((row) => row.id),
+    )
     const ownerUserIds = rows.flatMap((row) =>
       row.dev_owner_user_id === null && row.test_owner_user_id === null
         ? []
         : [row.dev_owner_user_id, row.test_owner_user_id].filter((userId): userId is string => userId !== null),
     )
     const [ownerRefs, needsReviewIds] = await Promise.all([
-      loadOwnerRefs(db, project.teamId, ownerUserIds),
+      loadOwnerRefs(db, project.teamId, [...ownerUserIds, ...owners.map((owner) => owner.userId)]),
       findNeedsReviewRequirementIds(
         db,
         rows.map((row) => row.id),
       ),
     ])
-    const items = rows.map((row) =>
-      toRequirementListItem({ row, refs: ownerRefs, needsReview: needsReviewIds.has(row.id) }),
-    )
+    const items = rows.map((row) => {
+      const item = toRequirementListItem({ row, refs: ownerRefs, needsReview: needsReviewIds.has(row.id) })
+      const assigned = owners.filter((owner) => owner.requirementId === row.id)
+      return {
+        ...item,
+        devOwners: toRequirementOwners(
+          item.devOwner,
+          assigned.filter((owner) => owner.role === 'development').map((owner) => owner.userId),
+          ownerRefs,
+        ),
+        testOwners: toRequirementOwners(
+          item.testOwner,
+          assigned.filter((owner) => owner.role === 'test').map((owner) => owner.userId),
+          ownerRefs,
+        ),
+      }
+    })
     return { items, page, pageSize, total }
   }
 
@@ -203,12 +242,19 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       externalUrl?: string | null
       externalSummary?: string | null
       acceptanceCriteria?: string | null
+      devOwnerUserIds?: string[]
+      testOwnerUserIds?: string[]
       devOwnerUserId?: string | null
       testOwnerUserId?: string | null
       collaboratorUserIds?: string[]
       attachmentIds?: string[]
     },
   ) {
+    input = {
+      ...input,
+      ...(input.devOwnerUserIds === undefined ? {} : { devOwnerUserId: input.devOwnerUserIds[0] ?? null }),
+      ...(input.testOwnerUserIds === undefined ? {} : { testOwnerUserId: input.testOwnerUserIds[0] ?? null }),
+    }
     const project = await requireProjectWrite(actor, projectId)
     const title = normalizeTitle(input.title)
     const content = validateContent(input)
@@ -243,6 +289,10 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         plan: instantiateWorkItemTemplate(workItemTemplates.requirement),
         createdByUserId: actor.id,
       })
+      if (input.devOwnerUserIds)
+        await replaceRequirementOwners(tx, requirementId, project.teamId, 'development', input.devOwnerUserIds)
+      if (input.testOwnerUserIds)
+        await replaceRequirementOwners(tx, requirementId, project.teamId, 'test', input.testOwnerUserIds)
       if (collaborators.length > 0) {
         await replaceCollaborators(tx, requirementId, project.teamId, collaborators, actor.id)
         await appendActivity(tx, {
@@ -294,6 +344,8 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       externalUrl?: string | null
       externalSummary?: string | null
       acceptanceCriteria?: string | null
+      devOwnerUserIds?: string[]
+      testOwnerUserIds?: string[]
       devOwnerUserId?: string | null
       testOwnerUserId?: string | null
       collaboratorUserIds?: string[]
@@ -301,18 +353,17 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       plan?: WorkItemPlan
     },
   ) {
+    input = {
+      ...input,
+      ...(input.devOwnerUserIds === undefined ? {} : { devOwnerUserId: input.devOwnerUserIds[0] ?? null }),
+      ...(input.testOwnerUserIds === undefined ? {} : { testOwnerUserId: input.testOwnerUserIds[0] ?? null }),
+    }
     if (!Number.isSafeInteger(input.version) || input.version < 1) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '版本参数不合法')
     }
     const { row: current, project } = await requireRequirement(actor, requirementId)
     await requireTeamMember(db, actor.id, project.teamId, ['admin', 'developer'])
-    const changesScope =
-      input.contentMode !== undefined ||
-      input.contentMarkdown !== undefined ||
-      input.externalUrl !== undefined ||
-      input.externalSummary !== undefined ||
-      input.acceptanceCriteria !== undefined ||
-      input.attachmentIds !== undefined
+    const changesScope = input.acceptanceCriteria !== undefined || input.attachmentIds !== undefined
     if (changesScope && !EDITABLE_REQUIREMENT_SCOPE_STATUSES.has(current.status)) {
       throw new ApiError(ERROR_CODES.INVALID_TRANSITION, '当前需求状态不允许修改范围字段')
     }
@@ -358,6 +409,8 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
       changes.contentUpdated = true
     if (acceptance !== undefined && acceptance !== current.acceptance_criteria)
       changes.acceptanceCriteria = [current.acceptance_criteria, acceptance || null]
+    if (input.devOwnerUserIds !== undefined) changes.devOwnerUserIds = input.devOwnerUserIds
+    if (input.testOwnerUserIds !== undefined) changes.testOwnerUserIds = input.testOwnerUserIds
     if (input.devOwnerUserId !== undefined && input.devOwnerUserId !== current.dev_owner_user_id)
       changes.devOwner = [current.dev_owner_user_id, input.devOwnerUserId]
     if (input.testOwnerUserId !== undefined && input.testOwnerUserId !== current.test_owner_user_id)
@@ -378,6 +431,25 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         plan,
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '需求已被更新，请刷新后重试')
+      if (input.devOwnerUserIds !== undefined || input.devOwnerUserId !== undefined) {
+        await replaceRequirementOwners(
+          tx,
+          requirementId,
+          project.teamId,
+          'development',
+          input.devOwnerUserIds ?? (input.devOwnerUserId ? [input.devOwnerUserId] : []),
+        )
+      }
+      if (input.testOwnerUserIds !== undefined || input.testOwnerUserId !== undefined) {
+        await replaceRequirementOwners(
+          tx,
+          requirementId,
+          project.teamId,
+          'test',
+          input.testOwnerUserIds ?? (input.testOwnerUserId ? [input.testOwnerUserId] : []),
+        )
+      }
+
       if (input.attachmentIds !== undefined) {
         const finalAttachmentIds = [...new Set(input.attachmentIds)]
         const currentAttachments = await attachmentBinding.listAttachmentsForTarget(tx, 'requirement', requirementId)
@@ -546,6 +618,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     input: {
       version: number
       testOwnerUserId: string
+      testOwnerUserIds?: string[]
       scopeNote: string
       selfTestResult: string
       selfTestNote?: string | null
@@ -555,6 +628,7 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
     },
   ) {
     const { row: current, project } = await requireWorkflow(actor, requirementId)
+    input = { ...input, testOwnerUserId: input.testOwnerUserIds?.[0] ?? input.testOwnerUserId }
     const scope = 'requirement.submit-test'
     if (input.idempotencyKey) {
       const existing = await findIdempotency(db, {
@@ -610,6 +684,9 @@ export function createRequirementsService(deps: RequirementsServiceDeps) {
         testOwnerUserId: input.testOwnerUserId,
       })
       if (!updated) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '需求已被更新，请刷新后重试')
+      if (input.testOwnerUserIds) {
+        await replaceRequirementOwners(tx, requirementId, project.teamId, 'test', input.testOwnerUserIds)
+      }
       const activity = await appendActivity(tx, {
         teamId: project.teamId,
         projectId: project.id,

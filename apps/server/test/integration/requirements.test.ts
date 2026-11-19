@@ -199,12 +199,12 @@ test('需求创建、内容校验、筛选、版本、评论、活动、项目�
   })
   assert.equal(conflict.json().code, 'VERSION_CONFLICT')
 
-  // 进入已提交状态后不允许修改范围字段。
+  // 提交后仍可编辑描述，验收标准及附件继续锁定。
   await app.db.update(requirement).set({ status: 'submitted', version: 3 }).where(eq(requirement.id, requirementId))
   const frozen = await app.inject({
     method: 'POST',
     url: `/api/v1/requirements/${requirementId}/update`,
-    payload: { version: 3, contentMode: 'markdown', contentMarkdown: '未重新交接的范围' },
+    payload: { version: 3, acceptanceCriteria: '修改已冻结的验收标准' },
     headers: { cookie: devUser.cookie },
   })
   assert.equal(frozen.json().code, 'INVALID_TRANSITION')
@@ -221,14 +221,47 @@ test('需求创建、内容校验、筛选、版本、评论、活动、项目�
   const edit = await app.inject({
     method: 'POST',
     url: `/api/v1/requirements/${requirementId}/update`,
-    payload: { version: 3, title: '登录能力 v3', testOwnerUserId: devUser.userId, plan },
+    payload: {
+      version: 3,
+      title: '登录能力 v3',
+      contentMode: 'markdown',
+      contentMarkdown: '提测后补充描述',
+      devOwnerUserIds: [adminUser.userId, devUser.userId],
+      testOwnerUserIds: [devUser.userId, adminUser.userId],
+      plan,
+    },
     headers: { cookie: devUser.cookie },
   })
   assert.equal(edit.json().success, true, edit.body)
   assert.equal(edit.json().data.status, 'submitted')
   assert.equal(edit.json().data.testOwner.userId, devUser.userId)
   assert.deepEqual(edit.json().data.plan, plan)
+  assert.equal(edit.json().data.contentMarkdown, '提测后补充描述')
+  assert.deepEqual(
+    new Set(edit.json().data.devOwners.map((owner: { userId: string }) => owner.userId)),
+    new Set([adminUser.userId, devUser.userId]),
+  )
+  const persistedOwners = await app.inject({
+    method: 'GET',
+    url: `/api/v1/requirements/${requirementId}`,
+    headers: { cookie: devUser.cookie },
+  })
+  assert.equal(persistedOwners.json().data.devOwners.length, 2)
+  assert.equal(persistedOwners.json().data.testOwners.length, 2)
 
+  const invalidOwner = await app.inject({
+    method: 'POST',
+    url: `/api/v1/requirements/${requirementId}/update`,
+    payload: { version: 4, testOwnerUserIds: [randomUUID()] },
+    headers: { cookie: devUser.cookie },
+  })
+  assert.equal(invalidOwner.json().code, 'PRECONDITION_FAILED')
+  const filteredBySecondOwner = await app.inject({
+    method: 'GET',
+    url: `/api/v1/projects/${projectId}/requirements?ownerId=${devUser.userId}`,
+    headers: { cookie: devUser.cookie },
+  })
+  assert.equal(filteredBySecondOwner.json().data.total, 1)
   const invalidPlan = await app.inject({
     method: 'POST',
     url: `/api/v1/requirements/${requirementId}/update`,

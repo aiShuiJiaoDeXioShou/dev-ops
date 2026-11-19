@@ -98,3 +98,23 @@ export const requirementTestSubmission = appSchema.table(
     index('idx_requirement_test_submission_requirement').on(table.requirement_id, table.created_at),
   ],
 )
+
+/** 需求负责人关联；单负责人字段保留首位负责人供既有流程及提测快照使用。 */
+export const requirementOwner = appSchema.table(
+  'requirement_owner',
+  {
+    id: uuid('id').notNull(),
+    team_id: uuid('team_id').notNull(),
+    requirement_id: uuid('requirement_id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    role: text('role').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ name: 'pk_requirement_owner_id', columns: [table.id] }),
+    unique('uk_requirement_owner_role_user').on(table.requirement_id, table.role, table.user_id),
+    check('ck_requirement_owner_role', sql`${table.role} in ('development', 'test')`),
+    index('idx_requirement_owner_user').on(table.team_id, table.user_id),
+  ],
+)

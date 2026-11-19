@@ -103,3 +103,5 @@ export {
   projectTemplateSelection,
   templateSnapshotLink,
 } from '../modules/knowledge/knowledge.tables.ts'
+
+export { requirementOwner } from '../modules/requirements/requirements.tables.ts'

@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { and, count, desc, eq, ilike, inArray, isNotNull, max, notExists, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, exists, ilike, inArray, isNotNull, max, notExists, or, sql } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
-import { requirement, requirementCollaborator, requirementTestSubmission } from './requirements.tables.ts'
+import {
+  requirement,
+  requirementOwner,
+  requirementCollaborator,
+  requirementTestSubmission,
+} from './requirements.tables.ts'
 import type { RequirementSummary } from './requirements.types.ts'
 import { bug, bugRequirementLink } from '../bugs/bugs.tables.ts'
 import { teamMember } from '../identity/identity.tables.ts'
@@ -61,7 +66,24 @@ export async function findRequirements(db: Database, projectId: string, filters:
     if (searchCondition) conditions.push(searchCondition)
   }
   if (filters.status) conditions.push(eq(requirement.status, filters.status))
-  if (filters.ownerId) conditions.push(eq(requirement.dev_owner_user_id, filters.ownerId))
+  if (filters.ownerId) {
+    const ownerCondition = or(
+      eq(requirement.dev_owner_user_id, filters.ownerId),
+      exists(
+        db
+          .select({ one: sql`1` })
+          .from(requirementOwner)
+          .where(
+            and(
+              eq(requirementOwner.requirement_id, requirement.id),
+              eq(requirementOwner.role, 'development'),
+              eq(requirementOwner.user_id, filters.ownerId),
+            ),
+          ),
+      ),
+    )
+    if (ownerCondition) conditions.push(ownerCondition)
+  }
   if (filters.ownerUnavailable) {
     const activeOwner = (ownerColumn: typeof requirement.dev_owner_user_id | typeof requirement.test_owner_user_id) =>
       notExists(

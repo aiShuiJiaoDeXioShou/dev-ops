@@ -102,3 +102,18 @@ export function toRequirementDetail(input: RequirementDetailMapping): Requiremen
     createdByUserId: row.created_by_user_id,
   }
 }
+
+/**
+ * 合并旧主负责人和多选关联，生成不重复的负责人引用。
+ * @param primary 旧单负责人字段解析出的用户，空值表示尚未指定。
+ * @param userIds 多选关联的成员标识。
+ * @param refs 已批量加载的团队成员展示信息。
+ * @returns 主负责人在前、其余成员顺序稳定的引用集合。
+ */
+export function toRequirementOwners(primary: OwnerRef | null, userIds: readonly string[], refs: Map<string, OwnerRef>) {
+  const ids = [...new Set([...(primary ? [primary.userId] : []), ...userIds])]
+  return ids.flatMap((id) => {
+    const ref = ownerRefOf(id, refs)
+    return ref ? [ref] : []
+  })
+}
