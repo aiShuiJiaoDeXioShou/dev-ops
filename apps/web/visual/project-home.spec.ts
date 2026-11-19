@@ -59,6 +59,7 @@ test('[desktop] [mobile] 首页组合筛选、保留 URL 并显示紧凑项目�
   const cards = page.locator('.project-card')
   const filter = page.getByRole('button', { name: /^筛选/ })
   const panel = page.getByRole('dialog', { name: '项目筛选' })
+  const status = panel.getByRole('combobox', { name: '状态', exact: true })
   const repository = panel.getByRole('combobox', { name: '仓库', exact: true })
   await expect(cards).toHaveCount(8)
   await expect(filter).toBeEnabled()
@@ -72,10 +73,18 @@ test('[desktop] [mobile] 首页组合筛选、保留 URL 并显示紧凑项目�
   await page.screenshot({ path: testInfo.outputPath('projects-compact.png') })
 
   await filter.press('Enter')
-  await expect(panel).toBeVisible()
-  await panel.getByRole('combobox', { name: '状态', exact: true }).selectOption('active')
-  await panel.getByRole('combobox', { name: '负责人' }).selectOption({ label: '我负责' })
+  await expect(panel).toBeFocused()
+  await expect(status).toHaveValue('')
+  const statusLabelGap = await status.evaluate((element: HTMLSelectElement) => {
+    const label = element.labels?.[0]
+    return label ? element.getBoundingClientRect().top - label.getBoundingClientRect().bottom : 0
+  })
+  expect(statusLabelGap).toBeGreaterThanOrEqual(4)
   await page.screenshot({ path: testInfo.outputPath('project-filters.png') })
+  await page.keyboard.press('Tab')
+  await expect(status).toBeFocused()
+  await status.selectOption('active')
+  await panel.getByRole('combobox', { name: '负责人' }).selectOption({ label: '我负责' })
   await repository.click()
   await expect(page.getByRole('textbox', { name: '搜索仓库' })).toBeFocused()
   await page.keyboard.press('Escape')
@@ -108,7 +117,7 @@ test('[desktop] [mobile] 首页组合筛选、保留 URL 并显示紧凑项目�
   await expect(cards).toHaveCount(1)
   await filter.click()
   await expect(repository).toHaveText('team/core · 团队 GitHub')
-  await panel.getByRole('combobox', { name: '状态', exact: true }).selectOption('paused')
+  await status.selectOption('paused')
   await panel.getByRole('button', { name: '应用筛选' }).click()
   await expect(page.getByText('没有匹配的项目', { exact: true })).toBeVisible()
 

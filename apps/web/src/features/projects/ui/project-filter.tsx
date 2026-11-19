@@ -86,7 +86,13 @@ export function ProjectFilter({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" collisionPadding={12} aria-label="项目筛选" className="project-filter-panel">
+      <PopoverContent
+        align="start"
+        collisionPadding={12}
+        aria-label="项目筛选"
+        className="project-filter-panel"
+        focusPanelOnOpen
+      >
         <form
           className="space-y-4"
           onSubmit={(event) => {

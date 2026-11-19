@@ -63,7 +63,7 @@ export function FormField({
       )}
     </span>
   )
-  const labelClassName = 'text-sm font-medium text-foreground'
+  const labelClassName = 'block text-sm font-medium text-foreground'
   return (
     <div data-slot="form-field" className={cn('space-y-1.5', className)}>
       {htmlFor ? (
