@@ -16,7 +16,7 @@ import {
 import { projectQueryOptions } from '@/features/projects/api/queries'
 import { CodeChangeSection } from '@/features/tools/ui/code-change-section'
 import { CodeInvocationLogSheet } from '@/features/tools/ui/code-invocation-log'
-import { CommitHistoryDialog } from '@/features/code/ui/commit-history-dialog'
+import { CommitHistorySheet } from '@/features/code/ui/commit-history-sheet'
 import { GitHubWriteAction } from '@/features/code/ui/github-write-action'
 import { pickDefaultPreviewPath } from '@/features/code/lib/default-preview'
 import {
@@ -157,7 +157,6 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
   const [selectedRepositoryId, setSelectedRepositoryId] = useState('')
   const [selectedBranch, setSelectedBranch] = useState('')
   const [selectedPath, setSelectedPath] = useState('')
-  const [commitsOpen, setCommitsOpen] = useState(false)
   const [changesOpen, setChangesOpen] = useState(false)
   const [invocationsOpen, setInvocationsOpen] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -318,20 +317,16 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
         >
           <History className="size-4" aria-hidden="true" />
         </Button>
-        <Button type="button" variant="outline" size="sm" onClick={() => setCommitsOpen(true)}>
-          提交记录
-        </Button>
+        <CommitHistorySheet
+          key={JSON.stringify([repository.id, currentBranch])}
+          projectId={projectId}
+          repositoryId={repository.id}
+          ref={currentBranch}
+        />
         <a className="btn" href={repository.webUrl} target="_blank" rel="noreferrer">
           <ExternalLink className="size-4" aria-hidden="true" />在 {providerLabel} 打开
         </a>
       </div>
-      <CommitHistoryDialog
-        projectId={projectId}
-        repositoryId={repository.id}
-        ref={currentBranch}
-        open={commitsOpen}
-        onOpenChange={setCommitsOpen}
-      />
       {tree.isError ? (
         <PageError
           title="代码文件读取失败"

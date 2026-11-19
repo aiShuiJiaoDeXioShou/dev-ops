@@ -1,0 +1,126 @@
+.commit-history-sheet[data-side='right'] {
+  width: min(576px, 100%);
+  max-width: 100%;
+}
+
+@layer components {
+  .commit-history-body {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px 24px 24px;
+  }
+
+  .commit-timeline-group {
+    position: relative;
+    margin-inline-start: 7px;
+    padding-inline-start: 16px;
+    padding-block-end: 16px;
+    border-inline-start: 1px solid var(--border);
+  }
+
+  .commit-timeline-group:last-child {
+    padding-block-end: 0;
+  }
+
+  .commit-timeline-date {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-block-end: 8px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .commit-timeline-date svg {
+    position: absolute;
+    inset-inline-start: -8px;
+    background: var(--background);
+  }
+
+  .commit-timeline-list {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .commit-timeline-list > li + li {
+    border-block-start: 1px solid var(--border);
+  }
+
+  .commit-timeline-entry {
+    display: grid;
+    width: 100%;
+    min-height: 44px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: start;
+  }
+
+  .commit-timeline-entry:hover,
+  .commit-timeline-entry[aria-expanded='true'] {
+    background: var(--muted);
+  }
+
+  .commit-timeline-entry[aria-expanded='true'] > svg {
+    rotate: 180deg;
+  }
+
+  .commit-timeline-summary {
+    display: grid;
+    gap: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .commit-timeline-title {
+    font-weight: 600;
+  }
+
+  .commit-timeline-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+  }
+
+  .commit-timeline-sha {
+    padding: 3px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--secondary);
+    color: var(--muted-foreground);
+    font-size: 12px;
+  }
+
+  .commit-timeline-files {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px;
+    border-block-start: 1px solid var(--border);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  .commit-timeline-files h4 {
+    font-weight: 500;
+  }
+
+  .commit-timeline-files li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 2px 8px;
+    padding-block: 4px;
+  }
+
+  @media (width < 768px) {
+    .commit-history-body {
+      padding-inline: 16px;
+    }
+  }
+}
