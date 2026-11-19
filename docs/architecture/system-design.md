@@ -57,7 +57,8 @@ dev-ops/
 │   └── cli/                       # 命令行入口
 ├── packages/
 │   ├── api-client/                # 从后端契约生成的客户端与接口类型
-│   └── pipeline-protocol/         # Server 与 Agent 共用的流水线协议类型
+│   ├── pipeline-protocol/         # Server 与 Agent 共用的流水线协议类型
+│   └── devops-bot/                # Git 子模块：可复用的 Bot 库（运行时、记忆、工具、模型连接）
 ├── tooling/                      # 共享编译配置、依赖边界检查和工程脚本
 ├── tests/
 │   └── e2e/                      # 跨 Web、Server、CLI 的完整流程
@@ -118,10 +119,10 @@ apps/web/
 │   │   ├── code/
 │   │   ├── delivery/
 │   │   ├── pipeline/             # 流水线页、运行详情与执行节点管理
-│   │   ├── bots/
+│   │   ├── bots/                 # Bot、模型连接与记忆
 │   │   ├── collaboration/
 │   │   ├── tasks/
-│   │   ├── knowledge/            # Skills、模板与记忆
+│   │   ├── knowledge/            # Skills
 │   │   ├── configuration/        # 凭据、环境变量和配置请求
 │   │   ├── integrations/
 │   │   ├── monitoring/
@@ -211,7 +212,8 @@ apps/server/
 ├── src/
 │   ├── entrypoints/
 │   │   ├── http.ts               # 启动 HTTP 服务和关闭资源
-│   │   └── worker.ts             # 流水线调度 Worker：领取运行、租约、超时与节点离线收口
+│   │   ├── worker.ts             # 流水线调度 Worker：领取运行、租约、超时与节点离线收口
+│   │   └── bot-worker.ts         # Bot 执行进程：领取 Bot 运行并调用 devops-bot
 │   ├── bootstrap/
 │   │   ├── create-services.ts    # 创建模块、适配器并传入依赖
 │   │   ├── create-http-app.ts    # 组装 Fastify、鉴权入口与路由
@@ -225,7 +227,7 @@ apps/server/
 │   │   ├── code/
 │   │   ├── delivery/
 │   │   ├── pipeline/             # 流水线定义解析、运行、日志、产物与执行节点
-│   │   ├── bots/
+│   │   ├── bots/                 # Bot、模型连接、运行队列、记忆、委托调用；runtime/ 子目录对接 devops-bot
 │   │   ├── collaboration/
 │   │   ├── tasks/
 │   │   ├── knowledge/
@@ -333,10 +335,10 @@ DSH 的包约定区分能力定义、提供方和使用方，并要求扩展依�
 | code | 仓库、Git 对象引用、来源信息与代码操作规则 | Git 内容以来源平台为准 |
 | delivery | 交付、构建记录、产物引用、已确认的运行版本及审核结果 | 最新产物与环境实际版本分别表达 |
 | pipeline | 流水线定义解析、运行与步骤、日志与产物、执行节点、令牌与租约 | 只保存运行事实与元数据，日志/产物正文在受控存储；不执行用户代码于 API 进程 |
-| bots | Bot 定义、配置、负责人及能力授权 | 不保存另一套任务运行状态 |
+| bots | Bot 定义、配置、负责人、模型连接、运行队列与事件、平台 API 委托调用与排除名单、记忆 | 模型循环由 bot-worker 进程调用 devops-bot 执行；不直接写其他模块的表，经委托调用走对方路由 |
 | collaboration | 会话、群组、消息、工作标签和资源引用 | 项目入口复用原会话记录 |
-| tasks | 任务、每次运行、交接、结果及验收 | 技术作业重试与任务业务状态分开 |
-| knowledge | Skills、模板、版本和记忆 | 不成为实时权限或业务状态的来源 |
+| tasks | 任务、交接、结果及验收 | 运行由 bots 调度并关联任务；运行失败不改变验收结果 |
+| knowledge | Skills 与版本 | 不成为实时权限或业务状态的来源 |
 | configuration | 凭据、环境变量、使用授权和配置请求 | 与 platform/config 的进程配置分开 |
 | integrations | 连接实例、连接状态、执行节点和工具配置 | 不吸收所有模块的外部业务操作 |
 | monitoring | 事件、聚合规则、值守规则和触发记录 | 通过公开用例创建 Bug 或任务 |
@@ -381,7 +383,9 @@ flowchart LR
 
 ## 8. 运行进程与数据边界
 
-HTTP 进程负责及时完成的请求，Worker 承接邮件投递、同步和后续 Bot 执行等需要持久记录与恢复的作业。两者先保留在同一个 Server 包内，复用 service、repository 和适配器，独立启动并管理连接生命周期。
+HTTP 进程负责及时完成的请求，Worker 承接邮件投递、同步等需要持久记录与恢复的作业。两者先保留在同一个 Server 包内，复用 service、repository 和适配器，独立启动并管理连接生命周期。
+
+Bot 执行由 Server 包内的独立进程 `entrypoints/bot-worker.ts` 承担：bots 模块保存运行队列与记忆，collaboration 模块保存会话与消息；bot-worker 用行锁与租约领取运行，调用 Git 子模块 `packages/devops-bot`（可复用的开源 Bot 库；V0.5 内部使用 pi-agent-core，V0.6 起改为托管 pi-coding-agent 的 `AgentSession`）执行模型循环，平台 API 调用在进程内以触发人身份 `inject()` 转发。只有 `modules/bots/runtime/` 与 bot-worker 入口可以导入 devops-bot。方案与取舍见 [Bots 轻量执行架构](bots-architecture.md)。
 
 流水线（V0.4a）按控制面与执行面分离：HTTP 进程负责工作流解析、触发、权限与日志/产物读取；`entrypoints/worker` 作为独立进程用 PostgreSQL 行锁与租约调度运行、监控超时并收口节点离线；`apps/pipeline-agent` 运行在团队自托管 Docker 主机上，主动外连平台领取租约，用短期 Git 凭据拉取固定提交，在单容器内执行平台固定后的运行计划并回传状态、日志与产物。API 进程不执行用户代码，Agent 不解析 YAML，两者通过 `packages/pipeline-protocol` 的同一份 TypeBox 契约交互。节点令牌、Git 短期凭据与运行时密钥只在内存短暂使用，不进入日志、运行记录与产物元数据。
 

@@ -16,11 +16,11 @@ GitHub App 授权、成员与 Bot 的权限和凭据、统一 Git 接口及执�
 
 Git 连接、仓库/PR 读取与自研流水线的分层结构见[Git、PR 与流水线架构](docs/architecture/code-pr-pipeline-architecture.md)，含 Mermaid 组件图与时序图。
 
-独立 Bot、会话、任务、Agent 执行与平台 API 隔离的建议见 [Bots 独立子系统架构草案](docs/architecture/bots-architecture.md)，包含开源参考、权限边界、恢复机制与实施顺序。
+平台内 Bot 的执行方案见 [Bots 轻量执行架构](docs/architecture/bots-architecture.md)：Server 保存协作数据并鉴权，Server 包内的 bot-worker 进程调用可复用的开源库 [devops-bot](https://github.com/aiShuiJiaoDeXioShou/devops-bot)（Git 子模块 `packages/devops-bot`，克隆后运行 `git submodule update --init`）执行，含模型连接、记忆、权限与实施顺序。
 
-运行时内部端口、原生协议映射、双向事件及控制顺序见 [Bots 运行时适配契约与示例](docs/architecture/bots-runtime-examples.md)。
+多种原生运行时并列接入的早期草案见 [Bots 运行时适配契约与示例](docs/architecture/bots-runtime-examples.md)，V0.5 不采用。
 
-前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。截至 2026-11-10，V0.1、V0.2、V0.3 阶段 A 与 V0.4a 已交付；下一版本为 V0.4b（流水线部署与产品发布），Bot 与运维后移，版本状态见[需求版本规划](docs/prd/release-plan.md)。
+前后端推荐组件、集成方式、测试方案和待补齐内容见[技术选型与集成方案](docs/technical-selection.md)。截至 2026-11-10，V0.1、V0.2、V0.3 阶段 A 与 V0.4a 已交付；下一版本为 V0.4b（流水线部署与产品发布），Bot 与运维后移；2026-11-17 已建立 V0.5 Bot 协作规格（`specs/009-v05-bot-collaboration/`，本地目录），版本状态见[需求版本规划](docs/prd/release-plan.md)。
 
 界面与主要操作可查看 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)，打开方式和演示边界见[原型说明](docs/desgin/interactive-prototype-v1/README.md)。
 

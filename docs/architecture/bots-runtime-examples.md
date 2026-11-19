@@ -1,5 +1,7 @@
 # Bots 运行时适配契约与示例
 
+> 注意：本文描述 Codex、Claude、pi 三种原生运行时并列接入的早期草案。V0.5 已改为 pi-agent-core 轻量方案，见 [Bots 轻量执行架构第 3.2 节](bots-architecture.md#32-运行时)；以后接入原生编码运行时时再据此修订。
+
 Bot 控制面管理身份、PostgreSQL 长期记忆与任务，Runner 通过统一端口接入 Codex app-server、Claude Agent SDK 与 pi RPC。接入方向已确定，以下内部契约与控制顺序仍为设计草案，实际适配器和真实运行验收待实现。
 
 ## 1. 端口与原生协议
