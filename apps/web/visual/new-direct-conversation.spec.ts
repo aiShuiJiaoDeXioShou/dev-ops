@@ -54,7 +54,17 @@ test('[desktop] [mobile] 会话内打开私聊并复用已有会话', async ({ p
   let roomExists = false
   let opens = 0
   let rejectNextOpen = true
-  await page.route(`${teamPath}/bots*`, (route) => route.fulfill({ json: success({ items: [bot], nextCursor: null }) }))
+  const secondBot = {
+    ...bot,
+    id: 'da55aa00-0000-4000-8000-000000000015',
+    name: '小杨',
+    responsibility: '产品经理',
+    avatarKey: 'signal',
+    availability: 'worker_offline',
+  } satisfies ApiSuccessData<'/api/v1/bots/{botId}', 'get'>
+  await page.route(`${teamPath}/bots*`, (route) =>
+    route.fulfill({ json: success({ items: [secondBot, bot], nextCursor: null }) }),
+  )
   await page.route(`${teamPath}/bot-inbox`, (route) => route.fulfill({ json: success({ items: [], count: 0 }) }))
   await page.route(`${teamPath}/bot-conversations*`, (route) => {
     if (route.request().method() === 'POST') {
@@ -90,18 +100,34 @@ test('[desktop] [mobile] 会话内打开私聊并复用已有会话', async ({ p
   if (isMobile) await listToggle.click()
   const trigger = page.getByRole('button', { name: '新建会话' })
   const picker = page.getByRole('dialog', { name: '新建私聊' })
+  const menu = page.getByRole('menu')
+  const directItem = menu.getByRole('menuitem', { name: '新建私聊' })
+  const groupItem = menu.getByRole('menuitem', { name: '新建群组' })
   async function openPicker() {
     await trigger.press('Enter')
-    await page.getByRole('menuitem', { name: '新建私聊' }).press('Enter')
+    await directItem.press('Enter')
     await expect(picker).toBeVisible()
   }
 
-  await openPicker()
+  await trigger.press('Enter')
+  await expect(groupItem).toBeVisible()
+  expect(await directItem.locator('svg').innerHTML()).not.toEqual(await groupItem.locator('svg').innerHTML())
+  await menu.screenshot({ path: testInfo.outputPath('new-conversation-menu.png'), animations: 'disabled' })
+  await directItem.press('Enter')
+  await expect(picker).toBeVisible()
   await expect(page).toHaveURL(/\/collaboration$/)
-  await expect(picker.getByRole('button', { name: /小林/ })).toBeVisible()
+  const botRow = picker.getByRole('button', { name: /小林/ })
+  await expect(botRow).toContainText('服务器运维')
+  await expect(botRow).toContainText(bot.modelId)
+  await expect(botRow).toContainText('可用')
+  await expect(picker.getByRole('button', { name: /小杨/ })).toContainText('环境离线')
+  expect((await botRow.boundingBox())?.height).toBeGreaterThanOrEqual(56)
   expect(await picker.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('new-direct-conversation.png'), animations: 'disabled' })
+  await page.evaluate(() => document.documentElement.classList.add('dark'))
+  await picker.screenshot({ path: testInfo.outputPath('new-direct-conversation-dark.png'), animations: 'disabled' })
+  await page.evaluate(() => document.documentElement.classList.remove('dark'))
   await page.keyboard.press('Escape')
   await expect(picker).toHaveCount(0)
   await expect(trigger).toBeFocused()

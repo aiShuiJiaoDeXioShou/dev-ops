@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ArrowRight } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { botChoicesOptions } from '@/features/bots/api/queries'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
@@ -39,15 +39,16 @@ export function DirectConversationPicker({
   return (
     <Dialog open onOpenChange={(open) => !open && !openConversation.isPending && onClose()}>
       <DialogContent
+        className="dialog-w-md gap-4 p-4 sm:p-6"
         onCloseAutoFocus={(event) => {
           if (!onRestoreFocus) return
           event.preventDefault()
           onRestoreFocus()
         }}
       >
-        <DialogHeader>
+        <DialogHeader className="gap-1">
           <DialogTitle>{skill ? `使用 ${skill.name}` : '新建私聊'}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className={skill ? undefined : 'sr-only'}>
             {skill ? '选择智能体，技能会带入聊天输入框。' : '选择智能体以打开对话。'}
           </DialogDescription>
         </DialogHeader>
@@ -61,26 +62,49 @@ export function DirectConversationPicker({
           />
         )}
         {choices.length > 0 && (
-          <div className="project-chat-picker">
+          <ul
+            role="list"
+            aria-label="智能体列表"
+            className="min-w-0 divide-y divide-border rounded-xl border border-border"
+          >
             {choices.map((bot) => (
-              <Button
-                key={bot.id}
-                unstyled
-                type="button"
-                className="min-w-0"
-                disabled={openConversation.isPending}
-                onClick={() => openForBot(bot.id)}
-              >
-                <BotAvatar botId={bot.id} avatarKey={bot.avatarKey} enabled={bot.status === 'enabled'} />
-                <span className="min-w-0 wrap-anywhere">
-                  <strong>{bot.name}</strong>
-                  {bot.responsibility && <small>{bot.responsibility}</small>}
-                  {!skill && bot.availability !== 'available' && <BotStatus value={bot.availability} />}
-                </span>
-                <ArrowRight className="icon shrink-0 fill-none stroke-current stroke-2" aria-hidden="true" />
-              </Button>
+              <li key={bot.id} className="p-1">
+                <Button
+                  unstyled
+                  type="button"
+                  className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted disabled:opacity-60 sm:gap-4"
+                  disabled={openConversation.isPending}
+                  onClick={() => openForBot(bot.id)}
+                >
+                  <span className="shrink-0">
+                    <BotAvatar botId={bot.id} avatarKey={bot.avatarKey} enabled={bot.status === 'enabled'} />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
+                    <strong className="min-w-0 text-sm leading-5 font-semibold wrap-anywhere">{bot.name}</strong>
+                    {bot.responsibility && (
+                      <small className="min-w-0 text-xs leading-5 wrap-anywhere text-muted-foreground">
+                        {bot.responsibility}
+                      </small>
+                    )}
+                  </span>
+                  <span className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
+                    {bot.modelId && (
+                      <span
+                        className="max-w-28 truncate rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:max-w-36"
+                        title={bot.modelId}
+                      >
+                        {bot.modelId}
+                      </span>
+                    )}
+                    <span className="sm:w-20">
+                      <BotStatus value={bot.availability} />
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                </Button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
         {list.isFetchNextPageError ? (
           <PageError

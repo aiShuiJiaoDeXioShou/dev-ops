@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { MessageSquare, UsersRound } from 'lucide-react'
 import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router'
 import { botInboxOptions, taskQueries } from '@/features/bot-tasks/api/queries'
 import { BotInbox } from '@/features/bot-tasks/ui/bot-inbox'
@@ -146,13 +147,13 @@ function TeamConversations({
                   <ConversationIcon name="plus" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onSelect={() => setNewDirectOpen(true)}>
-                  <ConversationIcon name="chat" />
+              <DropdownMenuContent align="start" sideOffset={8}>
+                <DropdownMenuItem className="min-h-10 gap-3 px-3" onSelect={() => setNewDirectOpen(true)}>
+                  <MessageSquare className="size-4 shrink-0" aria-hidden="true" />
                   新建私聊
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setNewGroupOpen(true)}>
-                  <ConversationIcon name="chat" />
+                <DropdownMenuItem className="min-h-10 gap-3 px-3" onSelect={() => setNewGroupOpen(true)}>
+                  <UsersRound className="size-4 shrink-0" aria-hidden="true" />
                   新建群组
                 </DropdownMenuItem>
               </DropdownMenuContent>
