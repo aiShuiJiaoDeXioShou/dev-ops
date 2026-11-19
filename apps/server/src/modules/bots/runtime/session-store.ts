@@ -7,13 +7,45 @@ import {
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../../../platform/database/client.ts'
 import { lockBotRunLease, type BotRunLease, type ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
+import { acknowledgeBotRunInputs } from './run-input-queue.ts'
 import { botSession, botSessionEntry } from '../bots.session.tables.ts'
 
-function isJsonValue(value: unknown): value is JsonValue {
+/**
+ * 校验 JSONB 值能作为不依赖 Pi 类型的会话条目保存。
+ * @param value PostgreSQL 返回的未知值。
+ * @returns 对象及子节点都是 JSON 数据时为 true。
+ */
+export function isJsonValue(value: unknown): value is JsonValue {
   if (value === null || typeof value === 'boolean' || typeof value === 'string') return true
   if (typeof value === 'number') return Number.isFinite(value)
   if (Array.isArray(value)) return value.every(isJsonValue)
   return typeof value === 'object' && Object.values(value).every(isJsonValue)
+}
+
+/**
+ * 确认运行是否已经持久化当前输入，可以从会话树继续执行。
+ * @param db 执行进程数据库。
+ * @param run 已重新领取的会话运行。
+ * @returns 本次运行的用户输入存在时为 true。
+ */
+export async function hasSavedBotInput(db: Database, run: ConversationBotRunRecord): Promise<boolean> {
+  const [row] = await db
+    .select({ id: botSessionEntry.id })
+    .from(botSessionEntry)
+    .innerJoin(botSession, eq(botSession.id, botSessionEntry.session_id))
+    .where(
+      and(
+        eq(botSession.team_id, run.team_id),
+        eq(botSession.conversation_id, run.conversation_id),
+        eq(botSession.bot_id, run.bot_id),
+        eq(botSessionEntry.run_id, run.id),
+        eq(botSessionEntry.team_id, run.team_id),
+        eq(botSessionEntry.entry_type, 'message'),
+        sql`${botSessionEntry.content}->'message'->>'role' = 'user'`,
+      ),
+    )
+    .limit(1)
+  return Boolean(row)
 }
 
 /**
@@ -76,7 +108,7 @@ export function createPgSessionStore(
       )
       if (
         entries.length !== rows.length ||
-        (entries.length > 0 && !entries.some(({ entryId }) => entryId === session.leaf))
+        (session.leaf !== null && !entries.some(({ entryId }) => entryId === session.leaf))
       ) {
         await markCorrupted()
         throw new SessionUnavailableError('会话记录包含无效内容或叶子')
@@ -124,6 +156,11 @@ export function createPgSessionStore(
             })),
           )
         }
+        await acknowledgeBotRunInputs(
+          tx,
+          run,
+          entries.flatMap(({ sourceMessageId }) => (sourceMessageId ? [sourceMessageId] : [])),
+        )
         const savedInput =
           roomCursor !== undefined &&
           entries.some(

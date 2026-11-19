@@ -1,8 +1,9 @@
+import { botSession, botSessionEntry } from '../bots.session.tables.ts'
 import { containsCredential, type RunEvent, type RunOutcome } from '@dev-ops/devops-bot'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../../../platform/database/client.ts'
 import { appendBotEvents } from '../../collaboration/bot-events.repository.ts'
-import { botConversation, botMessage } from '../../collaboration/bot-conversations.tables.ts'
+import { botConversation, botEvent, botMessage } from '../../collaboration/bot-conversations.tables.ts'
 import type { BotMessageBody } from '../../collaboration/bot-message-body.ts'
 import {
   finishBotRun,
@@ -19,7 +20,7 @@ function safeText(text: string): string {
   return containsCredential(text) ? REDACTED : text
 }
 
-function savedEvent(event: Exclude<RunEvent, { type: 'turn_finished' }>) {
+function savedEvent(event: Exclude<RunEvent, { type: 'turn_finished' }>, botId: string) {
   const order = { run_sequence: event.seq, created_at: new Date() }
   switch (event.type) {
     case 'output_delta':
@@ -28,6 +29,8 @@ function savedEvent(event: Exclude<RunEvent, { type: 'turn_finished' }>) {
       return { ...order, kind: 'tool_activity', payload: { state: 'started', ...event.payload } }
     case 'tool_finished':
       return { ...order, kind: 'tool_activity', payload: { state: 'finished', ...event.payload } }
+    case 'model_selected':
+      return { ...order, kind: 'tool_activity', payload: { state: 'model_selected', botId, ...event.payload } }
     case 'memory_written':
       return { ...order, kind: 'tool_activity', payload: { state: 'memory_written', ...event.payload } }
     default:
@@ -53,6 +56,7 @@ export function createPgRunSink(
   const buffer: ReturnType<typeof savedEvent>[] = []
   let timer: NodeJS.Timeout | undefined
   let writes = Promise.resolve()
+  let sequenceOffset: number | undefined
 
   async function flush(): Promise<void> {
     if (timer) clearTimeout(timer)
@@ -62,7 +66,19 @@ export function createPgRunSink(
     writes = writes.then(() =>
       db.transaction(async (tx) => {
         if (!(await lockBotRunLease(tx, lease))) throw new Error('Bot 运行租约已失效')
-        await appendBotEvents(tx, scope, batch)
+        if (sequenceOffset === undefined) {
+          const [previous] = await tx
+            .select({ sequence: sql<number>`coalesce(max(${botEvent.run_sequence}), 0)` })
+            .from(botEvent)
+            .where(and(eq(botEvent.team_id, scope.teamId), eq(botEvent.run_id, run.id)))
+          sequenceOffset = previous?.sequence ?? 0
+        }
+        const offset = sequenceOffset
+        await appendBotEvents(
+          tx,
+          scope,
+          batch.map((event) => ({ ...event, run_sequence: event.run_sequence + offset })),
+        )
       }),
     )
     return writes
@@ -76,7 +92,7 @@ export function createPgRunSink(
      */
     async emit(event: RunEvent): Promise<void> {
       if (event.type === 'turn_finished') return
-      buffer.push(savedEvent(event))
+      buffer.push(savedEvent(event, run.bot_id))
       if (buffer.length >= EVENT_BATCH_LIMIT) return flush()
       timer ??= setTimeout(() => {
         void flush().catch(onBatchFailure)
@@ -94,7 +110,7 @@ export function createPgRunSink(
       return db.transaction(async (tx) => {
         // 所有消息操作先锁会话行，保证队列回复与新输入使用同一个消息序列。
         const [conversation] = await tx
-          .select({ id: botConversation.id })
+          .select({ id: botConversation.id, branchId: botConversation.active_branch_id })
           .from(botConversation)
           .where(and(eq(botConversation.id, scope.conversationId), eq(botConversation.team_id, scope.teamId)))
           .for('update')
@@ -126,6 +142,7 @@ export function createPgRunSink(
             team_id: scope.teamId,
             conversation_id: scope.conversationId,
             run_id: run.id,
+            branch_id: conversation.branchId,
             sequence: (latest?.sequence ?? 0n) + 1n,
             speaker_kind: 'bot',
             speaker_id: run.bot_id,
@@ -133,6 +150,31 @@ export function createPgRunSink(
           })
           .returning({ id: botMessage.id, sequence: botMessage.sequence })
         if (!message) throw new Error('未能提交 Bot 回复')
+        const [tree] = await tx
+          .select({ id: botSession.id, leaf: botSession.leaf_entry_id })
+          .from(botSession)
+          .where(
+            and(
+              eq(botSession.team_id, scope.teamId),
+              eq(botSession.conversation_id, scope.conversationId),
+              eq(botSession.bot_id, run.bot_id),
+            ),
+          )
+        if (tree?.leaf) {
+          await tx
+            .update(botSessionEntry)
+            .set({ source_message_id: message.id, updated_at: new Date() })
+            .where(
+              and(
+                eq(botSessionEntry.team_id, scope.teamId),
+                eq(botSessionEntry.session_id, tree.id),
+                eq(botSessionEntry.entry_id, tree.leaf),
+                eq(botSessionEntry.run_id, run.id),
+                sql`${botSessionEntry.source_message_id} is null`,
+              ),
+            )
+        }
+
         await tx
           .update(botConversation)
           .set({

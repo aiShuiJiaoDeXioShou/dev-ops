@@ -3,6 +3,7 @@ import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { validatePage } from '../../platform/http/pagination.ts'
+import { platformBotSkills } from '../bots/bots.platform-skills/index.ts'
 import { appendActivity, listActivities } from '../collaboration/collaboration.service.ts'
 import { isActiveTeamMember } from '../identity/identity.repository.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
@@ -92,13 +93,32 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     validatePage(page, pageSize)
     const category = query.category === undefined ? undefined : validateSkillCategory(query.category)
     const search = query.search?.trim()
+    const term = search?.toLowerCase()
+    const builtins = platformBotSkills.filter(
+      (item) =>
+        (!category || item.category === category) &&
+        (!term || [item.name, item.identifier, item.summary].some((value) => value.toLowerCase().includes(term))),
+    )
+    const offset = (page - 1) * pageSize
+    const listed = builtins.slice(offset, offset + pageSize).map((item) => ({
+      ...item,
+      source: 'platform' as const,
+      enabled: true,
+      version: 1,
+      contentVersion: '1.0.0',
+      updatedAt: new Date(0).toISOString(),
+    }))
     const result = await findSkills(db, teamId, {
       search: search ? escapeLikeTerm(search) : undefined,
       category,
-      page,
-      pageSize,
+      offset: Math.max(0, offset - builtins.length),
+      limit: pageSize - listed.length,
     })
-    return { items: result.items.map(toSkillListItem), page, pageSize, total: result.total }
+    const configured = result.items.map((row) => ({
+      ...toSkillListItem(row),
+      conflictsWithPlatform: platformBotSkills.some(({ identifier }) => identifier === row.identifier),
+    }))
+    return { items: [...listed, ...configured], page, pageSize, total: builtins.length + result.total }
   }
 
   /**

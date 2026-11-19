@@ -3,6 +3,7 @@ import { Type, type Static } from 'typebox'
 import { Check } from 'typebox/value'
 import type { Database } from '../../platform/database/client.ts'
 import { skill, skillVersion } from '../knowledge/knowledge.tables.ts'
+import { platformBotSkills } from './bots.platform-skills/index.ts'
 import { botSkill } from './bots.tables.ts'
 
 const optionalId = Type.Union([Type.String(), Type.Null()])
@@ -109,5 +110,13 @@ export async function readBotSkillCandidates(db: Pick<Database, 'select'>, teamI
     if (previous) previous.botIds.push(botId)
     else grouped.set(item.id, { ...item, botIds: [botId] })
   }
-  return [...grouped.values()]
+  const builtins = platformBotSkills.map(({ id, name, identifier, summary }) => ({
+    id,
+    name,
+    identifier,
+    summary,
+    botIds: runnableBotIds,
+  }))
+  const builtInIdentifiers = new Set(platformBotSkills.map(({ identifier }) => identifier))
+  return [...builtins, ...[...grouped.values()].filter(({ identifier }) => !builtInIdentifiers.has(identifier))]
 }

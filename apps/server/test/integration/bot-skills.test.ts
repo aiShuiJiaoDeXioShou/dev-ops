@@ -39,7 +39,7 @@ test('技能候选校验可用性与团队，已领取运行继续读取它固�
   )
   const configured = await post(`${botPath}/update`, { ...configInput, skillIds: [local.data.id] })
   assert.equal(configured.code, 'OK', configured.message)
-  const candidate = (await get(roomPath)).data.skillReferences[0]
+  const candidate = (await get(roomPath)).data.skillReferences.find(({ id }: { id: string }) => id === local.data.id)
   assert.equal(candidate.id, local.data.id)
   assert.deepEqual(candidate.botIds, [botId])
 
@@ -66,7 +66,10 @@ test('技能候选校验可用性与团队，已领取运行继续读取它固�
   assert.equal(edited.code, 'OK', edited.message)
   const disabled = await post(`${skillPath}/disable`, { version: edited.data.version })
   assert.equal(disabled.code, 'OK', disabled.message)
-  assert.deepEqual((await get(roomPath)).data.skillReferences, [])
+  assert.equal(
+    (await get(roomPath)).data.skillReferences.some(({ id }: { id: string }) => id === local.data.id),
+    false,
+  )
   assert.equal(
     (await post(messagePath, { text: '禁止新调用', clientRequestId: randomUUID(), skillIds: [local.data.id] })).code,
     'PRECONDITION_FAILED',
@@ -85,7 +88,10 @@ test('技能候选校验可用性与团队，已领取运行继续读取它固�
   const context = await loadBotRunContext(db, run, 50)
   assert.ok(context)
   assert.equal(context.hasUnavailableSkillReference, false)
-  assert.match(context.context.layers.find(({ title }) => title === '已配置技能')?.body ?? '', /delivery-review/u)
+  assert.equal(
+    context.context.layers.find(({ title }) => title === '已引用技能 delivery-review')?.body,
+    skillFields.content,
+  )
   const tool = createSkillViewTool(db, run, lease, context.skillVersions)
   const output = await tool.execute({ identifier: skillFields.identifier }, new AbortController().signal)
   assert.equal(output.text, skillFields.content)

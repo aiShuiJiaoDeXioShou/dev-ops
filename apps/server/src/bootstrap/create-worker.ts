@@ -86,7 +86,7 @@ export function createWorker(
     cycleRunning = true
     try {
       await scheduler.runCycle()
-      await reconcileExpiredBotRuns(database.db).catch(() => {
+      await reconcileExpiredBotRuns(database.db, config.BOT_RESUME_LIMIT).catch(() => {
         log('error', 'Bot 运行租约收口失败', {})
       })
       await reconcilePendingCodeChanges(database.db, (runId, error) => {

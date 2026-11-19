@@ -17,6 +17,7 @@ import type { SecretCipher } from '../../configuration/configuration.crypto.ts'
 import {
   finishBotRun,
   isConversationBotRun,
+  releaseInterruptedBotRun,
   renewBotRunLease,
   type BotRunLease,
   type BotRunRecord,
@@ -26,10 +27,13 @@ import type { BotCallLog } from './api-invoker.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
 import { createCurrentContextTool } from './current-context-tool.ts'
+import { readBotMcpServers } from './mcp-configuration.ts'
+import { fetchBotMcp } from './mcp-fetch.ts'
 import { createPgMemoryStore } from './memory-store.ts'
 import { fetchBotPublicPage } from './public-page.ts'
 import { createSkillViewTool } from './skill-tool.ts'
-import { createPgSessionStore } from './session-store.ts'
+import { createPgRunInputQueue } from './run-input-queue.ts'
+import { createPgSessionStore, hasSavedBotInput } from './session-store.ts'
 import { createPgRunSink } from './run-sink.ts'
 import { auditBotWebTools } from './web-tool-audit.ts'
 import { createTaskResultTool } from './task-tools.ts'
@@ -95,11 +99,6 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       })
   }, config.BOT_LEASE_HEARTBEAT_SECONDS * 1_000)
   const sink = createPgRunSink(db, run, lease, () => cancellation.abort())
-  const interrupted = {
-    status: 'failed',
-    failureKind: 'execution_interrupted',
-    failureMessage: '执行服务已关闭，可重新运行任务',
-  } as const
   try {
     const input = await loadBotRunContext(db, run, config.BOT_ROOM_SYNC_LIMIT)
     if (!input) {
@@ -144,6 +143,8 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
     const settings: CompactBotSessionOptions = {
       model: input.model,
       workspace: { directory, access: input.accessMode },
+      skills: input.skills,
+      mcp: { servers: await readBotMcpServers(db, options.cipher, run.team_id, run.bot_id), fetch: fetchBotMcp },
       context: {
         ...input.context,
         layers: [
@@ -158,9 +159,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         createCurrentContextTool(db, lease),
         ...tools,
         ...memoryTools(memory),
-        ...(input.skillVersions.some(({ status }) => status === 'available')
-          ? [createSkillViewTool(db, run, lease, input.skillVersions)]
-          : []),
+        createSkillViewTool(db, run, lease, input.skillVersions),
         ...auditBotWebTools(
           db,
           run,
@@ -176,6 +175,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         ...(api ? openApiTools(api.catalog, api.invoker) : []),
       ],
       limits: { timeoutMs: config.BOT_RUN_TIMEOUT_SECONDS * 1_000 },
+      ...(run.kind === 'compact' ? {} : { queue: createPgRunInputQueue(db, run, lease) }),
       signal,
       ports: {
         credentials,
@@ -185,10 +185,16 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         api: api?.invoker ?? { invoke: async () => ({ ok: false, code: 'BOT_API_FORBIDDEN' }) },
       },
     }
+    const resumed = run.resume_count > 0
     const outcome = input.input
-      ? await options.execute({ ...settings, input: input.input })
+      ? await options.execute({
+          ...settings,
+          input: resumed && (await hasSavedBotInput(db, run)) ? { kind: 'resume' } : { ...input.input, resumed },
+        })
       : await (options.compact ?? compactBotSession)(settings)
-    if (leaseIsValid) await sink.finish(shutdown.aborted ? { ...outcome, ...interrupted } : outcome)
+    if (!leaseIsValid) return
+    if (shutdown.aborted) await releaseInterruptedBotRun(db, lease, config.BOT_RESUME_LIMIT)
+    else await sink.finish(outcome)
   } catch {
     options.onFailure(run)
     // 写入轮次失败也要清除定时刷新。不能以丢失事件的运行结果标成功。
@@ -197,19 +203,16 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
     } catch {
       cancellation.abort()
     }
-    if (leaseIsValid) {
+    if (!leaseIsValid) return
+    if (shutdown.aborted) {
+      await releaseInterruptedBotRun(db, lease, config.BOT_RESUME_LIMIT)
+    } else {
       await db.transaction((tx) =>
-        finishBotRun(
-          tx,
-          lease,
-          shutdown.aborted
-            ? interrupted
-            : {
-                status: 'failed',
-                failureKind: 'tool_error',
-                failureMessage: '运行处理失败，可重新运行任务',
-              },
-        ),
+        finishBotRun(tx, lease, {
+          status: 'failed',
+          failureKind: 'tool_error',
+          failureMessage: '运行处理失败，可重新运行任务',
+        }),
       )
     }
   } finally {

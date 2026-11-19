@@ -1,10 +1,13 @@
+import { randomUUID } from 'node:crypto'
 import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { Check } from 'typebox/value'
 import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
-import { botSession, botSessionEntry } from '../bots/bots.session.tables.ts'
+import { requireBotPromptTemplate } from '../bots/bots.prompt-templates.ts'
+import { readBotSessionSettings, saveBotSessionSetting } from '../bots/bots.session-settings.ts'
+import { botRunInput, botSession, botSessionEntry } from '../bots/bots.session.tables.ts'
 import { enqueueBotRun, type BotRunTransaction } from '../bots/bots.run-queue.repository.ts'
 import { botWorkerOnline, requireRunnableBot, runnableBotIds } from '../bots/bots.service.ts'
 import { readBotSkillCandidates } from '../bots/bots.skills.ts'
@@ -28,8 +31,16 @@ import type {
   ConversationMemberView,
   ConversationMessage,
   SendBotMessageInput,
+  SendBotMessageResult,
 } from './bot-conversations.schema.ts'
 import { conversationEventKind } from './bot-conversations.schema.ts'
+import {
+  activeBotBranchScope,
+  botBranchVersions,
+  readBotBranchSiblings,
+  setBotBranch,
+} from './bot-branches.repository.ts'
+import { forkBotConversation } from './bot-fork.service.ts'
 import { botMessageBodySchema } from './bot-message-body.ts'
 import { readTargetWorkTags } from './work-tags.repository.ts'
 
@@ -57,6 +68,9 @@ function viewOf(row: ConversationRow): BotConversationView {
     responsibility: row.responsibility,
     instructions: row.instructions,
     lastMessageAt: row.last_message_at.toISOString(),
+    ...(row.forked_from_conversation_id && row.forked_from_message_id
+      ? { forkedFrom: { conversationId: row.forked_from_conversation_id, messageId: row.forked_from_message_id } }
+      : {}),
   }
 }
 
@@ -73,6 +87,7 @@ function messageView(row: typeof botMessage.$inferSelect, speakerName: string | 
     speakerName,
     body: row.body,
     runId: row.run_id,
+    branchId: row.branch_id,
     createdAt: row.created_at.toISOString(),
   }
 }
@@ -225,7 +240,12 @@ export async function readBotConversationView(db: ReadDb, row: ConversationRow) 
     members.filter(({ kind }) => kind === 'bot').map(({ id }) => id),
   )
   const skillReferences = await readBotSkillCandidates(db, row.team_id, available)
-  return { ...viewOf(row), members, tags, skillReferences }
+  const botSettings = await readBotSessionSettings(
+    db,
+    row,
+    members.filter(({ kind }) => kind === 'bot').map(({ id }) => id),
+  )
+  return { ...viewOf(row), members, tags, skillReferences, botSettings }
 }
 
 function mentionedBotNames(text: string, members: ConversationMemberView[]): string[] {
@@ -300,6 +320,7 @@ async function lockBotSessionMaintenance(
   actor: SessionUser,
   conversationId: string,
   botId: string,
+  requireIdle = true,
 ) {
   const room = await lockWritableBotConversation(tx, actor, conversationId)
   const [member] = await tx
@@ -315,6 +336,11 @@ async function lockBotSessionMaintenance(
       ),
     )
   if (!member) throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '指定 Bot 不在当前会话')
+  if (requireIdle) await requireIdleConversation(tx, room)
+  return room
+}
+
+async function requireIdleConversation(tx: BotRunTransaction, room: ConversationRow) {
   const [active] = await tx
     .select({ id: botRun.id })
     .from(botRun)
@@ -327,7 +353,6 @@ async function lockBotSessionMaintenance(
     )
     .limit(1)
   if (active) throw new ApiError(ERROR_CODES.BOT_RUN_BUSY, '请等待当前会话中的运行结束')
-  return room
 }
 
 /**
@@ -395,6 +420,7 @@ export function createBotConversationsService(db: Database) {
             and(
               eq(botConversation.team_id, teamId),
               eq(botConversation.kind, 'direct'),
+              isNull(botConversation.forked_from_conversation_id),
               exists(
                 tx
                   .select({ id: receiver.id })
@@ -445,6 +471,7 @@ export function createBotConversationsService(db: Database) {
     async messages(actor: SessionUser, conversationId: string, before?: string, limit = 50) {
       const row = await requireBotConversation(db, actor, conversationId)
       const previous = sequenceOf(before)
+      const branchScope = await activeBotBranchScope(db, row)
       const messages = await db
         .select({ message: botMessage, userName: authUser.name, botName: bot.name, rating: botMessageFeedback.rating })
         .from(botMessage)
@@ -461,19 +488,27 @@ export function createBotConversationsService(db: Database) {
           bot,
           and(eq(bot.id, botMessage.speaker_id), eq(bot.team_id, row.team_id), eq(botMessage.speaker_kind, 'bot')),
         )
-        .where(
-          and(
-            eq(botMessage.team_id, row.team_id),
-            eq(botMessage.conversation_id, row.id),
-            previous === undefined ? undefined : lt(botMessage.sequence, previous),
-          ),
-        )
+        .where(and(branchScope, previous === undefined ? undefined : lt(botMessage.sequence, previous)))
         .orderBy(desc(botMessage.sequence))
         .limit(limit + 1)
-      const page = messages.slice(0, limit).map((item): ConversationMessage => {
+      const visible = messages.slice(0, limit)
+      const siblings =
+        row.kind === 'direct'
+          ? await readBotBranchSiblings(
+              db,
+              row,
+              visible.map((item) => item.message),
+            )
+          : new Map()
+      const page = visible.map((item): ConversationMessage => {
         if (item.rating !== null && item.rating !== 'helpful' && item.rating !== 'unhelpful')
           throw new Error('数据库中的消息评价不合法')
-        return { ...messageView(item.message, item.userName ?? item.botName), feedback: item.rating }
+        const branchSiblings = siblings.get(item.message.id)
+        return {
+          ...messageView(item.message, item.userName ?? item.botName),
+          feedback: item.rating,
+          ...(branchSiblings ? { branchSiblings } : {}),
+        }
       })
       return { nextBefore: messages.length > limit ? (page.at(-1)?.sequence ?? null) : null, items: page.reverse() }
     },
@@ -526,6 +561,168 @@ export function createBotConversationsService(db: Database) {
               set: { rating, updated_at: sql`clock_timestamp()` },
             })
         return { id: messageId, rating }
+      })
+    },
+    /**
+     * 在私聊中以新的文本重发自己的消息，保留原分支与关联运行。
+     * @param actor 原消息作者。
+     * @param conversationId 当前私聊。
+     * @param messageId 当前分支上要编辑的消息。
+     * @param input 新文本与客户端去重标识。
+     * @returns 新分支上的消息和排队运行。
+     */
+    async editResend(
+      actor: SessionUser,
+      conversationId: string,
+      messageId: string,
+      input: { text: string; clientRequestId: string },
+    ): Promise<SendBotMessageResult> {
+      const text = redactChatContent(input.text.trim())
+      if (!text) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '消息不能为空')
+      return db.transaction(async (tx) => {
+        const room = await lockWritableBotConversation(tx, actor, conversationId)
+        if (room.kind !== 'direct') throw new ApiError(ERROR_CODES.BOT_BRANCH_UNSUPPORTED, '只有私聊支持编辑重发')
+        const scope = and(eq(botMessage.team_id, room.team_id), eq(botMessage.conversation_id, room.id))
+        const [original] = await tx
+          .select()
+          .from(botMessage)
+          .where(and(scope, eq(botMessage.id, messageId)))
+        if (!original || original.speaker_kind !== 'user' || original.speaker_id !== actor.id)
+          throw new ApiError(ERROR_CODES.NOT_FOUND, '找不到你可以编辑的消息')
+        const rootId = original.edited_from_message_id ?? original.id
+        const [same] = await tx
+          .select()
+          .from(botMessage)
+          .where(and(scope, eq(botMessage.client_request_id, input.clientRequestId)))
+        if (same) {
+          const message = messageView(same, actor.name)
+          if (
+            same.speaker_id !== actor.id ||
+            same.edited_from_message_id !== rootId ||
+            !same.run_id ||
+            message.body.blocks[0]?.type !== 'text' ||
+            message.body.blocks[0].text !== text
+          ) {
+            throw new ApiError(ERROR_CODES.IDEMPOTENCY_CONFLICT, '该请求标识已用于另一条消息')
+          }
+          return { message, runId: same.run_id, delivery: 'queued' }
+        }
+        await requireIdleConversation(tx, room)
+        const visibleScope = await activeBotBranchScope(tx, room)
+        const [visible] = await tx
+          .select({ id: botMessage.id })
+          .from(botMessage)
+          .where(and(visibleScope, eq(botMessage.id, messageId)))
+        if (!visible) throw new ApiError(ERROR_CODES.NOT_FOUND, '消息不在当前分支')
+        const [root] = await tx
+          .select({ sequence: botMessage.sequence })
+          .from(botMessage)
+          .where(and(scope, eq(botMessage.id, rootId)))
+        const target = (await readMembers(tx, room)).find((member) => member.kind === 'bot')
+        if (!root || !target) throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '没有可用的智能体承接重发')
+        await requireRunnableBot(tx, room.team_id, target.id, { allowOffline: true })
+        const [latest] = await tx
+          .select({ sequence: botMessage.sequence })
+          .from(botMessage)
+          .where(scope)
+          .orderBy(desc(botMessage.sequence))
+          .limit(1)
+        const branchId = randomUUID()
+        const [replacement] = await tx
+          .insert(botMessage)
+          .values({
+            id: branchId,
+            team_id: room.team_id,
+            conversation_id: room.id,
+            sequence: (latest?.sequence ?? 0n) + 1n,
+            speaker_kind: 'user',
+            speaker_id: actor.id,
+            body: { blocks: [{ type: 'text', text }] },
+            client_request_id: input.clientRequestId,
+            branch_id: branchId,
+            edited_from_message_id: rootId,
+          })
+          .returning()
+        if (!replacement) throw new Error('未能写入编辑后的消息')
+        await setBotBranch(tx, room, branchId, root.sequence)
+        const run = await enqueueBotRun(tx, {
+          team_id: room.team_id,
+          conversation_id: room.id,
+          bot_id: target.id,
+          trigger_user_id: actor.id,
+          trigger_message_id: replacement.id,
+          input_version: 0,
+        })
+        await tx
+          .update(botMessage)
+          .set({ run_id: run.id, updated_at: new Date() })
+          .where(and(scope, eq(botMessage.id, branchId)))
+        await tx
+          .update(botConversation)
+          .set({ last_message_at: replacement.created_at })
+          .where(eq(botConversation.id, room.id))
+        return {
+          message: messageView({ ...replacement, run_id: run.id }, actor.name),
+          runId: run.id,
+          delivery: 'queued',
+        }
+      })
+    },
+    /**
+     * 选择当前编辑点相邻的版本，并切换会话树。
+     * @param actor 有写权限的会话成员。
+     * @param conversationId 当前私聊。
+     * @param input 已显示的消息和切换方向。
+     * @returns 新分支标识；不存在相邻版本时拒绝。
+     */
+    async switchBranch(
+      actor: SessionUser,
+      conversationId: string,
+      input: { messageId: string; direction: 'previous' | 'next' },
+    ) {
+      return db.transaction(async (tx) => {
+        const room = await lockWritableBotConversation(tx, actor, conversationId)
+        if (room.kind !== 'direct') throw new ApiError(ERROR_CODES.BOT_BRANCH_UNSUPPORTED, '只有私聊支持切换分支')
+        await requireIdleConversation(tx, room)
+        const values = await botBranchVersions(tx, room, input.messageId)
+        const index = values.findIndex(({ id }) => id === input.messageId)
+        const target = index === -1 ? undefined : values[index + (input.direction === 'next' ? 1 : -1)]
+        if (!target) throw new ApiError(ERROR_CODES.NOT_FOUND, '没有相邻的会话分支')
+        await setBotBranch(tx, room, target.branch)
+        return { branchId: target.branch }
+      })
+    },
+    /**
+     * 复制当前会话分支中指定位置以前的消息和上下文。
+     * @param actor 有发消息权限的源会话成员。
+     * @param conversationId 源会话。
+     * @param input 复制截止的会话消息和新名称。
+     * @returns 独立的新会话详情。
+     */
+    async fork(actor: SessionUser, conversationId: string, input: { messageId: string; name?: string }) {
+      return db.transaction(async (tx) => {
+        const room = await lockWritableBotConversation(tx, actor, conversationId)
+        const forked = await forkBotConversation(tx, room, actor.id, input)
+        return readBotConversationView(tx, forked)
+      })
+    },
+    /**
+     * 为当前会话的 Bot 保存模型与思考等级覆盖。
+     * @param actor 当前有写权限的成员。
+     * @param conversationId 目标会话。
+     * @param botId 当前会话内的智能体。
+     * @param input 与当前 Bot 连接兼容的覆盖设置。
+     * @returns 已保存的设置，从下一次运行起生效。
+     */
+    async settings(
+      actor: SessionUser,
+      conversationId: string,
+      botId: string,
+      input: Parameters<typeof saveBotSessionSetting>[2],
+    ) {
+      return db.transaction(async (tx) => {
+        const room = await lockBotSessionMaintenance(tx, actor, conversationId, botId, false)
+        return saveBotSessionSetting(tx, { teamId: room.team_id, conversationId, botId, actorId: actor.id }, input)
       })
     },
     /**
@@ -592,10 +789,15 @@ export function createBotConversationsService(db: Database) {
       })
     },
     /** 发送消息并排队；重复请求复用已保存的同一次运行。 */
-    async send(actor: SessionUser, conversationId: string, input: SendBotMessageInput) {
-      const text = redactChatContent(input.text.trim())
-      if (!text) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '消息不能为空')
-      const references = { mentionBotId: input.mentionBotId, skillIds: [...(input.skillIds ?? [])].sort() }
+    async send(actor: SessionUser, conversationId: string, input: SendBotMessageInput): Promise<SendBotMessageResult> {
+      const sourceText = redactChatContent(input.text.trim())
+      if (!sourceText) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '消息不能为空')
+      const deliveryMode = input.deliveryMode ?? 'auto'
+      const references = {
+        mentionBotId: input.mentionBotId,
+        skillIds: [...(input.skillIds ?? [])].sort(),
+        deliveryMode,
+      }
       return db.transaction(async (tx) => {
         const conversation = await lockWritableBotConversation(tx, actor, conversationId)
         const scope = and(eq(botMessage.team_id, conversation.team_id), eq(botMessage.conversation_id, conversationId))
@@ -608,15 +810,36 @@ export function createBotConversationsService(db: Database) {
           if (
             message.speakerId !== actor.id ||
             message.body.blocks[0]?.type !== 'text' ||
-            message.body.blocks[0].text !== text ||
+            (message.body.references?.promptTemplate?.sourceText ?? message.body.blocks[0].text) !== sourceText ||
+            message.body.references?.promptTemplate?.id !== input.promptTemplateId ||
             message.body.references?.mentionBotId !== references.mentionBotId ||
+            (message.body.references?.deliveryMode ?? 'auto') !== deliveryMode ||
             (message.body.references?.skillIds ?? []).join(',') !== references.skillIds.join(',') ||
             !same.run_id
           ) {
             throw new ApiError(ERROR_CODES.IDEMPOTENCY_CONFLICT, '该请求标识已用于另一条消息')
           }
-          return { message, runId: same.run_id }
+          const [queuedInput] = await tx
+            .select({ mode: botRunInput.delivery_mode, status: botRunInput.status })
+            .from(botRunInput)
+            .where(and(eq(botRunInput.team_id, conversation.team_id), eq(botRunInput.message_id, same.id)))
+          const mode = queuedInput?.status === 'requeued' ? undefined : queuedInput?.mode
+          const delivery = mode === 'steer' || mode === 'follow_up' ? mode : 'queued'
+          return { message, runId: same.run_id, delivery }
         }
+        const template = input.promptTemplateId
+          ? await requireBotPromptTemplate(tx, conversation.team_id, input.promptTemplateId)
+          : undefined
+        const args = template ? sourceText.replace(new RegExp(`^/${template.name}(?:\\s+|$)`, 'u'), '').trim() : ''
+        const text = template
+          ? redactChatContent(
+              template.body.includes('$ARGUMENTS')
+                ? template.body.replaceAll('$ARGUMENTS', () => args)
+                : [template.body, args].filter(Boolean).join('\n\n'),
+            ).trim()
+          : sourceText
+        if (!text || text.length > 16_000)
+          throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '模板展开后消息为零或超过长度上限')
         const members = await readMembers(tx, conversation)
         const mentioned = new Set(input.mentionBotId ? [input.mentionBotId] : [])
         if (conversation.kind === 'group') {
@@ -666,18 +889,54 @@ export function createBotConversationsService(db: Database) {
             speaker_kind: 'user',
             speaker_id: actor.id,
             client_request_id: input.clientRequestId,
-            body: { blocks: [{ type: 'text', text }], references },
+            branch_id: conversation.active_branch_id,
+            body: {
+              blocks: [{ type: 'text', text }],
+              references: {
+                ...references,
+                ...(template ? { promptTemplate: { id: template.id, name: template.name, sourceText } } : {}),
+              },
+            },
           })
           .returning()
         if (!message) throw new Error('未能保存 Bot 会话消息')
-        const run = await enqueueBotRun(tx, {
-          team_id: conversation.team_id,
-          bot_id: targetId,
-          conversation_id: conversationId,
-          trigger_user_id: actor.id,
-          trigger_message_id: message.id,
-          input_version: 0,
-        })
+        // 运行的工具授权固定为触发人，其他成员的补充要求按各自身份排队。
+        const [active] = references.skillIds.length
+          ? []
+          : await tx
+              .select({ id: botRun.id })
+              .from(botRun)
+              .where(
+                and(
+                  eq(botRun.team_id, conversation.team_id),
+                  eq(botRun.conversation_id, conversationId),
+                  eq(botRun.bot_id, targetId),
+                  eq(botRun.status, 'running'),
+                  eq(botRun.stop_requested, false),
+                  eq(botRun.trigger_user_id, actor.id),
+                  inArray(botRun.kind, ['task', 'reply']),
+                ),
+              )
+              .for('update')
+        const delivery = active ? (deliveryMode === 'steer' ? 'steer' : 'follow_up') : 'queued'
+        const run =
+          active ??
+          (await enqueueBotRun(tx, {
+            team_id: conversation.team_id,
+            bot_id: targetId,
+            conversation_id: conversationId,
+            trigger_user_id: actor.id,
+            trigger_message_id: message.id,
+            input_version: 0,
+          }))
+        if (delivery !== 'queued') {
+          await tx.insert(botRunInput).values({
+            team_id: conversation.team_id,
+            run_id: run.id,
+            message_id: message.id,
+            delivery_mode: delivery,
+          })
+        }
         await tx
           .update(botMessage)
           .set({ run_id: run.id, updated_at: sql`clock_timestamp()` })
@@ -689,7 +948,7 @@ export function createBotConversationsService(db: Database) {
             updated_at: sql`clock_timestamp()`,
           })
           .where(and(eq(botConversation.id, conversation.id), eq(botConversation.team_id, conversation.team_id)))
-        return { message: messageView({ ...message, run_id: run.id }, actor.name), runId: run.id }
+        return { message: messageView({ ...message, run_id: run.id }, actor.name), runId: run.id, delivery }
       })
     },
     /**

@@ -1,5 +1,6 @@
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
+import { botSessionSettingBody, effectiveBotThinkingLevel } from '../bots/bots.session-settings.ts'
 import { botMessageBodySchema } from './bot-message-body.ts'
 import { workTagViewSchema } from './work-tags.schema.ts'
 
@@ -20,6 +21,7 @@ const conversation = Type.Object({
   responsibility: Type.String(),
   instructions: Type.String(),
   lastMessageAt: Type.String(),
+  forkedFrom: Type.Optional(Type.Object({ conversationId: uuid, messageId: uuid })),
 })
 const member = Type.Object({
   id: uuid,
@@ -39,6 +41,10 @@ const message = Type.Object({
   runId: nullableId,
   createdAt: Type.String(),
   feedback: Type.Optional(feedbackRating),
+  branchId: Type.Optional(nullableId),
+  branchSiblings: Type.Optional(
+    Type.Object({ index: Type.Integer({ minimum: 1 }), total: Type.Integer({ minimum: 2 }) }),
+  ),
 })
 export const conversationEventKind = Type.Union([
   Type.Literal('run_status'),
@@ -72,7 +78,36 @@ const activeRun = Type.Object({
 })
 
 export const conversationParams = Type.Object({ conversationId: uuid })
+export const editResendBody = Type.Object(
+  {
+    text: Type.String({ minLength: 1, maxLength: 16000 }),
+    clientRequestId: uuid,
+  },
+  { additionalProperties: false },
+)
+export const switchBotBranchBody = Type.Object(
+  {
+    messageId: uuid,
+    direction: Type.Union([Type.Literal('previous'), Type.Literal('next')]),
+  },
+  { additionalProperties: false },
+)
+export const switchBotBranchResponse = apiResponseSchema(Type.Object({ branchId: nullableId }))
+export const forkConversationBody = Type.Object(
+  { messageId: uuid, name: Type.Optional(Type.String({ maxLength: 80 })) },
+  { additionalProperties: false },
+)
 export const conversationBotParams = Type.Object({ conversationId: uuid, botId: uuid })
+export const conversationSettingsResponse = apiResponseSchema(
+  Type.Object({ botId: uuid, ...botSessionSettingBody.properties }),
+)
+const botSetting = Type.Object({
+  botId: uuid,
+  modelId: botSessionSettingBody.properties.modelId,
+  thinkingLevel: botSessionSettingBody.properties.thinkingLevel,
+  effectiveThinkingLevel: Type.Union([effectiveBotThinkingLevel, Type.Null()]),
+  isOverrideValid: Type.Boolean(),
+})
 export const conversationCompactResponse = apiResponseSchema(Type.Object({ runId: uuid }))
 export const conversationReseedResponse = apiResponseSchema(Type.Object({ botId: uuid }))
 export const conversationTeamParams = Type.Object({ teamId: uuid })
@@ -104,6 +139,8 @@ export const sendBotMessageBody = Type.Object(
     clientRequestId: uuid,
     text: Type.String({ minLength: 1, maxLength: 16000 }),
     mentionBotId: Type.Optional(uuid),
+    promptTemplateId: Type.Optional(uuid),
+    deliveryMode: Type.Optional(Type.Union([Type.Literal('auto'), Type.Literal('steer')])),
     skillIds: Type.Optional(Type.Array(uuid, { maxItems: 20, uniqueItems: true })),
   },
   { additionalProperties: false },
@@ -126,6 +163,7 @@ export const conversationListResponse = apiResponseSchema(
 export const conversationResponse = apiResponseSchema(
   Type.Object({
     ...conversation.properties,
+    botSettings: Type.Array(botSetting),
     members: Type.Array(member),
     tags: Type.Array(workTagViewSchema),
     skillReferences: Type.Array(
@@ -145,7 +183,13 @@ export const conversationMessagesResponse = apiResponseSchema(
     nextBefore: Type.Union([sequence, Type.Null()]),
   }),
 )
-export const conversationSendResponse = apiResponseSchema(Type.Object({ message, runId: uuid }))
+export const conversationSendResponse = apiResponseSchema(
+  Type.Object({
+    message,
+    runId: uuid,
+    delivery: Type.Union([Type.Literal('queued'), Type.Literal('follow_up'), Type.Literal('steer')]),
+  }),
+)
 export const conversationEventsResponse = apiResponseSchema(
   Type.Object({
     items: Type.Array(event),
@@ -161,4 +205,9 @@ export type ConversationMessage = Static<typeof message>
 export type ConversationEvent = Static<typeof event>
 export type ConversationActiveRun = Static<typeof activeRun>
 export type ConversationListFilters = Static<typeof conversationListQuery>
+export type SendBotMessageResult = {
+  message: Static<typeof message>
+  runId: string
+  delivery: 'queued' | 'steer' | 'follow_up'
+}
 export type SendBotMessageInput = Static<typeof sendBotMessageBody>

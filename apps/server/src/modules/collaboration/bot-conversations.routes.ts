@@ -1,11 +1,17 @@
 import { Type } from 'typebox'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
+import { botSessionSettingBody } from '../bots/bots.session-settings.ts'
 import { requireActor } from '../identity/identity.actor.ts'
 import {
   conversationBotParams,
   conversationCompactResponse,
   conversationReseedResponse,
+  conversationSettingsResponse,
+  editResendBody,
+  switchBotBranchBody,
+  switchBotBranchResponse,
+  forkConversationBody,
   conversationEventsQuery,
   conversationEventsResponse,
   conversationListQuery,
@@ -103,6 +109,77 @@ export const botConversationsRoutes: FastifyPluginAsyncTypebox<{
         ),
     )
   }
+  app.post(
+    '/bot-conversations/:conversationId/messages/:messageId/edit-resend',
+    {
+      schema: {
+        summary: '编辑重发私聊中的本人消息',
+        params: messageFeedbackParams,
+        body: editResendBody,
+        response: { 200: conversationSendResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.editResend(
+          await requireActor(request),
+          request.params.conversationId,
+          request.params.messageId,
+          request.body,
+        ),
+        request.id,
+      ),
+  )
+  app.post(
+    '/bot-conversations/:conversationId/branches/switch',
+    {
+      schema: {
+        summary: '切换私聊编辑分支',
+        params: conversationParams,
+        body: switchBotBranchBody,
+        response: { 200: switchBotBranchResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.switchBranch(await requireActor(request), request.params.conversationId, request.body),
+        request.id,
+      ),
+  )
+  app.post(
+    '/bot-conversations/:conversationId/fork',
+    {
+      schema: {
+        summary: '从消息分叉独立的 Bot 会话',
+        params: conversationParams,
+        body: forkConversationBody,
+        response: { 200: conversationResponse },
+      },
+    },
+    async (request) =>
+      success(await service.fork(await requireActor(request), request.params.conversationId, request.body), request.id),
+  )
+  app.post(
+    '/bot-conversations/:conversationId/bots/:botId/settings',
+    {
+      schema: {
+        summary: '保存会话 Bot 的模型与思考等级',
+        params: conversationBotParams,
+        body: botSessionSettingBody,
+        response: { 200: conversationSettingsResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.settings(
+          await requireActor(request),
+          request.params.conversationId,
+          request.params.botId,
+          request.body,
+        ),
+        request.id,
+      ),
+  )
   app.post(
     '/bot-conversations/:conversationId/bots/:botId/compact',
     {

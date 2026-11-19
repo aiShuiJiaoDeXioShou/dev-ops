@@ -1,12 +1,13 @@
-import { and, desc, eq, gt, inArray, lt, lte, ne, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, lt, lte, ne, notExists, or, sql } from 'drizzle-orm'
 import { Check } from 'typebox/value'
 import type { Database } from '../../../platform/database/client.ts'
 import { botMessageBodySchema } from '../../collaboration/bot-message-body.ts'
-import { botMessage } from '../../collaboration/bot-conversations.tables.ts'
+import { activeBotBranchScope } from '../../collaboration/bot-branches.repository.ts'
+import { botConversation, botMessage } from '../../collaboration/bot-conversations.tables.ts'
 import { authUser } from '../../identity/identity.tables.ts'
 import type { ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
-import { botSession } from '../bots.session.tables.ts'
-import { bot } from '../bots.tables.ts'
+import { botRunInput, botSession } from '../bots.session.tables.ts'
+import { bot, botRun } from '../bots.tables.ts'
 
 const SEED_LIMIT = 24
 const messageFields = {
@@ -25,7 +26,16 @@ const messageFields = {
  * @returns 当前消息、房间上下文及待持久化的游标。
  */
 export async function readBotRoomSync(db: Database, run: ConversationBotRunRecord, syncLimit: number) {
-  const scope = and(eq(botMessage.team_id, run.team_id), eq(botMessage.conversation_id, run.conversation_id))
+  const [conversation] = await db
+    .select({
+      id: botConversation.id,
+      team_id: botConversation.team_id,
+      active_branch_id: botConversation.active_branch_id,
+    })
+    .from(botConversation)
+    .where(and(eq(botConversation.team_id, run.team_id), eq(botConversation.id, run.conversation_id)))
+  if (!conversation) throw new Error('运行所属会话不存在')
+  const scope = await activeBotBranchScope(db, conversation)
   const [[session], [input]] = await Promise.all([
     db
       .select({ cursor: botSession.synced_message_sequence, seededAt: botSession.seeded_at })
@@ -49,6 +59,20 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
     ? lt(botMessage.sequence, input.sequence)
     : lte(botMessage.created_at, run.started_at ?? run.created_at)
   const limit = session?.seededAt ? syncLimit : SEED_LIMIT
+  const alreadyDelivered = db
+    .select({ id: botRunInput.id })
+    .from(botRunInput)
+    .innerJoin(
+      botRun,
+      and(eq(botRun.id, botRunInput.run_id), eq(botRun.bot_id, run.bot_id), eq(botRun.team_id, run.team_id)),
+    )
+    .where(
+      and(
+        eq(botRunInput.team_id, run.team_id),
+        eq(botRunInput.message_id, botMessage.id),
+        eq(botRunInput.status, 'delivered'),
+      ),
+    )
   const rows = await db
     .select({ ...messageFields, total: sql<string>`count(*) over ()` })
     .from(botMessage)
@@ -57,6 +81,7 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
         scope,
         before,
         gt(botMessage.sequence, after),
+        notExists(alreadyDelivered),
         session?.seededAt ? or(ne(botMessage.speaker_kind, 'bot'), ne(botMessage.speaker_id, run.bot_id)) : undefined,
       ),
     )

@@ -92,6 +92,18 @@ test('Bot 租约跨进程遵守团队和全局限额，过期后旧代次不能�
   assert.equal(await reconcileExpiredBotRuns(db), 1)
   assert.equal(await reconcileExpiredBotRuns(another.db), 0)
   assert.equal(await db.transaction((tx) => finishBotRun(tx, lease, { status: 'succeeded' })), null)
+  for (const attempt of [1, 2]) {
+    const resumed = await claimBotRun(db, `resumed-${attempt}`, { ...limits, global: 4, perTeam: 3 })
+    assert.equal(resumed?.id, first.id)
+    assert.equal(resumed.resume_count, attempt)
+    assert.equal(resumed.lease_epoch, lease.epoch + attempt)
+    assert.deepEqual(resumed.config_snapshot, claimed.config_snapshot)
+    await db
+      .update(botRun)
+      .set({ lease_until: new Date(0) })
+      .where(eq(botRun.id, first.id))
+    assert.equal(await reconcileExpiredBotRuns(db), 1)
+  }
   const [finished] = await db.select().from(botRun).where(eq(botRun.id, first.id))
   assert.equal(finished?.status, 'failed')
   assert.equal(finished.failure_kind, 'execution_interrupted')

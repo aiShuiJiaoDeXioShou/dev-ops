@@ -35,7 +35,12 @@ function publicAddress(address: string, family: number): boolean {
   return false
 }
 
-async function pinnedAddress(url: URL) {
+/**
+ * 在请求前解析并校验公网地址，供出站连接固定使用已校验的 IP。
+ * @param url 要访问的外部服务 URL。
+ * @returns 公网 IP 及地址族；任何 DNS 结果落入禁用网段时拒绝。
+ */
+export async function resolveBotPublicAddress(url: URL) {
   const host = url.hostname.replace(/^\[|\]$/gu, '')
   const family = isIP(host)
   const resolved = family ? [{ address: host, family }] : await lookup(host, { all: true })
@@ -55,7 +60,7 @@ async function openPage(url: URL, signal: AbortSignal): Promise<IncomingMessage>
   ) {
     throw new Error('只允许直接访问公开 HTTP 或 HTTPS 网页')
   }
-  const target = await pinnedAddress(url)
+  const target = await resolveBotPublicAddress(url)
   signal.throwIfAborted()
   const get = url.protocol === 'https:' ? getHttps : getHttp
   return new Promise((resolve, reject) => {

@@ -7,8 +7,12 @@ import { and, eq } from 'drizzle-orm'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { catalogBotApis } from '../../src/modules/bots/bots.api-catalog.ts'
 import { botApiExclusion, type BotApiMethod } from '../../src/modules/bots/bots.api-denylist.ts'
-import { claimBotRun, renewBotRunLease } from '../../src/modules/bots/bots.run-queue.repository.ts'
-import { botApiCall } from '../../src/modules/bots/bots.tables.ts'
+import {
+  claimBotRun,
+  reconcileExpiredBotRuns,
+  renewBotRunLease,
+} from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { botApiCall, botRun } from '../../src/modules/bots/bots.tables.ts'
 import { createBotApiInvoker } from '../../src/modules/bots/runtime/api-invoker.ts'
 import { createBotDelegation } from '../../src/modules/identity/identity.bot-delegation.ts'
 import { teamMember } from '../../src/modules/identity/identity.tables.ts'
@@ -42,7 +46,7 @@ test('平台 API 委托使用团队范围与当前成员角色，写入只执行
   assert.equal(selected.code, 'OK', selected.message)
   const run = await claimBotRun(db, 'delegate-test', { global: 3, perTeam: 2, ttlSeconds: 60 })
   assert.ok(run)
-  const lease = { id: run.id, owner: 'delegate-test', epoch: run.lease_epoch }
+  let lease = { id: run.id, owner: 'delegate-test', epoch: run.lease_epoch }
   const swagger = app.swagger()
   const catalog = catalogBotApis(swagger)
   for (const [path, operations] of Object.entries(swagger.paths ?? {})) {
@@ -57,7 +61,7 @@ test('平台 API 委托使用团队范围与当前成员角色，写入只执行
   }
   const createInvoker = (current = lease) =>
     createBotApiInvoker({ app, db, lease: current, delegation, teamId, conversationId: roomId, botId, catalog })
-  const api = createInvoker()
+  let api = createInvoker()
   const search = openApiTools(catalog, api).find(({ name }) => name === 'platform_api_search')
   assert.ok(search)
   const signal = new AbortController().signal
@@ -143,6 +147,21 @@ test('平台 API 委托使用团队范围与当前成员角色，写入只执行
     },
   )
 
+  const beforeResume = (await get(`/projects/${own.data.id}/requirements`)).data.items.length
+  await db
+    .update(botRun)
+    .set({ lease_until: new Date(0) })
+    .where(eq(botRun.id, run.id))
+  assert.equal(await reconcileExpiredBotRuns(db), 1)
+  const resumed = await claimBotRun(db, 'delegate-test-next', { global: 3, perTeam: 2, ttlSeconds: 60 })
+  assert.ok(resumed?.lease_owner)
+  assert.equal(resumed.id, run.id)
+  assert.equal(resumed.resume_count, 1)
+  assert.equal((await api.invoke(write)).code, 'BOT_API_FORBIDDEN')
+  lease = { id: resumed.id, owner: resumed.lease_owner, epoch: resumed.lease_epoch }
+  api = createInvoker(lease)
+  assert.deepEqual(await api.invoke(write), repeat)
+  assert.equal((await get(`/projects/${own.data.id}/requirements`)).data.items.length, beforeResume)
   await db.update(teamMember).set({ role: 'viewer' }).where(eq(teamMember.user_id, devUser.userId))
   assert.equal((await api.invoke({ ...write, idempotencyKey: 'viewer-attempt' })).code, 'FORBIDDEN')
   assert.equal((await api.invoke({ method: 'GET', path })).ok, true)

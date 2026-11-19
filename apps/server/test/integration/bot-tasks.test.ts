@@ -66,7 +66,7 @@ test('任务保存输入版本，排队停止和中断后可以重新运行，�
     .update(botRun)
     .set({ lease_until: sql`clock_timestamp() - interval '1 second'` })
     .where(eq(botRun.id, interrupted.id))
-  assert.equal(await reconcileExpiredBotRuns(db), 1)
+  assert.equal(await reconcileExpiredBotRuns(db, 0), 1)
   current = (await get(taskPath)).data
   assert.equal(current.status, 'waiting')
   assert.equal(current.runs[0].failureKind, 'execution_interrupted')

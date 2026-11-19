@@ -65,8 +65,8 @@ export interface SkillVersionRow {
 export interface SkillListFilters {
   search?: string
   category?: string
-  page: number
-  pageSize: number
+  offset: number
+  limit: number
 }
 
 export interface SkillListRecord {
@@ -124,8 +124,8 @@ export async function findSkills(db: Database, teamId: string, filters: SkillLis
       .innerJoin(skillVersion, eq(skill.current_version_id, skillVersion.id))
       .where(where)
       .orderBy(desc(skill.updated_at), desc(skill.id))
-      .limit(filters.pageSize)
-      .offset((filters.page - 1) * filters.pageSize),
+      .limit(filters.limit)
+      .offset(filters.offset),
     db.select({ value: count() }).from(skill).where(where),
   ])
   return { items: rows as SkillListRecord[], total: total?.value ?? 0 }

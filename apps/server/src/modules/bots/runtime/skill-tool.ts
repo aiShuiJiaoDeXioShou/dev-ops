@@ -4,6 +4,7 @@ import type { Database } from '../../../platform/database/client.ts'
 import { appendBotEvents } from '../../collaboration/bot-events.repository.ts'
 import { skillVersion } from '../../knowledge/knowledge.tables.ts'
 import { lockBotRunLease, type BotRunLease, type ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
+import { platformBotSkills } from '../bots.platform-skills/index.ts'
 import type { BotSkillVersion } from '../bots.skills.ts'
 import { redactChatContent } from './content.ts'
 
@@ -34,6 +35,20 @@ export function createSkillViewTool(
     async execute(input, signal) {
       signal.throwIfAborted()
       const identifier: unknown = input && typeof input === 'object' ? Reflect.get(input, 'identifier') : undefined
+      const builtin = platformBotSkills.find((item) => item.identifier === identifier)
+      if (builtin) {
+        return db.transaction(async (tx) => {
+          const active = await lockBotRunLease(tx, lease)
+          if (!active || active.stop_requested) return { text: '当前运行已停止', isError: true }
+          await appendBotEvents(tx, { teamId: run.team_id, conversationId: run.conversation_id, runId: run.id }, [
+            {
+              kind: 'tool_activity',
+              payload: { state: 'succeeded', name: 'skill_view', skillId: builtin.id, source: 'platform' },
+            },
+          ])
+          return { text: builtin.content }
+        })
+      }
       const skill = versions.find((item) => item.identifier === identifier)
       if (!skill || skill.status !== 'available' || !skill.versionId) {
         return { text: skill?.status === 'unknown' ? '该技能的版本未知' : '该技能对本次运行不可用', isError: true }

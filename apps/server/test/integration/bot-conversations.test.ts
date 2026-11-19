@@ -149,11 +149,12 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
     .where(eq(botModelCatalog.provider_id, 'fixture'))
   const whileOffline = await post(messagePath, devUser, { text: '离线时仍可发送', clientRequestId: randomUUID() })
   assert.equal(whileOffline.code, 'OK', whileOffline.message)
+  assert.equal(whileOffline.data.delivery, 'follow_up')
+  assert.equal(whileOffline.data.runId, claimed.id)
   const queued = (await get(eventsPath, devUser)).data.activeRuns
   assert.deepEqual(queued, [
     { id: first.data.runId, botId, status: 'running' },
     { id: second.data.runId, botId, status: 'queued', teamQueuePosition: 1, queueReason: 'worker_offline' },
-    { id: whileOffline.data.runId, botId, status: 'queued', teamQueuePosition: 2, queueReason: 'worker_offline' },
   ])
 
   const usage = { inputTokens: 32, outputTokens: 12, cacheReadTokens: 8, cacheWriteTokens: 0, costUsd: 0.001 }
@@ -165,6 +166,16 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
       finalMessage: { role: 'assistant', blocks: [{ type: 'text', text: '最终回复' }] },
     }),
     true,
+  )
+  const requeued = (await get(messagePath, devUser)).data.items.find(
+    (item: { id: string }) => item.id === whileOffline.data.message.id,
+  )
+  assert.ok(requeued)
+  assert.notEqual(requeued.runId, claimed.id)
+  assert.ok(
+    (await get(eventsPath, devUser)).data.activeRuns.some(
+      (item: { id: string; status: string }) => item.id === requeued.runId && item.status === 'queued',
+    ),
   )
   const saved = (await get(messagePath, devUser)).data.items.find(
     (item: { speakerKind: string }) => item.speakerKind === 'bot',

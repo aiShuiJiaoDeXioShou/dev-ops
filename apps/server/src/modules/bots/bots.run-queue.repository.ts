@@ -1,8 +1,11 @@
-import { and, asc, count, eq, gt, inArray, lt, lte, ne, notExists, or, sql } from 'drizzle-orm'
+import { and, asc, count, eq, gt, inArray, lt, lte, notExists, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import type { Database } from '../../platform/database/client.ts'
+import { botMessage } from '../collaboration/bot-conversations.tables.ts'
 import { appendBotEvents } from '../collaboration/bot-events.repository.ts'
 import { botTask } from '../tasks/bot-tasks.tables.ts'
+import { botConversationBotSetting } from '../collaboration/bot-relay.tables.ts'
+import { botRunInput } from './bots.session.tables.ts'
 import { snapshotBotSkills } from './bots.skills.ts'
 import { bot, botRun } from './bots.tables.ts'
 
@@ -115,7 +118,7 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
     const previous = alias(botRun, 'previous_run')
     const teamRunning = alias(botRun, 'team_running')
     const [candidate] = await tx
-      .select({ id: botRun.id, teamId: botRun.team_id, botId: botRun.bot_id })
+      .select({ id: botRun.id, teamId: botRun.team_id, botId: botRun.bot_id, resumes: botRun.resume_count })
       .from(botRun)
       .where(
         and(
@@ -152,7 +155,7 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
       .limit(1)
       .for('update', { skipLocked: true })
     if (!candidate) return null
-    const skillVersions = await snapshotBotSkills(tx, candidate.teamId, candidate.botId)
+    const skillVersions = candidate.resumes ? [] : await snapshotBotSkills(tx, candidate.teamId, candidate.botId)
 
     const [run] = await tx
       .update(botRun)
@@ -161,17 +164,24 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
         lease_owner: owner,
         lease_until: sql`clock_timestamp() + ${limits.ttlSeconds} * interval '1 second'`,
         lease_epoch: sql`${botRun.lease_epoch} + 1`,
-        config_snapshot: sql`coalesce((
+        config_snapshot: candidate.resumes
+          ? sql`${botRun.config_snapshot}`
+          : sql`coalesce((
           select jsonb_build_object(
             'name', ${bot.name}, 'responsibility', ${bot.responsibility}, 'instructions', ${bot.instructions},
             'modelConnectionId', ${bot.model_connection_id}, 'modelId', ${bot.model_id}, 'status', ${bot.status},
+            'modelOverride', ${botConversationBotSetting.model_id},
+            'thinkingLevel', ${botConversationBotSetting.thinking_level},
             'accessMode', ${bot.access_mode},
             'skillVersions', ${JSON.stringify(skillVersions)}::jsonb
           )
-          from ${bot}
+          from ${bot} left join ${botConversationBotSetting}
+            on ${botConversationBotSetting.team_id} = ${botRun.team_id}
+              and ${botConversationBotSetting.conversation_id} = ${botRun.conversation_id}
+              and ${botConversationBotSetting.bot_id} = ${botRun.bot_id}
           where ${bot.id} = ${botRun.bot_id} and ${bot.team_id} = ${botRun.team_id}
         ), '{}'::jsonb)`,
-        started_at: sql`clock_timestamp()`,
+        started_at: sql`coalesce(${botRun.started_at}, clock_timestamp())`,
         updated_at: sql`clock_timestamp()`,
       })
       .where(and(eq(botRun.id, candidate.id), eq(botRun.status, 'queued')))
@@ -255,6 +265,42 @@ async function updateTaskAfterRun(tx: BotRunTransaction, run: BotRunRecord) {
     )
 }
 
+async function requeuePendingInputs(tx: BotRunTransaction, run: BotRunRecord) {
+  if (!isConversationBotRun(run)) return
+  const pending = await tx
+    .select({ id: botRunInput.id, messageId: botRunInput.message_id, sender: botMessage.speaker_id })
+    .from(botRunInput)
+    .innerJoin(
+      botMessage,
+      and(
+        eq(botMessage.id, botRunInput.message_id),
+        eq(botMessage.team_id, run.team_id),
+        eq(botMessage.conversation_id, run.conversation_id),
+      ),
+    )
+    .where(and(eq(botRunInput.run_id, run.id), eq(botRunInput.team_id, run.team_id), eq(botRunInput.status, 'pending')))
+    .orderBy(asc(botMessage.sequence))
+  for (const { id, messageId, sender } of pending) {
+    if (!sender) throw new Error('待投递 Bot 消息缺少触发人')
+    const next = await enqueueBotRun(tx, {
+      team_id: run.team_id,
+      conversation_id: run.conversation_id,
+      bot_id: run.bot_id,
+      trigger_user_id: sender,
+      trigger_message_id: messageId,
+      input_version: 0,
+    })
+    await tx
+      .update(botMessage)
+      .set({ run_id: next.id, updated_at: sql`clock_timestamp()` })
+      .where(and(eq(botMessage.team_id, run.team_id), eq(botMessage.id, messageId), eq(botMessage.run_id, run.id)))
+    await tx
+      .update(botRunInput)
+      .set({ status: 'requeued', updated_at: sql`clock_timestamp()` })
+      .where(eq(botRunInput.id, id))
+  }
+}
+
 /**
  * 防止旧代次覆盖运行，原子写入终态与用量，并收口仍在执行的任务。
  * @param tx 用于同时提交最终消息的事务。
@@ -282,52 +328,66 @@ export async function finishBotRun(tx: BotRunTransaction, lease: BotRunLease, ou
   if (!run) return null
   await updateTaskAfterRun(tx, run)
   await writeRunState(tx, run)
+  await requeuePendingInputs(tx, run)
   return run
 }
 
+async function recoverClaim(tx: BotRunTransaction, run: BotRunRecord, resumeLimit: number) {
+  const shouldResume = !run.stop_requested && run.resume_count < resumeLimit
+  const [recovered] = await tx
+    .update(botRun)
+    .set({
+      status: shouldResume ? 'queued' : run.stop_requested ? 'stopped' : 'failed',
+      resume_count: run.resume_count + (shouldResume ? 1 : 0),
+      failure_kind: shouldResume || run.stop_requested ? null : 'execution_interrupted',
+      failure_message: shouldResume || run.stop_requested ? null : '执行服务多次中断，未能完成运行',
+      lease_owner: null,
+      lease_until: null,
+      finished_at: shouldResume ? null : sql`clock_timestamp()`,
+      updated_at: sql`clock_timestamp()`,
+    })
+    .where(and(eq(botRun.id, run.id), eq(botRun.status, 'running'), eq(botRun.lease_epoch, run.lease_epoch)))
+    .returning()
+  if (!recovered) return
+  await writeRunState(tx, recovered)
+  if (!shouldResume) {
+    await updateTaskAfterRun(tx, recovered)
+    await requeuePendingInputs(tx, recovered)
+  }
+}
+
 /**
- * 将一批已过期的运行收口为执行中断，不重新入队。
- * @param db 调度进程的数据库连接。
- * @returns 本次收口数量；另一调度进程持有的行留给该进程。
+ * 将仍持有的运行主动交还队列，供关闭后的执行进程从同一运行恢复。
+ * @param db 执行进程数据库。
+ * @param lease 本次运行的有效租约。
+ * @param resumeLimit 单次运行允许的自动续跑上限。
+ * @returns 租约失效时直接结束，数据库异常向上传递。
  */
-export async function reconcileExpiredBotRuns(db: Database): Promise<number> {
+export async function releaseInterruptedBotRun(db: Database, lease: BotRunLease, resumeLimit: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    const run = await lockBotRunLease(tx, lease)
+    if (run) await recoverClaim(tx, run, resumeLimit)
+  })
+}
+
+/**
+ * 让失去租约的运行重新入队，达到续跑上限后收口为中断失败。
+ * @param db 调度进程的数据库连接。
+ * @param resumeLimit 同一运行允许的自动续跑次数。
+ * @returns 本次处理数量；其他调度进程持有的行跳过。
+ */
+export async function reconcileExpiredBotRuns(db: Database, resumeLimit = 2): Promise<number> {
   return db.transaction(async (tx) => {
     const rows = await tx
-      .select({ id: botRun.id })
+      .select()
       .from(botRun)
       .where(and(eq(botRun.status, 'running'), lte(botRun.lease_until, sql`clock_timestamp()`)))
-      .orderBy(asc(botRun.lease_until), asc(botRun.id))
+      .orderBy(asc(botRun.conversation_id), asc(botRun.id))
       .limit(50)
       .for('update', { skipLocked: true })
-    if (rows.length === 0) return 0
-    const runs = await tx
-      .update(botRun)
-      .set({
-        status: 'failed',
-        failure_kind: 'execution_interrupted',
-        failure_message: '执行服务已断开，可重新运行任务',
-        lease_owner: null,
-        lease_until: null,
-        finished_at: sql`clock_timestamp()`,
-        updated_at: sql`clock_timestamp()`,
-      })
-      .where(
-        and(
-          inArray(
-            botRun.id,
-            rows.map((row) => row.id),
-          ),
-          ne(botRun.status, 'failed'),
-        ),
-      )
-      .returning()
-    // 同一批次以会话标识排序，避免两个调度进程以相反顺序获取事件锁。
-    runs.sort((left, right) => (left.conversation_id ?? '').localeCompare(right.conversation_id ?? ''))
-    for (const run of runs) {
-      await updateTaskAfterRun(tx, run)
-      await writeRunState(tx, run)
-    }
-    return runs.length
+    // 以会话顺序取事件锁，避免多个调度进程交叉等锁。
+    for (const run of rows) await recoverClaim(tx, run, resumeLimit)
+    return rows.length
   })
 }
 

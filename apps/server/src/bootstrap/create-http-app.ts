@@ -36,6 +36,8 @@ import { botMemoryRoutes } from '../modules/bots/bots.memory.routes.ts'
 import { createBotMemoryService } from '../modules/bots/bots.memory.service.ts'
 import { botsRoutes } from '../modules/bots/bots.routes.ts'
 import { botConnectionsRoutes } from '../modules/bots/bots.connections.routes.ts'
+import { botMcpServerRoutes } from '../modules/bots/bots.mcp-servers.routes.ts'
+import { botPromptTemplateRoutes } from '../modules/bots/bots.prompt-templates.ts'
 import { botConversationsRoutes } from '../modules/collaboration/bot-conversations.routes.ts'
 import { createBotConversationsService } from '../modules/collaboration/bot-conversations.service.ts'
 import { createBotGroupsService } from '../modules/collaboration/bot-groups.service.ts'
@@ -150,6 +152,12 @@ export function createHttpApp(
     connections: createBotConnectionsService(services.database.db, botCipher),
     login: createBotLoginService(services.database.db, botCipher),
   })
+  app.register(botMcpServerRoutes, {
+    prefix: '/api/v1',
+    db: services.database.db,
+    cipher: botCipher,
+  })
+  app.register(botPromptTemplateRoutes, { prefix: '/api/v1', db: services.database.db })
   app.register(botConversationsRoutes, {
     prefix: '/api/v1',
     service: createBotConversationsService(services.database.db),
