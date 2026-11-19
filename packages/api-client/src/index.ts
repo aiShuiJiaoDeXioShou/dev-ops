@@ -2190,6 +2190,381 @@ export function createApiClient(options: ApiClientOptions) {
         { ...options, query },
       )
     },
+    /**
+     * 编辑并重发当前私聊消息。
+     * @param conversationId 会话标识。
+     * @param messageId 消息标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async editBotMessage(
+      conversationId: string,
+      messageId: string,
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/messages/{messageId}/edit-resend', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/messages/{messageId}/edit-resend', 'post'>
+      >(
+        `/api/v1/bot-conversations/${segment(conversationId)}/messages/${segment(messageId)}/edit-resend`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 切换私聊的编辑分支。
+     * @param conversationId 会话标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async switchBotConversationBranch(
+      conversationId: string,
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/branches/switch', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/branches/switch', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/branches/switch`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 从指定消息创建独立的会话。
+     * @param conversationId 会话标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async forkBotConversation(
+      conversationId: string,
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/fork', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/fork', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/fork`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 设置当前会话内单个 Bot 的模型与思考等级。
+     * @param conversationId 会话标识。
+     * @param botId 智能体标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async updateBotSessionSettings(
+      conversationId: string,
+      botId: string,
+      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/bots/{botId}/settings', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/bots/{botId}/settings', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/bots/${segment(botId)}/settings`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 为当前 Bot 会话排入主动压缩。
+     * @param conversationId 会话标识。
+     * @param botId 智能体标识。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async compactBotConversation(conversationId: string, botId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/bots/{botId}/compact', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/bots/${segment(botId)}/compact`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /**
+     * 重新播种已损坏的 Bot 会话树。
+     * @param conversationId 会话标识。
+     * @param botId 智能体标识。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async reseedBotConversation(conversationId: string, botId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/bots/{botId}/reseed', 'post'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/bots/${segment(botId)}/reseed`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /**
+     * 读取团队共享的 Bot 上下文。
+     * @param teamId 团队标识。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async getTeamBotContext(teamId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-context', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-context`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /**
+     * 保存带版本检查的团队 Bot 上下文。
+     * @param teamId 团队标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async updateTeamBotContext(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-context', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-context', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-context`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 列出团队提示模板，可按关键词或游标查询。
+     * @param teamId 团队标识。
+     * @param query 筛选与分页条件。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async listBotPromptTemplates(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/bot-prompt-templates', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-prompt-templates', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-prompt-templates`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /**
+     * 创建团队提示模板。
+     * @param teamId 团队标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async createBotPromptTemplate(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-prompt-templates', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-prompt-templates', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-prompt-templates`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 保存提示模板的修改。
+     * @param templateId 提示模板标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async updateBotPromptTemplate(
+      templateId: string,
+      body: ApiBody<'/api/v1/bot-prompt-templates/{templateId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-prompt-templates/{templateId}/update', 'post'>>(
+        `/api/v1/bot-prompt-templates/${segment(templateId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 移除提示模板。
+     * @param templateId 提示模板标识。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async removeBotPromptTemplate(templateId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-prompt-templates/{templateId}/remove', 'post'>>(
+        `/api/v1/bot-prompt-templates/${segment(templateId)}/remove`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /**
+     * 按成员权限读取团队的远程 MCP 服务。
+     * @param teamId 团队标识。
+     * @param query 筛选与分页条件。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async listBotMcpServers(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/bot-mcp-servers', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-mcp-servers', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-mcp-servers`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /**
+     * 保存新远程 MCP 服务和授权。
+     * @param teamId 团队标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async createBotMcpServer(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-mcp-servers', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-mcp-servers', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-mcp-servers`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 更新远程 MCP 服务和授权范围。
+     * @param serverId 远程 MCP 服务标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async updateBotMcpServer(
+      serverId: string,
+      body: ApiBody<'/api/v1/bot-mcp-servers/{serverId}/update', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-mcp-servers/{serverId}/update', 'post'>>(
+        `/api/v1/bot-mcp-servers/${segment(serverId)}/update`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 测试已配置的 MCP 连接及工具发现。
+     * @param serverId 远程 MCP 服务标识。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async testBotMcpServer(serverId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-mcp-servers/{serverId}/test', 'post'>>(
+        `/api/v1/bot-mcp-servers/${segment(serverId)}/test`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /**
+     * 读取当前月份或指定月份的团队用量与预算。
+     * @param teamId 团队标识。
+     * @param query 筛选与分页条件。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async getBotUsage(
+      teamId: string,
+      query?: ApiQuery<'/api/v1/teams/{teamId}/bot-usage', 'get'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-usage', 'get'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-usage`,
+        'GET',
+        undefined,
+        { ...options, query },
+      )
+    },
+    /**
+     * 设置或取消团队月度预算。
+     * @param teamId 团队标识。
+     * @param body 当前操作的请求数据。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async updateBotBudget(
+      teamId: string,
+      body: ApiBody<'/api/v1/teams/{teamId}/bot-budget', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/bot-budget', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/bot-budget`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 为指定 Bot 排入当天的记忆整理。
+     * @param botId 智能体标识。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 校验后的平台响应，业务失败时拒绝。
+     */
+    async consolidateBotMemories(botId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bots/{botId}/memories/consolidate', 'post'>>(
+        `/api/v1/bots/${segment(botId)}/memories/consolidate`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /**
+     * 执行成员发起的接力控制。
+     * @param relayId 接力标识。
+     * @param action 继续、结束或停止。
+     * @param body 用于并发校验的接力版本。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 更新后的接力状态，发生冲突时拒绝。
+     */
+    async controlBotRelay(
+      relayId: string,
+      action: 'continue' | 'end' | 'stop',
+      body: ApiBody<'/api/v1/bot-relays/{relayId}/continue', 'post'>,
+      options: ApiCallOptions = {},
+    ) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-relays/{relayId}/continue', 'post'>>(
+        `/api/v1/bot-relays/${segment(relayId)}/${action}`,
+        'POST',
+        body,
+        options,
+      )
+    },
+    /**
+     * 启停或移除远程 MCP 服务。
+     * @param serverId 服务标识。
+     * @param action 启用、停用或移除。
+     * @param options 取消信号和可选的幂等标识。
+     * @returns 操作对象的状态，业务失败时拒绝。
+     */
+    async controlBotMcpServer(serverId: string, action: 'enable' | 'disable' | 'remove', options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-mcp-servers/{serverId}/enable', 'post'>>(
+        `/api/v1/bot-mcp-servers/${segment(serverId)}/${action}`,
+        'POST',
+        {},
+        options,
+      )
+    },
     /** 读取会话任务列表。 */
     async listBotTasks(
       conversationId: string,
