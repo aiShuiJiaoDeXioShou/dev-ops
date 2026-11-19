@@ -10,6 +10,8 @@ export type MessageView = {
   bot?: { id: string; avatarKey?: string | null; enabled?: boolean }
   status?: string
   statusText?: string
+  /** 当前运行已完成的工具调用次数。 */
+  toolCalls?: number
   elapsed?: string
   isStored?: boolean
   canEdit?: boolean

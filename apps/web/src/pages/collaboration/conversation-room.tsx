@@ -178,10 +178,6 @@ export function ConversationRoom({
   const liveRun = running && runsById.get(running.id)
   const traceRun = liveRun ?? runs.slice().sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0]
   const stopping = !!running && (liveRun?.stopRequested === true || stop.isPending)
-  const liveTools = activity.filter(
-    ({ runId, kind, payload }) =>
-      runId === running?.id && (kind === 'mcp_call_finished' || conversationEventText(payload, 'state') === 'finished'),
-  ).length
   const memoryFor = (runId: string) =>
     activity.flatMap(({ runId: id, payload }) =>
       id === runId && conversationEventText(payload, 'state') === 'memory_written'
@@ -225,7 +221,12 @@ export function ConversationRoom({
         bot: bots.find(({ id }) => id === run.botId) ?? (run.botId ? { id: run.botId } : undefined),
         text: run.text,
         status: run.status,
-        statusText: run.statusText,
+        statusText: stopping && run.id === running?.id ? '正在停止…' : run.statusText,
+        toolCalls: activity.filter(
+          ({ runId, kind, payload }) =>
+            runId === run.id &&
+            (kind === 'mcp_call_finished' || conversationEventText(payload, 'state') === 'finished'),
+        ).length,
         elapsed: runElapsed(run, now),
         memoryChanges: memoryFor(run.id),
       },
@@ -383,22 +384,6 @@ export function ConversationRoom({
             <p className="dsh-readonly-note" role="alert">
               {describeRequestError(stop.error).description}
             </p>
-          )}
-          {liveRun && (
-            <div className="dsh-running" role="status">
-              <span className="dsh-pulse" aria-hidden="true" />
-              <span className="dsh-running-label">{stopping ? '正在停止…' : liveRun.statusText}</span>
-              <span className="dsh-running-time" aria-hidden="true">
-                {runElapsed(liveRun, now)}
-              </span>
-              {liveTools > 0 && (
-                <>
-                  <span className="dsh-sep" aria-hidden="true" />
-                  <span className="dsh-running-steps">{liveTools} 次工具调用</span>
-                </>
-              )}
-              <span className="spacer" />
-            </div>
           )}
           {activeRelay && (
             <ConversationRelay

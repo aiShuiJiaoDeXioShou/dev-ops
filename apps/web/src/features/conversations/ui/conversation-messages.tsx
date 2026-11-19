@@ -173,14 +173,30 @@ export function ConversationMessages({
                     ) : (
                       message.text && <div className="dsh-plain-text">{message.text}</div>
                     )}
-                    {running && !message.text && <p className="dsh-waiting">正在准备回复…</p>}
                     {message.status && ['running', 'queued', 'stopped', 'failed'].includes(message.status) && (
                       <div className="dsh-message-foot" role="status">
-                        {running && <span className="dsh-pulse" aria-hidden="true" />}
+                        {['running', 'queued'].includes(message.status ?? '') && (
+                          <span className="dsh-pulse" aria-hidden="true" />
+                        )}
                         {message.statusText && (
                           <span className={message.status === 'stopped' ? 'dsh-stopped' : undefined}>
                             {message.statusText}
                           </span>
+                        )}
+                        {['running', 'queued'].includes(message.status ?? '') && (
+                          <>
+                            {message.elapsed && (
+                              <span className="dsh-running-time" aria-hidden="true">
+                                {message.elapsed}
+                              </span>
+                            )}
+                            {!!message.toolCalls && (
+                              <>
+                                <span className="dsh-sep" aria-hidden="true" />
+                                <span className="dsh-running-steps">{message.toolCalls} 次工具调用</span>
+                              </>
+                            )}
+                          </>
                         )}
                         {message.status === 'stopped' && message.text && <span>已保留部分结果</span>}
                       </div>
