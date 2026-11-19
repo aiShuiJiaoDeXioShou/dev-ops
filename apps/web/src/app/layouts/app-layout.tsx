@@ -10,13 +10,16 @@ import { CollaborationNavIcon } from '@/shared/ui/collaboration-nav-icon'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/ui/controls/dialog'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/shared/ui/controls/alert-dialog'
 import './app-layout.css'
 
 const ROLE_LABELS = { admin: '管理员', developer: '开发者', viewer: '浏览者' } as const
@@ -31,7 +34,6 @@ export function AppLayout() {
   const { user, teams, currentTeam, role, setCurrentTeam, isReady, isPlatformAdmin } = useSession()
   const [menuOpen, setMenuOpen] = useState(false)
   const [navigationCollapsed, setNavigationCollapsed] = useState(false)
-  const [logoutOpen, setLogoutOpen] = useState(false)
   const location = useLocation()
   useEffect(() => {
     // 页面标题用于浏览器多标签、历史记录与读屏识别；无法匹配时回退到产品名。
@@ -61,19 +63,20 @@ export function AppLayout() {
     setMenuOpen(true)
   }
   useEffect(() => {
-    if (!menuOpen) return
+    const sidebar = sidebarRef.current
+    if (!menuOpen || !sidebar) return
     // 打开抽屉后把焦点移入第一个可操作项，并把 Tab 限制在抽屉内；Esc/关闭时归还触发按钮。
-    const focusables = sidebarRef.current?.querySelectorAll<HTMLElement>(
+    const focusables = sidebar.querySelectorAll<HTMLElement>(
       'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
     )
-    focusables?.[0]?.focus()
+    focusables[0]?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setMenuOpen(false)
         menuButtonRef.current?.focus()
         return
       }
-      if (event.key !== 'Tab' || !focusables || focusables.length === 0) return
+      if (event.key !== 'Tab') return
       const first = focusables[0]
       const last = focusables[focusables.length - 1]
       if (!first || !last) return
@@ -85,11 +88,11 @@ export function AppLayout() {
         first.focus()
       }
     }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    // 只处理导航内的按键，让通过 Portal 打开的确认弹窗独立管理焦点。
+    sidebar.addEventListener('keydown', onKeyDown)
+    return () => sidebar.removeEventListener('keydown', onKeyDown)
   }, [menuOpen])
   const logout = async () => {
-    setLogoutOpen(false)
     await signOut().catch(() => undefined)
     queryClient.clear()
     navigate('/login', { replace: true })
@@ -213,17 +216,30 @@ export function AppLayout() {
             </span>
             <span className="badge">{ROLE_LABELS[role]}</span>
           </Link>
-          <Button
-            type="button"
-            variant="ghost"
-            className="nav-btn logout-btn"
-            aria-label="退出登录"
-            title="退出登录"
-            onClick={() => setLogoutOpen(true)}
-          >
-            <LogOut className="size-4.5" aria-hidden="true" />
-            <span className="workspace-nav-label">退出登录</span>
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="nav-btn logout-btn"
+                aria-label="退出登录"
+                title="退出登录"
+              >
+                <LogOut className="size-4.5" aria-hidden="true" />
+                <span className="workspace-nav-label">退出登录</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>退出登录</AlertDialogTitle>
+                <AlertDialogDescription>退出后，你需要重新登录才能访问工作区。</AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction onClick={() => void logout()}>确认退出</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           {teams.length > 1 && (
             <div className="team-switcher" aria-label="切换团队">
               {teams.map((team) => (
@@ -262,24 +278,6 @@ export function AppLayout() {
           <div id="workspace-detail-host" />
         </main>
       </div>
-      <Dialog open={logoutOpen} onOpenChange={setLogoutOpen}>
-        <DialogContent className="dialog-w-sm">
-          <DialogHeader className="items-center gap-3 pr-0 text-center">
-            <DialogTitle className="text-xl">退出登录</DialogTitle>
-            <DialogDescription className="max-w-sm text-sm leading-6">
-              退出后需要重新登录，才能继续访问当前团队的项目、需求与 Bug。
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-3 pt-2 sm:justify-center">
-            <Button type="button" variant="outline" className="h-10 min-w-28 px-5" onClick={() => setLogoutOpen(false)}>
-              取消
-            </Button>
-            <Button type="button" className="h-10 min-w-28 px-5" onClick={() => void logout()}>
-              确认退出
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
