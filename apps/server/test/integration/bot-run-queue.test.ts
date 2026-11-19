@@ -236,7 +236,7 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
     .where(eq(botRun.id, run.id))
   assert.deepEqual(
     events.map(({ kind }) => kind),
-    ['run_status', 'run_status', 'output_delta', 'run_status', 'message_committed'],
+    ['run_status', 'run_status', 'tool_activity', 'output_delta', 'run_status', 'message_committed'],
   )
   assert.equal(state[0]?.turns, 1)
   assert.ok(state[0]?.usage)

@@ -97,3 +97,70 @@ test('技能候选校验可用性与团队，已领取运行继续读取它固�
   assert.equal(output.text, skillFields.content)
   assert.equal((await get(`${botPath}/runs`)).data.items[0].skillVersions[0].version, '1.0.0')
 })
+
+test('团队技能与平台内置标识冲突时，目录标注冲突且运行使用平台版本', async (t) => {
+  const { db, config, cleanup } = await createBotTestDatabase(t)
+  const app = createHttpApp({ ...config, GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 82).toString('base64') })
+  cleanup.push(() => app.close())
+  const { botId, roomPath, devUser, teamPath, post, get } = await seedBotWorkflowFixture(app)
+  const local = await post(`${teamPath}/skills`, {
+    name: '团队接口流程',
+    identifier: 'platform-api',
+    category: 'engineering',
+    summary: '同标识的团队流程',
+    content: '团队版本正文',
+    contentVersion: '1.0.0',
+  })
+  assert.equal(local.code, 'OK', local.message)
+  const listed = (await get(`${teamPath}/skills?search=platform-api`)).data.items.filter(
+    ({ identifier }: { identifier: string }) => identifier === 'platform-api',
+  )
+  assert.deepEqual(
+    listed.map(({ source, conflictsWithPlatform }: { source: string; conflictsWithPlatform?: boolean }) => ({
+      source,
+      conflictsWithPlatform,
+    })),
+    [
+      { source: 'platform', conflictsWithPlatform: undefined },
+      { source: 'team', conflictsWithPlatform: true },
+    ],
+  )
+  const botPath = `/bots/${botId}`
+  const existing = (await get(botPath)).data
+  assert.equal(
+    (
+      await post(`${botPath}/update`, {
+        configVersion: existing.configVersion,
+        name: existing.name,
+        responsibility: existing.responsibility,
+        ownerUserId: devUser.userId,
+        skillIds: [local.data.id],
+      })
+    ).code,
+    'OK',
+  )
+  const room = (await get(roomPath)).data
+  assert.deepEqual(
+    room.skillReferences.filter(({ identifier }: { identifier: string }) => identifier === 'platform-api'),
+    [
+      {
+        id: listed[0].id,
+        name: listed[0].name,
+        identifier: 'platform-api',
+        summary: listed[0].summary,
+        botIds: [botId],
+      },
+    ],
+  )
+  const sent = await post(`${roomPath}/messages`, { text: '核对项目列表', clientRequestId: randomUUID() })
+  assert.equal(sent.code, 'OK')
+  const owner = 'platform-skill-test'
+  const run = await claimBotRun(db, owner, { global: 2, perTeam: 2, ttlSeconds: 60 })
+  assert.ok(run && isConversationBotRun(run))
+  const context = await loadBotRunContext(db, run, 50)
+  assert.ok(context)
+  const tool = createSkillViewTool(db, run, { id: run.id, owner, epoch: run.lease_epoch }, context.skillVersions)
+  const output = await tool.execute({ identifier: 'platform-api' }, new AbortController().signal)
+  assert.match(output.text, /get_current_context/u)
+  assert.doesNotMatch(output.text, /团队版本正文/u)
+})

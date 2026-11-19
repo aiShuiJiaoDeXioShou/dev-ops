@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createBotWorker } from '../../apps/server/dist/bootstrap/create-bot-worker.js'
-import { listModelCatalog, runBot } from '../../packages/devops-bot/dist/index.js'
+import { listModelCatalog, runBotSession } from '../../packages/devops-bot/dist/index.js'
 import { createFauxBotRunner } from '../../packages/devops-bot/dist/testing.js'
 import { createLocalHttpFixture } from './support/local-http.mjs'
 
@@ -29,7 +29,7 @@ async function verifyBotCollaboration(t, live) {
   if (!fixture) return
   const { cleanup, config, env, request, post, teamId, user } = fixture
   assert.ok(user?.id, 'HTTP 会话应返回团队管理员')
-  const configuredKey = process.env.DEEPSEEK_API_KEY ?? env.DEEPSEEK_API_KEY
+  const configuredKey = live ? (process.env.DEEPSEEK_API_KEY ?? env.DEEPSEEK_API_KEY) : undefined
   if (live && !configuredKey) {
     t.skip('本地 Server .env 未配置 DeepSeek 凭据')
     return
@@ -49,7 +49,7 @@ async function verifyBotCollaboration(t, live) {
       ]
   const reply = createFauxBotRunner('执行完成')
   const runner = live
-    ? runBot
+    ? runBotSession
     : async (options) => {
         if (options.tools.some(({ name }) => name === 'submit_task_result')) {
           const read = options.tools.find(({ name }) => name === 'platform_api_call')

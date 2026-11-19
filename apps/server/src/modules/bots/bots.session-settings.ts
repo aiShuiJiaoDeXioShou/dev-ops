@@ -63,7 +63,7 @@ export async function readBotSessionSettings(
         eq(botEvent.conversation_id, room.id),
         sql`${botEvent.payload}->>'botId' = ${bot.id}::text`,
         sql`${botEvent.payload}->>'state' = 'model_selected'`,
-        sql`${botEvent.payload}->>'requested' = ${botConversationBotSetting.thinking_level}`,
+        sql`${botEvent.payload}->>'requested' is not distinct from ${botConversationBotSetting.thinking_level}`,
         sql`${botEvent.payload}->>'modelId' = coalesce(${botConversationBotSetting.model_id}, ${bot.model_id})`,
       ),
     )
