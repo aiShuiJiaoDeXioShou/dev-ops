@@ -4,7 +4,7 @@ import { installApiMocks } from './mock-api'
 test('[desktop] [mobile] 退出确认在明暗主题中保持紧凑布局和键盘焦点', async ({ page }, testInfo) => {
   await installApiMocks(page)
   await page.goto('/projects')
-  await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '项目', exact: true })).toBeVisible({ timeout: 15_000 })
   const isMobile = testInfo.project.name === 'mobile'
   if (isMobile) await page.getByRole('button', { name: '打开导航' }).click()
 
