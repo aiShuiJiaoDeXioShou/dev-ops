@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm prepare:clients && pnpm --parallel --filter @dev-ops/web --filter @dev-ops/server dev",
+    "dev:all": "pnpm --parallel --filter @dev-ops/pipeline-protocol --filter @dev-ops/devops-bot build && pnpm prepare:clients && pnpm --parallel --filter @dev-ops/web --filter @dev-ops/server --filter @dev-ops/pipeline-agent run '/^dev(:worker|:bot-worker)?$/'",
     "dev:web": "pnpm prepare:clients && pnpm --filter @dev-ops/web dev",
     "dev:server": "pnpm --filter @dev-ops/server dev",
     "dev:prototype": "pnpm --filter @dev-ops/web exec vite ../../docs/desgin/interactive-prototype-v1 --host 127.0.0.1 --port 4178 --strictPort",

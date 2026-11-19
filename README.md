@@ -44,6 +44,8 @@ pnpm dev
 
 `pnpm dev` 先生成并构建 API 客户端，再同时启动 Web 和 Server。默认 Web 地址为 `http://localhost:5173`，API 为 `http://127.0.0.1:3001`。也可以分别运行 `pnpm dev:web`、`pnpm dev:server`。开发代理地址可用启动进程环境变量 `DEV_OPS_API_TARGET` 指定。
 
+同时调试 Web、HTTP 服务、调度 Worker、Bot Worker 和流水线 Agent 时，在仓库根目录运行 `pnpm dev:all`。先启动 Docker，并按上面的步骤启动和迁移本地 PostgreSQL。将节点令牌、平台地址、工作目录和标签写入 `apps/pipeline-agent/.env`。Agent 会等待 API 就绪后再启动，按 `Ctrl+C` 可停止本次启动的进程。节点配置见[流水线 Agent 开发说明](apps/pipeline-agent/README.md#配置)。
+
 V0.4a 内置流水线还需要两个独立进程：调度 Worker 与自托管执行节点 Agent。Worker 用 PostgreSQL 行锁和租约调度运行、监控超时并收口节点离线，需在 Server 之外单独启动：
 
 ```bash

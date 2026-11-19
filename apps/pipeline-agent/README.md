@@ -23,7 +23,7 @@ V0.4a 自托管执行节点 Agent。Agent 主动外连平台，领取租约后�
 
 ## 配置
 
-复制 `.env.example` 为本地配置并按需修改；必需项：
+复制 `.env.example` 为 `.env` 并按需修改。开发脚本会加载这份文件，启动时的环境变量优先。配置项如下。
 
 | 变量                                        | 说明                                                    |
 | ------------------------------------------- | ------------------------------------------------------- |
@@ -37,8 +37,11 @@ V0.4a 自托管执行节点 Agent。Agent 主动外连平台，领取租约后�
 ## 启动
 
 ```bash
-# 开发（tsx 直接运行，读取进程环境变量）
+# 单独调试 Agent（加载本地 .env，等待平台 API 就绪）
 pnpm --dir apps/pipeline-agent dev
+
+# 同时启动 Web、Server、调度 Worker、Bot Worker 和 Agent
+pnpm dev:all
 
 # 构建后运行
 pnpm --dir apps/pipeline-agent build
