@@ -43,7 +43,7 @@ export function RequirementWorkflow({
   startError: string
   onStart: (action: StartAction) => void
   onAction: (action: RequirementAction, trigger: HTMLButtonElement | null) => void
-  onOwnerChange: (field: 'devOwnerUserId' | 'testOwnerUserId', userId: string | null) => Promise<void>
+  onOwnerChange: (field: 'devOwnerUserIds' | 'testOwnerUserIds', userIds: string[]) => Promise<void>
   onPlanChange: (next: WorkItemPlan) => Promise<void>
 }) {
   const { status } = requirement
@@ -84,7 +84,7 @@ export function RequirementWorkflow({
             )
           : undefined
       }
-      renderOwner={(nodeId, isCurrent) => {
+      renderOwner={(nodeId) => {
         if (!isWorkflowStage('requirement', nodeId)) return null
         const usesTestOwner = nodeId === 'submitted' || nodeId === 'in_testing' || nodeId === 'passed'
         return (
@@ -92,10 +92,13 @@ export function RequirementWorkflow({
             teamId={requirement.teamId}
             label={usesTestOwner ? '测试负责人' : '研发负责人'}
             owner={usesTestOwner ? requirement.testOwner : requirement.devOwner}
-            onSave={
-              canWrite && isCurrent
-                ? (id) => onOwnerChange(usesTestOwner ? 'testOwnerUserId' : 'devOwnerUserId', id)
-                : undefined
+            owners={
+              usesTestOwner
+                ? (requirement.testOwners ?? (requirement.testOwner ? [requirement.testOwner] : []))
+                : (requirement.devOwners ?? (requirement.devOwner ? [requirement.devOwner] : []))
+            }
+            onSaveMany={
+              canWrite ? (ids) => onOwnerChange(usesTestOwner ? 'testOwnerUserIds' : 'devOwnerUserIds', ids) : undefined
             }
           />
         )

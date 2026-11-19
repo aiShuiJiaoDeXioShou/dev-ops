@@ -146,7 +146,7 @@ describe('RequirementForm', () => {
 
   it('协作人员复用成员多选：候选带角色，选中后以标签展示', async () => {
     renderForm()
-    await userEvent.click(screen.getByLabelText('搜索姓名或邮箱'))
+    await userEvent.click(within(screen.getByRole('combobox', { name: '协作人员' })).getByRole('textbox'))
     const listbox = await screen.findByRole('listbox', { name: '候选成员' })
     const option = within(listbox).getByRole('option', { name: /测试用户/ })
     expect(option).toHaveTextContent('管理员')
@@ -155,39 +155,36 @@ describe('RequirementForm', () => {
     expect(screen.getByText(/已选 1 人/)).toBeInTheDocument()
   })
 
-  it('负责人可按邮箱搜索并键盘选中，同一人可以分别承担两个角色', async () => {
+  it('研发与测试均可选择多名成员并保存', async () => {
     const user = userEvent.setup()
-    const submitRequest = vi.fn(async (request: Request) => request.json())
+    const second = { ...memberFixture, userId: 'user-2', name: '第二成员', email: 'second@example.test' }
+    let body: unknown
     server.use(
+      http.get('*/api/v1/teams/team-1/members', () => success([memberFixture, second])),
       http.post('*/api/v1/projects/project-1/requirements', async ({ request }) => {
-        await submitRequest(request)
+        body = await request.json()
         return success({ id: 'req-1' })
       }),
     )
     renderForm()
-    await user.type(screen.getByRole('textbox', { name: /标题/ }), '负责人单选')
-    await user.type(screen.getByRole('textbox', { name: /正文/ }), '选择负责人后保存')
-    await user.click(screen.getByRole('button', { name: '研发负责人' }))
-    const search = screen.getByRole('combobox', { name: '研发负责人' })
-    expect(search).toHaveFocus()
-    await user.type(search, '找不到的成员{Enter}')
-    expect(await screen.findByText('无匹配成员')).toBeInTheDocument()
-    expect(submitRequest).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: '清除搜索' }))
-    await user.type(search, memberFixture.email.toUpperCase())
-    expect((await screen.findByText(memberFixture.email)).closest('[role="option"]')).toHaveTextContent('· 我')
-    await user.keyboard('{Enter}')
-    expect(screen.getByRole('button', { name: '研发负责人' })).toHaveTextContent(memberFixture.name)
-    expect(screen.getByRole('button', { name: '测试负责人' })).toHaveTextContent('未指定')
-    await user.click(screen.getByRole('button', { name: '测试负责人' }))
-    await user.keyboard('{Enter}')
+    await user.type(screen.getByRole('textbox', { name: /标题/ }), '多人共同负责')
+    await user.type(screen.getByRole('textbox', { name: /正文/ }), '正文')
+    for (const label of ['研发负责人', '测试负责人']) {
+      const input = within(screen.getByRole('combobox', { name: label })).getByRole('textbox')
+      await user.type(input, memberFixture.email + '{Enter}')
+      await user.type(input, second.email + '{Enter}')
+      await user.keyboard('{Escape}')
+      expect(
+        within(screen.getByRole('combobox', { name: label })).getAllByRole('button', { name: /移除/ }),
+      ).toHaveLength(2)
+    }
     await user.click(screen.getByRole('button', { name: '保存' }))
-    await waitFor(() => expect(submitRequest).toHaveBeenCalledTimes(1))
-    expect(await submitRequest.mock.results[0]?.value).toMatchObject({
-      devOwnerUserId: memberFixture.userId,
-      testOwnerUserId: memberFixture.userId,
-      collaboratorUserIds: [],
-    })
+    await waitFor(() =>
+      expect(body).toMatchObject({
+        devOwnerUserIds: [memberFixture.userId, second.userId],
+        testOwnerUserIds: [memberFixture.userId, second.userId],
+      }),
+    )
   })
 
   it('编辑时可清除失效负责人，保留另一负责人的已选值和原版本', async () => {
@@ -214,20 +211,11 @@ describe('RequirementForm', () => {
         testOwner: { userId: memberFixture.userId, name: memberFixture.name, status: 'active', available: true },
       },
     })
-    expect(screen.getByRole('button', { name: '研发负责人' })).toHaveTextContent('停用同学已失效')
-    await user.click(screen.getByRole('button', { name: '研发负责人' }))
-    expect(await screen.findByText(memberFixture.email)).toBeInTheDocument()
-    expect(screen.queryByText(inactive.email)).not.toBeInTheDocument()
-    await user.keyboard('{ArrowUp}{Enter}')
-    expect(screen.getByRole('button', { name: '研发负责人' })).toHaveTextContent('未指定')
-    await user.click(screen.getByRole('button', { name: '测试负责人' }))
-    expect((await screen.findByText(memberFixture.email)).closest('[role="option"]')).toHaveAttribute(
-      'aria-selected',
-      'true',
+    expect(screen.getByRole('combobox', { name: '研发负责人' })).toHaveTextContent('停用同学')
+    await user.click(
+      within(screen.getByRole('combobox', { name: '研发负责人' })).getByRole('button', { name: '移除 停用同学' }),
     )
-    await user.keyboard('{Escape}')
-    expect(screen.getByRole('dialog')).toBeVisible()
-    await waitFor(() => expect(screen.getByRole('button', { name: '测试负责人' })).toHaveFocus())
+    expect(screen.getByRole('combobox', { name: '测试负责人' })).toHaveTextContent(memberFixture.name)
     await user.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() =>
       expect(submittedBody).toMatchObject({
@@ -238,31 +226,48 @@ describe('RequirementForm', () => {
     expect(submittedBody).not.toHaveProperty('testOwnerUserId')
   })
 
-  it('成员列表加载失败后，能用键盘重试并继续选人', async () => {
+  it('成员列表加载失败后，能重试并继续选人', async () => {
     const user = userEvent.setup()
+    let reads = 0
     server.use(
-      http.get(
-        '*/api/v1/teams/team-1/members',
-        () =>
-          HttpResponse.json({
-            success: false,
-            code: 'FORBIDDEN',
-            message: '无权限',
-            requestId: 'trace',
-          }),
-        { once: true },
-      ),
+      http.get('*/api/v1/teams/team-1/members', () => {
+        reads += 1
+        return reads === 1
+          ? HttpResponse.json({ success: false, code: 'FORBIDDEN', message: '无权限', requestId: 'trace' })
+          : success([memberFixture])
+      }),
     )
     renderForm()
-    await user.click(screen.getByRole('button', { name: '测试负责人' }))
-    expect(await screen.findByText('当前角色无权执行该操作。')).toBeInTheDocument()
-    await user.tab()
-    expect(screen.getByRole('button', { name: '重试' })).toHaveFocus()
+    const group = screen.getByRole('combobox', { name: '测试负责人' })
+    const input = within(group).getByRole('textbox')
+    await user.click(input)
+    const [retry] = await screen.findAllByRole('button', { name: '重试' })
+    if (!retry) throw new Error('未显示重试入口')
+    await user.click(retry)
+    await waitFor(() => expect(reads).toBe(2))
+    await user.type(input, memberFixture.email)
     await user.keyboard('{Enter}')
-    expect(screen.getByRole('combobox', { name: '测试负责人' })).toHaveFocus()
-    await screen.findByText(memberFixture.email)
-    await user.keyboard('{Enter}')
-    expect(screen.getByRole('button', { name: '测试负责人' })).toHaveTextContent(memberFixture.name)
+    await waitFor(() => expect(group).toHaveTextContent(memberFixture.name))
+  })
+})
+
+describe('RequirementForm 描述编辑', () => {
+  it('已通过需求仍可编辑描述且不提交锁定字段', async () => {
+    let body: unknown
+    server.use(
+      http.post('*/api/v1/requirements/req-1/update', async ({ request }) => {
+        body = await request.json()
+        return success({ id: 'req-1' })
+      }),
+    )
+    renderForm({ requirement: { ...editingRequirement, status: 'passed' } })
+    const input = screen.getByRole('textbox', { name: /正文/ })
+    await userEvent.clear(input)
+    await userEvent.type(input, '补充说明')
+    await userEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(body).toMatchObject({ contentMarkdown: '补充说明' }))
+    expect(body).not.toHaveProperty('attachmentIds')
+    expect(body).not.toHaveProperty('acceptanceCriteria')
   })
 })
 

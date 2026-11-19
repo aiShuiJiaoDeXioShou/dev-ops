@@ -130,11 +130,11 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
     actionTrigger.current = trigger
     setEditor({ item: detail, section })
   }
-  const saveOwner = (field: 'devOwnerUserId' | 'testOwnerUserId', userId: string | null) =>
+  const saveOwner = (field: 'devOwnerUserIds' | 'testOwnerUserIds', userIds: string[]) =>
     saveWorkItemUpdate(queryClient, {
       kind: 'requirement',
       id: detail.id,
-      body: { version: detail.version, [field]: userId },
+      body: { version: detail.version, [field]: userIds },
     })
   /**
    * 附件删除权限：上传者本人、团队管理员或项目负责人；浏览者与无权限成员不展示删除入口。
@@ -231,13 +231,15 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
                 teamId={detail.teamId}
                 label="研发负责人"
                 owner={detail.devOwner}
-                onSave={canWrite ? (id) => saveOwner('devOwnerUserId', id) : undefined}
+                owners={detail.devOwners ?? (detail.devOwner ? [detail.devOwner] : [])}
+                onSaveMany={canWrite ? (ids) => saveOwner('devOwnerUserIds', ids) : undefined}
               />
               <WorkItemOwnerField
                 teamId={detail.teamId}
                 label="测试负责人"
                 owner={detail.testOwner}
-                onSave={canWrite ? (id) => saveOwner('testOwnerUserId', id) : undefined}
+                owners={detail.testOwners ?? (detail.testOwner ? [detail.testOwner] : [])}
+                onSaveMany={canWrite ? (ids) => saveOwner('testOwnerUserIds', ids) : undefined}
               />
               <div className="sm:col-span-2">
                 <dt className="flex items-center justify-between gap-2">
@@ -263,7 +265,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
             <section className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold">需求描述</h3>
-                {scopeEditable && (
+                {canWrite && (
                   <Button
                     type="button"
                     variant="ghost"

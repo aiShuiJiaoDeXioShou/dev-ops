@@ -1,0 +1,9 @@
+@layer components {
+  .comment-markdown ul {
+    list-style-type: disc;
+  }
+
+  .comment-markdown ol {
+    list-style-type: decimal;
+  }
+}

@@ -85,6 +85,13 @@ for (const kind of ['requirements', 'bugs'] as const) {
       )
         throw new Error('更新版本不一致')
       detail = { ...detail, ...body, version: body.version + 1 }
+      if (isRequirement && 'testOwnerUserIds' in body && Array.isArray(body.testOwnerUserIds)) {
+        detail = {
+          ...detail,
+          testOwners: body.testOwnerUserIds.length ? [person] : [],
+          testOwner: body.testOwnerUserIds.length ? person : null,
+        }
+      }
       if (`${role}OwnerUserId` in body) {
         const fields: Record<string, unknown> = { ...body }
         detail = { ...detail, [`${role}Owner`]: fields[`${role}OwnerUserId`] ? person : null }
@@ -97,6 +104,25 @@ for (const kind of ['requirements', 'bugs'] as const) {
     const flow = sheet.getByRole('region', { name: isRequirement ? '需求流程' : 'Bug 流程' })
     await expect(flow.locator('[data-slot="user-avatar"] img')).toHaveAttribute('src', avatar)
     await page.screenshot({ path: testInfo.outputPath(`${kind}-detail.png`), animations: 'disabled' })
+    if (isRequirement) {
+      await sheet.getByRole('tab', { name: '评论', exact: true }).click()
+      await expect(sheet.getByRole('heading', { name: /本轮实现摘要/ })).toBeVisible()
+      await page.screenshot({ path: testInfo.outputPath('requirements-comments.png') })
+      await sheet.getByRole('tab', { name: '基本信息', exact: true }).click()
+      const completed = flow.getByRole('list', { name: '流程节点' }).getByRole('button').first()
+      await completed.click()
+      const foreground = await completed.evaluate((element) => {
+        const sample = document.createElement('span')
+        sample.style.color = 'var(--foreground)'
+        element.append(sample)
+        const color = getComputedStyle(sample).color
+        sample.remove()
+        return color
+      })
+      await expect(completed).toHaveCSS('color', foreground)
+      await page.screenshot({ path: testInfo.outputPath('requirements-completed-node.png') })
+      await flow.getByRole('list', { name: '流程节点' }).getByRole('button', { name: '测试，进行中' }).click()
+    }
 
     const edit = sheet.getByRole('button', { name: isRequirement ? '编辑需求' : '编辑 Bug', exact: true })
     await edit.click()
@@ -107,9 +133,14 @@ for (const kind of ['requirements', 'bugs'] as const) {
     await expect(sheet.getByRole('heading', { name: '更新后的事项标题', exact: true })).toBeVisible()
     await expect(edit).toBeFocused()
 
-    await flow.getByRole('button', { name: isRequirement ? '测试负责人' : '修复负责人', exact: true }).click()
-    await page.getByRole('option', { name: '清除选择' }).click()
-    await expect(flow.getByText('未指定')).toBeVisible()
+    if (isRequirement) {
+      await flow.getByRole('button', { name: '移除 林辰' }).click()
+      await expect(flow.getByRole('combobox', { name: '测试负责人' })).not.toContainText('林辰')
+    } else {
+      await flow.getByRole('button', { name: '修复负责人', exact: true }).click()
+      await page.getByRole('option', { name: '清除选择' }).click()
+      await expect(flow.getByText('未指定')).toBeVisible()
+    }
 
     const timeline = flow.getByRole('list', { name: '流程节点' })
     const node = flow.getByRole('region', { name: '当前查看的节点' })

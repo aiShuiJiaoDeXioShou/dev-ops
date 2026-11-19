@@ -148,7 +148,9 @@ export function RequirementList({ projectId }: { projectId: string }) {
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>{item.devOwner?.name ?? '未指定'}</TableCell>
+                  <TableCell>
+                    {item.devOwners?.map((owner) => owner.name).join('、') || item.devOwner?.name || '未指定'}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge tone={requirementStatusTone(item.status)}>
                       {REQUIREMENT_STATUS_LABELS[item.status] ?? item.status}

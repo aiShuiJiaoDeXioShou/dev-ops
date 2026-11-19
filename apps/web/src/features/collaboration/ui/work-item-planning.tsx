@@ -345,11 +345,11 @@ export function WorkItemPlanning({
             </div>
           )}
         </div>
-        <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-border px-3 py-2.5">
+        <dl className="grid min-w-0 gap-4 rounded-lg border border-border px-3 py-3 sm:grid-cols-2">
           {renderOwner(node.id, isCurrent)}
           <div>
             <dt className="text-xs text-muted-foreground">节点排期</dt>
-            <dd className="mt-1 text-sm">{planDateLabel(node) ?? '未设置'}</dd>
+            <dd className="mt-1 flex min-h-8 items-center text-sm">{planDateLabel(node) ?? '未设置'}</dd>
           </div>
         </dl>
         <div className="work-item-flow-actions flex flex-wrap items-center justify-between gap-2">

@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
+import { Markdown } from '@/shared/lib/markdown'
 import { formatDateTime } from '@/shared/lib/format'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedPageLoading } from '@/shared/ui/page-state'
 import { commentsQueryOptions, type CollabTarget } from '../api/queries'
+import './comment-list.css'
 
 /**
  * 展示事项评论的作者、时间和正文。
@@ -37,7 +39,9 @@ export function CommentList({ target, targetId }: { target: CollabTarget; target
               {formatDateTime(comment.createdAt)}
             </time>
           </div>
-          <p className="mt-2 text-sm leading-6 wrap-anywhere whitespace-pre-wrap">{comment.bodyMarkdown}</p>
+          <div className="comment-markdown mt-2 min-w-0 text-sm wrap-anywhere">
+            <Markdown>{comment.bodyMarkdown}</Markdown>
+          </div>
         </li>
       ))}
     </ul>

@@ -15,6 +15,9 @@ import {
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
+import { MemberMultiSelect } from '@/shared/ui/controls/member-multiselect'
+import { toMemberOption } from '@/features/identity/model/team-member'
+import { describeRequestError } from '@/shared/api/errors'
 import { teamMembersQueryOptions } from '@/features/identity/api/team-queries'
 import type { RequirementDetail } from '../model/types'
 import { SELF_TEST_LABELS } from '../model/labels'
@@ -58,7 +61,7 @@ export function RequirementActionDialog({
   const { showToast } = useToast()
   const members = useQuery(teamMembersQueryOptions(teamId))
   const [reason, setReason] = useState('')
-  const [testOwnerUserId, setTestOwnerUserId] = useState('')
+  const [testOwnerUserIds, setTestOwnerUserIds] = useState<string[]>([])
   const [scopeNote, setScopeNote] = useState('')
   const [selfTestResult, setSelfTestResult] = useState('passed')
   const [selfTestNote, setSelfTestNote] = useState('')
@@ -68,7 +71,9 @@ export function RequirementActionDialog({
   useEffect(() => {
     if (!open) return
     setReason('')
-    setTestOwnerUserId(requirement.testOwner?.userId ?? '')
+    setTestOwnerUserIds(
+      (requirement.testOwners ?? (requirement.testOwner ? [requirement.testOwner] : [])).map((owner) => owner.userId),
+    )
     setScopeNote('')
     setSelfTestResult('passed')
     setSelfTestNote('')
@@ -85,7 +90,8 @@ export function RequirementActionDialog({
             requirement.id,
             {
               version,
-              testOwnerUserId,
+              testOwnerUserId: testOwnerUserIds[0] ?? '',
+              testOwnerUserIds,
               scopeNote: scopeNote.trim(),
               selfTestResult: selfTestResult as 'passed' | 'has_failures' | 'not_run' | 'not_applicable',
               selfTestNote: selfTestNote.trim() || null,
@@ -132,7 +138,7 @@ export function RequirementActionDialog({
   const submit = () => {
     setError('')
     if (action === 'submit-test') {
-      if (!testOwnerUserId) return setError('请选择测试负责人。')
+      if (!testOwnerUserIds.length) return setError('请选择测试负责人。')
       if (!scopeNote.trim()) return setError('请填写测试范围。')
       if (selfTestResult !== 'passed' && !selfTestNote.trim()) return setError('非通过的自测结论必须填写说明。')
     } else if (!reason.trim()) return setError('请填写原因或结论。')
@@ -152,17 +158,22 @@ export function RequirementActionDialog({
           )}
           {action === 'submit-test' ? (
             <>
-              <label className="block space-y-1.5 text-sm font-medium">
-                测试负责人
-                <Select value={testOwnerUserId} onChange={(event) => setTestOwnerUserId(event.target.value)}>
-                  <option value="">请选择</option>
-                  {memberList.map((member) => (
-                    <option key={member.userId} value={member.userId}>
-                      {member.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
+              <div className="space-y-1.5">
+                <div id="submit-test-owner-label" className="text-sm font-medium">
+                  测试负责人
+                </div>
+                <MemberMultiSelect
+                  labelId="submit-test-owner-label"
+                  values={testOwnerUserIds}
+                  onValuesChange={setTestOwnerUserIds}
+                  selectedDetails={requirement.testOwners ?? (requirement.testOwner ? [requirement.testOwner] : [])}
+                  options={memberList.map(toMemberOption).filter((member) => member.available)}
+                  loading={members.isPending}
+                  error={members.isError ? describeRequestError(members.error).description : null}
+                  onRetry={() => void members.refetch()}
+                  disabled={mutation.isPending}
+                />
+              </div>
               <label className="block space-y-1.5 text-sm font-medium">
                 测试范围
                 <Textarea value={scopeNote} onChange={(event) => setScopeNote(event.target.value)} />

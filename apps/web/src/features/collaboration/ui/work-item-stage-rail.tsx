@@ -49,8 +49,8 @@ export function WorkItemStageRail({
               title={title}
               className={cn(
                 'relative z-10 min-w-11 max-w-40 gap-1 rounded-full px-2 text-xs sm:gap-1.5 sm:px-3 sm:text-sm dark:bg-background dark:hover:bg-muted',
-                id === selectedId && 'border-primary text-primary dark:border-primary',
-                id === currentId && id !== selectedId && 'border-primary/50 font-semibold',
+                id === selectedId && progress !== '已完成' && 'border-primary text-primary dark:border-primary',
+                id === currentId && id !== selectedId && progress !== '已完成' && 'border-primary/50 font-semibold',
                 progress === '未进入' && id !== selectedId && 'text-muted-foreground',
               )}
               onClick={() => onSelect(id)}
