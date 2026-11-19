@@ -12,6 +12,16 @@ export {
   personalAccessToken,
 } from '../modules/identity/identity.tables.ts'
 export { comment, activity } from '../modules/collaboration/collaboration.tables.ts'
+export { botSession, botSessionEntry, botRunInput } from '../modules/bots/bots.session.tables.ts'
+export {
+  teamBotContext,
+  botPromptTemplate,
+  botMcpServer,
+  teamBotBudget,
+  botUsageDaily,
+  botMemoryCursor,
+} from '../modules/bots/bots.platform.tables.ts'
+export { botRoomRelay, botConversationBotSetting } from '../modules/collaboration/bot-relay.tables.ts'
 export {
   bot,
   botApiCall,

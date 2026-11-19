@@ -148,12 +148,19 @@ export const botRun = appSchema.table(
   'bot_run',
   {
     ...teamAuditColumns(),
-    conversation_id: uuid('conversation_id').notNull(),
+    conversation_id: uuid('conversation_id'),
     task_id: uuid('task_id'),
     bot_id: uuid('bot_id').notNull(),
     trigger_user_id: uuid('trigger_user_id').notNull(),
     trigger_message_id: uuid('trigger_message_id'),
     input_version: integer('input_version').notNull(),
+    kind: text('kind').notNull().default('reply'),
+    relay_id: uuid('relay_id'),
+    relay_role: text('relay_role'),
+    hop: integer('hop'),
+    resume_count: integer('resume_count').notNull().default(0),
+    is_skipped: boolean('is_skipped').notNull().default(false),
+    relay_mentions: jsonb('relay_mentions'),
     status: text('status').notNull().default('queued'),
     failure_kind: text('failure_kind'),
     failure_message: text('failure_message'),
@@ -173,10 +180,14 @@ export const botRun = appSchema.table(
     primaryKey({ name: 'pk_bot_run_id', columns: [table.id] }),
     uniqueIndex('uk_bot_run_conversation_running')
       .on(table.conversation_id)
-      .where(sql`${table.status} = 'running'`),
+      .where(sql`${table.conversation_id} is not null and ${table.status} = 'running'`),
+    uniqueIndex('uk_bot_run_bot_consolidation_running')
+      .on(table.bot_id)
+      .where(sql`${table.kind} = 'memory_consolidation' and ${table.status} = 'running'`),
     index('idx_bot_run_queue').on(table.status, table.created_at, table.id),
     index('idx_bot_run_team_status').on(table.team_id, table.status),
     index('idx_bot_run_task').on(table.task_id, table.created_at),
+    index('idx_bot_run_relay').on(table.relay_id, table.status),
     index('idx_bot_run_leased')
       .on(table.lease_until)
       .where(sql`${table.status} = 'running'`),
@@ -186,13 +197,21 @@ export const botRun = appSchema.table(
       sql`
     (${table.status} = 'failed') = (${table.failure_kind} is not null)
     and (${table.failure_kind} is null or ${table.failure_kind} in
-      ('model_error', 'model_quota', 'timeout', 'turn_limit', 'execution_interrupted', 'model_unavailable', 'tool_error'))
+      ('model_error', 'model_quota', 'timeout', 'turn_limit', 'execution_interrupted', 'model_unavailable', 'tool_error',
+       'budget_exhausted', 'session_unavailable', 'context_overflow'))
   `,
     ),
     check(
       'ck_bot_run_counters',
       sql`${table.input_version} >= 0 and ${table.lease_epoch} >= 0 and ${table.turns} >= 0`,
     ),
+    check('ck_bot_run_kind', sql`${table.kind} in ('reply', 'task', 'compact', 'memory_consolidation')`),
+    check(
+      'ck_bot_run_conversation',
+      sql`(${table.kind} = 'memory_consolidation') = (${table.conversation_id} is null)`,
+    ),
+    check('ck_bot_run_resume_count', sql`${table.resume_count} between 0 and 2`),
+    check('ck_bot_run_relay_role', sql`${table.relay_role} in ('leader', 'mention', 'all', 'relay')`),
   ],
 )
 
@@ -242,6 +261,8 @@ export const botMemory = appSchema.table(
     essential: boolean('essential').notNull().default(false),
     source_conversation_id: uuid('source_conversation_id'),
     source_user_id: uuid('source_user_id').notNull(),
+    source_kind: text('source_kind').notNull().default('conversation'),
+    source_detail: jsonb('source_detail'),
     updated_by_kind: text('updated_by_kind').notNull(),
   },
   (table) => [
@@ -261,5 +282,6 @@ export const botMemory = appSchema.table(
   `,
     ),
     check('ck_bot_memory_updater', sql`${table.updated_by_kind} in ('bot', 'user')`),
+    check('ck_bot_memory_source', sql`${table.source_kind} in ('conversation', 'consolidation')`),
   ],
 )

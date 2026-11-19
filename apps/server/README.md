@@ -332,3 +332,11 @@ Bot 默认启用 pi 的全部本地工具，`accessMode` 默认 `sandbox`。`BOT
 会话右侧「会话设置 → 工具权限」可切换为完全访问。管理员或开发者调用 `POST /api/v1/bots/:botId/set-access`，提交 `{ configVersion, accessMode: "sandbox" | "full" }`；版本冲突返回 `VERSION_CONFLICT`。切换会停止排队运行，并要求执行中的运行在心跳取消时退出。该配置作用于 Bot 的所有会话，后续运行使用新的配置快照。
 
 成功回复的消息体包含 `metrics`（真实 Token、缓存用量、费用、轮次和耗时）；旧消息可不包含。`POST /api/v1/bot-conversations/:conversationId/messages/:messageId/feedback` 接收 `{ rating: "helpful" | "unhelpful" | null }`，仅允许有写权限的当前会话成员评价 Bot 回复；`null` 取消评价。消息读取返回当前用户的 `feedback`，不同用户的评价相互隔离。两个新增接口都使用 HTTP 200 和统一业务响应信封。
+
+## V0.6 Bot 会话存储
+
+Worker 使用 Pi 内存会话，按会话与 Bot 将脱敏条目、分支叶子和房间同步游标写入 PostgreSQL。新会话首次取最近 24 条房间消息。后续最多同步 50 条新消息，并排除本 Bot 自己的回复。默认运行超时为 1800 秒。
+
+`POST /api/v1/bot-conversations/:conversationId/bots/:botId/compact` 为具有写权限的会话成员排队一次主动压缩，成功返回运行 ID。有在途运行时返回 `BOT_RUN_BUSY`。通过 `events` 查询压缩开始、完成及用量，原始条目仍保留。
+
+`POST /api/v1/bot-conversations/:conversationId/bots/:botId/reseed` 允许有会话访问权限的团队管理员清除指定 Bot 已标记为损坏的会话树。接口返回 Bot ID，下一次运行从房间记录重新播种。会话记录不可用时，运行返回 `session_unavailable`，维护操作返回 `BOT_SESSION_UNAVAILABLE`。

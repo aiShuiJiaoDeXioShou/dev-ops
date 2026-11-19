@@ -4,7 +4,12 @@ import type { Database } from '../../../platform/database/client.ts'
 import { appendBotEvents } from '../../collaboration/bot-events.repository.ts'
 import { botConversation, botMessage } from '../../collaboration/bot-conversations.tables.ts'
 import type { BotMessageBody } from '../../collaboration/bot-message-body.ts'
-import { finishBotRun, lockBotRunLease, type BotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
+import {
+  finishBotRun,
+  lockBotRunLease,
+  type BotRunLease,
+  type ConversationBotRunRecord,
+} from '../bots.run-queue.repository.ts'
 
 const EVENT_WRITE_INTERVAL_MS = 300
 const EVENT_BATCH_LIMIT = 100
@@ -25,6 +30,8 @@ function savedEvent(event: Exclude<RunEvent, { type: 'turn_finished' }>) {
       return { ...order, kind: 'tool_activity', payload: { state: 'finished', ...event.payload } }
     case 'memory_written':
       return { ...order, kind: 'tool_activity', payload: { state: 'memory_written', ...event.payload } }
+    default:
+      return { ...order, kind: event.type, payload: event.payload }
   }
 }
 
@@ -36,7 +43,12 @@ function savedEvent(event: Exclude<RunEvent, { type: 'turn_finished' }>) {
  * @param onBatchFailure 异步刷新失败时中止模型调用的回调。
  * @returns 运行事件接收器和终态提交方法。
  */
-export function createPgRunSink(db: Database, run: BotRunRecord, lease: BotRunLease, onBatchFailure: () => void) {
+export function createPgRunSink(
+  db: Database,
+  run: ConversationBotRunRecord,
+  lease: BotRunLease,
+  onBatchFailure: () => void,
+) {
   const scope = { teamId: run.team_id, conversationId: run.conversation_id, runId: run.id }
   const buffer: ReturnType<typeof savedEvent>[] = []
   let timer: NodeJS.Timeout | undefined
@@ -89,6 +101,7 @@ export function createPgRunSink(db: Database, run: BotRunRecord, lease: BotRunLe
         const finished = await finishBotRun(tx, lease, outcome)
         if (!finished) return false
         if (finished.status !== 'succeeded' || outcome.status !== 'succeeded') return true
+        if (run.kind === 'compact') return true
         if (!conversation) throw new Error('Bot 回复所属会话不存在')
         const [latest] = await tx
           .select({ sequence: botMessage.sequence })

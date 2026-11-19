@@ -40,15 +40,26 @@ const message = Type.Object({
   createdAt: Type.String(),
   feedback: Type.Optional(feedbackRating),
 })
+export const conversationEventKind = Type.Union([
+  Type.Literal('run_status'),
+  Type.Literal('output_delta'),
+  Type.Literal('tool_activity'),
+  Type.Literal('message_committed'),
+  Type.Literal('compaction_started'),
+  Type.Literal('compaction_finished'),
+  Type.Literal('resumed'),
+  Type.Literal('steer_delivered'),
+  Type.Literal('follow_up_delivered'),
+  Type.Literal('reply_skipped'),
+  Type.Literal('mcp_call_started'),
+  Type.Literal('mcp_call_finished'),
+  Type.Literal('relay_paused'),
+  Type.Literal('relay_finished'),
+])
 const event = Type.Object({
   sequence,
   runId: uuid,
-  kind: Type.Union([
-    Type.Literal('run_status'),
-    Type.Literal('output_delta'),
-    Type.Literal('tool_activity'),
-    Type.Literal('message_committed'),
-  ]),
+  kind: conversationEventKind,
   payload: Type.Unknown(),
   createdAt: Type.String(),
 })
@@ -61,6 +72,9 @@ const activeRun = Type.Object({
 })
 
 export const conversationParams = Type.Object({ conversationId: uuid })
+export const conversationBotParams = Type.Object({ conversationId: uuid, botId: uuid })
+export const conversationCompactResponse = apiResponseSchema(Type.Object({ runId: uuid }))
+export const conversationReseedResponse = apiResponseSchema(Type.Object({ botId: uuid }))
 export const conversationTeamParams = Type.Object({ teamId: uuid })
 export const conversationListQuery = Type.Object(
   {

@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { createDatabase } from '../platform/database/client.ts'
 import type { AppConfig } from '../platform/config/env.ts'
-import { claimBotRun, type BotRunLease, type BotRunRecord } from '../modules/bots/bots.run-queue.repository.ts'
-import { executeClaimedBotRun, type BotRunner } from '../modules/bots/runtime/execute-run.ts'
+import {
+  claimBotRun,
+  type BotRunLease,
+  type BotRunRecord,
+  type ConversationBotRunRecord,
+} from '../modules/bots/bots.run-queue.repository.ts'
+import { executeClaimedBotRun, type BotCompactor, type BotRunner } from '../modules/bots/runtime/execute-run.ts'
 import { createSecretCipher } from '../modules/configuration/configuration.crypto.ts'
 import {
   heartbeatBotModelCatalog,
@@ -31,7 +36,7 @@ export function createBotWorker(
   config: AppConfig,
   execute: BotRunner,
   log: Log,
-  options: { catalog?: readonly BotModelCatalogEntry[]; login?: BotProviderLogin } = {},
+  options: { catalog?: readonly BotModelCatalogEntry[]; login?: BotProviderLogin; compact?: BotCompactor } = {},
 ) {
   const database = createDatabase(config, (code) => log('error', 'Bot 数据库空闲连接异常', { code }))
   const db = database.db
@@ -39,7 +44,7 @@ export function createBotWorker(
   const apiApp = createHttpApp({ ...config, DOCS_ENABLED: true }, { botDelegation: delegation })
   let catalog: ReturnType<typeof catalogBotApis> = []
   const logCall = (event: BotCallLog) => log('info', 'Bot 工具调用已记录', event)
-  const platformApi = (lease: BotRunLease, run: BotRunRecord) => ({
+  const platformApi = (lease: BotRunLease, run: ConversationBotRunRecord) => ({
     catalog,
     invoker: createBotApiInvoker({
       db,
@@ -62,7 +67,7 @@ export function createBotWorker(
     perTeam: config.BOT_TEAM_CONCURRENCY,
     ttlSeconds: config.BOT_LEASE_TTL_SECONDS,
   }
-  const onFailure = (run: { id: string; bot_id: string; team_id: string; conversation_id: string }) =>
+  const onFailure = (run: BotRunRecord) =>
     log('error', 'Bot 执行失败', {
       runId: run.id,
       botId: run.bot_id,
@@ -87,7 +92,7 @@ export function createBotWorker(
         conversationId: run.conversation_id,
       })
       const running = executeClaimedBotRun(
-        { config, db, cipher, execute, onFailure, platformApi, logCall },
+        { config, db, cipher, execute, compact: options.compact, onFailure, platformApi, logCall },
         run,
         shutdown.signal,
       )

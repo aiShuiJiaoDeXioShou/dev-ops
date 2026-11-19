@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { test } from 'node:test'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
-import { claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { isConversationBotRun, claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { botMemory } from '../../src/modules/bots/bots.tables.ts'
 import { teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { loadBotRunContext } from '../../src/modules/bots/runtime/context.ts'
@@ -35,9 +35,9 @@ test('长期记忆按触发人隔离、支持中文搜索、拒绝凭据并遵�
   assert.equal(queued.code, 'OK', queued.message)
   const leaseOptions = { global: 4, perTeam: 4, ttlSeconds: 30 }
   const first = await claimBotRun(db, 'memory-test', leaseOptions)
-  assert.ok(first)
+  assert.ok(first && isConversationBotRun(first))
   assert.equal(first.id, queued.data.runId)
-  assert.equal((await loadBotRunContext(db, first))?.context.essentialMemories[0]?.id, profileId)
+  assert.equal((await loadBotRunContext(db, first, 50))?.context.essentialMemories[0]?.id, profileId)
   const store = createPgMemoryStore(db, first, { id: first.id, owner: 'memory-test', epoch: first.lease_epoch })
   const notes = await store.add({ scope: 'bot', content: '每次发布前核对验收记录', essential: true })
   assert.equal((await store.search('验收', 10))[0]?.id, notes.id)
@@ -75,14 +75,14 @@ test('长期记忆按触发人隔离、支持中文搜索、拒绝凭据并遵�
   )
   assert.equal(adminMessage.code, 'OK', adminMessage.message)
   const second = await claimBotRun(db, 'memory-test', leaseOptions)
-  assert.ok(second)
+  assert.ok(second && isConversationBotRun(second))
   assert.equal(second.id, adminMessage.data.runId)
-  const context = await loadBotRunContext(db, second)
+  const context = await loadBotRunContext(db, second, 50)
   assert.deepEqual(
     context?.context.essentialMemories.map(({ id }) => id),
     [notes.id],
   )
   assert.equal((await post(`/bot-memories/${notes.id}/remove`, {})).code, 'OK')
   assert.equal((await post(`/bot-memories/${profileId}/remove`, {})).code, 'OK')
-  assert.deepEqual((await loadBotRunContext(db, first))?.context.essentialMemories, [])
+  assert.deepEqual((await loadBotRunContext(db, first, 50))?.context.essentialMemories, [])
 })

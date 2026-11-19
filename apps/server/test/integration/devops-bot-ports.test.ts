@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { testCredentialStore, testMemoryStore, testRunSink } from '@dev-ops/devops-bot/testing'
+import { testCredentialStore, testMemoryStore, testRunSink, testSessionStore } from '@dev-ops/devops-bot/testing'
 import type { RunEvent } from '@dev-ops/devops-bot'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { Type } from 'typebox'
 import { Check } from 'typebox/value'
-import { claimBotRun, enqueueBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { isConversationBotRun, claimBotRun, enqueueBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { botModelConnection } from '../../src/modules/bots/bots.tables.ts'
 import { createPgCredentialStore } from '../../src/modules/bots/runtime/credential-store.ts'
 import { createPgMemoryStore } from '../../src/modules/bots/runtime/memory-store.ts'
+import { createPgSessionStore } from '../../src/modules/bots/runtime/session-store.ts'
 import { createPgRunSink } from '../../src/modules/bots/runtime/run-sink.ts'
 import { botEvent } from '../../src/modules/collaboration/bot-conversations.tables.ts'
 import { createSecretCipher } from '../../src/modules/configuration/configuration.crypto.ts'
@@ -47,7 +48,7 @@ test('PostgreSQL Bot 端口通过共享接口一致性检查', async (t) => {
       }),
     )
     const claimed = await claimBotRun(db, 'sink-fixture', { global: 1, perTeam: 1, ttlSeconds: 30 })
-    assert.ok(claimed?.lease_owner)
+    assert.ok(claimed && isConversationBotRun(claimed) && claimed.lease_owner)
     assert.equal(claimed.id, run.id)
     const sink = createPgRunSink(
       db,
@@ -93,10 +94,28 @@ test('PostgreSQL 记忆端口通过共享接口一致性检查', async (t) => {
         }),
       )
       const run = await claimBotRun(db, 'memory-contract', { global: 4, perTeam: 4, ttlSeconds: 30 })
-      assert.ok(run)
+      assert.ok(run && isConversationBotRun(run))
       assert.equal(run.id, queued.id)
       return createPgMemoryStore(db, run, { id: run.id, owner: 'memory-contract', epoch: run.lease_epoch })
     }
     return { store: await makeStore(), otherScope: await makeStore() }
+  })
+})
+
+test('PostgreSQL 会话端口通过共享接口一致性检查', async (t) => {
+  const { db } = await createBotTestDatabase(t)
+  await testSessionStore(t, async () => {
+    await db.transaction((tx) =>
+      enqueueBotRun(tx, {
+        team_id: randomUUID(),
+        conversation_id: randomUUID(),
+        bot_id: randomUUID(),
+        trigger_user_id: randomUUID(),
+        input_version: 0,
+      }),
+    )
+    const run = await claimBotRun(db, 'session-contract', { global: 1, perTeam: 1, ttlSeconds: 30 })
+    assert.ok(run && isConversationBotRun(run) && run.lease_owner)
+    return createPgSessionStore(db, run, { id: run.id, owner: run.lease_owner, epoch: run.lease_epoch })
   })
 })

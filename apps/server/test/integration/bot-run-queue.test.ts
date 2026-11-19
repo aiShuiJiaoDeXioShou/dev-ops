@@ -175,7 +175,7 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
   const worker = createBotWorker(
     config,
     async (options) => {
-      const guidance = options.context.systemSections.find(({ title }) => title === '查询团队与用户数据')
+      const guidance = options.context.layers.find(({ title }) => title === '查询团队与用户数据')
       assert.match(guidance?.body ?? '', /get_current_context/)
       const currentContext = options.tools.find(({ name }) => name === 'get_current_context')
       assert.ok(currentContext)
@@ -190,9 +190,7 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
         )
       }
       assert.ok(
-        options.context.systemSections.some(
-          (section) => section.title === '本地工作目录' && section.body.includes('沙盒'),
-        ),
+        options.context.layers.some((section) => section.title === '本地工作目录' && section.body.includes('沙盒')),
       )
       return faux(options)
     },

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
-import { listModelCatalog, runBot } from '@dev-ops/devops-bot'
+import { listModelCatalog, runBotSession } from '@dev-ops/devops-bot'
 import { and, eq } from 'drizzle-orm'
 import { createBotWorker } from '../../src/bootstrap/create-bot-worker.ts'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
@@ -93,7 +93,7 @@ test(
     )
     const worker = createBotWorker(
       { ...config, GIT_CREDENTIAL_ENCRYPTION_KEY: encryptionKey, BOT_RUN_TIMEOUT_SECONDS: 25 },
-      runBot,
+      runBotSession,
       () => {},
     )
     cleanup.push(worker.close)

@@ -66,7 +66,7 @@ export async function submitBotTaskResult(db: Database, lease: BotRunLease, inpu
   }
   return db.transaction(async (tx) => {
     const run = await lockBotRunLease(tx, lease)
-    if (!run?.task_id || run.stop_requested) stateConflict('运行已停止或不再具备提交资格')
+    if (!run?.task_id || !run.conversation_id || run.stop_requested) stateConflict('运行已停止或不再具备提交资格')
     const scope = and(
       eq(botTask.id, run.task_id),
       eq(botTask.team_id, run.team_id),

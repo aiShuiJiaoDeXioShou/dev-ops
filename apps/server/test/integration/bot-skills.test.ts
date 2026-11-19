@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
-import { claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { isConversationBotRun, claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { loadBotRunContext } from '../../src/modules/bots/runtime/context.ts'
 import { createSkillViewTool } from '../../src/modules/bots/runtime/skill-tool.ts'
 import { createBotTestDatabase } from '../support/bot-database.ts'
@@ -51,7 +51,7 @@ test('技能候选校验可用性与团队，已领取运行继续读取它固�
   })
   assert.equal(message.code, 'OK', message.message)
   const run = await claimBotRun(db, 'skill-test', { global: 2, perTeam: 2, ttlSeconds: 60 })
-  assert.ok(run)
+  assert.ok(run && isConversationBotRun(run))
   assert.equal(run.id, message.data.runId)
   const lease = { id: run.id, owner: 'skill-test', epoch: run.lease_epoch }
   const skillPath = `/skills/${local.data.id}`
@@ -82,13 +82,10 @@ test('技能候选校验可用性与团队，已领取运行继续读取它固�
     'VALIDATION_ERROR',
   )
 
-  const context = await loadBotRunContext(db, run)
+  const context = await loadBotRunContext(db, run, 50)
   assert.ok(context)
   assert.equal(context.hasUnavailableSkillReference, false)
-  assert.match(
-    context.context.systemSections.find(({ title }) => title === '已配置技能')?.body ?? '',
-    /delivery-review/u,
-  )
+  assert.match(context.context.layers.find(({ title }) => title === '已配置技能')?.body ?? '', /delivery-review/u)
   const tool = createSkillViewTool(db, run, lease, context.skillVersions)
   const output = await tool.execute({ identifier: skillFields.identifier }, new AbortController().signal)
   assert.equal(output.text, skillFields.content)

@@ -28,6 +28,9 @@ export const botConversation = appSchema.table(
     instructions: text('instructions').notNull().default(''),
     last_message_at: timestamp('last_message_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     created_by: uuid('created_by').notNull(),
+    forked_from_conversation_id: uuid('forked_from_conversation_id'),
+    forked_from_message_id: uuid('forked_from_message_id'),
+    active_branch_id: text('active_branch_id'),
   },
   (table) => [
     primaryKey({ name: 'pk_bot_conversation_id', columns: [table.id] }),
@@ -76,6 +79,9 @@ export const botMessage = appSchema.table(
     body: jsonb('body').notNull(),
     run_id: uuid('run_id'),
     client_request_id: uuid('client_request_id'),
+    branch_id: text('branch_id'),
+    edited_from_message_id: uuid('edited_from_message_id'),
+    relay_id: uuid('relay_id'),
   },
   (table) => [
     primaryKey({ name: 'pk_bot_message_id', columns: [table.id] }),
@@ -114,7 +120,7 @@ export const botEvent = appSchema.table(
     ),
     check(
       'ck_bot_event_kind',
-      sql`${table.kind} in ('run_status', 'output_delta', 'tool_activity', 'message_committed')`,
+      sql`${table.kind} in ('run_status', 'output_delta', 'tool_activity', 'message_committed', 'compaction_started', 'compaction_finished', 'resumed', 'steer_delivered', 'follow_up_delivered', 'reply_skipped', 'mcp_call_started', 'mcp_call_finished', 'relay_paused', 'relay_finished')`,
     ),
   ],
 )

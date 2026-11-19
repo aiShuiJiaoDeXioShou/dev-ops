@@ -8,6 +8,16 @@ import { bot, botRun } from './bots.tables.ts'
 
 export type BotRunTransaction = Parameters<Parameters<Database['transaction']>[0]>[0]
 export type BotRunRecord = typeof botRun.$inferSelect
+export type ConversationBotRunRecord = BotRunRecord & { conversation_id: string }
+
+/**
+ * 校验运行归属于一个会话。
+ * @param run 已读取的运行记录。
+ * @returns 运行有会话标识时为 true。
+ */
+export function isConversationBotRun(run: BotRunRecord): run is ConversationBotRunRecord {
+  return run.conversation_id !== null
+}
 
 export interface BotRunLease {
   id: string
@@ -36,13 +46,21 @@ export async function enqueueBotRun(
   tx: BotRunTransaction,
   input: Pick<
     typeof botRun.$inferInsert,
-    'team_id' | 'conversation_id' | 'task_id' | 'bot_id' | 'trigger_user_id' | 'trigger_message_id' | 'input_version'
+    | 'team_id'
+    | 'conversation_id'
+    | 'task_id'
+    | 'bot_id'
+    | 'trigger_user_id'
+    | 'trigger_message_id'
+    | 'input_version'
+    | 'kind'
   >,
 ): Promise<BotRunRecord> {
   const [run] = await tx
     .insert(botRun)
     .values({
       ...input,
+      kind: input.kind ?? (input.task_id ? 'task' : 'reply'),
       created_at: sql`clock_timestamp()`,
       updated_at: sql`clock_timestamp()`,
     })
@@ -53,6 +71,7 @@ export async function enqueueBotRun(
 }
 
 async function writeRunState(tx: BotRunTransaction, run: BotRunRecord, actorId?: string) {
+  if (!run.conversation_id) return
   await appendBotEvents(tx, { teamId: run.team_id, conversationId: run.conversation_id, runId: run.id }, [
     {
       kind: 'run_status',
@@ -303,7 +322,7 @@ export async function reconcileExpiredBotRuns(db: Database): Promise<number> {
       )
       .returning()
     // 同一批次以会话标识排序，避免两个调度进程以相反顺序获取事件锁。
-    runs.sort((left, right) => left.conversation_id.localeCompare(right.conversation_id))
+    runs.sort((left, right) => (left.conversation_id ?? '').localeCompare(right.conversation_id ?? ''))
     for (const run of runs) {
       await updateTaskAfterRun(tx, run)
       await writeRunState(tx, run)
@@ -334,7 +353,7 @@ export async function stopRunsForBot(tx: BotRunTransaction, teamId: string, botI
     })
     .where(and(scope, eq(botRun.status, 'queued')))
     .returning()
-  cancelled.sort((left, right) => left.conversation_id.localeCompare(right.conversation_id))
+  cancelled.sort((left, right) => (left.conversation_id ?? '').localeCompare(right.conversation_id ?? ''))
   for (const run of cancelled) await writeRunState(tx, run)
 }
 

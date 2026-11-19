@@ -4,6 +4,7 @@ import { Check } from 'typebox/value'
 import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
+import { botSession, botSessionEntry } from '../bots/bots.session.tables.ts'
 import { enqueueBotRun, type BotRunTransaction } from '../bots/bots.run-queue.repository.ts'
 import { botWorkerOnline, requireRunnableBot, runnableBotIds } from '../bots/bots.service.ts'
 import { readBotSkillCandidates } from '../bots/bots.skills.ts'
@@ -28,6 +29,7 @@ import type {
   ConversationMessage,
   SendBotMessageInput,
 } from './bot-conversations.schema.ts'
+import { conversationEventKind } from './bot-conversations.schema.ts'
 import { botMessageBodySchema } from './bot-message-body.ts'
 import { readTargetWorkTags } from './work-tags.repository.ts'
 
@@ -77,7 +79,7 @@ function messageView(row: typeof botMessage.$inferSelect, speakerName: string | 
 
 function toEvent(row: typeof botEvent.$inferSelect): ConversationEvent {
   const kind = row.kind
-  if (kind !== 'run_status' && kind !== 'output_delta' && kind !== 'message_committed' && kind !== 'tool_activity') {
+  if (!Check(conversationEventKind, kind)) {
     throw new Error('数据库中的会话事件类型不合法')
   }
   return {
@@ -293,6 +295,41 @@ export async function lockWritableBotConversation(tx: BotRunTransaction, actor: 
   return requireBotConversation(tx, actor, conversationId, true)
 }
 
+async function lockBotSessionMaintenance(
+  tx: BotRunTransaction,
+  actor: SessionUser,
+  conversationId: string,
+  botId: string,
+) {
+  const room = await lockWritableBotConversation(tx, actor, conversationId)
+  const [member] = await tx
+    .select({ id: botConversationMember.id })
+    .from(botConversationMember)
+    .where(
+      and(
+        eq(botConversationMember.team_id, room.team_id),
+        eq(botConversationMember.conversation_id, room.id),
+        eq(botConversationMember.member_kind, 'bot'),
+        eq(botConversationMember.member_id, botId),
+        isNull(botConversationMember.removed_at),
+      ),
+    )
+  if (!member) throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '指定 Bot 不在当前会话')
+  const [active] = await tx
+    .select({ id: botRun.id })
+    .from(botRun)
+    .where(
+      and(
+        eq(botRun.team_id, room.team_id),
+        eq(botRun.conversation_id, room.id),
+        inArray(botRun.status, ['running', 'queued']),
+      ),
+    )
+    .limit(1)
+  if (active) throw new ApiError(ERROR_CODES.BOT_RUN_BUSY, '请等待当前会话中的运行结束')
+  return room
+}
+
 /**
  * 组装 Bot 私聊、消息与事件端口。
  * @param db 平台数据库连接。
@@ -489,6 +526,69 @@ export function createBotConversationsService(db: Database) {
               set: { rating, updated_at: sql`clock_timestamp()` },
             })
         return { id: messageId, rating }
+      })
+    },
+    /**
+     * 为指定 Bot 的会话树排队一次压缩。
+     * @param actor 当前有写权限的会话成员。
+     * @param conversationId 会话标识。
+     * @param botId 该会话内的 Bot。
+     * @returns 运行标识；有在途运行或没有有效会话树时拒绝。
+     */
+    async compact(actor: SessionUser, conversationId: string, botId: string) {
+      return db.transaction(async (tx) => {
+        const room = await lockBotSessionMaintenance(tx, actor, conversationId, botId)
+        const [session] = await tx
+          .select({ status: botSession.status, leaf: botSession.leaf_entry_id })
+          .from(botSession)
+          .where(
+            and(
+              eq(botSession.team_id, room.team_id),
+              eq(botSession.conversation_id, room.id),
+              eq(botSession.bot_id, botId),
+            ),
+          )
+        if (!session?.leaf || session.status !== 'active')
+          throw new ApiError(ERROR_CODES.BOT_SESSION_UNAVAILABLE, '当前没有可以压缩的会话记录')
+        await requireRunnableBot(tx, room.team_id, botId, { allowOffline: true })
+        const run = await enqueueBotRun(tx, {
+          team_id: room.team_id,
+          conversation_id: room.id,
+          bot_id: botId,
+          trigger_user_id: actor.id,
+          input_version: 1,
+          kind: 'compact',
+        })
+        return { runId: run.id }
+      })
+    },
+    /**
+     * 移除损坏的单 Bot 会话树，使其下次从房间记录重新播种。
+     * @param actor 具有会话访问权限的团队管理员。
+     * @param conversationId 会话标识。
+     * @param botId 要恢复的会话成员。
+     * @returns 恢复的 Bot 标识；非损坏状态或仍有运行时拒绝。
+     */
+    async reseed(actor: SessionUser, conversationId: string, botId: string) {
+      return db.transaction(async (tx) => {
+        const room = await lockBotSessionMaintenance(tx, actor, conversationId, botId)
+        await requireTeamMember(tx, actor.id, room.team_id, ['admin'])
+        const [session] = await tx
+          .delete(botSession)
+          .where(
+            and(
+              eq(botSession.team_id, room.team_id),
+              eq(botSession.conversation_id, room.id),
+              eq(botSession.bot_id, botId),
+              eq(botSession.status, 'corrupted'),
+            ),
+          )
+          .returning({ id: botSession.id })
+        if (!session) throw new ApiError(ERROR_CODES.BOT_SESSION_UNAVAILABLE, '没有需要重新播种的损坏会话')
+        await tx
+          .delete(botSessionEntry)
+          .where(and(eq(botSessionEntry.team_id, room.team_id), eq(botSessionEntry.session_id, session.id)))
+        return { botId }
       })
     },
     /** 发送消息并排队；重复请求复用已保存的同一次运行。 */

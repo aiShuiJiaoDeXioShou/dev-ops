@@ -3,6 +3,9 @@ import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
 import { requireActor } from '../identity/identity.actor.ts'
 import {
+  conversationBotParams,
+  conversationCompactResponse,
+  conversationReseedResponse,
   conversationEventsQuery,
   conversationEventsResponse,
   conversationListQuery,
@@ -100,6 +103,36 @@ export const botConversationsRoutes: FastifyPluginAsyncTypebox<{
         ),
     )
   }
+  app.post(
+    '/bot-conversations/:conversationId/bots/:botId/compact',
+    {
+      schema: {
+        summary: '排队压缩指定 Bot 的会话',
+        params: conversationBotParams,
+        response: { 200: conversationCompactResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.compact(await requireActor(request), request.params.conversationId, request.params.botId),
+        request.id,
+      ),
+  )
+  app.post(
+    '/bot-conversations/:conversationId/bots/:botId/reseed',
+    {
+      schema: {
+        summary: '重新播种损坏的 Bot 会话',
+        params: conversationBotParams,
+        response: { 200: conversationReseedResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.reseed(await requireActor(request), request.params.conversationId, request.params.botId),
+        request.id,
+      ),
+  )
   app.get(
     '/bot-conversations/:conversationId',
     {

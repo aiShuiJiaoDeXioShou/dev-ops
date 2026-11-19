@@ -1,0 +1,107 @@
+import { and, desc, eq, gt, inArray, lt, lte, ne, or, sql } from 'drizzle-orm'
+import { Check } from 'typebox/value'
+import type { Database } from '../../../platform/database/client.ts'
+import { botMessageBodySchema } from '../../collaboration/bot-message-body.ts'
+import { botMessage } from '../../collaboration/bot-conversations.tables.ts'
+import { authUser } from '../../identity/identity.tables.ts'
+import type { ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
+import { botSession } from '../bots.session.tables.ts'
+import { bot } from '../bots.tables.ts'
+
+const SEED_LIMIT = 24
+const messageFields = {
+  id: botMessage.id,
+  sequence: botMessage.sequence,
+  kind: botMessage.speaker_kind,
+  speakerId: botMessage.speaker_id,
+  body: botMessage.body,
+}
+
+/**
+ * 读取运行开始时的房间片段与触发消息。首次播种和增量同步使用同一房间序列。
+ * @param db 运行数据库。
+ * @param run 已领取的会话运行。
+ * @param syncLimit 增量同步最多读取的非本 Bot 消息数。
+ * @returns 当前消息、房间上下文及待持久化的游标。
+ */
+export async function readBotRoomSync(db: Database, run: ConversationBotRunRecord, syncLimit: number) {
+  const scope = and(eq(botMessage.team_id, run.team_id), eq(botMessage.conversation_id, run.conversation_id))
+  const [[session], [input]] = await Promise.all([
+    db
+      .select({ cursor: botSession.synced_message_sequence, seededAt: botSession.seeded_at })
+      .from(botSession)
+      .where(
+        and(
+          eq(botSession.team_id, run.team_id),
+          eq(botSession.conversation_id, run.conversation_id),
+          eq(botSession.bot_id, run.bot_id),
+        ),
+      ),
+    run.trigger_message_id
+      ? db
+          .select(messageFields)
+          .from(botMessage)
+          .where(and(scope, eq(botMessage.id, run.trigger_message_id)))
+      : Promise.resolve([]),
+  ])
+  const after = session?.cursor ?? 0n
+  const before = input
+    ? lt(botMessage.sequence, input.sequence)
+    : lte(botMessage.created_at, run.started_at ?? run.created_at)
+  const limit = session?.seededAt ? syncLimit : SEED_LIMIT
+  const rows = await db
+    .select({ ...messageFields, total: sql<string>`count(*) over ()` })
+    .from(botMessage)
+    .where(
+      and(
+        scope,
+        before,
+        gt(botMessage.sequence, after),
+        session?.seededAt ? or(ne(botMessage.speaker_kind, 'bot'), ne(botMessage.speaker_id, run.bot_id)) : undefined,
+      ),
+    )
+    .orderBy(desc(botMessage.sequence))
+    .limit(limit)
+  const omitted = BigInt(rows[0]?.total ?? '0') - BigInt(rows.length)
+  const included = rows
+  const cursor = input?.sequence ?? included[0]?.sequence ?? after
+  const relevant = input ? [...included, input] : included
+  const idsOf = (kind: string) => [
+    ...new Set(relevant.flatMap((row) => (row.kind === kind && row.speakerId ? [row.speakerId] : []))),
+  ]
+  const userIds = idsOf('user')
+  const botIds = idsOf('bot')
+  const [users, bots] = await Promise.all([
+    userIds.length
+      ? db.select({ id: authUser.id, name: authUser.name }).from(authUser).where(inArray(authUser.id, userIds))
+      : [],
+    botIds.length
+      ? db
+          .select({ id: bot.id, name: bot.name })
+          .from(bot)
+          .where(and(eq(bot.team_id, run.team_id), inArray(bot.id, botIds)))
+      : [],
+  ])
+  const names = new Map([...users, ...bots].map(({ id, name }) => [id, name]))
+  function textOf(row: Pick<(typeof rows)[number], keyof typeof messageFields>): string {
+    if (!Check(botMessageBodySchema, row.body)) throw new Error('数据库中的会话消息格式不合法')
+    const name = row.speakerId ? names.get(row.speakerId) : undefined
+    const speaker = name ?? (row.kind === 'bot' ? 'Bot' : row.kind === 'user' ? '成员' : '系统')
+    const text = row.body.blocks.map((item) => (item.type === 'tool_activity' ? item.summary : item.text)).join('\n')
+    return `${speaker}：${text}`
+  }
+
+  const history = [
+    ...(omitted > 0n ? [`（已省略 ${omitted} 条更早的房间消息）`] : []),
+    ...included.reverse().map(textOf),
+  ]
+  return {
+    cursor,
+    input: input ? textOf(input) : null,
+    sourceMessageId: input?.id,
+    roomContext: history.length
+      ? [session?.seededAt ? '上次回复以来的消息' : '最近的房间消息', ...history].join('\n')
+      : undefined,
+    skillReferences: input && Check(botMessageBodySchema, input.body) ? (input.body.references?.skillIds ?? []) : [],
+  }
+}

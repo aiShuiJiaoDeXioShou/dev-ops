@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import { and, eq, lte } from 'drizzle-orm'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { publishBotModelCatalog } from '../../src/modules/bots/bots.catalog.ts'
-import { claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { isConversationBotRun, claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { botModelCatalog } from '../../src/modules/bots/bots.tables.ts'
 import { createPgRunSink } from '../../src/modules/bots/runtime/run-sink.ts'
 import { botEvent } from '../../src/modules/collaboration/bot-conversations.tables.ts'
@@ -108,7 +108,7 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   )
 
   const claimed = await claimBotRun(db, 'chat-test', { global: 5, perTeam: 5, ttlSeconds: 30 })
-  assert.ok(claimed)
+  assert.ok(claimed && isConversationBotRun(claimed))
   assert.equal(claimed.id, first.data.runId)
   assert.equal(await claimBotRun(db, 'chat-test-2', { global: 5, perTeam: 5, ttlSeconds: 30 }), null)
   const eventsPath = `${roomPath}/events`

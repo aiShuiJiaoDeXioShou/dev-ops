@@ -75,6 +75,7 @@ export function toBotRunSummary(row: typeof botRun.$inferSelect): BotRunSummary 
   ) {
     throw new Error('数据库中的 Bot 运行状态不合法')
   }
+  if (!row.conversation_id) throw new Error('会话运行缺少会话标识')
   return {
     id: row.id,
     conversationId: row.conversation_id,

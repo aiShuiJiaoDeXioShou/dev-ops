@@ -458,7 +458,7 @@ export function createBotTasksService(db: Database) {
           .select({ conversationId: botRun.conversation_id, teamId: botRun.team_id })
           .from(botRun)
           .where(eq(botRun.id, runId))
-        if (!run) throw new ApiError(ERROR_CODES.NOT_FOUND, '运行不存在或不可见')
+        if (!run?.conversationId) throw new ApiError(ERROR_CODES.NOT_FOUND, '运行不存在或不可见')
         const room = await lockWritableBotConversation(tx, actor, run.conversationId)
         if (room.team_id !== run.teamId) throw new ApiError(ERROR_CODES.NOT_FOUND, '运行不存在或不可见')
         const updated = await requestBotRunStop(tx, runId, actor.id)

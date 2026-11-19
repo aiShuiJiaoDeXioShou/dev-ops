@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import type { Database } from '../../../platform/database/client.ts'
 import { appendBotEvents } from '../../collaboration/bot-events.repository.ts'
 import { skillVersion } from '../../knowledge/knowledge.tables.ts'
-import { lockBotRunLease, type BotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
+import { lockBotRunLease, type BotRunLease, type ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
 import type { BotSkillVersion } from '../bots.skills.ts'
 import { redactChatContent } from './content.ts'
 
@@ -17,7 +17,7 @@ import { redactChatContent } from './content.ts'
  */
 export function createSkillViewTool(
   db: Database,
-  run: BotRunRecord,
+  run: ConversationBotRunRecord,
   lease: BotRunLease,
   versions: BotSkillVersion[],
 ): BotTool {

@@ -1,6 +1,6 @@
 import type { BotTool } from '@dev-ops/devops-bot'
 import type { Database } from '../../../platform/database/client.ts'
-import { lockBotRunLease, type BotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
+import { lockBotRunLease, type BotRunLease, type ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
 import type { BotCallLog } from './api-invoker.ts'
 import { botApiCall } from '../bots.tables.ts'
 
@@ -15,7 +15,7 @@ import { botApiCall } from '../bots.tables.ts'
  */
 export function auditBotWebTools(
   db: Database,
-  run: BotRunRecord,
+  run: ConversationBotRunRecord,
   lease: BotRunLease,
   tools: BotTool[],
   logCall?: (event: BotCallLog) => void,

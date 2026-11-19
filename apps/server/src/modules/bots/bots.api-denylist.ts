@@ -29,6 +29,11 @@ const rules: readonly Rule[] = [
   { category: 'skills_management', methods: ['POST'], path: /^\/(?:teams\/[^/]+\/)?skills(?:\/|$)/u },
   { category: 'bot_management', methods: ['POST'], path: /^\/(?:teams\/[^/]+\/)?bots(?:\/|$)/u },
   { category: 'bot_management', path: /^\/(?:teams\/[^/]+\/)?bot-model-connections(?:\/|$)/u },
+  {
+    category: 'bot_management',
+    methods: ['POST'],
+    path: /^\/bot-conversations\/[^/]+\/bots\/[^/]+\/(?:compact|reseed)$/u,
+  },
   { category: 'bot_management', path: /^\/bot-model-login-sessions(?:\/|$)/u },
   { category: 'bot_management', path: /^\/bot-tasks\/[^/]+\/(?:accept|request-changes)$/u },
   { category: 'authentication', path: /^\/auth(?:\/|$)/u },

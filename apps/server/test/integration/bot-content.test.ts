@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
-import { claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
+import { isConversationBotRun, claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { createPgRunSink } from '../../src/modules/bots/runtime/run-sink.ts'
 import { createBotTestDatabase } from '../support/bot-database.ts'
 import { seedBotWorkflowFixture } from '../support/bot-workflow-fixtures.ts'
@@ -17,7 +17,7 @@ test('消息、增量事件与最终正文均在落库前遮蔽凭据内容', as
   assert.equal(send.code, 'OK', send.message)
   assert.match(send.data.message.body.blocks[0].text, /疑似凭据/u)
   const run = await claimBotRun(db, 'redaction-test', { global: 3, perTeam: 2, ttlSeconds: 60 })
-  assert.ok(run)
+  assert.ok(run && isConversationBotRun(run))
   const sink = createPgRunSink(db, run, { id: run.id, owner: 'redaction-test', epoch: run.lease_epoch }, () =>
     assert.fail('事件写入失败'),
   )

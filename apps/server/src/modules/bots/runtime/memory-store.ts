@@ -15,7 +15,7 @@ import { ApiError } from '../../../platform/http/errors.ts'
 import {
   lockBotRunLease,
   type BotRunLease,
-  type BotRunRecord,
+  type ConversationBotRunRecord,
   type BotRunTransaction,
 } from '../bots.run-queue.repository.ts'
 import { botMemory } from '../bots.tables.ts'
@@ -199,7 +199,7 @@ export function memorySearchCondition(query?: string): { filter?: SQL; relevance
 }
 
 /** 装配本轮的 PostgreSQL 记忆端口；旧租约无法读写当前用户的记忆。 */
-export function createPgMemoryStore(db: Database, run: BotRunRecord, lease: BotRunLease): MemoryStore {
+export function createPgMemoryStore(db: Database, run: ConversationBotRunRecord, lease: BotRunLease): MemoryStore {
   const scope = { teamId: run.team_id, botId: run.bot_id, userId: run.trigger_user_id }
   async function withLease<Result>(action: (tx: BotRunTransaction) => Promise<Result>, write: boolean) {
     return db.transaction(async (tx) => {

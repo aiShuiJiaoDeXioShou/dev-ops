@@ -2,17 +2,26 @@ import {
   localTools,
   memoryTools,
   openApiTools,
-  runBot,
+  compactBotSession,
+  runBotSession,
   webTools,
   type ApiInvoker,
   type PlatformApiOperation,
   type RunOutcome,
+  type CompactBotSessionOptions,
 } from '@dev-ops/devops-bot'
 import { resolve } from 'node:path'
 import type { Database } from '../../../platform/database/client.ts'
 import type { AppConfig } from '../../../platform/config/env.ts'
 import type { SecretCipher } from '../../configuration/configuration.crypto.ts'
-import { finishBotRun, renewBotRunLease, type BotRunLease, type BotRunRecord } from '../bots.run-queue.repository.ts'
+import {
+  finishBotRun,
+  isConversationBotRun,
+  renewBotRunLease,
+  type BotRunLease,
+  type BotRunRecord,
+  type ConversationBotRunRecord,
+} from '../bots.run-queue.repository.ts'
 import type { BotCallLog } from './api-invoker.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
@@ -20,22 +29,25 @@ import { createCurrentContextTool } from './current-context-tool.ts'
 import { createPgMemoryStore } from './memory-store.ts'
 import { fetchBotPublicPage } from './public-page.ts'
 import { createSkillViewTool } from './skill-tool.ts'
+import { createPgSessionStore } from './session-store.ts'
 import { createPgRunSink } from './run-sink.ts'
 import { auditBotWebTools } from './web-tool-audit.ts'
 import { createTaskResultTool } from './task-tools.ts'
 
-export type BotRunner = typeof runBot
+export type BotRunner = typeof runBotSession
+export type BotCompactor = typeof compactBotSession
 
 type RuntimeOptions = {
   config: AppConfig
   db: Database
   cipher: SecretCipher | null
   execute: BotRunner
+  compact?: BotCompactor
   onFailure: (run: BotRunRecord) => void
   logCall?: (event: BotCallLog) => void
   platformApi?: (
     lease: BotRunLease,
-    run: BotRunRecord,
+    run: ConversationBotRunRecord,
   ) => { catalog: readonly PlatformApiOperation[]; invoker: ApiInvoker }
 }
 
@@ -58,6 +70,10 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
   const { db, config } = options
   if (!run.lease_owner) throw new Error('Bot 运行缺少租约领取者')
   const lease = { id: run.id, owner: run.lease_owner, epoch: run.lease_epoch }
+  if (!isConversationBotRun(run)) {
+    await db.transaction((tx) => finishBotRun(tx, lease, unavailable))
+    return
+  }
   const cancellation = new AbortController()
   const signal = AbortSignal.any([cancellation.signal, shutdown])
   let heartbeat: Promise<void> | undefined
@@ -85,7 +101,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
     failureMessage: '执行服务已关闭，可重新运行任务',
   } as const
   try {
-    const input = await loadBotRunContext(db, run)
+    const input = await loadBotRunContext(db, run, config.BOT_ROOM_SYNC_LIMIT)
     if (!input) {
       await sink.finish(unavailable)
       return
@@ -125,12 +141,13 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         return tool.execute(args, toolSignal)
       },
     }))
-    const outcome = await options.execute({
+    const settings: CompactBotSessionOptions = {
       model: input.model,
+      workspace: { directory, access: input.accessMode },
       context: {
         ...input.context,
-        systemSections: [
-          ...input.context.systemSections,
+        layers: [
+          ...input.context.layers,
           {
             title: '本地工作目录',
             body: `工作目录为 ${directory}。当前访问模式为 ${input.accessMode === 'full' ? '完全访问' : '沙盒，仅可访问工作目录中的文件'}。使用 read、write、edit、bash、grep、find、ls 或 powershell 处理本地文件。`,
@@ -158,15 +175,19 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         ...(run.task_id ? [createTaskResultTool(db, lease)] : []),
         ...(api ? openApiTools(api.catalog, api.invoker) : []),
       ],
-      limits: { maxTurns: config.BOT_RUN_MAX_TURNS, timeoutMs: config.BOT_RUN_TIMEOUT_SECONDS * 1_000 },
+      limits: { timeoutMs: config.BOT_RUN_TIMEOUT_SECONDS * 1_000 },
       signal,
       ports: {
         credentials,
         sink,
         memory,
+        session: createPgSessionStore(db, run, lease, input.roomCursor),
         api: api?.invoker ?? { invoke: async () => ({ ok: false, code: 'BOT_API_FORBIDDEN' }) },
       },
-    })
+    }
+    const outcome = input.input
+      ? await options.execute({ ...settings, input: input.input })
+      : await (options.compact ?? compactBotSession)(settings)
     if (leaseIsValid) await sink.finish(shutdown.aborted ? { ...outcome, ...interrupted } : outcome)
   } catch {
     options.onFailure(run)
