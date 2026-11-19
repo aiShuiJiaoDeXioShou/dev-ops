@@ -27,6 +27,7 @@ type RunProgress = {
 type EventState = {
   cursor: string
   activeRuns: ConversationEvents['activeRuns']
+  activeRelay?: ConversationEvents['activeRelay']
   progress: Record<string, RunProgress>
   activity: ConversationEvents['items']
   hasMore: boolean
@@ -87,8 +88,12 @@ export function conversationEventsOptions(client: QueryClient, id: string) {
       const progress = { ...(data.resetRequired ? undefined : cached?.progress) }
       const activity = data.resetRequired ? [] : [...(cached?.activity ?? [])]
       let shouldReloadMessages = data.resetRequired
+      let shouldReloadSettings = false
       for (const event of data.items) {
-        if (event.kind === 'tool_activity') activity.push(event)
+        if (event.kind === 'tool_activity' || event.kind === 'mcp_call_finished') activity.push(event)
+        if (event.kind === 'tool_activity' && conversationEventText(event.payload, 'state') === 'model_selected') {
+          shouldReloadSettings = true
+        }
         if (event.kind === 'message_committed') {
           const run = progress[event.runId]
           if (run) progress[event.runId] = { ...run, text: '' }
@@ -117,9 +122,13 @@ export function conversationEventsOptions(client: QueryClient, id: string) {
       if (shouldReloadMessages) {
         await client.invalidateQueries({ queryKey: messagesOptions(id).queryKey })
       }
+      if (shouldReloadSettings) {
+        void client.invalidateQueries({ queryKey: conversationOptions(id).queryKey })
+      }
       return {
         cursor: data.cursor,
         activeRuns: data.activeRuns,
+        activeRelay: data.activeRelay,
         progress: Object.fromEntries(Object.entries(progress).slice(-200)),
         activity: activity.slice(-100),
         hasMore: data.items.length >= EVENT_PAGE_SIZE,
@@ -127,7 +136,9 @@ export function conversationEventsOptions(client: QueryClient, id: string) {
     },
     refetchInterval: ({ state }) => {
       if (state.data?.hasMore) return POLL_EVENT_BACKLOG_MS
-      return state.data?.activeRuns.length ? POLL_WHILE_ACTIVE_MS : POLL_WHILE_IDLE_MS
+      return state.data?.activeRuns.length || state.data?.activeRelay?.status === 'running'
+        ? POLL_WHILE_ACTIVE_MS
+        : POLL_WHILE_IDLE_MS
     },
   })
 }

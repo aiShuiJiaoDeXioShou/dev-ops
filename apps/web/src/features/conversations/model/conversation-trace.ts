@@ -37,6 +37,7 @@ export type TraceStep = {
   target?: string
   code?: string
   sequence?: string
+  runtimeStage?: boolean
 }
 
 const statusSteps = {
@@ -46,6 +47,19 @@ const statusSteps = {
   failed: { title: '执行失败', status: 'failed' },
   stopped: { title: '已停止生成', status: 'interrupted' },
 } satisfies Record<string, Pick<TraceStep, 'title' | 'status'>>
+
+const runtimeStages = {
+  resumed: '已续跑',
+  steer_delivered: '插话已送达',
+  follow_up_delivered: '追加消息已送达',
+  reply_skipped: '跳过回复',
+  relay_paused: '接力已暂停',
+  relay_finished: '接力已结束',
+} satisfies Partial<Record<ConversationEvents['items'][number]['kind'], string>>
+
+function runtimeStageTitle(kind: string) {
+  return Object.entries(runtimeStages).find(([key]) => key === kind)?.[1]
+}
 
 function isRunStatus(value: string | undefined): value is keyof typeof statusSteps {
   return value !== undefined && Object.hasOwn(statusSteps, value)
@@ -112,6 +126,8 @@ export function traceSteps(
   let output: TraceStep | undefined
   let hasOutput = false
   let previousStatus: string | undefined
+  let compaction: TraceStep | undefined
+  const connected = new Map<string, TraceStep[]>()
   for (const { sequence, kind, payload, createdAt: at, runId } of events) {
     if (runId !== run.id) continue
     const base = { id: `event-${sequence}`, sequence, at }
@@ -145,8 +161,78 @@ export function traceSteps(
         note: conversationEventText(payload, 'failureMessage'),
       })
     }
+
+    const stage = runtimeStageTitle(kind)
+    if (stage) {
+      output = undefined
+      steps.push({
+        ...base,
+        kind: 'input',
+        title: stage,
+        status: 'done',
+        runtimeStage: true,
+        note: conversationEventText(payload, 'messageId') ?? conversationEventText(payload, 'endReason'),
+      })
+    }
+    if (kind === 'compaction_started') {
+      output = undefined
+      compaction = {
+        ...base,
+        kind: 'model',
+        title: '上下文压缩',
+        status: run.status === 'running' ? 'running' : 'interrupted',
+        runtimeStage: true,
+      }
+      steps.push(compaction)
+    }
+    if (kind === 'compaction_finished') {
+      const count = payload && typeof payload === 'object' ? Reflect.get(payload, 'tokensBefore') : undefined
+      const note = typeof count === 'number' ? `压缩前 ${count.toLocaleString('zh-CN')} token` : undefined
+      if (compaction) Object.assign(compaction, { endAt: at, note, status: 'done' })
+      else steps.push({ ...base, kind: 'model', title: '上下文压缩', status: 'done', note, runtimeStage: true })
+      compaction = undefined
+    }
+    if (kind === 'mcp_call_started' || kind === 'mcp_call_finished') {
+      output = undefined
+      const server = conversationEventText(payload, 'server')
+      const tool = conversationEventText(payload, 'tool')
+      const key = conversationEventText(payload, 'callId') ?? JSON.stringify([server, tool])
+      const pending = connected.get(key) ?? []
+      const title = tool ? `MCP · ${tool}` : 'MCP 调用'
+      if (kind === 'mcp_call_started') {
+        const step: TraceStep = {
+          ...base,
+          kind: 'tool',
+          title,
+          note: server,
+          runtimeStage: true,
+          status: run.status === 'running' ? 'running' : 'interrupted',
+        }
+        steps.push(step)
+        pending.push(step)
+        connected.set(key, pending)
+      } else {
+        const status = flag(payload, 'ok') ? 'done' : 'failed'
+        const start = pending.shift()
+        if (start) Object.assign(start, { status, endAt: at })
+        else steps.push({ ...base, kind: 'tool', title, note: server, runtimeStage: true, status })
+      }
+    }
     if (kind !== 'tool_activity') continue
     const state = conversationEventText(payload, 'state')
+    if (state === 'model_selected') {
+      steps.push({
+        ...base,
+        kind: 'model',
+        title: '模型与思考等级',
+        status: 'done',
+        runtimeStage: true,
+        text: [conversationEventText(payload, 'modelId'), conversationEventText(payload, 'effective')]
+          .filter(Boolean)
+          .join(' · '),
+      })
+      continue
+    }
     if (state === 'memory_written') {
       steps.push({ ...base, kind: 'tool', title: '记忆已更新', status: 'done' })
       continue

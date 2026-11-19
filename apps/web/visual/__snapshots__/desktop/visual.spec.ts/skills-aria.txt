@@ -6,6 +6,12 @@
       - /url: /capabilities/skills
     - link "记忆":
       - /url: /capabilities/memory
+    - link "团队上下文":
+      - /url: /capabilities/team-context
+    - link "提示模板":
+      - /url: /capabilities/prompt-templates
+    - link "用量与预算":
+      - /url: /capabilities/usage
   - heading "技能库" [level=1]
   - button "发布 Skill"
   - group "技能分类":

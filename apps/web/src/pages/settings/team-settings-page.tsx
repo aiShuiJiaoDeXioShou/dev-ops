@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { Plus, ShieldAlert } from 'lucide-react'
+import { BotMcpServers } from '@/features/bots/ui/bot-mcp-servers'
 import { BotModelConnections } from '@/features/bots/ui/bot-model-connections'
 import { TeamGitConnections } from '@/features/code/ui/team-git-connections'
 import { pipelineNodesQueryOptions } from '@/features/pipeline/api/nodes'
@@ -109,6 +110,7 @@ export function Component() {
             authorizationResult={searchParams.get('git')}
           />
           <NodeManagementEntry teamId={currentTeam.id} canManage={canManage} />
+          <BotMcpServers key={`mcp-${currentTeam.id}`} teamId={currentTeam.id} />
         </TabsContent>
         <TabsContent value="models">
           <BotModelConnections key={currentTeam.id} teamId={currentTeam.id} canManage={canManage} />

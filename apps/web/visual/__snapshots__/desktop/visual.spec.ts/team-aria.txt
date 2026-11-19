@@ -31,3 +31,8 @@
       - text: 已注册
       - strong: "5"
       - text: 待连接
+    - region "MCP 服务器":
+      - heading "MCP 服务器" [level=3]
+      - button "添加服务器"
+      - heading "还没有 MCP 服务器" [level=3]
+      - list

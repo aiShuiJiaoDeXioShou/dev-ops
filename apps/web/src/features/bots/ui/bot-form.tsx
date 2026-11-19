@@ -59,7 +59,9 @@ export function BotForm({ teamId, bot, defaultOwnerId, canBindModel = false, inl
   const changedSkills =
     selectedSkills.length !== (bot?.skillIds.length ?? 0) || selectedSkills.some((id) => !bot?.skillIds.includes(id))
   const skills = skillCatalog.data?.pages.flatMap(({ data }) => data.items) ?? []
-  const selectableSkills = skills.filter((skill) => skill.enabled || selectedSkills.includes(skill.id))
+  const selectableSkills = skills.filter(
+    (skill) => skill.source !== 'platform' && (skill.enabled || selectedSkills.includes(skill.id)),
+  )
 
   const [discardOpen, setDiscardOpen] = useState(false)
   const [name, setName] = useState(bot?.name ?? '')

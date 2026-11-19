@@ -28,6 +28,7 @@ test('[desktop] [mobile] 自动展示最近一次运行并在时间线上查看�
     responsibility: '',
     instructions: '',
     tags: [],
+    botSettings: [],
     skillReferences: [],
     members: [
       { id: botId, name: '小林', kind: 'bot' },

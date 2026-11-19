@@ -8,6 +8,7 @@ import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { cn } from '@/shared/lib/utils'
 import { Pagination } from '@/shared/ui/pagination'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
@@ -52,6 +53,7 @@ export function SkillList({ teamId }: { teamId: string }) {
     setParams(next, { replace: true })
   }
   const filtered = Boolean(search || category)
+  const platform = query.data?.data.items.find((item) => item.id === selected && item.source === 'platform')
   const headerAction = canWrite ? (
     <Button type="button" onClick={() => setCreateOpen(true)}>
       <Plus className="size-4" />
@@ -167,8 +169,11 @@ export function SkillList({ teamId }: { teamId: string }) {
                       <span>{SKILL_CATEGORY_LABELS[item.category]}</span>
                       <span>v{item.contentVersion}</span>
                       <span className="spacer" />
-                      <span>团队维护</span>
+                      <span>{item.source === 'platform' ? '平台内置' : '团队维护'}</span>
                     </div>
+                    {item.conflictsWithPlatform && (
+                      <p className="small muted">与平台内置 Skill 同名。运行时优先使用平台版本。</p>
+                    )}
                     <div className="skill-card-footer">
                       <code>@skill/{item.identifier}</code>
                       <Button
@@ -195,7 +200,27 @@ export function SkillList({ teamId }: { teamId: string }) {
           </>
         )}
       </div>
-      {selected && <SkillDetailDialog teamId={teamId} skillId={selected} onClose={() => updateParam('skill', '')} />}
+      {platform ? (
+        <Dialog
+          open
+          onOpenChange={(open) => {
+            if (!open) updateParam('skill', '')
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{platform.name}</DialogTitle>
+              <DialogDescription>平台内置 · {platform.summary}</DialogDescription>
+            </DialogHeader>
+            <pre className="small whitespace-pre-wrap wrap-break-word">{platform.content}</pre>
+          </DialogContent>
+        </Dialog>
+      ) : (
+        selected &&
+        !query.isPending && (
+          <SkillDetailDialog teamId={teamId} skillId={selected} onClose={() => updateParam('skill', '')} />
+        )
+      )}
       {createOpen && <SkillForm teamId={teamId} open={createOpen} onOpenChange={setCreateOpen} />}
     </>
   )

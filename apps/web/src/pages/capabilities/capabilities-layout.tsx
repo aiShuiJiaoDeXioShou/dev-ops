@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router'
 import { cn } from '@/shared/lib/utils'
 
 /**
- * 渲染智能体、Skills 与记忆的能力中心导航和右侧详情宿主。
+ * 渲染团队能力中心导航和右侧详情宿主。
  * @returns 能力页面布局；子路由通过 Outlet 上下文使用详情宿主。
  */
 export function Component() {
@@ -20,6 +20,15 @@ export function Component() {
           </NavLink>
           <NavLink to="memory" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
             记忆
+          </NavLink>
+          <NavLink to="team-context" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
+            团队上下文
+          </NavLink>
+          <NavLink to="prompt-templates" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
+            提示模板
+          </NavLink>
+          <NavLink to="usage" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
+            用量与预算
           </NavLink>
         </nav>
         <Outlet context={detailHost} />

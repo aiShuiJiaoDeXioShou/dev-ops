@@ -56,6 +56,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     responsibility: '',
     instructions: '',
     tags: [],
+    botSettings: [],
     skillReferences: [
       { id: skillId, name: '交付复核', identifier: 'delivery-review', summary: '核对证据', botIds: [botId] },
     ],
@@ -156,7 +157,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await page.route(`${messagePath}*`, (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: success({ items: list, nextBefore: null }) })
     const input = route.request().postDataJSON()
-    expect(input).toMatchObject({ text: '@验收助理 检查结果', mentionBotId: botId })
+    expect(input).toMatchObject({ text: '@验收助理 检查结果', mentionBotIds: [botId] })
     expect(input.clientRequestId).toBeTruthy()
     const message: Message = {
       id: 'da55aa00-0000-4000-8000-000000000021',
@@ -170,7 +171,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     }
     list.push(message)
     stage = 'queued'
-    return route.fulfill({ json: success({ message, runId }) })
+    return route.fulfill({ json: success({ message, runId, delivery: 'queued' }) })
   })
   await page.route(`${eventsPath}*`, (route) => {
     const after = Number(new URL(route.request().url()).searchParams.get('after') ?? '0')
@@ -390,6 +391,7 @@ test('[desktop] [mobile] 在对话和轨迹停止生成并保留已经输出的�
     responsibility: '',
     instructions: '',
     tags: [],
+    botSettings: [],
     skillReferences: [],
     members: [
       { id: userId, kind: 'user', name: '当前成员' },

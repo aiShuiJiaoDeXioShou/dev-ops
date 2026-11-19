@@ -8,6 +8,8 @@ import { AnswerFooter } from './answer-footer'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
+import { ConversationMessageActions } from './conversation-message-actions'
+import './conversation-runtime.css'
 import type { MessageView } from './conversation-message.view'
 
 const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
@@ -28,6 +30,7 @@ export function ConversationMessages({
   loadEarlier,
   conversationId,
   readOnly,
+  busy,
   isVisible,
 }: {
   items: MessageView[]
@@ -39,6 +42,7 @@ export function ConversationMessages({
   loadEarlier: () => void
   conversationId: string
   readOnly: boolean
+  busy: boolean
   isVisible: boolean
 }) {
   const scrollBox = useRef<HTMLDivElement>(null)
@@ -120,7 +124,15 @@ export function ConversationMessages({
                 {message.kind === 'user' ? (
                   <>
                     <div className="dsh-user-bubble">{message.text}</div>
-                    {time && <div className="dsh-user-meta">{time}</div>}
+                    {(time || message.templateName || (!readOnly && message.isStored)) && (
+                      <div className="dsh-user-meta row flex-wrap gap-2">
+                        {time}
+                        {message.templateName && <span className="small quiet">模板 /{message.templateName}</span>}
+                        {!readOnly && message.isStored && (
+                          <ConversationMessageActions message={message} conversationId={conversationId} busy={busy} />
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -176,6 +188,9 @@ export function ConversationMessages({
                     )}
                     {message.text && message.runId && !['running', 'queued'].includes(message.status ?? '') && (
                       <AnswerFooter message={message} conversationId={conversationId} readOnly={readOnly} />
+                    )}
+                    {!readOnly && message.isStored && (
+                      <ConversationMessageActions message={message} conversationId={conversationId} busy={busy} />
                     )}
                     {message.memoryChanges?.map((action, index) => (
                       <details key={index} className="dsh-note">

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { cn } from '@/shared/lib/utils'
@@ -10,19 +10,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/shared/ui/controls/dropdown-menu'
+import { Switch } from '@/shared/ui/controls/switch'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import type { BotConversation } from '../api/queries'
 import { ConversationIcon } from './conversation-icon'
 
-type Candidate = { id: string; kind: 'bot' | 'skill'; name: string; token: string }
+type Candidate = { id: string; kind: 'bot' | 'skill' | 'all' | 'template'; name: string; token: string }
 
 function asSkillCandidate(skill: BotConversation['skillReferences'][number]): Candidate {
   return { id: skill.id, name: skill.name, token: skill.identifier, kind: 'skill' }
 }
 
 function mentionAt(text: string, caret: number) {
-  const match = /(?:^|\s)@([^\s@]*)$/u.exec(text.slice(0, caret))
-  return match ? { query: match[1] ?? '', start: match.index + match[0].indexOf('@') } : undefined
+  const prefix = text.slice(0, caret)
+  const command = /^\/([^\s/]*)$/u.exec(prefix)
+  if (command) return { query: command[1] ?? '', start: 0, symbol: '/' }
+  const match = /(?:^|\s)@([^\s@]*)$/u.exec(prefix)
+  return match ? { query: match[1] ?? '', start: match.index + match[0].indexOf('@'), symbol: '@' } : undefined
 }
 
 type StoredDraft = { text: string; requestId?: string }
@@ -32,7 +36,7 @@ function mentionsIn(text: string, candidates: Candidate[]) {
   return [...text.matchAll(/(?:^|\s)@(?=\S)/gu)].map((match) => {
     const value = text.slice(match.index + match[0].length)
     return ordered.find(
-      ({ token }) => value.startsWith(token) && /^(?:$|[\s,，。！？;；、])/u.test(value.slice(token.length)),
+      ({ token }) => value.startsWith(token) && /^(?:$|[\s,.!?;:，。！？；：、])/u.test(value.slice(token.length)),
     )
   })
 }
@@ -77,6 +81,7 @@ export function ConversationComposer({
   })
   const [caret, setCaret] = useState(draft.length)
   const [hideMentions, setHideMentions] = useState(false)
+  const [steering, setSteering] = useState(false)
   const [candidateIndex, setCandidateIndex] = useState(0)
   const [supplementId, setSupplementId] = useState<string>()
   const input = useRef<HTMLTextAreaElement>(null)
@@ -89,16 +94,34 @@ export function ConversationComposer({
   const botCandidates: Candidate[] = room.members
     .filter(({ kind, enabled }) => kind === 'bot' && enabled !== false)
     .map(({ id, name }) => ({ id, kind: 'bot', name, token: name }))
+  const all: Candidate = { id: 'all', kind: 'all', name: '所有智能体', token: '全部' }
+  const templateName = draft.match(/^\/([a-z0-9-]+)/u)?.[1]
+  const templates = useQuery({
+    queryKey: ['bot-prompt-templates', room.teamId, templateName ?? ''],
+    queryFn: ({ signal }) => apiClient.listBotPromptTemplates(room.teamId, { query: templateName }, { signal }),
+    enabled: !readOnly && draft.startsWith('/'),
+  })
+  const templateCandidates: Candidate[] = (templates.data?.data.items ?? []).map(({ id, name, description }) => ({
+    id,
+    kind: 'template',
+    token: name,
+    name: description,
+  }))
+  const chosenTemplate = templateCandidates.find(({ token }) => token === templateName)
   const mentioned = supplement
     ? []
-    : mentionsIn(draft, [...botCandidates, ...room.skillReferences.map(asSkillCandidate)])
-  const selectedBotId = mentioned.find((item) => item?.kind === 'bot')?.id
-  const targetBot = selectedBotId ?? defaultBot
+    : mentionsIn(draft, [...botCandidates, all, ...room.skillReferences.map(asSkillCandidate)])
+  const selectedBots = [...new Set(mentioned.flatMap((item) => (item?.kind === 'bot' ? [item.id] : [])))]
+  const mentionAll = room.kind === 'group' && mentioned.some((item) => item?.kind === 'all')
+  const targetBot = selectedBots[0] ?? defaultBot
   const skillCandidates = room.skillReferences
     .filter(({ botIds }) => !!targetBot && botIds.includes(targetBot))
     .map(asSkillCandidate)
   const candidates = mention
-    ? [...botCandidates, ...skillCandidates]
+    ? (mention.symbol === '/'
+        ? templateCandidates
+        : [...(room.kind === 'group' ? [all] : []), ...botCandidates, ...skillCandidates]
+      )
         .filter(({ name, token }) => `${name} ${token}`.toLowerCase().includes(mention.query.toLowerCase()))
         .slice(0, 12)
     : []
@@ -124,7 +147,10 @@ export function ConversationComposer({
         {
           text: draft,
           clientRequestId: id,
-          mentionBotId: selectedBotId,
+          ...(selectedBots.length && !mentionAll ? { mentionBotIds: selectedBots } : {}),
+          ...(mentionAll ? { mentionAll: true } : {}),
+          ...(runningId && steering ? { deliveryMode: 'steer' } : {}),
+          ...(chosenTemplate ? { promptTemplateId: chosenTemplate.id } : {}),
           ...(activeSkillIds.length ? { skillIds: activeSkillIds } : {}),
         },
         { idempotencyKey: id },
@@ -135,6 +161,7 @@ export function ConversationComposer({
       setCaret(0)
       client.setQueryData<StoredDraft>(draftKey, { text: '' })
       setSupplementId(undefined)
+      setSteering(false)
       requestId.current = undefined
       onSent()
       input.current?.focus()
@@ -164,7 +191,7 @@ export function ConversationComposer({
   }
   const insert = (candidate: Candidate) => {
     if (!mention) return
-    const start = `${draft.slice(0, mention.start)}@${candidate.token} `
+    const start = `${draft.slice(0, mention.start)}${mention.symbol}${candidate.token} `
     replace(start + draft.slice(caret), start.length)
   }
   const submit = () => {
@@ -172,7 +199,7 @@ export function ConversationComposer({
       insert(activeCandidate)
       return
     }
-    if (mention || !draft.trim() || send.isPending) return
+    if (!draft.trim() || send.isPending || (draft.startsWith('/') && templates.isPending)) return
     if (hasUnknownReference) {
       setReferenceError(true)
       return
@@ -189,10 +216,19 @@ export function ConversationComposer({
       }}
     >
       {mention && (
-        <div className="mention-results" role="group" aria-label="引用资源候选">
-          {candidates.length === 0 && (
+        <div
+          className="mention-results"
+          role="group"
+          aria-label={mention.symbol === '/' ? '提示模板候选' : '引用资源候选'}
+        >
+          {mention.symbol === '/' && templates.isError && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => void templates.refetch()}>
+              模板加载失败，重试
+            </Button>
+          )}
+          {candidates.length === 0 && !(mention.symbol === '/' && templates.isError) && (
             <p className="mention-choice small muted" role="status">
-              没有匹配的引用
+              {mention.symbol === '/' && templates.isPending ? '正在加载提示模板…' : '没有匹配的引用'}
             </p>
           )}
           {candidates.map((candidate) => (
@@ -205,8 +241,15 @@ export function ConversationComposer({
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => insert(candidate)}
             >
-              @{candidate.token}
-              <small>{candidate.kind === 'bot' ? 'Bot' : `技能 · ${candidate.name}`}</small>
+              {mention.symbol}
+              {candidate.token}
+              <small>
+                {candidate.kind === 'bot'
+                  ? 'Bot'
+                  : candidate.kind === 'skill'
+                    ? `技能 · ${candidate.name}`
+                    : candidate.name}
+              </small>
             </Button>
           ))}
         </div>
@@ -235,7 +278,9 @@ export function ConversationComposer({
         className="dsh-composer-input min-h-7 resize-none! rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
         maxLength={16000}
         aria-label="协作消息"
-        placeholder={supplement ? `补充任务「${supplement.title}」` : `发消息给 ${room.name}，输入 @ 引用资源`}
+        placeholder={
+          supplement ? `补充任务「${supplement.title}」` : `发消息给 ${room.name}，输入 @ 引用资源或 / 选择模板`
+        }
         value={draft}
         readOnly={send.isPending}
         onChange={(event) => change(event.target.value, event.target.selectionStart)}
@@ -314,19 +359,37 @@ export function ConversationComposer({
               <ConversationIcon name="chat" />
               插入引用
             </DropdownMenuItem>
-            {runningId && draft.trim() && (
-              <DropdownMenuItem disabled={!!mention} onSelect={submit}>
-                <ConversationIcon name="send" />
-                {supplement ? '保存补充' : '发送排队消息'}
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem
+              disabled={!!supplement}
+              onSelect={() => {
+                menuOpenedMention.current = true
+                replace(`/${draft}`, 1)
+              }}
+            >
+              <ConversationIcon name="file" />
+              插入提示模板
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         {room.kind === 'group' && (
           <span className="dsh-composer-hint is-required">智能体读取团队资料后，结果对会话全体成员可见。</span>
         )}
         <span className="spacer" />
-        {runningId ? (
+        {runningId && !supplement && (
+          <label className="row small gap-2">
+            插话
+            <Switch
+              checked={steering}
+              aria-label="插话"
+              disabled={send.isPending}
+              onCheckedChange={(value) => {
+                setSteering(value)
+                requestId.current = undefined
+              }}
+            />
+          </label>
+        )}
+        {runningId && (
           <Button
             unstyled
             type="button"
@@ -339,14 +402,15 @@ export function ConversationComposer({
             <span className="dsh-send-ring" aria-hidden="true" />
             <ConversationIcon name="stop" />
           </Button>
-        ) : (
+        )}
+        {(!runningId || !!draft.trim()) && (
           <Button
             unstyled
             type="submit"
             className="dsh-send"
             size="icon"
             aria-label={supplement ? '保存补充' : '发送消息'}
-            disabled={!draft.trim() || send.isPending || (!!mention && !activeCandidate)}
+            disabled={!draft.trim() || send.isPending || (draft.startsWith('/') && templates.isPending)}
           >
             <ConversationIcon name="send" />
           </Button>

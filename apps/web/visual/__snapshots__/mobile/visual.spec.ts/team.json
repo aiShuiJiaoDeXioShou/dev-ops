@@ -8,7 +8,9 @@
     "团队管理",
     "DevOps 研发团队",
     "Git 连接",
-    "执行节点"
+    "执行节点",
+    "MCP 服务器",
+    "还没有 MCP 服务器"
   ],
   "tabs": [
     "成员与权限",
@@ -18,7 +20,7 @@
   "rows": 0,
   "statusTexts": [],
   "documentOverflow": false,
-  "interactiveCount": 12,
+  "interactiveCount": 13,
   "nonPointerControls": [],
   "smallTargets": []
 }

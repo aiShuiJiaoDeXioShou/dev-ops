@@ -63,6 +63,16 @@ const envVariablePage = envelope({
   total: 1,
 })
 
+const emptyUsage = {
+  inputTokens: '0',
+  outputTokens: '0',
+  cacheReadTokens: '0',
+  cacheWriteTokens: '0',
+  costUsd: '0',
+  unknownCostRuns: 0,
+  costKnown: true,
+}
+
 /**
  * 为视觉测试安装确定性的 API 模拟。
  * 已采集的接口返回脱敏真实响应；未采集的列表接口返回空列表，避免测试依赖本机后端。
@@ -82,6 +92,31 @@ export async function installApiMocks(page: Page): Promise<void> {
     }
     if (path.includes('/eligibility')) {
       return route.fulfill({ json: envelope({ eligible: true, blockers: [] }) })
+    }
+    if (path.endsWith('/bot-context')) {
+      return route.fulfill({ json: envelope({ content: '', version: 0, updatedBy: null, updatedAt: null }) })
+    }
+    if (path.endsWith('/bot-prompt-templates') || path.endsWith('/bot-memories')) {
+      return route.fulfill({ json: envelope({ items: [], nextCursor: null }) })
+    }
+    if (path.endsWith('/bot-mcp-servers')) {
+      return route.fulfill({ json: envelope({ items: [], nextCursor: null, canManage: true }) })
+    }
+    if (path.endsWith('/bot-usage')) {
+      return route.fulfill({
+        json: envelope({
+          month: url.searchParams.get('month') ?? '2026-11',
+          monthlyLimitUsd: null,
+          total: emptyUsage,
+          byBot: [],
+          byDay: [],
+          nextBotCursor: null,
+        }),
+      })
+    }
+    if (/\/bot-model-(connections|catalog)$/.test(path)) {
+      const sample = apiFixtures[path]
+      return route.fulfill({ json: sample ?? envelope([]) })
     }
     const fixture = apiFixtures[path]
     const directory = url.searchParams.get('path')

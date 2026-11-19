@@ -16,6 +16,7 @@ import type { ConversationRun } from '@/features/conversations/model/conversatio
 import { ConversationAvatar } from '@/features/conversations/ui/conversation-avatar'
 import { ConversationComposer } from '@/features/conversations/ui/conversation-composer'
 import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
+import { ConversationRelay } from '@/features/conversations/ui/conversation-relay'
 import { ConversationMessages } from '@/features/conversations/ui/conversation-messages'
 import type { MessageView } from '@/features/conversations/ui/conversation-message.view'
 import {
@@ -75,9 +76,17 @@ export function ConversationRoom({
   const messages = useInfiniteQuery({ ...messagesOptions(id), enabled: detail.isSuccess })
   const events = useQuery({ ...conversationEventsOptions(client, id), enabled: detail.isSuccess })
   const tasks = useInfiniteQuery({ ...botTasksOptions(id), enabled: detail.isSuccess })
+  const activeRelay = events.data ? events.data.activeRelay : detail.data?.data.activeRelay
   const running = events.data?.activeRuns.find(({ status }) => status === 'running')
   const stop = useMutation({
-    mutationFn: (runId: string) => apiClient.stopBotRun(runId, { idempotencyKey: createIdempotencyKey() }),
+    mutationFn: async (runId: string) => {
+      const options = { idempotencyKey: createIdempotencyKey() }
+      if (activeRelay?.status === 'running') {
+        await apiClient.controlBotRelay(activeRelay.id, 'stop', { version: activeRelay.version }, options)
+      } else {
+        await apiClient.stopBotRun(runId, options)
+      }
+    },
     onSuccess: () => {
       void events.refetch()
     },
@@ -168,9 +177,10 @@ export function ConversationRoom({
   const runsById = new Map(runs.map((run) => [run.id, run]))
   const liveRun = running && runsById.get(running.id)
   const traceRun = liveRun ?? runs.slice().sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0]
-  const stopping = !!running && (liveRun?.stopRequested === true || stop.isPending || stop.data?.data.id === running.id)
+  const stopping = !!running && (liveRun?.stopRequested === true || stop.isPending)
   const liveTools = activity.filter(
-    ({ runId, payload }) => runId === running?.id && conversationEventText(payload, 'state') === 'finished',
+    ({ runId, kind, payload }) =>
+      runId === running?.id && (kind === 'mcp_call_finished' || conversationEventText(payload, 'state') === 'finished'),
   ).length
   const memoryFor = (runId: string) =>
     activity.flatMap(({ runId: id, payload }) =>
@@ -183,6 +193,10 @@ export function ConversationRoom({
     return {
       id: message.id,
       kind: message.speakerKind,
+      isStored: true,
+      canEdit: room.kind === 'direct' && message.speakerKind === 'user' && message.speakerId === userId,
+      branchSiblings: message.branchSiblings,
+      templateName: message.body.references?.promptTemplate?.name,
       name: message.speakerName ?? '会话通知',
       time: message.createdAt,
       bot:
@@ -309,19 +323,17 @@ export function ConversationRoom({
                   </span>
                 )}
               </Button>
-              {!readOnly && (
-                <Button
-                  unstyled
-                  type="button"
-                  className="dsh-icon-btn"
-                  aria-label="会话设置"
-                  aria-pressed={panel === 'settings'}
-                  title="会话设置"
-                  onClick={(event) => openSettings(event.currentTarget)}
-                >
-                  <ConversationIcon name="settings" />
-                </Button>
-              )}
+              <Button
+                unstyled
+                type="button"
+                className="dsh-icon-btn"
+                aria-label="会话设置"
+                aria-pressed={panel === 'settings'}
+                title="会话设置"
+                onClick={(event) => openSettings(event.currentTarget)}
+              >
+                <ConversationIcon name="settings" />
+              </Button>
             </div>
           </div>
           <TabsList unstyled className="dsh-tabs" aria-label="会话视图">
@@ -355,6 +367,7 @@ export function ConversationRoom({
               loadEarlier={() => void messages.fetchNextPage()}
               conversationId={room.id}
               readOnly={readOnly}
+              busy={active.size > 0}
               isVisible={tab === 'chat'}
             />
           )}
@@ -386,6 +399,14 @@ export function ConversationRoom({
               )}
               <span className="spacer" />
             </div>
+          )}
+          {activeRelay && (
+            <ConversationRelay
+              relay={activeRelay}
+              readOnly={readOnly}
+              hasRunningReply={Boolean(running)}
+              onChange={() => void events.refetch()}
+            />
           )}
           <ConversationComposer
             room={room}
@@ -443,8 +464,15 @@ export function ConversationRoom({
           onChanged={() => void events.refetch()}
         />
       )}
-      {panel === 'settings' && !readOnly && (
-        <ConversationSettings room={room} userId={userId} avatar={avatar} onClose={closePanel} />
+      {panel === 'settings' && (
+        <ConversationSettings
+          room={room}
+          userId={userId}
+          avatar={avatar}
+          onClose={closePanel}
+          readOnly={readOnly}
+          busy={active.size > 0}
+        />
       )}
       {newTaskOpen && (
         <NewTaskDialog

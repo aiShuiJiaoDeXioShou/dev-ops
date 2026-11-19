@@ -48,6 +48,7 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
       { kind: 'user', id: userId, name: '负责人' },
     ],
     tags: [],
+    botSettings: [],
     skillReferences: [],
   } satisfies ApiSuccessData<'/api/v1/bot-conversations/{conversationId}', 'get'>
   let exists = false

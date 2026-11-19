@@ -27,6 +27,7 @@ import { Textarea } from '@/shared/ui/controls/textarea'
 import { useGroupMemberChoices } from '../api/group-members'
 import { ConversationIcon } from './conversation-icon'
 import { conversationOptions, conversationsQueryKey, type BotConversation } from '../api/queries'
+import { ConversationRuntimeSettings } from './conversation-runtime-settings'
 import './conversation-settings.css'
 
 type Membership = { action: 'add' | 'remove'; memberId: string; kind: 'user' | 'bot' }
@@ -41,11 +42,15 @@ export function ConversationSettings({
   userId,
   avatar,
   onClose,
+  readOnly,
+  busy,
 }: {
   room: BotConversation
   userId: string
   avatar: ReactNode
   onClose: () => void
+  readOnly: boolean
+  busy: boolean
 }) {
   const client = useQueryClient()
   const close = useRef<HTMLButtonElement>(null)
@@ -112,12 +117,22 @@ export function ConversationSettings({
           teamId={room.teamId}
           tags={room.tags}
           target={{ targetKind: 'conversation', targetId: room.id }}
-          readOnly={false}
+          readOnly={readOnly}
           onChanged={refreshRoom}
         />
       </div>
       {introduction && <BotIntroduction text={introduction} />}
-      {room.kind === 'group' && <GroupSettingsFields room={room} userId={userId} onSaved={onClose} />}
+      {room.kind === 'group' && !readOnly && <GroupSettingsFields room={room} userId={userId} onSaved={onClose} />}
+      {bots.map((member) => (
+        <ConversationRuntimeSettings
+          key={member.id}
+          room={room}
+          botId={member.id}
+          name={member.name}
+          readOnly={readOnly}
+          busy={busy}
+        />
+      ))}
       <section className="settings-section" aria-label="工具权限">
         <strong>工具权限</strong>
         {bots.map((member) => (
@@ -131,7 +146,7 @@ export function ConversationSettings({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>放弃尚未保存的修改？</AlertDialogTitle>
-            <AlertDialogDescription>关闭会清除侧栏中尚未保存的配置和记忆内容。</AlertDialogDescription>
+            <AlertDialogDescription>关闭会清除侧栏中尚未保存的设置。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>继续编辑</AlertDialogCancel>

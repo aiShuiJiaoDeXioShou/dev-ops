@@ -273,7 +273,7 @@ function TraceRun({
 }) {
   const client = useQueryClient()
   const trace = useQuery(conversationTraceOptions(client, conversationId, run.id))
-  const [filter, setFilter] = useState<TraceStep['kind'] | 'all'>('all')
+  const [filter, setFilter] = useState<TraceStep['kind'] | 'all' | 'runtime'>('all')
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string>()
   const opener = useRef<HTMLElement>(null)
@@ -294,7 +294,7 @@ function TraceRun({
   const term = search.trim().toLowerCase()
   const filtered = steps.filter(
     (step) =>
-      (filter === 'all' || step.kind === filter) &&
+      (filter === 'all' || (filter === 'runtime' ? step.runtimeStage : step.kind === filter)) &&
       (!term ||
         [step.title, traceLanes[step.kind], traceStatuses[step.status], plainPreview(step)]
           .join(' ')
@@ -388,7 +388,9 @@ function TraceRun({
         <>
           <div className="filters trace-filters">
             <div className="trace-filters-group" role="group" aria-label="步骤类型">
-              {(['all', ...lanes] as const).map((kind) => (
+              {(
+                ['all', ...lanes, ...(steps.some((step) => step.runtimeStage) ? ['runtime' as const] : [])] as const
+              ).map((kind) => (
                 <Button
                   key={kind}
                   unstyled
@@ -400,7 +402,7 @@ function TraceRun({
                     setSelectedId(undefined)
                   }}
                 >
-                  {kind === 'all' ? '全部' : traceLanes[kind]}
+                  {kind === 'all' ? '全部' : kind === 'runtime' ? '运行阶段' : traceLanes[kind]}
                 </Button>
               ))}
             </div>

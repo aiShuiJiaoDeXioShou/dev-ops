@@ -27,6 +27,7 @@ test('[desktop] [mobile] 从协作任务面板创建和停止运行', async ({ p
     responsibility: '',
     instructions: '',
     tags: [],
+    botSettings: [],
     skillReferences: [],
     members: [
       { id: userId, name: '业务负责人', kind: 'user' },

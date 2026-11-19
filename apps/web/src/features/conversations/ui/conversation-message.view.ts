@@ -11,6 +11,10 @@ export type MessageView = {
   status?: string
   statusText?: string
   elapsed?: string
+  isStored?: boolean
+  canEdit?: boolean
+  branchSiblings?: ConversationMessage['branchSiblings']
+  templateName?: string
   memoryChanges?: string[]
   metrics?: ConversationMessage['body']['metrics']
   feedback?: ConversationMessage['feedback']

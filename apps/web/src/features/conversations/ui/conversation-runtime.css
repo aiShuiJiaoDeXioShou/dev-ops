@@ -1,0 +1,13 @@
+@layer components {
+  @media (hover: hover) and (pointer: fine) {
+    .dsh-message .dsh-message-menu {
+      opacity: 0;
+    }
+
+    .dsh-message:hover .dsh-message-menu,
+    .dsh-message:focus-within .dsh-message-menu,
+    .dsh-message .dsh-message-menu[data-state='open'] {
+      opacity: 1;
+    }
+  }
+}

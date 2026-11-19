@@ -52,6 +52,10 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
     mutationFn: (id: string) => apiClient.removeBotMemory(id, { idempotencyKey: createIdempotencyKey() }),
     onSuccess: refresh,
   })
+  const consolidate = useMutation({
+    mutationFn: (id: string) => apiClient.consolidateBotMemories(id, { idempotencyKey: createIdempotencyKey() }),
+    onSuccess: refresh,
+  })
   function closeDialog() {
     setEditing(undefined)
     requestAnimationFrame(() => (opener.current?.isConnected ? opener.current : add.current)?.focus())
@@ -76,6 +80,7 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
           value={botId}
           onChange={(event) => {
             const value = event.target.value
+            consolidate.reset()
             setSearchParams(
               (previous) => {
                 const next = new URLSearchParams(previous)
@@ -116,6 +121,17 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
             重试加载智能体
           </Button>
         )}
+        {isAdmin && botId && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={consolidate.isPending}
+            aria-busy={consolidate.isPending}
+            onClick={() => consolidate.mutate(botId)}
+          >
+            {consolidate.isPending ? '排队中…' : '整理记忆'}
+          </Button>
+        )}
         {canWrite && (
           <Button
             ref={add}
@@ -130,6 +146,16 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
           </Button>
         )}
       </div>
+      {consolidate.isSuccess && (
+        <p role="status" className="small muted">
+          {consolidate.data.data.runId ? '整理已排队，完成后可刷新查看新记忆。' : '当前没有可排队的整理运行。'}
+        </p>
+      )}
+      {consolidate.isError && (
+        <p className="field-error" role="alert">
+          {describeRequestError(consolidate.error).description}
+        </p>
+      )}
       {list.isPending && <DelayedPageSkeleton />}
       {list.isError && <PageError title="记忆加载失败" error={list.error} onRetry={() => void list.refetch()} />}
       {list.isSuccess && items.length === 0 && (
@@ -141,6 +167,7 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
             <BotAvatar botId={item.botId} avatarKey={bots.find(({ id }) => id === item.botId)?.avatarKey ?? null} />
             <strong>{item.botName}</strong>
             <span className="badge">{item.scope === 'user' ? '用户画像' : 'Bot 笔记'}</span>
+            {item.source?.kind === 'consolidation' && <span className="badge">整理</span>}
             {item.essential && <span className="badge">常驻</span>}
             <span className="spacer" />
             {canWrite && item.canEdit && (
@@ -183,6 +210,17 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
             {item.sourceUserName && <span>来源成员 {item.sourceUserName}</span>}
             <time dateTime={item.updatedAt}>{formatDateTime(item.updatedAt)}</time>
           </div>
+          {item.source?.detail && (
+            <details className="small muted">
+              <summary>查看整理来源</summary>
+              <p>
+                {formatDateTime(item.source.detail.from)} 至 {formatDateTime(item.source.detail.to)}
+              </p>
+              <p>
+                {item.source.detail.conversationCount} 个会话，合并 {item.source.detail.mergedMemoryIds.length} 条记忆
+              </p>
+            </details>
+          )}
         </article>
       ))}
       {remove.isError && (

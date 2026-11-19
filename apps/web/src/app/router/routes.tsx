@@ -113,6 +113,21 @@ export function createAppRoutes(): RouteObject[] {
                   HydrateFallback: DelayedPageSkeleton,
                 },
                 {
+                  path: 'usage',
+                  lazy: () => import('@/pages/capabilities/bot-usage-page'),
+                  HydrateFallback: DelayedPageSkeleton,
+                },
+                {
+                  path: 'prompt-templates',
+                  lazy: () => import('@/pages/capabilities/bot-prompt-templates-page'),
+                  HydrateFallback: DelayedPageSkeleton,
+                },
+                {
+                  path: 'team-context',
+                  lazy: () => import('@/pages/capabilities/bot-context-page'),
+                  HydrateFallback: DelayedPageSkeleton,
+                },
+                {
                   path: 'connections',
                   element: <Navigate to="/settings/team?tab=models" replace />,
                 },
