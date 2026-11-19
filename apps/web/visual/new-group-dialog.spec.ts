@@ -14,10 +14,24 @@ test('[desktop] [mobile] 群组选人、切换 Leader 与固定提交栏', async
   const roomId = 'da55aa00-0000-4000-8000-000000000041'
   const yangId = 'da55aa00-0000-4000-8000-000000000042'
   const linId = 'da55aa00-0000-4000-8000-000000000043'
+  const offlineId = 'da55aa00-0000-4000-8000-000000000044'
   const developerId = 'd290b120-1130-569f-8eb4-3329234453f6'
   const bots = [
-    { id: yangId, name: '小杨', responsibility: '产品经理', avatarKey: 'prism' },
-    { id: linId, name: '小林', responsibility: '服务器运维与部署验证', avatarKey: 'orbit' },
+    { id: yangId, name: '小杨', responsibility: '产品经理', avatarKey: 'prism', availability: 'available' as const },
+    {
+      id: linId,
+      name: '小林',
+      responsibility: '服务器运维与部署验证',
+      avatarKey: 'orbit',
+      availability: 'available' as const,
+    },
+    {
+      id: offlineId,
+      name: '小周',
+      responsibility: '测试',
+      avatarKey: 'signal',
+      availability: 'worker_offline' as const,
+    },
   ].map((bot) => ({
     ...bot,
     teamId,
@@ -25,7 +39,6 @@ test('[desktop] [mobile] 群组选人、切换 Leader 与固定提交栏', async
     ownerUserId: userId,
     ownerName: '管理员',
     status: 'enabled' as const,
-    availability: 'available' as const,
     accessMode: 'sandbox' as const,
     configVersion: 1,
     modelConnectionId: null,
@@ -50,7 +63,7 @@ test('[desktop] [mobile] 群组选人、切换 Leader 与固定提交栏', async
     members: [
       { id: userId, name: '管理员', kind: 'user' },
       { id: developerId, name: '开发同学', kind: 'user' },
-      ...bots.map(({ id, name }) => ({ id, name, kind: 'bot' as const })),
+      ...bots.filter((bot) => bot.id !== offlineId).map(({ id, name }) => ({ id, name, kind: 'bot' as const })),
     ],
   } satisfies ApiSuccessData<'/api/v1/bot-conversations/{conversationId}', 'get'>
   const teamPath = `**/api/v1/teams/${teamId}`
@@ -83,7 +96,12 @@ test('[desktop] [mobile] 群组选人、切换 Leader 与固定提交栏', async
   const trigger = page.getByRole('button', { name: '新建会话' })
   const dialog = page.getByRole('dialog', { name: '新建群组' })
   const groupName = dialog.getByRole('textbox', { name: '群组名称' })
-  const leader = dialog.getByRole('combobox', { name: 'Leader' })
+  const yangOption = dialog.getByRole('checkbox', { name: '小杨' })
+  const linOption = dialog.getByRole('checkbox', { name: '小林' })
+  const offlineOption = dialog.getByRole('checkbox', { name: '小周' })
+  const yangLeader = dialog.getByRole('button', { name: '将小杨设为 Leader' })
+  const linLeader = dialog.getByRole('button', { name: '将小林设为 Leader' })
+  const currentLeader = dialog.getByRole('button', { name: /设为 Leader$/, pressed: true })
   const submit = dialog.getByRole('button', { name: '创建群组' })
   async function openDialog() {
     await trigger.press('Enter')
@@ -92,25 +110,52 @@ test('[desktop] [mobile] 群组选人、切换 Leader 与固定提交栏', async
   }
 
   await openDialog()
-  await expect(leader).toBeDisabled()
+  await expect(dialog.getByRole('combobox', { name: 'Leader' })).toHaveCount(0)
+  await expect(dialog.getByRole('button', { name: /设为 Leader$/ })).toHaveCount(0)
   await expect(submit).toBeDisabled()
   await page.keyboard.press('Escape')
   await expect(trigger).toBeFocused()
   await openDialog()
 
   await groupName.fill(room.name)
-  await dialog.getByText('小杨', { exact: true }).click()
-  const yangOption = dialog.getByRole('checkbox', { name: '小杨' })
+  await expect(linOption).toBeVisible()
+  const yangBox = await yangOption.boundingBox()
+  const linBox = await linOption.boundingBox()
+  expect(linBox?.y).toBe(yangBox?.y)
+  expect(linBox?.x).toBeGreaterThan(yangBox?.x ?? Infinity)
+  await offlineOption.press('Space')
+  await expect(offlineOption).toBeChecked()
+  await expect(offlineOption).toContainText('环境离线')
+  await expect(dialog.getByRole('button', { name: '将小周设为 Leader' })).toHaveCount(0)
+  await expect(submit).toBeDisabled()
+  await offlineOption.press('Space')
+
+  await linOption.press('Space')
+  await expect(linLeader).toHaveAttribute('aria-pressed', 'true')
+  await yangOption.click()
   await expect(yangOption).toBeChecked()
-  await expect(dialog.locator('label').filter({ has: page.getByRole('checkbox', { name: '小杨' }) })).toHaveCSS(
-    'flex-direction',
-    'row',
-  )
-  await expect(leader).toHaveValue(yangId)
-  await dialog.getByRole('checkbox', { name: '小林' }).press('Space')
-  await leader.selectOption(linId)
-  await expect(dialog.getByRole('checkbox', { name: '小林' })).toHaveAccessibleDescription(/Leader/)
-  await dialog.getByText('开发同学', { exact: true }).click()
+  await expect(yangLeader).toHaveAttribute('aria-pressed', 'true')
+  await linOption.press('Space')
+  await linOption.press('Space')
+  await linLeader.press('Enter')
+  await expect(linLeader).toBeFocused()
+  await expect(linLeader).toHaveText('Leader')
+  await expect(currentLeader).toHaveAccessibleName('将小林设为 Leader')
+  await expect(linOption).toBeChecked()
+  await linOption.press('Space')
+  await expect(linLeader).toHaveCount(0)
+  await expect(currentLeader).toHaveAccessibleName('将小杨设为 Leader')
+  await linOption.press('Space')
+  await expect(currentLeader).toHaveAccessibleName('将小林设为 Leader')
+
+  if (isMobile) {
+    await expect(linOption.getByText('服务器运维与部署验证', { exact: true })).toBeVisible()
+  } else {
+    await linOption.locator('img').hover()
+    await expect(page.getByRole('tooltip')).toContainText('服务器运维与部署验证')
+  }
+
+  await dialog.getByRole('checkbox', { name: '开发同学' }).click()
   await expect(dialog.getByRole('checkbox', { name: '开发同学' })).toBeChecked()
   await expect(dialog.getByRole('checkbox', { name: '管理员' })).toHaveCount(0)
   await expect(submit).toBeEnabled()

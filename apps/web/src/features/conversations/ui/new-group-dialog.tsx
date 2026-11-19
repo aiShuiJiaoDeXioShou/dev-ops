@@ -1,8 +1,6 @@
 import { useId, useState, type ReactNode } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation } from '@tanstack/react-query'
-import { BotAvatar } from '@/features/bots/ui/bot-avatar'
-import { BotStatus } from '@/features/bots/ui/bot-status'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { cn } from '@/shared/lib/utils'
@@ -19,12 +17,13 @@ import {
 } from '@/shared/ui/controls/dialog'
 import { FormField } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
+import { TooltipProvider } from '@/shared/ui/controls/tooltip'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { useGroupMemberChoices } from '../api/group-members'
 import type { BotConversation } from '../api/queries'
+import { ConversationBotOption } from './conversation-bot-option'
 import './new-group-dialog.css'
 
 function toggleSelection(state: string[], id: string, selected: boolean) {
@@ -34,23 +33,17 @@ function toggleSelection(state: string[], id: string, selected: boolean) {
 function GroupMemberOption({
   name,
   avatar,
-  description,
-  status,
   checked,
   disabled,
   onSelect,
 }: {
   name: string
   avatar: ReactNode
-  description?: string
-  status?: ReactNode
   checked: boolean
   disabled: boolean
   onSelect: (selected: boolean) => void
 }) {
   const nameId = useId()
-  const descriptionId = `${nameId}-description`
-  const statusId = `${nameId}-status`
   return (
     <label
       className={cn(
@@ -60,24 +53,11 @@ function GroupMemberOption({
       )}
     >
       <span className="shrink-0">{avatar}</span>
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
-        <span id={nameId} className="min-w-0 text-sm leading-5 font-medium wrap-anywhere">
-          {name}
-        </span>
-        {description && (
-          <span id={descriptionId} className="min-w-0 text-xs leading-5 wrap-anywhere text-muted-foreground">
-            {description}
-          </span>
-        )}
+      <span id={nameId} className="min-w-0 flex-1 text-sm leading-5 font-medium wrap-anywhere">
+        {name}
       </span>
-      {status && (
-        <span id={statusId} className="shrink-0 sm:w-20">
-          {status}
-        </span>
-      )}
       <Checkbox
         aria-labelledby={nameId}
-        aria-describedby={[description && descriptionId, status && statusId].filter(Boolean).join(' ') || undefined}
         checked={checked}
         disabled={disabled}
         onCheckedChange={(value) => onSelect(value === true)}
@@ -106,7 +86,6 @@ export function NewGroupDialog({
   onCreated: (room: BotConversation) => void
 }) {
   const nameId = useId()
-  const leaderId = useId()
   const [name, setName] = useState('')
   const [selectedBots, setSelectedBots] = useState<string[]>([])
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
@@ -172,29 +151,25 @@ export function NewGroupDialog({
                   {choices.bots.length === 0 ? (
                     <p className="text-xs text-muted-foreground">在能力页创建智能体后，即可添加到群组。</p>
                   ) : (
-                    <ul role="list" className={memberList}>
-                      {choices.bots.map((bot) => (
-                        <li key={bot.id} className="p-1">
-                          <GroupMemberOption
-                            name={bot.name}
-                            description={bot.responsibility}
-                            avatar={
-                              <BotAvatar botId={bot.id} avatarKey={bot.avatarKey} enabled={bot.status === 'enabled'} />
-                            }
-                            status={
-                              bot.id === leader ? (
-                                <span className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">Leader</span>
-                              ) : (
-                                <BotStatus value={bot.availability} />
-                              )
-                            }
-                            checked={selectedBots.includes(bot.id)}
+                    <TooltipProvider delayDuration={250}>
+                      <ul role="list" className="conversation-bot-options">
+                        {choices.bots.map((bot) => (
+                          <ConversationBotOption
+                            key={bot.id}
+                            bot={bot}
                             disabled={create.isPending}
-                            onSelect={(checked) => setSelectedBots((value) => toggleSelection(value, bot.id, checked))}
+                            selection={{
+                              checked: selectedBots.includes(bot.id),
+                              isLeader: bot.id === leader,
+                              onSetLeader: () => setSelectedLeader(bot.id),
+                            }}
+                            onSelect={() =>
+                              setSelectedBots((value) => toggleSelection(value, bot.id, !value.includes(bot.id)))
+                            }
                           />
-                        </li>
-                      ))}
-                    </ul>
+                        ))}
+                      </ul>
+                    </TooltipProvider>
                   )}
                   {choices.more && (
                     <Button
@@ -208,23 +183,6 @@ export function NewGroupDialog({
                     </Button>
                   )}
                 </fieldset>
-                <FormField label="Leader" htmlFor={leaderId}>
-                  <Select
-                    id={leaderId}
-                    className="flex"
-                    required
-                    disabled={leads.length === 0 || create.isPending}
-                    value={leader}
-                    onChange={(event) => setSelectedLeader(event.target.value)}
-                  >
-                    <option value="">请先选择可用的智能体</option>
-                    {leads.map((bot) => (
-                      <option key={bot.id} value={bot.id}>
-                        {bot.name}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
                 <fieldset className="min-w-0">
                   <legend className={memberLegend}>
                     团队成员 <span className="ml-1.5 text-xs font-normal text-muted-foreground">选填</span>

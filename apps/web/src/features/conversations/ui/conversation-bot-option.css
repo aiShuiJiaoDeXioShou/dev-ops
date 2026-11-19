@@ -1,0 +1,112 @@
+.conversation-bot-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.conversation-bot-option {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background);
+}
+
+.conversation-bot-option[data-selected] {
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background: color-mix(in oklab, var(--primary) 5%, var(--background));
+}
+
+/* 卡片和独立的 Leader 控件按网格宽度排版。 */
+[data-slot='dialog-content'] .conversation-bot-option > [data-slot='button'] {
+  height: auto;
+  min-width: 0;
+  white-space: normal;
+}
+
+[data-slot='dialog-content'] .conversation-bot-option > .conversation-bot-choice {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border-radius: inherit;
+  padding: 14px 8px 10px;
+  text-align: center;
+}
+
+.conversation-bot-choice:disabled {
+  opacity: 0.6;
+}
+
+.conversation-bot-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+}
+
+[data-selected] .conversation-bot-check {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.conversation-bot-avatar {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+}
+
+.conversation-bot-touch-details {
+  display: none;
+}
+
+[data-slot='dialog-content'] .conversation-bot-option > .conversation-bot-leader {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 0 5px 5px;
+  border-radius: var(--radius-md);
+  padding: 2px 4px;
+  color: var(--primary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.conversation-bot-leader[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--primary) 12%, var(--background));
+  font-weight: 600;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .conversation-bot-choice:hover:not(:disabled),
+  .conversation-bot-leader[aria-pressed='false']:hover:not(:disabled) {
+    background: var(--muted);
+  }
+}
+
+@media (hover: none) {
+  .conversation-bot-touch-details {
+    display: block;
+  }
+}
+
+@media (pointer: coarse) {
+  [data-slot='dialog-content'] .conversation-bot-option > .conversation-bot-leader {
+    min-height: 44px;
+  }
+}

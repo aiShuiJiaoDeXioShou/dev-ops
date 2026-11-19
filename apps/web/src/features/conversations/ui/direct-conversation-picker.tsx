@@ -1,14 +1,14 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { ChevronRight } from 'lucide-react'
+import { useRef } from 'react'
 import { Link } from 'react-router'
 import { botChoicesOptions } from '@/features/bots/api/queries'
-import { BotAvatar } from '@/features/bots/ui/bot-avatar'
-import { BotStatus } from '@/features/bots/ui/bot-status'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
+import { TooltipProvider } from '@/shared/ui/controls/tooltip'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useOpenDirectConversation } from '../api/open-direct'
+import { ConversationBotOption } from './conversation-bot-option'
 
 /**
  * 选择团队智能体后打开私聊；从技能入口打开时仅列出可执行该技能的智能体。
@@ -28,6 +28,7 @@ export function DirectConversationPicker({
   onOpened?: () => void
   onRestoreFocus?: () => void
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null)
   const list = useInfiniteQuery(botChoicesOptions(teamId))
   const bots = list.data?.pages.flatMap(({ data }) => data.items) ?? []
   const choices = skill
@@ -39,7 +40,11 @@ export function DirectConversationPicker({
   return (
     <Dialog open onOpenChange={(open) => !open && !openConversation.isPending && onClose()}>
       <DialogContent
-        className="dialog-w-md gap-4 p-4 sm:p-6"
+        className="dialog-w-sm gap-4 p-4 sm:p-6"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          titleRef.current?.focus()
+        }}
         onCloseAutoFocus={(event) => {
           if (!onRestoreFocus) return
           event.preventDefault()
@@ -47,7 +52,9 @@ export function DirectConversationPicker({
         }}
       >
         <DialogHeader className="gap-1">
-          <DialogTitle>{skill ? `使用 ${skill.name}` : '新建私聊'}</DialogTitle>
+          <DialogTitle ref={titleRef} tabIndex={-1} className="outline-none">
+            {skill ? `使用 ${skill.name}` : '新建私聊'}
+          </DialogTitle>
           <DialogDescription className={skill ? undefined : 'sr-only'}>
             {skill ? '选择智能体，技能会带入聊天输入框。' : '选择智能体以打开对话。'}
           </DialogDescription>
@@ -62,49 +69,18 @@ export function DirectConversationPicker({
           />
         )}
         {choices.length > 0 && (
-          <ul
-            role="list"
-            aria-label="智能体列表"
-            className="min-w-0 divide-y divide-border rounded-xl border border-border"
-          >
-            {choices.map((bot) => (
-              <li key={bot.id} className="p-1">
-                <Button
-                  unstyled
-                  type="button"
-                  className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted disabled:opacity-60 sm:gap-4"
+          <TooltipProvider delayDuration={250}>
+            <ul role="list" aria-label="智能体列表" className="conversation-bot-options">
+              {choices.map((bot) => (
+                <ConversationBotOption
+                  key={bot.id}
+                  bot={bot}
                   disabled={openConversation.isPending}
-                  onClick={() => openForBot(bot.id)}
-                >
-                  <span className="shrink-0">
-                    <BotAvatar botId={bot.id} avatarKey={bot.avatarKey} enabled={bot.status === 'enabled'} />
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
-                    <strong className="min-w-0 text-sm leading-5 font-semibold wrap-anywhere">{bot.name}</strong>
-                    {bot.responsibility && (
-                      <small className="min-w-0 text-xs leading-5 wrap-anywhere text-muted-foreground">
-                        {bot.responsibility}
-                      </small>
-                    )}
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3">
-                    {bot.modelId && (
-                      <span
-                        className="max-w-28 truncate rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:max-w-36"
-                        title={bot.modelId}
-                      >
-                        {bot.modelId}
-                      </span>
-                    )}
-                    <span className="sm:w-20">
-                      <BotStatus value={bot.availability} />
-                    </span>
-                  </span>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                </Button>
-              </li>
-            ))}
-          </ul>
+                  onSelect={() => openForBot(bot.id)}
+                />
+              ))}
+            </ul>
+          </TooltipProvider>
         )}
         {list.isFetchNextPageError ? (
           <PageError
