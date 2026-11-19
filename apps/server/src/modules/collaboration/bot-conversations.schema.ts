@@ -42,6 +42,7 @@ const message = Type.Object({
   createdAt: Type.String(),
   feedback: Type.Optional(feedbackRating),
   branchId: Type.Optional(nullableId),
+  relayId: Type.Optional(nullableId),
   branchSiblings: Type.Optional(
     Type.Object({ index: Type.Integer({ minimum: 1 }), total: Type.Integer({ minimum: 2 }) }),
   ),
@@ -62,6 +63,33 @@ export const conversationEventKind = Type.Union([
   Type.Literal('relay_paused'),
   Type.Literal('relay_finished'),
 ])
+export const botRelaySchema = Type.Object({
+  id: uuid,
+  status: Type.Union([
+    Type.Literal('running'),
+    Type.Literal('paused'),
+    Type.Literal('finished'),
+    Type.Literal('stopped'),
+  ]),
+  hopCount: Type.Integer(),
+  hopLimit: Type.Integer(),
+  replyCount: Type.Integer(),
+  replyLimit: Type.Integer(),
+  continueCount: Type.Integer(),
+  version: Type.Integer(),
+  pendingBotIds: Type.Array(uuid),
+  endReason: Type.Optional(
+    Type.Union([
+      Type.Literal('completed'),
+      Type.Literal('limit'),
+      Type.Literal('stopped_by_member'),
+      Type.Literal('budget_exhausted'),
+      Type.Literal('ended_by_member'),
+    ]),
+  ),
+})
+export const botRelayResponse = apiResponseSchema(botRelaySchema)
+export type BotRelayView = Static<typeof botRelaySchema>
 const event = Type.Object({
   sequence,
   runId: uuid,
@@ -138,7 +166,8 @@ export const sendBotMessageBody = Type.Object(
   {
     clientRequestId: uuid,
     text: Type.String({ minLength: 1, maxLength: 16000 }),
-    mentionBotId: Type.Optional(uuid),
+    mentionBotIds: Type.Optional(Type.Array(uuid, { maxItems: 100 })),
+    mentionAll: Type.Optional(Type.Boolean()),
     promptTemplateId: Type.Optional(uuid),
     deliveryMode: Type.Optional(Type.Union([Type.Literal('auto'), Type.Literal('steer')])),
     skillIds: Type.Optional(Type.Array(uuid, { maxItems: 20, uniqueItems: true })),
@@ -164,6 +193,7 @@ export const conversationResponse = apiResponseSchema(
   Type.Object({
     ...conversation.properties,
     botSettings: Type.Array(botSetting),
+    activeRelay: Type.Optional(botRelaySchema),
     members: Type.Array(member),
     tags: Type.Array(workTagViewSchema),
     skillReferences: Type.Array(
@@ -187,6 +217,7 @@ export const conversationSendResponse = apiResponseSchema(
   Type.Object({
     message,
     runId: uuid,
+    relay: Type.Optional(botRelaySchema),
     delivery: Type.Union([Type.Literal('queued'), Type.Literal('follow_up'), Type.Literal('steer')]),
   }),
 )
@@ -195,6 +226,7 @@ export const conversationEventsResponse = apiResponseSchema(
     items: Type.Array(event),
     cursor: sequence,
     resetRequired: Type.Boolean(),
+    activeRelay: Type.Optional(botRelaySchema),
     activeRuns: Type.Array(activeRun),
   }),
 )
@@ -208,6 +240,7 @@ export type ConversationListFilters = Static<typeof conversationListQuery>
 export type SendBotMessageResult = {
   message: Static<typeof message>
   runId: string
+  relay?: BotRelayView
   delivery: 'queued' | 'steer' | 'follow_up'
 }
 export type SendBotMessageInput = Static<typeof sendBotMessageBody>

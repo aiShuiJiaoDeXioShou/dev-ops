@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm'
 import { Type } from 'typebox'
 import { Check } from 'typebox/value'
 import type { Database } from '../../../platform/database/client.ts'
+import { relayMentionableBots } from '../../collaboration/bot-relay.repository.ts'
 import { botConversation, botConversationMember } from '../../collaboration/bot-conversations.tables.ts'
 import { teamMember } from '../../identity/identity.tables.ts'
 import { botTask, botTaskInput } from '../../tasks/bot-tasks.tables.ts'
@@ -75,6 +76,7 @@ export async function loadBotRunContext(
   context: RunBotSessionOptions['context']
   input: Extract<RunBotSessionOptions['input'], { kind: 'prompt' }> | null
   roomCursor?: bigint
+  room: RunBotSessionOptions['room']
   connectionId: string
   skillVersions: BotSkillVersion[]
   skills: RunBotSessionOptions['skills']
@@ -130,6 +132,15 @@ export async function loadBotRunContext(
       ),
     )
   if (!conversation || !connection) return null
+  const group = conversation.kind === 'group'
+  const bots = group ? await relayMentionableBots(db, { teamId: run.team_id, conversationId: run.conversation_id }) : []
+  if (group && !bots.some(({ id }) => id === run.bot_id)) return null
+  const roomProtocol = {
+    mode: group ? ('group' as const) : ('direct' as const),
+    allowSkip: run.relay_role === 'all',
+    mentionableBots: bots.filter(({ id }) => id !== run.bot_id),
+  }
+
   const [override] = snapshot.modelOverride
     ? await db
         .select({ id: botModelCatalog.model_id })
@@ -189,5 +200,6 @@ export async function loadBotRunContext(
       ? { kind: 'prompt', text: input, sourceMessageId: room?.sourceMessageId, roomContext: room?.roomContext }
       : null,
     roomCursor: room?.cursor,
+    room: roomProtocol,
   }
 }

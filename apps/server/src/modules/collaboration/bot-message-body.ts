@@ -17,7 +17,9 @@ export const botMessageBodySchema = Type.Object({
     Type.Object({
       promptTemplate: Type.Optional(Type.Object({ id: Type.String(), name: Type.String(), sourceText: Type.String() })),
       deliveryMode: Type.Optional(Type.Union([Type.Literal('auto'), Type.Literal('steer')])),
-      mentionBotId: Type.Optional(Type.String()),
+      mentionBotIds: Type.Optional(Type.Array(Type.String())),
+      mentionAll: Type.Optional(Type.Boolean()),
+      relayRecipients: Type.Optional(Type.Array(Type.String())),
       skillIds: Type.Array(Type.String()),
     }),
   ),

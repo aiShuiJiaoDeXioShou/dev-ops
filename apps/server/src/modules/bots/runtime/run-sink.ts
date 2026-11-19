@@ -2,6 +2,7 @@ import { botSession, botSessionEntry } from '../bots.session.tables.ts'
 import { containsCredential, type RunEvent, type RunOutcome } from '@dev-ops/devops-bot'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import type { Database } from '../../../platform/database/client.ts'
+import { defaultBotRelayLimits, relayMentionableBots } from '../../collaboration/bot-relay.repository.ts'
 import { appendBotEvents } from '../../collaboration/bot-events.repository.ts'
 import { botConversation, botEvent, botMessage } from '../../collaboration/bot-conversations.tables.ts'
 import type { BotMessageBody } from '../../collaboration/bot-message-body.ts'
@@ -38,12 +39,33 @@ function savedEvent(event: Exclude<RunEvent, { type: 'turn_finished' }>, botId: 
   }
 }
 
+async function relayMentions(
+  tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+  scope: { teamId: string; conversationId: string },
+  outcome: Extract<RunOutcome, { status: 'succeeded' }>,
+) {
+  if (outcome.skipped) return []
+  const text = outcome.finalMessage.blocks.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n')
+  if (!text.includes('@')) return outcome.mentions ?? []
+  const bots = await relayMentionableBots(tx, scope)
+  const names = bots
+    .flatMap(({ id, name }) => {
+      const label = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+      const match = new RegExp(`(?:^|\\s)@${label}(?=$|[\\s，。,.!?；;:：、！？])`, 'iu').exec(text)
+      return match ? [{ id, index: match.index }] : []
+    })
+    .sort((a, b) => a.index - b.index)
+    .map(({ id }) => id)
+  return [...new Set([...(outcome.mentions ?? []), ...names])]
+}
+
 /**
  * 将运行事件合批写入 PostgreSQL，最终消息与运行终态使用同一事务。
  * @param db 数据库连接。
  * @param run 当前运行持有的队列记录。
  * @param lease 领取者与代次凭证。
  * @param onBatchFailure 异步刷新失败时中止模型调用的回调。
+ * @param relayLimits 群聊接力可用的跳数与回复条数。
  * @returns 运行事件接收器和终态提交方法。
  */
 export function createPgRunSink(
@@ -51,6 +73,7 @@ export function createPgRunSink(
   run: ConversationBotRunRecord,
   lease: BotRunLease,
   onBatchFailure: () => void,
+  relayLimits = defaultBotRelayLimits,
 ) {
   const scope = { teamId: run.team_id, conversationId: run.conversation_id, runId: run.id }
   const buffer: ReturnType<typeof savedEvent>[] = []
@@ -114,10 +137,17 @@ export function createPgRunSink(
           .from(botConversation)
           .where(and(eq(botConversation.id, scope.conversationId), eq(botConversation.team_id, scope.teamId)))
           .for('update')
-        const finished = await finishBotRun(tx, lease, outcome)
+        const mentions =
+          outcome.status === 'succeeded' && run.relay_id ? await relayMentions(tx, scope, outcome) : undefined
+        const finished = await finishBotRun(tx, lease, { ...outcome, mentions, relayLimits })
         if (!finished) return false
-        if (finished.status !== 'succeeded' || outcome.status !== 'succeeded') return true
-        if (run.kind === 'compact') return true
+        const shouldReply =
+          finished.status === 'succeeded' &&
+          outcome.status === 'succeeded' &&
+          !outcome.skipped &&
+          run.kind !== 'compact'
+        const shouldExplain = Boolean(run.relay_id) && finished.failure_kind === 'model_unavailable'
+        if (!shouldReply && !shouldExplain) return true
         if (!conversation) throw new Error('Bot 回复所属会话不存在')
         const [latest] = await tx
           .select({ sequence: botMessage.sequence })
@@ -125,17 +155,19 @@ export function createPgRunSink(
           .where(and(eq(botMessage.team_id, scope.teamId), eq(botMessage.conversation_id, scope.conversationId)))
           .orderBy(desc(botMessage.sequence))
           .limit(1)
-        const body: BotMessageBody = {
-          metrics: {
-            ...outcome.usage,
-            turns: outcome.turns,
-            durationMs: Math.max(0, Date.now() - (run.started_at ?? run.created_at).getTime()),
-          },
-          blocks: outcome.finalMessage.blocks.flatMap<BotMessageBody['blocks'][number]>((block) => {
-            if (block.type !== 'text') return []
-            return [{ type: 'text', text: safeText(block.text) }]
-          }),
-        }
+        const body: BotMessageBody = shouldReply
+          ? {
+              metrics: {
+                ...outcome.usage,
+                turns: outcome.turns,
+                durationMs: Math.max(0, Date.now() - (run.started_at ?? run.created_at).getTime()),
+              },
+              blocks: outcome.finalMessage.blocks.flatMap<BotMessageBody['blocks'][number]>((block) => {
+                if (block.type !== 'text') return []
+                return [{ type: 'text', text: safeText(block.text) }]
+              }),
+            }
+          : { blocks: [{ type: 'notice', text: '本轮接力跳过了一位不可用的智能体。' }] }
         const [message] = await tx
           .insert(botMessage)
           .values({
@@ -144,8 +176,9 @@ export function createPgRunSink(
             run_id: run.id,
             branch_id: conversation.branchId,
             sequence: (latest?.sequence ?? 0n) + 1n,
-            speaker_kind: 'bot',
-            speaker_id: run.bot_id,
+            speaker_kind: shouldReply ? 'bot' : 'system',
+            speaker_id: shouldReply ? run.bot_id : null,
+            relay_id: run.relay_id,
             body,
           })
           .returning({ id: botMessage.id, sequence: botMessage.sequence })
@@ -160,7 +193,7 @@ export function createPgRunSink(
               eq(botSession.bot_id, run.bot_id),
             ),
           )
-        if (tree?.leaf) {
+        if (tree?.leaf && shouldReply) {
           await tx
             .update(botSessionEntry)
             .set({ source_message_id: message.id, updated_at: new Date() })

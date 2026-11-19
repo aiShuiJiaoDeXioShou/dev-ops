@@ -38,6 +38,7 @@ import { botsRoutes } from '../modules/bots/bots.routes.ts'
 import { botConnectionsRoutes } from '../modules/bots/bots.connections.routes.ts'
 import { botMcpServerRoutes } from '../modules/bots/bots.mcp-servers.routes.ts'
 import { botPromptTemplateRoutes } from '../modules/bots/bots.prompt-templates.ts'
+import { botRelayRoutes } from '../modules/collaboration/bot-relay.routes.ts'
 import { botConversationsRoutes } from '../modules/collaboration/bot-conversations.routes.ts'
 import { createBotConversationsService } from '../modules/collaboration/bot-conversations.service.ts'
 import { createBotGroupsService } from '../modules/collaboration/bot-groups.service.ts'
@@ -158,9 +159,11 @@ export function createHttpApp(
     cipher: botCipher,
   })
   app.register(botPromptTemplateRoutes, { prefix: '/api/v1', db: services.database.db })
+  const relayLimits = { hop: config.BOT_RELAY_HOP_LIMIT, reply: config.BOT_RELAY_REPLY_LIMIT }
+  app.register(botRelayRoutes, { prefix: '/api/v1', db: services.database.db, limits: relayLimits })
   app.register(botConversationsRoutes, {
     prefix: '/api/v1',
-    service: createBotConversationsService(services.database.db),
+    service: createBotConversationsService(services.database.db, relayLimits),
     groups: createBotGroupsService(services.database.db),
   })
   app.register(workTagRoutes, { prefix: '/api/v1', service: createWorkTagsService(services.database.db) })

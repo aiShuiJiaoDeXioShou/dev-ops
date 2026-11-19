@@ -98,7 +98,10 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         heartbeat = undefined
       })
   }, config.BOT_LEASE_HEARTBEAT_SECONDS * 1_000)
-  const sink = createPgRunSink(db, run, lease, () => cancellation.abort())
+  const sink = createPgRunSink(db, run, lease, () => cancellation.abort(), {
+    hop: config.BOT_RELAY_HOP_LIMIT,
+    reply: config.BOT_RELAY_REPLY_LIMIT,
+  })
   try {
     const input = await loadBotRunContext(db, run, config.BOT_ROOM_SYNC_LIMIT)
     if (!input) {
@@ -144,6 +147,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       model: input.model,
       workspace: { directory, access: input.accessMode },
       skills: input.skills,
+      room: input.room,
       mcp: { servers: await readBotMcpServers(db, options.cipher, run.team_id, run.bot_id), fetch: fetchBotMcp },
       context: {
         ...input.context,

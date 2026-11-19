@@ -2,9 +2,18 @@ import { and, asc, count, eq, gt, inArray, lt, lte, notExists, or, sql } from 'd
 import { alias } from 'drizzle-orm/pg-core'
 import type { Database } from '../../platform/database/client.ts'
 import { botMessage } from '../collaboration/bot-conversations.tables.ts'
+import {
+  advanceBotRelay,
+  defaultBotRelayLimits,
+  openBotRelay,
+  readBotRelayReceivers,
+  updateBotRelay,
+  type BotRelayLimits,
+} from '../collaboration/bot-relay.repository.ts'
+import { botConversationBotSetting, botRoomRelay } from '../collaboration/bot-relay.tables.ts'
 import { appendBotEvents } from '../collaboration/bot-events.repository.ts'
 import { botTask } from '../tasks/bot-tasks.tables.ts'
-import { botConversationBotSetting } from '../collaboration/bot-relay.tables.ts'
+import { isBotBudgetExhausted } from './bots.budget-read.ts'
 import { botRunInput } from './bots.session.tables.ts'
 import { snapshotBotSkills } from './bots.skills.ts'
 import { bot, botRun } from './bots.tables.ts'
@@ -37,6 +46,9 @@ export interface BotQueueLimits {
 type FinishInput = {
   turns?: number
   usage?: unknown
+  mentions?: string[]
+  skipped?: boolean
+  relayLimits?: BotRelayLimits
 } & ({ status: 'succeeded' | 'stopped' } | { status: 'failed'; failureKind: string; failureMessage: string })
 
 /**
@@ -57,6 +69,9 @@ export async function enqueueBotRun(
     | 'trigger_message_id'
     | 'input_version'
     | 'kind'
+    | 'relay_id'
+    | 'relay_role'
+    | 'hop'
   >,
 ): Promise<BotRunRecord> {
   const [run] = await tx
@@ -117,12 +132,34 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
 
     const previous = alias(botRun, 'previous_run')
     const teamRunning = alias(botRun, 'team_running')
+    const activeRelay = alias(botRoomRelay, 'active_relay')
+    const relayForConversation = tx
+      .select({ id: activeRelay.id })
+      .from(activeRelay)
+      .where(
+        and(
+          eq(activeRelay.conversation_id, botRun.conversation_id),
+          inArray(activeRelay.status, ['running', 'paused']),
+        ),
+      )
+
     const [candidate] = await tx
-      .select({ id: botRun.id, teamId: botRun.team_id, botId: botRun.bot_id, resumes: botRun.resume_count })
+      .select({
+        id: botRun.id,
+        teamId: botRun.team_id,
+        botId: botRun.bot_id,
+        resumes: botRun.resume_count,
+        relayId: botRun.relay_id,
+        relayRole: botRun.relay_role,
+        conversationId: botRun.conversation_id,
+        messageId: botRun.trigger_message_id,
+        actorId: botRun.trigger_user_id,
+      })
       .from(botRun)
       .where(
         and(
           eq(botRun.status, 'queued'),
+          or(sql`${botRun.relay_id} in (${relayForConversation})`, notExists(relayForConversation)),
           notExists(
             tx
               .select({ id: previous.id })
@@ -134,6 +171,7 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
                     eq(previous.status, 'running'),
                     and(
                       eq(previous.status, 'queued'),
+                      or(sql`${previous.relay_id} = ${botRun.relay_id}`, notExists(relayForConversation)),
                       or(
                         lt(previous.created_at, botRun.created_at),
                         and(eq(previous.created_at, botRun.created_at), lt(previous.id, botRun.id)),
@@ -155,12 +193,46 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
       .limit(1)
       .for('update', { skipLocked: true })
     if (!candidate) return null
+    let relayId = candidate.relayId
+    if (!relayId && candidate.relayRole && candidate.conversationId && candidate.messageId) {
+      const scope = { teamId: candidate.teamId, conversationId: candidate.conversationId }
+      const receivers = await readBotRelayReceivers(tx, scope, candidate.messageId)
+      const relay = await openBotRelay(tx, {
+        ...scope,
+        messageId: candidate.messageId,
+        actorId: candidate.actorId,
+        receivers: receivers.ids,
+      })
+      if (!relay) return null
+      relayId = relay.id
+    }
+    if (await isBotBudgetExhausted(tx, candidate.teamId)) {
+      const [rejected] = await tx
+        .update(botRun)
+        .set({
+          status: 'failed',
+          relay_id: relayId,
+          failure_kind: 'budget_exhausted',
+          failure_message: '团队本月 Bot 预算已用完',
+          finished_at: sql`clock_timestamp()`,
+          updated_at: sql`clock_timestamp()`,
+        })
+        .where(and(eq(botRun.id, candidate.id), eq(botRun.status, 'queued')))
+        .returning()
+      if (rejected) {
+        await updateTaskAfterRun(tx, rejected)
+        await writeRunState(tx, rejected)
+        await settleBotRelay(tx, rejected)
+      }
+      return null
+    }
     const skillVersions = candidate.resumes ? [] : await snapshotBotSkills(tx, candidate.teamId, candidate.botId)
 
     const [run] = await tx
       .update(botRun)
       .set({
         status: 'running',
+        relay_id: relayId,
         lease_owner: owner,
         lease_until: sql`clock_timestamp() + ${limits.ttlSeconds} * interval '1 second'`,
         lease_epoch: sql`${botRun.lease_epoch} + 1`,
@@ -259,7 +331,10 @@ async function updateTaskAfterRun(tx: BotRunTransaction, run: BotRunRecord) {
         eq(botTask.team_id, run.team_id),
         eq(botTask.executor_bot_id, run.bot_id),
         eq(botTask.input_version, run.input_version),
-        eq(botTask.status, 'in_progress'),
+        inArray(
+          botTask.status,
+          run.failure_kind === 'budget_exhausted' ? ['pending', 'waiting', 'in_progress'] : ['in_progress'],
+        ),
         eq(botTask.blocked, false),
       ),
     )
@@ -289,6 +364,7 @@ async function requeuePendingInputs(tx: BotRunTransaction, run: BotRunRecord) {
       trigger_user_id: sender,
       trigger_message_id: messageId,
       input_version: 0,
+      ...(run.relay_id ? { relay_role: 'mention', hop: 0 } : {}),
     })
     await tx
       .update(botMessage)
@@ -299,6 +375,36 @@ async function requeuePendingInputs(tx: BotRunTransaction, run: BotRunRecord) {
       .set({ status: 'requeued', updated_at: sql`clock_timestamp()` })
       .where(eq(botRunInput.id, id))
   }
+}
+
+async function settleBotRelay(tx: BotRunTransaction, run: BotRunRecord, outcome?: FinishInput) {
+  if (!run.relay_id || !run.conversation_id) return
+  const [relay] = await tx
+    .select()
+    .from(botRoomRelay)
+    .where(
+      and(
+        eq(botRoomRelay.id, run.relay_id),
+        eq(botRoomRelay.team_id, run.team_id),
+        eq(botRoomRelay.conversation_id, run.conversation_id),
+        eq(botRoomRelay.status, 'running'),
+      ),
+    )
+    .for('update')
+  if (!relay) return
+  if (run.failure_kind === 'budget_exhausted') {
+    await updateBotRelay(tx, relay, { status: 'finished', end_reason: 'budget_exhausted', pending_bot_ids: [] }, run.id)
+    return
+  }
+  await advanceBotRelay(
+    tx,
+    relay,
+    outcome?.relayLimits ?? defaultBotRelayLimits,
+    enqueueBotRun,
+    run,
+    outcome?.mentions,
+    run.status === 'succeeded' && !outcome?.skipped,
+  )
 }
 
 /**
@@ -318,6 +424,8 @@ export async function finishBotRun(tx: BotRunTransaction, lease: BotRunLease, ou
       failure_message: sql`case when ${botRun.stop_requested} then null else ${failure?.failureMessage ?? null} end`,
       usage: outcome.usage ?? null,
       turns: outcome.turns ?? 0,
+      relay_mentions: outcome.mentions ?? null,
+      is_skipped: outcome.skipped ?? false,
       lease_owner: null,
       lease_until: null,
       finished_at: sql`clock_timestamp()`,
@@ -329,6 +437,7 @@ export async function finishBotRun(tx: BotRunTransaction, lease: BotRunLease, ou
   await updateTaskAfterRun(tx, run)
   await writeRunState(tx, run)
   await requeuePendingInputs(tx, run)
+  await settleBotRelay(tx, run, outcome)
   return run
 }
 
@@ -353,6 +462,7 @@ async function recoverClaim(tx: BotRunTransaction, run: BotRunRecord, resumeLimi
   if (!shouldResume) {
     await updateTaskAfterRun(tx, recovered)
     await requeuePendingInputs(tx, recovered)
+    await settleBotRelay(tx, recovered)
   }
 }
 
@@ -414,7 +524,10 @@ export async function stopRunsForBot(tx: BotRunTransaction, teamId: string, botI
     .where(and(scope, eq(botRun.status, 'queued')))
     .returning()
   cancelled.sort((left, right) => (left.conversation_id ?? '').localeCompare(right.conversation_id ?? ''))
-  for (const run of cancelled) await writeRunState(tx, run)
+  for (const run of cancelled) {
+    await writeRunState(tx, run)
+    await settleBotRelay(tx, run)
+  }
 }
 
 /**

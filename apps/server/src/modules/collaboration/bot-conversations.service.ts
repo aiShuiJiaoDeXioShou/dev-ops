@@ -40,6 +40,14 @@ import {
   readBotBranchSiblings,
   setBotBranch,
 } from './bot-branches.repository.ts'
+import {
+  botRelayView,
+  defaultBotRelayLimits,
+  latestBotRelayRun,
+  openBotRelay,
+  readActiveBotRelay,
+  updateBotRelay,
+} from './bot-relay.repository.ts'
 import { forkBotConversation } from './bot-fork.service.ts'
 import { botMessageBodySchema } from './bot-message-body.ts'
 import { readTargetWorkTags } from './work-tags.repository.ts'
@@ -88,6 +96,7 @@ function messageView(row: typeof botMessage.$inferSelect, speakerName: string | 
     body: row.body,
     runId: row.run_id,
     branchId: row.branch_id,
+    relayId: row.relay_id,
     createdAt: row.created_at.toISOString(),
   }
 }
@@ -229,7 +238,7 @@ async function listConversationPreviews(db: ReadDb, teamId: string, rooms: Conve
  * @param row 业务用例已校验的会话。
  * @returns 当前成员与会话配置。
  */
-export async function readBotConversationView(db: ReadDb, row: ConversationRow) {
+export async function readBotConversationView(db: ReadDb, row: ConversationRow, limits = defaultBotRelayLimits) {
   const [members, tags] = await Promise.all([
     readMembers(db, row),
     readTargetWorkTags(db, row.team_id, { targetKind: 'conversation', targetId: row.id }),
@@ -245,16 +254,30 @@ export async function readBotConversationView(db: ReadDb, row: ConversationRow) 
     row,
     members.filter(({ kind }) => kind === 'bot').map(({ id }) => id),
   )
-  return { ...viewOf(row), members, tags, skillReferences, botSettings }
+  const relay =
+    row.kind === 'group' ? await readActiveBotRelay(db, { teamId: row.team_id, conversationId: row.id }) : undefined
+  return {
+    ...viewOf(row),
+    members,
+    tags,
+    skillReferences,
+    botSettings,
+    ...(relay ? { activeRelay: botRelayView(relay, limits) } : {}),
+  }
 }
 
-function mentionedBotNames(text: string, members: ConversationMemberView[]): string[] {
-  return members.flatMap(({ id, name, kind }) => {
-    if (kind !== 'bot') return []
-    const safeName = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
-    const pattern = new RegExp(`(?:^|\\s)@${safeName}(?=$|[\\s，。,.!?；;:：、！？])`, 'iu')
-    return pattern.test(text) ? [id] : []
-  })
+function messageReceivers(text: string, members: ConversationMemberView[], explicit: string[], mentionsAll: boolean) {
+  const bots = members.filter(({ kind }) => kind === 'bot')
+  if (mentionsAll) return bots.map(({ id }) => id)
+  const matches = bots
+    .flatMap(({ id, name }) => {
+      const safeName = name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+      const match = new RegExp(`(?:^|\\s)@${safeName}(?=$|[\\s，。,.!?；;:：、！？])`, 'iu').exec(text)
+      return match ? [{ id, index: match.index }] : []
+    })
+    .sort((a, b) => a.index - b.index)
+    .map(({ id }) => id)
+  return [...new Set([...explicit, ...matches])]
 }
 
 function membershipQuery(db: ReadDb, actor: SessionUser) {
@@ -360,7 +383,7 @@ async function requireIdleConversation(tx: BotRunTransaction, room: Conversation
  * @param db 平台数据库连接。
  * @returns 会话用例，读写均校验当前成员与角色权限。
  */
-export function createBotConversationsService(db: Database) {
+export function createBotConversationsService(db: Database, limits = defaultBotRelayLimits) {
   return {
     /** 列出当前成员在本团队可见的会话。 */
     async list(actor: SessionUser, teamId: string, filters: ConversationListFilters) {
@@ -465,7 +488,7 @@ export function createBotConversationsService(db: Database) {
     /** 读取会话与当前成员。 */
     async get(actor: SessionUser, conversationId: string) {
       const row = await requireBotConversation(db, actor, conversationId)
-      return readBotConversationView(db, row)
+      return readBotConversationView(db, row, limits)
     },
     /** 按序号读取消息并返回更早一页的游标。 */
     async messages(actor: SessionUser, conversationId: string, before?: string, limit = 50) {
@@ -793,8 +816,10 @@ export function createBotConversationsService(db: Database) {
       const sourceText = redactChatContent(input.text.trim())
       if (!sourceText) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '消息不能为空')
       const deliveryMode = input.deliveryMode ?? 'auto'
+      const mentionsAll = input.mentionAll || /(?:^|\s)@全部(?=$|[\s，。,.!?；;:：、！？])/u.test(sourceText)
       const references = {
-        mentionBotId: input.mentionBotId,
+        mentionBotIds: [...new Set(input.mentionBotIds ?? [])],
+        mentionAll: mentionsAll,
         skillIds: [...(input.skillIds ?? [])].sort(),
         deliveryMode,
       }
@@ -812,7 +837,8 @@ export function createBotConversationsService(db: Database) {
             message.body.blocks[0]?.type !== 'text' ||
             (message.body.references?.promptTemplate?.sourceText ?? message.body.blocks[0].text) !== sourceText ||
             message.body.references?.promptTemplate?.id !== input.promptTemplateId ||
-            message.body.references?.mentionBotId !== references.mentionBotId ||
+            (message.body.references?.mentionBotIds ?? []).join(',') !== references.mentionBotIds.join(',') ||
+            (message.body.references?.mentionAll ?? false) !== references.mentionAll ||
             (message.body.references?.deliveryMode ?? 'auto') !== deliveryMode ||
             (message.body.references?.skillIds ?? []).join(',') !== references.skillIds.join(',') ||
             !same.run_id
@@ -841,31 +867,31 @@ export function createBotConversationsService(db: Database) {
         if (!text || text.length > 16_000)
           throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '模板展开后消息为零或超过长度上限')
         const members = await readMembers(tx, conversation)
-        const mentioned = new Set(input.mentionBotId ? [input.mentionBotId] : [])
-        if (conversation.kind === 'group') {
-          for (const id of mentionedBotNames(text, members)) mentioned.add(id)
-        }
-        if (mentioned.size > 1) throw new ApiError(ERROR_CODES.BOT_MENTION_AMBIGUOUS, '每条消息只能指定一个智能体')
-        const explicit = [...mentioned][0]
-        const targetId =
-          explicit ??
-          (conversation.kind === 'group' ? conversation.leader_bot_id : members.find(({ kind }) => kind === 'bot')?.id)
-        if (!targetId) throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '没有可用的智能体承接这条消息')
-        if (!members.some((member) => member.kind === 'bot' && member.id === targetId)) {
+        const group = conversation.kind === 'group'
+        const botMembers = new Set(members.filter(({ kind }) => kind === 'bot').map(({ id }) => id))
+        if (references.mentionBotIds.some((id) => !botMembers.has(id))) {
           throw new ApiError(ERROR_CODES.BOT_NOT_FOUND, '引用的智能体不是当前会话成员')
         }
-        try {
+        const all = group && references.mentionAll
+        const selected = group
+          ? messageReceivers(text, members, references.mentionBotIds, all)
+          : references.mentionBotIds
+        const targetId = selected[0] ?? (group ? conversation.leader_bot_id : [...botMembers][0])
+        if (!targetId) throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '没有智能体承接这条消息')
+        const recipients = selected.length ? selected : [targetId]
+        if (!group)
           await requireRunnableBot(tx, conversation.team_id, targetId, { allowOffline: !input.skillIds?.length })
-        } catch (error) {
-          if (
-            !explicit &&
-            conversation.kind === 'group' &&
-            error instanceof ApiError &&
-            error.code === ERROR_CODES.BOT_UNAVAILABLE
-          ) {
-            throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '当前 Leader 无法承接，请 @ 一个可用的智能体')
-          }
-          throw error
+        const relayScope = { teamId: conversation.team_id, conversationId }
+        let relay = group ? await readActiveBotRelay(tx, relayScope) : undefined
+        if (relay?.status === 'paused') {
+          const previous = await latestBotRelayRun(tx, relay)
+          await updateBotRelay(
+            tx,
+            relay,
+            { status: 'finished', end_reason: 'ended_by_member', pending_bot_ids: [] },
+            previous?.id,
+          )
+          relay = undefined
         }
         if (input.skillIds?.length) {
           const skills = await readBotSkillCandidates(tx, conversation.team_id, [targetId])
@@ -894,6 +920,7 @@ export function createBotConversationsService(db: Database) {
               blocks: [{ type: 'text', text }],
               references: {
                 ...references,
+                ...(group ? { relayRecipients: recipients } : {}),
                 ...(template ? { promptTemplate: { id: template.id, name: template.name, sourceText } } : {}),
               },
             },
@@ -901,24 +928,29 @@ export function createBotConversationsService(db: Database) {
           .returning()
         if (!message) throw new Error('未能保存 Bot 会话消息')
         // 运行的工具授权固定为触发人，其他成员的补充要求按各自身份排队。
-        const [active] = references.skillIds.length
-          ? []
-          : await tx
-              .select({ id: botRun.id })
-              .from(botRun)
-              .where(
-                and(
-                  eq(botRun.team_id, conversation.team_id),
-                  eq(botRun.conversation_id, conversationId),
-                  eq(botRun.bot_id, targetId),
-                  eq(botRun.status, 'running'),
-                  eq(botRun.stop_requested, false),
-                  eq(botRun.trigger_user_id, actor.id),
-                  inArray(botRun.kind, ['task', 'reply']),
-                ),
-              )
-              .for('update')
+        const [active] =
+          references.skillIds.length || recipients.length !== 1 || all
+            ? []
+            : await tx
+                .select({ id: botRun.id })
+                .from(botRun)
+                .where(
+                  and(
+                    eq(botRun.team_id, conversation.team_id),
+                    eq(botRun.conversation_id, conversationId),
+                    eq(botRun.bot_id, targetId),
+                    eq(botRun.status, 'running'),
+                    eq(botRun.stop_requested, false),
+                    eq(botRun.trigger_user_id, actor.id),
+                    inArray(botRun.kind, ['task', 'reply']),
+                  ),
+                )
+                .for('update')
         const delivery = active ? (deliveryMode === 'steer' ? 'steer' : 'follow_up') : 'queued'
+        const createdRelay =
+          group && !active && !relay
+            ? await openBotRelay(tx, { ...relayScope, messageId: message.id, actorId: actor.id, receivers: recipients })
+            : undefined
         const run =
           active ??
           (await enqueueBotRun(tx, {
@@ -928,6 +960,9 @@ export function createBotConversationsService(db: Database) {
             trigger_user_id: actor.id,
             trigger_message_id: message.id,
             input_version: 0,
+            ...(group
+              ? { relay_id: createdRelay?.id, hop: 0, relay_role: all ? 'all' : selected.length ? 'mention' : 'leader' }
+              : {}),
           }))
         if (delivery !== 'queued') {
           await tx.insert(botRunInput).values({
@@ -948,7 +983,12 @@ export function createBotConversationsService(db: Database) {
             updated_at: sql`clock_timestamp()`,
           })
           .where(and(eq(botConversation.id, conversation.id), eq(botConversation.team_id, conversation.team_id)))
-        return { message: messageView({ ...message, run_id: run.id }, actor.name), runId: run.id, delivery }
+        return {
+          message: messageView({ ...message, run_id: run.id }, actor.name),
+          runId: run.id,
+          delivery,
+          ...(createdRelay ? { relay: botRelayView(createdRelay, limits) } : {}),
+        }
       })
     },
     /**
@@ -1020,7 +1060,12 @@ export function createBotConversationsService(db: Database) {
           return [{ id, botId, status, teamQueuePosition, ...(workerOnline ? {} : { queueReason: 'worker_offline' }) }]
         },
       )
+      const relay =
+        conversation.kind === 'group'
+          ? await readActiveBotRelay(db, { teamId: conversation.team_id, conversationId })
+          : undefined
       return {
+        ...(relay ? { activeRelay: botRelayView(relay, limits) } : {}),
         items: rows.map(toEvent),
         cursor: (rows.at(-1)?.sequence ?? cursor ?? 0n).toString(),
         resetRequired,

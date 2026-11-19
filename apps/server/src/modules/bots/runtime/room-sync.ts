@@ -55,9 +55,10 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
       : Promise.resolve([]),
   ])
   const after = session?.cursor ?? 0n
-  const before = input
-    ? lt(botMessage.sequence, input.sequence)
-    : lte(botMessage.created_at, run.started_at ?? run.created_at)
+  const before =
+    input && !run.relay_id
+      ? lt(botMessage.sequence, input.sequence)
+      : lte(botMessage.created_at, run.started_at ?? run.created_at)
   const limit = session?.seededAt ? syncLimit : SEED_LIMIT
   const alreadyDelivered = db
     .select({ id: botRunInput.id })
@@ -80,6 +81,7 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
       and(
         scope,
         before,
+        input ? ne(botMessage.id, input.id) : undefined,
         gt(botMessage.sequence, after),
         notExists(alreadyDelivered),
         session?.seededAt ? or(ne(botMessage.speaker_kind, 'bot'), ne(botMessage.speaker_id, run.bot_id)) : undefined,
@@ -89,7 +91,10 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
     .limit(limit)
   const omitted = BigInt(rows[0]?.total ?? '0') - BigInt(rows.length)
   const included = rows
-  const cursor = input?.sequence ?? included[0]?.sequence ?? after
+  const cursor = [input?.sequence, included[0]?.sequence].reduce<bigint>(
+    (max, value) => (value !== undefined && value > max ? value : max),
+    after,
+  )
   const relevant = input ? [...included, input] : included
   const idsOf = (kind: string) => [
     ...new Set(relevant.flatMap((row) => (row.kind === kind && row.speakerId ? [row.speakerId] : []))),

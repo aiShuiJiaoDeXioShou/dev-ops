@@ -7,7 +7,7 @@ import { botRun } from '../../src/modules/bots/bots.tables.ts'
 import { createBotTestDatabase } from '../support/bot-database.ts'
 import { seedBotWorkflowFixture } from '../support/bot-workflow-fixtures.ts'
 
-test('群组按 Leader 或唯一引用路由，移出成员即拒绝读取，转交保留已有历史', async (t) => {
+test('群组按 Leader 或点名路由，移出成员即拒绝读取，转交保留已有历史', async (t) => {
   const { db, config, cleanup } = await createBotTestDatabase(t)
   const app = createHttpApp({ ...config, GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 90).toString('base64') })
   cleanup.push(() => app.close())
@@ -56,15 +56,16 @@ test('群组按 Leader 或唯一引用路由，移出成员即拒绝读取，转
       .where(eq(botRun.id, String(runId)))
     assert.equal(row?.id, receiver)
   }
-  const ambiguous = await post(messages, { clientRequestId: randomUUID(), text: '@任务助理 @复核 Bot 核对' })
-  assert.equal(ambiguous.code, 'BOT_MENTION_AMBIGUOUS')
+  const multi = await post(messages, { clientRequestId: randomUUID(), text: '@任务助理 @复核 Bot 核对' })
+  assert.equal(multi.code, 'OK')
+  assert.deepEqual(multi.data.message.body.references.relayRecipients, [botId, otherBotId])
   assert.equal((await get(room, viewerUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
   assert.equal(
     (await post(`${room}/members/add`, { kind: 'user', memberId: otherUser.userId })).code,
     'VALIDATION_ERROR',
   )
   assert.equal((await post(`${room}/members/add`, { kind: 'user', memberId: viewerUser.userId })).code, 'OK')
-  assert.equal((await get(messages, viewerUser)).data.items.length, 2)
+  assert.equal((await get(messages, viewerUser)).data.items.length, 3)
   assert.equal(
     (await post(messages, { clientRequestId: randomUUID(), text: '尝试发送' }, viewerUser)).code,
     'FORBIDDEN',
@@ -103,5 +104,5 @@ test('群组按 Leader 或唯一引用路由，移出成员即拒绝读取，转
   assert.equal((await get(messages, viewerUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
   const disabled = await post(otherBotPath + '/disable', { configVersion: binding.data.configVersion }, devUser)
   assert.equal(disabled.code, 'OK', disabled.message)
-  assert.equal((await post(messages, { clientRequestId: randomUUID(), text: '默认承接' })).code, 'BOT_NO_RECEIVER')
+  assert.equal((await post(messages, { clientRequestId: randomUUID(), text: '默认承接' })).code, 'OK')
 })

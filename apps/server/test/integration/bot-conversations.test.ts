@@ -89,9 +89,10 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   ])
   assert.equal(first.code, 'OK', first.message)
   assert.equal(first.data.runId, duplicate.data.runId)
-  assert.equal((await post(messagePath, devUser, { ...message, mentionBotId: botId })).code, 'IDEMPOTENCY_CONFLICT')
+  assert.equal((await post(messagePath, devUser, { ...message, mentionBotIds: [botId] })).code, 'IDEMPOTENCY_CONFLICT')
   assert.equal(
-    (await post(messagePath, devUser, { ...message, clientRequestId: randomUUID(), mentionBotId: randomUUID() })).code,
+    (await post(messagePath, devUser, { ...message, clientRequestId: randomUUID(), mentionBotIds: [randomUUID()] }))
+      .code,
     'BOT_NOT_FOUND',
   )
   const second = await post(messagePath, devUser, {
