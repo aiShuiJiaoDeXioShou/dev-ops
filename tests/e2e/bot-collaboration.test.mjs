@@ -51,10 +51,10 @@ async function verifyBotCollaboration(t, live) {
   const runner = live
     ? runBotSession
     : async (options) => {
-        if (options.tools.some(({ name }) => name === 'submit_task_result')) {
-          const read = options.tools.find(({ name }) => name === 'platform_api_call')
-          const submit = options.tools.find(({ name }) => name === 'submit_task_result')
-          assert.ok(read && submit)
+        const read = options.tools.find(({ name }) => name === 'platform_api_call')
+        const submit = options.tools.find(({ name }) => name === 'submit_task_result')
+        assert.ok(read)
+        if (submit) {
           const data = await read.execute({ method: 'GET', path: projectsPath }, options.signal)
           assert.equal(data.isError, false, data.text)
           assert.match(data.text, /Bot 验收项目/u)
@@ -68,8 +68,24 @@ async function verifyBotCollaboration(t, live) {
             options.signal,
           )
           assert.equal(result.isError, undefined, result.text)
+          return reply(options)
         }
-        return reply(options)
+        const identify = options.tools.find(({ name }) => name === 'get_current_context')
+        assert.ok(identify)
+        const identity = await identify.execute({}, options.signal)
+        assert.equal(identity.isError, undefined, identity.text)
+        const scope = JSON.parse(identity.text)
+        assert.equal(scope.teamId, teamId)
+        assert.equal(scope.userId, user.id)
+        assert.equal(scope.role, 'admin')
+        const projects = await read.execute(
+          { method: 'GET', path: `/api/v1/teams/${scope.teamId}/projects` },
+          options.signal,
+        )
+        assert.equal(projects.isError, false, projects.text)
+        const data = JSON.parse(projects.text).data
+        assert.equal(data.total, 1)
+        return createFauxBotRunner(`「${scope.teamName}」共有 ${data.total} 个项目。`)(options)
       }
   const logs = []
   const worker = createBotWorker(config, runner, (level, message, context) => logs.push({ level, message, context }), {
@@ -87,7 +103,7 @@ async function verifyBotCollaboration(t, live) {
   )
   const bot = checked(
     await post(`${team}/bots`, {
-      name: '协作验收助理',
+      name: live ? '协作验收助理' : '小林',
       ownerUserId: user.id,
       responsibility: '按成员明确要求核对团队项目与交付',
       modelBinding: { connectionId: connection.id, modelId: live ? 'deepseek-flash' : 'test-chat' },
@@ -99,7 +115,7 @@ async function verifyBotCollaboration(t, live) {
   const sendStarted = performance.now()
   const sent = checked(
     await post(`${roomPath}/messages`, {
-      text: '请直接回复“就绪”。',
+      text: live ? '请直接回复“就绪”。' : '我当前有多少个项目？在 devop 团队当中？',
       clientRequestId: randomUUID(),
     }),
   )
@@ -111,11 +127,13 @@ async function verifyBotCollaboration(t, live) {
   assert.ok(feedback, '发出消息后应能读取排队或执行反馈')
   assert.ok(performance.now() - sendStarted < 3_000, '排队反馈必须在 3 秒内可见')
   assert.equal(checked(await request(`${roomPath}/tasks`)).items.length, 0)
-  await waitFor(
+  const history = await waitFor(
     async () => checked(await request(`${roomPath}/messages`)),
     ({ items }) => items.some((message) => message.speakerKind === 'bot' && message.runId === sent.runId),
     live ? 60_000 : 15_000,
   )
+  if (!live)
+    assert.match(history.items.find(({ speakerKind }) => speakerKind === 'bot')?.body.blocks[0].text, /共有 1 个项目/u)
   const created = checked(
     await post(`${roomPath}/tasks`, {
       title: '核对验收项目',
