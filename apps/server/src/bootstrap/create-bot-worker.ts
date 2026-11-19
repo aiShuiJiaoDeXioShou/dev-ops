@@ -14,6 +14,7 @@ import {
   publishBotModelCatalog,
   type BotModelCatalogEntry,
 } from '../modules/bots/bots.catalog.ts'
+import { enqueueBotMemoryJobs } from '../modules/bots/bots.memory-jobs.ts'
 import { runPendingBotLogin, type BotProviderLogin } from '../modules/bots/runtime/login-runner.ts'
 import { catalogBotApis } from '../modules/bots/bots.api-catalog.ts'
 import { createBotApiInvoker, type BotCallLog } from '../modules/bots/runtime/api-invoker.ts'
@@ -76,6 +77,8 @@ export function createBotWorker(
     })
   let timer: NodeJS.Timeout | undefined
   let catalogTimer: NodeJS.Timeout | undefined
+  let memoryTimer: NodeJS.Timeout | undefined
+  let memoryJob: Promise<void> | undefined
   let catalogHeartbeat: Promise<void> | undefined
   let loginJob: Promise<void> | undefined
   let polling: Promise<void> | undefined
@@ -123,6 +126,16 @@ export function createBotWorker(
       })
   }
 
+  function scheduleMemories() {
+    if (memoryJob || shutdown.signal.aborted) return
+    memoryJob = enqueueBotMemoryJobs(db)
+      .then(() => undefined)
+      .catch(() => log('error', '未能安排 Bot 记忆整理', {}))
+      .finally(() => {
+        memoryJob = undefined
+      })
+  }
+
   function reportOnline() {
     if (catalogHeartbeat || shutdown.signal.aborted) return
     catalogHeartbeat = heartbeatBotModelCatalog(db)
@@ -147,6 +160,7 @@ export function createBotWorker(
         void pollOnce()
         pollLogin()
       }, POLL_INTERVAL_MS)
+      memoryTimer = setInterval(scheduleMemories, config.BOT_MEMORY_CONSOLIDATION_INTERVAL_MINUTES * 60_000)
       pollLogin()
       await pollOnce()
       log('info', 'Bot 执行服务已启动', { workerId: owner, ...limits })
@@ -159,8 +173,9 @@ export function createBotWorker(
         shutdown.abort()
         if (timer) clearInterval(timer)
         if (catalogTimer) clearInterval(catalogTimer)
+        if (memoryTimer) clearInterval(memoryTimer)
         await polling
-        await Promise.all([...active, loginJob, catalogHeartbeat])
+        await Promise.all([...active, loginJob, catalogHeartbeat, memoryJob])
         await Promise.all([database.close(), apiApp.close()])
       })()
       await closing

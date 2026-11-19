@@ -10,14 +10,21 @@ import { requireActor } from '../identity/identity.actor.ts'
 import { requireTeamMember, type SessionUser } from '../identity/identity.session.ts'
 import { botPromptTemplate } from './bots.platform.tables.ts'
 
-const uuid = Type.String({ format: 'uuid' })
+const uuid = Type.String({ pattern: '^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$' })
 const fields = {
   name: Type.String({ minLength: 1, maxLength: 40, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }),
   description: Type.String({ minLength: 1, maxLength: 200 }),
   body: Type.String({ minLength: 1, maxLength: 16000 }),
 }
 const body = Type.Object(fields, { additionalProperties: false })
-const view = Type.Object({ id: uuid, teamId: uuid, ...fields, updatedAt: Type.String() })
+const view = Type.Object({
+  id: uuid,
+  teamId: uuid,
+  name: Type.String(),
+  description: Type.String(),
+  body: Type.String(),
+  updatedAt: Type.String(),
+})
 const viewResponse = apiResponseSchema(view)
 const teamParams = Type.Object({ teamId: uuid })
 const templateParams = Type.Object({ templateId: uuid })

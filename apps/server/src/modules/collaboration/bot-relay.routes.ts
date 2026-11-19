@@ -33,7 +33,9 @@ export const botRelayRoutes: FastifyPluginAsyncTypebox<{ db: Database; limits: B
   app,
   { db, limits },
 ) => {
-  const params = Type.Object({ relayId: Type.String({ format: 'uuid' }) })
+  const params = Type.Object({
+    relayId: Type.String({ pattern: '^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$' }),
+  })
   const body = Type.Object({ version: Type.Integer({ minimum: 1 }) }, { additionalProperties: false })
   for (const action of ['continue', 'end', 'stop'] as const) {
     const label = { continue: '继续暂停的群聊接力', end: '结束群聊接力', stop: '停止群聊接力与当前运行' }[action]

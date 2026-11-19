@@ -53,8 +53,12 @@ function toMemoryEntry(row: MemoryRow): MemoryEntry {
   return { id: row.id, scope: knownScope(row), content: row.content, essential: row.essential }
 }
 
+/** 整理归档的历史仍可追溯，但不再注入常驻上下文或占用可编辑容量。 */
+export const activeMemory = sql`coalesce(${botMemory.source_detail}->>'archived', 'false') <> 'true'`
+
 function visible(scope: MemoryScope) {
   return and(
+    activeMemory,
     eq(botMemory.team_id, scope.teamId),
     eq(botMemory.bot_id, scope.botId),
     or(eq(botMemory.scope, 'bot'), and(eq(botMemory.scope, 'user'), eq(botMemory.user_id, scope.userId))),
@@ -87,6 +91,7 @@ async function assertBudget(tx: BotRunTransaction, scope: MemoryScope, entry: Me
       and(
         eq(botMemory.team_id, scope.teamId),
         eq(botMemory.bot_id, scope.botId),
+        activeMemory,
         eq(botMemory.essential, true),
         replacing ? ne(botMemory.id, replacing) : undefined,
         entry.scope === 'user' ? or(eq(botMemory.scope, 'bot'), eq(botMemory.user_id, scope.userId)) : undefined,
@@ -107,7 +112,12 @@ export async function addScopedMemory(
   tx: BotRunTransaction,
   scope: MemoryScope,
   entry: MemoryDraft,
-  source: { userId: string; conversationId?: string; kind: 'user' | 'bot' },
+  source: {
+    userId: string
+    conversationId?: string
+    kind: 'user' | 'bot'
+    consolidation?: { runId: string; from: string; to: string; conversationIds: string[]; mergedMemoryIds: string[] }
+  },
 ) {
   const content = checkedContent(entry.content)
   const normalized = normalizeMemory(content)
@@ -117,7 +127,7 @@ export async function addScopedMemory(
     .from(botMemory)
     .where(and(within, eq(botMemory.normalized_content, normalized)))
   if (previous) return previous
-  const [total] = await tx.select({ amount: count() }).from(botMemory).where(within)
+  const [total] = await tx.select({ amount: count() }).from(botMemory).where(and(within, activeMemory))
   if ((total?.amount ?? 0) >= (entry.scope === 'bot' ? BOT_LIMIT : USER_LIMIT)) limitExceeded()
   await assertBudget(tx, scope, { ...entry, content })
   const [saved] = await tx
@@ -132,6 +142,7 @@ export async function addScopedMemory(
       essential: entry.essential,
       source_user_id: source.userId,
       source_conversation_id: source.conversationId,
+      ...(source.consolidation ? { source_kind: 'consolidation', source_detail: source.consolidation } : {}),
       updated_by_kind: source.kind,
     })
     .returning()

@@ -300,13 +300,21 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 | `BOT_MODEL_CONNECTION_UNAVAILABLE` | 模型连接已停用或登录失败           |
 | `BOT_MODEL_NOT_IN_CATALOG`         | 所选模型不在模型目录中             |
 | `BOT_CONVERSATION_NOT_FOUND`       | 会话不存在或用户不可见             |
-| `BOT_MENTION_AMBIGUOUS`            | 会话消息同时指定多个 Bot           |
 | `BOT_NO_RECEIVER`                  | 会话没有可用的承接 Bot             |
 | `BOT_TASK_STATE_CONFLICT`          | 任务状态拒绝该操作                 |
 | `BOT_RUN_STATE_CONFLICT`           | 运行状态拒绝该操作                 |
 | `BOT_API_FORBIDDEN`                | 委托调用命中平台接口排除规则       |
 | `BOT_MEMORY_LIMIT`                 | 记忆条数或常驻长度达到上限         |
 | `BOT_MEMORY_SECRET`                | 内容包含疑似凭据                   |
+| `BOT_CONTEXT_TOO_LARGE`            | 团队上下文超过 16 KiB              |
+| `BOT_BUDGET_EXHAUSTED`             | 团队当月已知费用达到预算           |
+| `BOT_MCP_SERVER_INVALID`           | 远程 MCP 配置、地址或凭据无效      |
+| `BOT_PROMPT_TEMPLATE_CONFLICT`     | 团队已存在同名提示模板             |
+| `BOT_MODEL_OVERRIDE_INVALID`       | 模型无法通过当前 Bot 的连接使用    |
+| `BOT_SESSION_UNAVAILABLE`          | 会话条目不可用                     |
+| `BOT_BRANCH_UNSUPPORTED`           | 当前会话或消息不允许编辑或切换分支 |
+| `BOT_RELAY_STATE_CONFLICT`         | 接力版本或状态已变化               |
+| `BOT_RUN_BUSY`                     | 会话有运行在途，无法执行该操作     |
 | `BOT_LOGIN_FAILED`                 | 订阅登录失败、超时或取消           |
 
 ## 需求与 Bug 流程模板
@@ -340,3 +348,38 @@ Worker 使用 Pi 内存会话，按会话与 Bot 将脱敏条目、分支叶子�
 `POST /api/v1/bot-conversations/:conversationId/bots/:botId/compact` 为具有写权限的会话成员排队一次主动压缩，成功返回运行 ID。有在途运行时返回 `BOT_RUN_BUSY`。通过 `events` 查询压缩开始、完成及用量，原始条目仍保留。
 
 `POST /api/v1/bot-conversations/:conversationId/bots/:botId/reseed` 允许有会话访问权限的团队管理员清除指定 Bot 已标记为损坏的会话树。接口返回 Bot ID，下一次运行从房间记录重新播种。会话记录不可用时，运行返回 `session_unavailable`，维护操作返回 `BOT_SESSION_UNAVAILABLE`。
+
+### V0.6 会话与团队接口
+
+以下路径以 `/api/v1` 为前缀，响应采用统一信封。团队和会话访问权限由 Server 校验。
+
+| 方法和路径                                                                          | 行为                                                                                                                                   |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /bot-conversations/:conversationId/messages`                                  | 发送普通消息、按序点名 `mentionBotIds` 或群内 `mentionAll`。支持 `promptTemplateId` 与 `deliveryMode: "steer"`。返回已排队、追加或插话 |
+| `POST /bot-conversations/:conversationId/messages/:messageId/edit-resend`           | 在私聊编辑本人消息并新建分支                                                                                                           |
+| `POST /bot-conversations/:conversationId/branches/switch`                           | 切换私聊消息的相邻版本                                                                                                                 |
+| `POST /bot-conversations/:conversationId/fork`                                      | 把指定消息及其前面的可见历史复制到新会话                                                                                               |
+| `POST /bot-conversations/:conversationId/bots/:botId/settings`                      | 更新会话的模型、思考等级覆盖。传空值恢复 Bot 默认值                                                                                    |
+| `POST /bot-relays/:relayId/continue`、`/end`、`/stop`                               | 携带接力版本，继续、结束或停止整条群聊接力                                                                                             |
+| `GET /teams/:teamId/bot-context`、同路径 `POST`                                     | 读取共享指令，管理员按版本保存                                                                                                         |
+| `GET /teams/:teamId/bot-prompt-templates`、同路径 `POST`                            | 搜索、分页读取以及创建提示模板                                                                                                         |
+| `POST /bot-prompt-templates/:templateId/update`、`/remove`                          | 管理团队提示模板                                                                                                                       |
+| `GET /teams/:teamId/bot-mcp-servers`、同路径 `POST`                                 | 读取远程 MCP 列表。管理员可看到地址、授权及凭据引用并创建连接                                                                          |
+| `POST /bot-mcp-servers/:serverId/update`、`/enable`、`/disable`、`/remove`、`/test` | 管理员更新、启停、移除和测试远程连接                                                                                                   |
+| `GET /teams/:teamId/bot-usage`、`POST /teams/:teamId/bot-budget`                    | 查询 UTC 自然月的 Token、缓存及费用统计，管理员设置已知费用预算                                                                        |
+| `POST /bots/:botId/memories/consolidate`                                            | 管理员按需排队整理 Bot 记忆                                                                                                            |
+
+群聊迁移采用 `mentionBotIds`，旧的单数 `mentionBotId` 与 `BOT_MENTION_AMBIGUOUS` 已移除。
+
+### V0.6 Worker 配置
+
+| 变量                                        | 默认值 | 用途                            |
+| ------------------------------------------- | ------ | ------------------------------- |
+| `BOT_RUN_TIMEOUT_SECONDS`                   | 1800   | 一次 Bot 运行的时间上限         |
+| `BOT_RESUME_LIMIT`                          | 2      | Worker 中断后允许的自动续跑次数 |
+| `BOT_ROOM_SYNC_LIMIT`                       | 50     | 每次运行带入的房间增量消息上限  |
+| `BOT_RELAY_HOP_LIMIT`                       | 4      | 群聊每轮接力的跳数额度          |
+| `BOT_RELAY_REPLY_LIMIT`                     | 10     | 群聊每轮接力的回复额度          |
+| `BOT_MEMORY_CONSOLIDATION_INTERVAL_MINUTES` | 10     | Worker 检查整理记忆资格的间隔   |
+
+远程 MCP 按 Bot 授权，只允许连接到通过公网地址校验的 HTTPS 服务。团队凭据库只提供授权时所需的凭据引用，密钥由 Worker 在连接时读取并写入请求头。

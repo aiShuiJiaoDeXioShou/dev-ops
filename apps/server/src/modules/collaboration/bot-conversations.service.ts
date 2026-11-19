@@ -5,6 +5,7 @@ import { Check } from 'typebox/value'
 import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
+import { isBotBudgetExhausted } from '../bots/bots.budget-read.ts'
 import { requireBotPromptTemplate } from '../bots/bots.prompt-templates.ts'
 import { readBotSessionSettings, saveBotSessionSetting } from '../bots/bots.session-settings.ts'
 import { botRunInput, botSession, botSessionEntry } from '../bots/bots.session.tables.ts'
@@ -946,6 +947,9 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
                   ),
                 )
                 .for('update')
+        if (!active && (await isBotBudgetExhausted(tx, conversation.team_id))) {
+          throw new ApiError(ERROR_CODES.BOT_BUDGET_EXHAUSTED, '团队本月 Bot 预算已用完')
+        }
         const delivery = active ? (deliveryMode === 'steer' ? 'steer' : 'follow_up') : 'queued'
         const createdRelay =
           group && !active && !relay

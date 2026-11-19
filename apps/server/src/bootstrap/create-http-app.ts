@@ -37,6 +37,8 @@ import { createBotMemoryService } from '../modules/bots/bots.memory.service.ts'
 import { botsRoutes } from '../modules/bots/bots.routes.ts'
 import { botConnectionsRoutes } from '../modules/bots/bots.connections.routes.ts'
 import { botMcpServerRoutes } from '../modules/bots/bots.mcp-servers.routes.ts'
+import { teamBotContextRoutes } from '../modules/bots/bots.team-context.ts'
+import { botUsageRoutes } from '../modules/bots/bots.usage.routes.ts'
 import { botPromptTemplateRoutes } from '../modules/bots/bots.prompt-templates.ts'
 import { botRelayRoutes } from '../modules/collaboration/bot-relay.routes.ts'
 import { botConversationsRoutes } from '../modules/collaboration/bot-conversations.routes.ts'
@@ -158,6 +160,8 @@ export function createHttpApp(
     db: services.database.db,
     cipher: botCipher,
   })
+  app.register(teamBotContextRoutes, { prefix: '/api/v1', db: services.database.db })
+  app.register(botUsageRoutes, { prefix: '/api/v1', db: services.database.db })
   app.register(botPromptTemplateRoutes, { prefix: '/api/v1', db: services.database.db })
   const relayLimits = { hop: config.BOT_RELAY_HOP_LIMIT, reply: config.BOT_RELAY_REPLY_LIMIT }
   app.register(botRelayRoutes, { prefix: '/api/v1', db: services.database.db, limits: relayLimits })

@@ -29,6 +29,7 @@ import { createPgCredentialStore } from './credential-store.ts'
 import { createCurrentContextTool } from './current-context-tool.ts'
 import { readBotMcpServers } from './mcp-configuration.ts'
 import { fetchBotMcp } from './mcp-fetch.ts'
+import { executeBotMemoryConsolidation } from './memory-consolidation.ts'
 import { createPgMemoryStore } from './memory-store.ts'
 import { fetchBotPublicPage } from './public-page.ts'
 import { createSkillViewTool } from './skill-tool.ts'
@@ -74,10 +75,6 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
   const { db, config } = options
   if (!run.lease_owner) throw new Error('Bot 运行缺少租约领取者')
   const lease = { id: run.id, owner: run.lease_owner, epoch: run.lease_epoch }
-  if (!isConversationBotRun(run)) {
-    await db.transaction((tx) => finishBotRun(tx, lease, unavailable))
-    return
-  }
   const cancellation = new AbortController()
   const signal = AbortSignal.any([cancellation.signal, shutdown])
   let heartbeat: Promise<void> | undefined
@@ -98,11 +95,21 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         heartbeat = undefined
       })
   }, config.BOT_LEASE_HEARTBEAT_SECONDS * 1_000)
-  const sink = createPgRunSink(db, run, lease, () => cancellation.abort(), {
-    hop: config.BOT_RELAY_HOP_LIMIT,
-    reply: config.BOT_RELAY_REPLY_LIMIT,
-  })
+  const sink = isConversationBotRun(run)
+    ? createPgRunSink(db, run, lease, () => cancellation.abort(), {
+        hop: config.BOT_RELAY_HOP_LIMIT,
+        reply: config.BOT_RELAY_REPLY_LIMIT,
+      })
+    : null
   try {
+    if (run.kind === 'memory_consolidation') {
+      await executeBotMemoryConsolidation(options, run, lease, signal)
+      if (leaseIsValid && shutdown.aborted) await releaseInterruptedBotRun(db, lease, config.BOT_RESUME_LIMIT)
+      else if (leaseIsValid && cancellation.signal.aborted)
+        await db.transaction((tx) => finishBotRun(tx, lease, { status: 'stopped' }))
+      return
+    }
+    if (!sink || !isConversationBotRun(run)) throw new Error('会话运行缺少会话标识')
     const input = await loadBotRunContext(db, run, config.BOT_ROOM_SYNC_LIMIT)
     if (!input) {
       await sink.finish(unavailable)
@@ -203,7 +210,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
     options.onFailure(run)
     // 写入轮次失败也要清除定时刷新。不能以丢失事件的运行结果标成功。
     try {
-      await sink.flush()
+      await sink?.flush()
     } catch {
       cancellation.abort()
     }

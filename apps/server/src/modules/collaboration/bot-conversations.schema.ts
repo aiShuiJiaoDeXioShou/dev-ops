@@ -126,12 +126,17 @@ export const forkConversationBody = Type.Object(
   { additionalProperties: false },
 )
 export const conversationBotParams = Type.Object({ conversationId: uuid, botId: uuid })
+const nullableModelId = Type.Union([Type.String(), Type.Null()])
 export const conversationSettingsResponse = apiResponseSchema(
-  Type.Object({ botId: uuid, ...botSessionSettingBody.properties }),
+  Type.Object({
+    botId: uuid,
+    modelId: nullableModelId,
+    thinkingLevel: botSessionSettingBody.properties.thinkingLevel,
+  }),
 )
 const botSetting = Type.Object({
   botId: uuid,
-  modelId: botSessionSettingBody.properties.modelId,
+  modelId: nullableModelId,
   thinkingLevel: botSessionSettingBody.properties.thinkingLevel,
   effectiveThinkingLevel: Type.Union([effectiveBotThinkingLevel, Type.Null()]),
   isOverrideValid: Type.Boolean(),

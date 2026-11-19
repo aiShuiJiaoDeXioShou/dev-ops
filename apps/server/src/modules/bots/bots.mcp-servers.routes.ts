@@ -16,7 +16,7 @@ import { bot } from './bots.tables.ts'
 import { tryBotMcpConnection } from './runtime/mcp-configuration.ts'
 import { parseBotMcpUrl } from './runtime/mcp-fetch.ts'
 
-const uuid = Type.String({ format: 'uuid' })
+const uuid = Type.String({ pattern: '^[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$' })
 const status = Type.Union([Type.Literal('enabled'), Type.Literal('disabled')])
 const exposure = Type.Union([Type.Literal('direct'), Type.Literal('deferred')])
 const botIds = Type.Array(uuid, { maxItems: 100, uniqueItems: true })

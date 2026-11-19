@@ -11,15 +11,18 @@ import {
   type BotRelayLimits,
 } from '../collaboration/bot-relay.repository.ts'
 import { botConversationBotSetting, botRoomRelay } from '../collaboration/bot-relay.tables.ts'
-import { appendBotEvents } from '../collaboration/bot-events.repository.ts'
 import { botTask } from '../tasks/bot-tasks.tables.ts'
+import { enqueueBotRun, writeRunState, type BotRunRecord, type BotRunTransaction } from './bots.run-enqueue.ts'
 import { isBotBudgetExhausted } from './bots.budget-read.ts'
+import { recordBotMemoryJob } from './bots.memory-jobs.ts'
 import { botRunInput } from './bots.session.tables.ts'
 import { snapshotBotSkills } from './bots.skills.ts'
+import { addBotDailyUsage } from './bots.usage.repository.ts'
 import { bot, botRun } from './bots.tables.ts'
 
-export type BotRunTransaction = Parameters<Parameters<Database['transaction']>[0]>[0]
-export type BotRunRecord = typeof botRun.$inferSelect
+export type { BotRunRecord, BotRunTransaction } from './bots.run-enqueue.ts'
+export { enqueueBotRun } from './bots.run-enqueue.ts'
+
 export type ConversationBotRunRecord = BotRunRecord & { conversation_id: string }
 
 /**
@@ -51,61 +54,6 @@ type FinishInput = {
   relayLimits?: BotRelayLimits
 } & ({ status: 'succeeded' | 'stopped' } | { status: 'failed'; failureKind: string; failureMessage: string })
 
-/**
- * 新增已由业务用例校验的运行，并在同一事务发布排队状态。
- * @param tx 创建消息或任务时使用的事务。
- * @param input 所属团队、会话、Bot、触发人和可选的任务或消息。
- * @returns 排队记录；创建失败时抛错。
- */
-export async function enqueueBotRun(
-  tx: BotRunTransaction,
-  input: Pick<
-    typeof botRun.$inferInsert,
-    | 'team_id'
-    | 'conversation_id'
-    | 'task_id'
-    | 'bot_id'
-    | 'trigger_user_id'
-    | 'trigger_message_id'
-    | 'input_version'
-    | 'kind'
-    | 'relay_id'
-    | 'relay_role'
-    | 'hop'
-  >,
-): Promise<BotRunRecord> {
-  const [run] = await tx
-    .insert(botRun)
-    .values({
-      ...input,
-      kind: input.kind ?? (input.task_id ? 'task' : 'reply'),
-      created_at: sql`clock_timestamp()`,
-      updated_at: sql`clock_timestamp()`,
-    })
-    .returning()
-  if (!run) throw new Error('未能创建 Bot 运行')
-  await writeRunState(tx, run)
-  return run
-}
-
-async function writeRunState(tx: BotRunTransaction, run: BotRunRecord, actorId?: string) {
-  if (!run.conversation_id) return
-  await appendBotEvents(tx, { teamId: run.team_id, conversationId: run.conversation_id, runId: run.id }, [
-    {
-      kind: 'run_status',
-      payload: {
-        runId: run.id,
-        botId: run.bot_id,
-        status: run.status,
-        failureKind: run.failure_kind,
-        failureMessage: run.failure_message,
-        stopRequested: run.stop_requested,
-        ...(actorId ? { actorId } : {}),
-      },
-    },
-  ])
-}
-
 function activeLease(lease: BotRunLease) {
   return and(
     eq(botRun.id, lease.id),
@@ -132,6 +80,7 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
 
     const previous = alias(botRun, 'previous_run')
     const teamRunning = alias(botRun, 'team_running')
+    const botRunning = alias(botRun, 'bot_running')
     const activeRelay = alias(botRoomRelay, 'active_relay')
     const relayForConversation = tx
       .select({ id: activeRelay.id })
@@ -162,6 +111,20 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
           or(sql`${botRun.relay_id} in (${relayForConversation})`, notExists(relayForConversation)),
           notExists(
             tx
+              .select({ id: botRunning.id })
+              .from(botRunning)
+              .where(
+                and(
+                  eq(botRunning.team_id, botRun.team_id),
+                  eq(botRunning.bot_id, botRun.bot_id),
+                  eq(botRunning.status, 'running'),
+                  or(eq(botRunning.kind, 'memory_consolidation'), eq(botRun.kind, 'memory_consolidation')),
+                ),
+              ),
+          ),
+
+          notExists(
+            tx
               .select({ id: previous.id })
               .from(previous)
               .where(
@@ -189,7 +152,11 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
             )}) < ${limits.perTeam}`,
         ),
       )
-      .orderBy(asc(botRun.created_at), asc(botRun.id))
+      .orderBy(
+        sql`case when ${botRun.kind} = 'memory_consolidation' then 1 else 0 end`,
+        asc(botRun.created_at),
+        asc(botRun.id),
+      )
       .limit(1)
       .for('update', { skipLocked: true })
     if (!candidate) return null
@@ -222,7 +189,9 @@ export async function claimBotRun(db: Database, owner: string, limits: BotQueueL
       if (rejected) {
         await updateTaskAfterRun(tx, rejected)
         await writeRunState(tx, rejected)
+        await requeuePendingInputs(tx, rejected)
         await settleBotRelay(tx, rejected)
+        if (rejected.kind === 'memory_consolidation') await recordBotMemoryJob(tx, rejected, 'skipped_budget')
       }
       return null
     }
@@ -434,6 +403,10 @@ export async function finishBotRun(tx: BotRunTransaction, lease: BotRunLease, ou
     .where(activeLease(lease))
     .returning()
   if (!run) return null
+  await addBotDailyUsage(tx, run, outcome.usage)
+  if (run.kind === 'memory_consolidation' && run.status !== 'succeeded') {
+    await recordBotMemoryJob(tx, run, run.failure_kind === 'model_unavailable' ? 'skipped_model' : 'failed')
+  }
   await updateTaskAfterRun(tx, run)
   await writeRunState(tx, run)
   await requeuePendingInputs(tx, run)
@@ -463,6 +436,7 @@ async function recoverClaim(tx: BotRunTransaction, run: BotRunRecord, resumeLimi
     await updateTaskAfterRun(tx, recovered)
     await requeuePendingInputs(tx, recovered)
     await settleBotRelay(tx, recovered)
+    if (recovered.kind === 'memory_consolidation') await recordBotMemoryJob(tx, recovered, 'failed')
   }
 }
 

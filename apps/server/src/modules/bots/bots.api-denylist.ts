@@ -44,6 +44,7 @@ const rules: readonly Rule[] = [
   { category: 'bot_management', path: /^\/bot-model-login-sessions(?:\/|$)/u },
   { category: 'bot_management', path: /^\/bot-tasks\/[^/]+\/(?:accept|request-changes|handoff)$/u },
   { category: 'bot_management', methods: ['POST'], path: /^\/bot-relays\/[^/]+\/(?:continue|end|stop)$/u },
+  { category: 'bot_management', methods: ['POST'], path: /^\/teams\/[^/]+\/(?:bot-context|bot-budget)$/u },
   { category: 'authentication', path: /^\/auth(?:\/|$)/u },
 ]
 

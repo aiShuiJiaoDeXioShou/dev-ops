@@ -11,6 +11,19 @@ const memory = Type.Object({
   scope,
   content: Type.String(),
   essential: Type.Boolean(),
+  source: Type.Optional(
+    Type.Object({
+      kind: Type.Union([Type.Literal('conversation'), Type.Literal('consolidation')]),
+      detail: Type.Optional(
+        Type.Object({
+          from: Type.String(),
+          to: Type.String(),
+          mergedMemoryIds: Type.Array(id),
+          conversationCount: Type.Integer({ minimum: 0 }),
+        }),
+      ),
+    }),
+  ),
   sourceUserName: Type.Union([Type.String(), Type.Null()]),
   sourceConversationId: Type.Union([id, Type.Null()]),
   sourceConversationName: Type.Union([Type.String(), Type.Null()]),

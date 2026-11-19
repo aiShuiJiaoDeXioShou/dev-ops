@@ -1,3 +1,5 @@
+import { Type } from 'typebox'
+import { Check } from 'typebox/value'
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
@@ -12,8 +14,10 @@ import type {
   BotMemoryUpdateInput,
   BotMemoryView,
 } from './bots.memory.schema.ts'
+import { enqueueBotMemoryJobs } from './bots.memory-jobs.ts'
 import { bot, botMemory } from './bots.tables.ts'
 import {
+  activeMemory,
   addScopedMemory,
   lockMemoryScope,
   memorySearchCondition,
@@ -22,6 +26,12 @@ import {
 } from './runtime/memory-store.ts'
 
 const PAGE_SIZE = 40
+const consolidationDetail = Type.Object({
+  from: Type.String(),
+  to: Type.String(),
+  conversationIds: Type.Array(Type.String()),
+  mergedMemoryIds: Type.Array(Type.String()),
+})
 type ReadDb = Pick<Database, 'select'>
 
 function unavailable(): never {
@@ -70,8 +80,21 @@ type MemoryDetailRow = Awaited<ReturnType<typeof detailQuery>>[number]
 function view(detail: MemoryDetailRow, actor: SessionUser, role: string): BotMemoryView {
   const { row, ...metadata } = detail
   if (row.scope !== 'user' && row.scope !== 'bot') throw new Error('数据库中的记忆范围不合法')
+  const consolidated = row.source_kind === 'consolidation'
+  const sourceDetail =
+    consolidated && Check(consolidationDetail, row.source_detail)
+      ? {
+          from: row.source_detail.from,
+          to: row.source_detail.to,
+          conversationCount: row.source_detail.conversationIds.length,
+          mergedMemoryIds: row.source_detail.mergedMemoryIds,
+        }
+      : undefined
   return {
     id: row.id,
+    source: consolidated
+      ? { kind: 'consolidation', ...(sourceDetail ? { detail: sourceDetail } : {}) }
+      : { kind: 'conversation' },
     botId: row.bot_id,
     scope: row.scope,
     essential: row.essential,
@@ -88,14 +111,21 @@ function checkDelegatedBot(botId: string) {
 }
 
 async function memoryById(db: ReadDb, id: string) {
-  const [row] = await db.select().from(botMemory).where(eq(botMemory.id, id))
+  const [row] = await db
+    .select()
+    .from(botMemory)
+    .where(and(eq(botMemory.id, id), activeMemory))
   if (!row) unavailable()
   checkDelegatedBot(row.bot_id)
   return row
 }
 
 function visibleInTeam(teamId: string, actorId: string) {
-  return and(eq(botMemory.team_id, teamId), or(eq(botMemory.scope, 'bot'), eq(botMemory.user_id, actorId)))
+  return and(
+    activeMemory,
+    eq(botMemory.team_id, teamId),
+    or(eq(botMemory.scope, 'bot'), eq(botMemory.user_id, actorId)),
+  )
 }
 
 async function getView(db: ReadDb, actor: SessionUser, id: string, role: string) {
@@ -107,6 +137,19 @@ async function getView(db: ReadDb, actor: SessionUser, id: string, role: string)
 /** 组装按团队、当前成员和 Bot 过滤的长期记忆管理。 */
 export function createBotMemoryService(db: Database) {
   return {
+    /**
+     * 为当前 Bot 排入当天的记忆整理。
+     * @param actor 本团队管理员。
+     * @param botId 需要整理的 Bot 标识。
+     * @returns 本次运行标识；忙碌或本日已整理时返回 null。
+     */
+    async consolidate(actor: SessionUser, botId: string) {
+      const [record] = await db.select({ teamId: bot.team_id }).from(bot).where(eq(bot.id, botId))
+      if (!record) unavailable()
+      await requireTeamMember(db, actor.id, record.teamId, ['admin'])
+      const [job] = await enqueueBotMemoryJobs(db, { teamId: record.teamId, botId, actorId: actor.id })
+      return { runId: job?.id ?? null }
+    },
     /** 列出本人的用户画像和团队 Bot 笔记，来源会话只对会话成员显示。 */
     async list(actor: SessionUser, teamId: string, filters: BotMemoryFilters) {
       const { role } = await requireTeamMember(db, actor.id, teamId)

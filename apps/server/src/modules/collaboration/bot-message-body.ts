@@ -9,6 +9,7 @@ export const botMessageBodySchema = Type.Object({
       cacheReadTokens: Type.Integer({ minimum: 0 }),
       cacheWriteTokens: Type.Integer({ minimum: 0 }),
       costUsd: Type.Number({ minimum: 0 }),
+      costKnown: Type.Optional(Type.Boolean()),
       turns: Type.Integer({ minimum: 0 }),
       durationMs: Type.Number({ minimum: 0 }),
     }),
