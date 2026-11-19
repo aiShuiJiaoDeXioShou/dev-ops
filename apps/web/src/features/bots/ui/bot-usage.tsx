@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { createIdempotencyKey, type ApiSuccessData } from '@dev-ops/api-client'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChartNoAxesColumn } from 'lucide-react'
-import { useSession } from '@/features/identity/model/session'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
@@ -119,7 +118,13 @@ function Counts({ usage }: { usage: Usage['total'] }) {
   )
 }
 
-function UsageContent({ teamId, canManage }: { teamId: string; canManage: boolean }) {
+/**
+ * 展示团队的月度用量、按智能体或日期汇总的费用与预算表单。
+ * @param props.teamId 当前团队标识。
+ * @param props.canManage 是否允许修改预算。
+ * @returns 用量与预算区块；查询失败支持重试，分页加载保留已有记录。
+ */
+export function BotUsage({ teamId, canManage }: { teamId: string; canManage: boolean }) {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const [botId, setBotId] = useState('')
   const [group, setGroup] = useState<'bot' | 'day'>('bot')
@@ -141,9 +146,9 @@ function UsageContent({ teamId, canManage }: { teamId: string; canManage: boolea
       ? bots.map((row) => ({ id: row.botId, label: row.name, usage: row }))
       : (data?.byDay ?? []).map((row) => ({ id: row.date, label: row.date, usage: row }))
   return (
-    <div className="work-padding grid content-start gap-4">
+    <div className="grid content-start gap-4">
       <header className="work-header">
-        <h1>用量与预算</h1>
+        <h2>用量与预算</h2>
       </header>
       <div className="row flex-wrap items-end">
         <label className="field">
@@ -230,15 +235,4 @@ function UsageContent({ teamId, canManage }: { teamId: string; canManage: boolea
       </ul>
     </div>
   )
-}
-
-/**
- * 展示当前团队的 Bot 用量、已知费用和预算。
- * @returns 支持月度、Bot 与每日视图的用量页。
- */
-export function Component() {
-  const { currentTeam, isReady, role } = useSession()
-  if (!isReady) return <DelayedPageSkeleton />
-  if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
-  return <UsageContent key={currentTeam.id} teamId={currentTeam.id} canManage={role === 'admin'} />
 }

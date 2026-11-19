@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { createIdempotencyKey, type ApiSuccessData } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useSession } from '@/features/identity/model/session'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/controls/button'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
-import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
 
 type Context = ApiSuccessData<'/api/v1/teams/{teamId}/bot-context', 'get'>
 const maxBytes = 16_384
@@ -113,20 +112,19 @@ function ContextForm({ teamId, isAdmin }: { teamId: string; isAdmin: boolean }) 
 }
 
 /**
- * 展示团队级 Bot 指令，管理员可保存新的版本。
- * @returns 当前团队的上下文页面。
+ * 展示团队共用的 Agent 指令及版本化编辑表单。
+ * @param props.teamId 当前团队标识。
+ * @param props.canManage 是否允许保存团队指令。
+ * @returns 团队上下文区块；查询或保存失败时保留重试入口与草稿。
  */
-export function Component() {
-  const { isReady, currentTeam, role } = useSession()
-  if (!isReady) return <DelayedPageSkeleton />
-  if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
+export function TeamBotContext({ teamId, canManage }: { teamId: string; canManage: boolean }) {
   return (
-    <div className="work-padding">
+    <section className="grid gap-4" aria-label="团队上下文">
       <header className="work-header">
-        <h1>团队上下文</h1>
+        <h2>团队上下文</h2>
         <p className="muted">这些指令会提供给本团队的 Bot，用于补充团队共用约定。</p>
       </header>
-      <ContextForm key={currentTeam.id} teamId={currentTeam.id} isAdmin={role === 'admin'} />
-    </div>
+      <ContextForm key={teamId} teamId={teamId} isAdmin={canManage} />
+    </section>
   )
 }

@@ -21,14 +21,8 @@ export function Component() {
           <NavLink to="memory" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
             记忆
           </NavLink>
-          <NavLink to="team-context" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
-            团队上下文
-          </NavLink>
           <NavLink to="prompt-templates" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
             提示模板
-          </NavLink>
-          <NavLink to="usage" className={({ isActive }) => cn('capability-tab', isActive && 'active')}>
-            用量与预算
           </NavLink>
         </nav>
         <Outlet context={detailHost} />

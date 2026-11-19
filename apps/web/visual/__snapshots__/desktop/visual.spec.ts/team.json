@@ -15,12 +15,13 @@
   "tabs": [
     "成员与权限",
     "连接与节点",
-    "模型配置"
+    "模型配置",
+    "Agent 管理"
   ],
   "rows": 0,
   "statusTexts": [],
   "documentOverflow": false,
-  "interactiveCount": 24,
+  "interactiveCount": 25,
   "nonPointerControls": [],
   "smallTargets": []
 }

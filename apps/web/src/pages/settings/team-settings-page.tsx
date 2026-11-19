@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { Plus, ShieldAlert } from 'lucide-react'
+import { BotUsage } from '@/features/bots/ui/bot-usage'
+import { TeamBotContext } from '@/features/bots/ui/team-bot-context'
 import { BotMcpServers } from '@/features/bots/ui/bot-mcp-servers'
 import { BotModelConnections } from '@/features/bots/ui/bot-model-connections'
 import { TeamGitConnections } from '@/features/code/ui/team-git-connections'
@@ -15,7 +17,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { EmptyState } from '@/shared/ui/page-state'
 
-const TAB_VALUES = ['members', 'connections', 'models'] as const
+const TAB_VALUES = ['members', 'connections', 'models', 'agents'] as const
 type TabValue = (typeof TAB_VALUES)[number]
 
 /** 判断 URL 页签参数是否为允许的团队设置分组。 */
@@ -24,7 +26,7 @@ function isTabValue(value: string | null): value is TabValue {
 }
 
 /**
- * 渲染团队管理，按 URL 页签展示成员、代码连接与节点、模型配置。
+ * 渲染团队管理，按 URL 页签展示成员、代码连接与节点、模型配置和 Agent 管理。
  * @returns 当前团队的管理页；未加入团队时提供创建团队入口。
  */
 export function Component() {
@@ -90,6 +92,7 @@ export function Component() {
           <TabsTrigger value="members">成员与权限</TabsTrigger>
           <TabsTrigger value="connections">连接与节点</TabsTrigger>
           <TabsTrigger value="models">模型配置</TabsTrigger>
+          <TabsTrigger value="agents">Agent 管理</TabsTrigger>
         </TabsList>
         <TabsContent value="members">
           {canManage ? (
@@ -114,6 +117,27 @@ export function Component() {
         </TabsContent>
         <TabsContent value="models">
           <BotModelConnections key={currentTeam.id} teamId={currentTeam.id} canManage={canManage} />
+        </TabsContent>
+        <TabsContent value="agents">
+          <Tabs
+            value={searchParams.get('agentTab') === 'usage' ? 'usage' : 'context'}
+            onValueChange={(value) => {
+              const next = new URLSearchParams(searchParams)
+              next.set('agentTab', value)
+              setSearchParams(next, { replace: true })
+            }}
+          >
+            <TabsList aria-label="Agent 管理分组">
+              <TabsTrigger value="context">团队上下文</TabsTrigger>
+              <TabsTrigger value="usage">用量与预算</TabsTrigger>
+            </TabsList>
+            <TabsContent value="context">
+              <TeamBotContext key={currentTeam.id} teamId={currentTeam.id} canManage={canManage} />
+            </TabsContent>
+            <TabsContent value="usage">
+              <BotUsage key={currentTeam.id} teamId={currentTeam.id} canManage={canManage} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
       <InviteMemberDialog teamId={currentTeam.id} open={inviteOpen} onOpenChange={setInviteOpen} />

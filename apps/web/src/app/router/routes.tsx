@@ -114,8 +114,7 @@ export function createAppRoutes(): RouteObject[] {
                 },
                 {
                   path: 'usage',
-                  lazy: () => import('@/pages/capabilities/bot-usage-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  element: <Navigate to="/settings/team?tab=agents&agentTab=usage" replace />,
                 },
                 {
                   path: 'prompt-templates',
@@ -124,8 +123,7 @@ export function createAppRoutes(): RouteObject[] {
                 },
                 {
                   path: 'team-context',
-                  lazy: () => import('@/pages/capabilities/bot-context-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  element: <Navigate to="/settings/team?tab=agents&agentTab=context" replace />,
                 },
                 {
                   path: 'connections',
