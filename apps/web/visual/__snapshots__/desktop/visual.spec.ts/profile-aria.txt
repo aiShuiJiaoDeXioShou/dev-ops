@@ -4,15 +4,20 @@
     - tab "个人资料" [selected]
     - tab "API Token"
   - tabpanel "个人资料":
-    - region "管理员":
-      - heading "管理员" [level=2]
+    - region "基本资料":
+      - heading "基本资料" [level=2]
       - button "编辑资料"
+      - heading "管理员" [level=3]
       - term: 邮箱
       - definition: admin@example.test
       - term: 当前团队
       - definition: DevOps 研发团队
+    - region "登录安全":
+      - heading "登录安全" [level=2]
       - text: 登录密码
       - button "修改密码"
+    - region "关联账号":
+      - heading "关联账号" [level=2]
       - paragraph: GitHub 账号
       - paragraph: 未绑定
       - button "绑定 GitHub 账号"

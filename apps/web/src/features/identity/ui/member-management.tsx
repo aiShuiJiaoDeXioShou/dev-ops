@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select } from '@/shared/ui/controls/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { teamInvitationsQueryOptions, teamMembersQueryOptions } from '../api/team-queries'
 import { useSession, type TeamRole } from '../model/session'
@@ -166,21 +166,17 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
   }
   return (
     <div className="team-admin-content">
-      <section>
-        <div className="section-heading">
-          <h2>成员与权限</h2>
-        </div>
+      <div>
         {error && !manageTarget && (
           <p role="alert" className="field-error">
             {error}
           </p>
         )}
         <div className="table-wrap">
-          <Table className="table">
+          <Table aria-label="成员" className="settings-table">
             <TableHeader>
               <TableRow>
-                <TableHead>成员</TableHead>
-                <TableHead>邮箱</TableHead>
+                <TableHead className="sm:w-1/2">成员</TableHead>
                 <TableHead>角色</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead className="text-right">操作</TableHead>
@@ -198,25 +194,30 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
                   }}
                 >
                   <TableCell>
-                    <span className="item-cell">
-                      <UserAvatar name={member.name} image={member.image} className="size-6" />
-                      <strong>{member.name}</strong>
-                      {member.userId === user?.id && <span className="badge">我</span>}
-                    </span>
+                    <div className="flex items-center gap-2.5">
+                      <UserAvatar name={member.name} image={member.image} className="hidden sm:inline-grid" />
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <strong className="font-medium wrap-anywhere">{member.name}</strong>
+                          {member.userId === user?.id && <span className="badge">我</span>}
+                        </div>
+                        <p className="text-xs text-muted-foreground wrap-anywhere">{member.email}</p>
+                      </div>
+                    </div>
                   </TableCell>
-                  <TableCell>{member.email}</TableCell>
-                  <TableCell>{ROLE_LABELS[member.role]}</TableCell>
+                  <TableCell className="whitespace-nowrap">{ROLE_LABELS[member.role]}</TableCell>
                   <TableCell>
                     <span className="status">
                       <span className={member.status === 'active' ? 'dot green' : 'dot'} />
                       {member.status === 'active' ? '正常' : '已停用'}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="w-px text-right">
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
+                      variant="ghost"
+                      className="max-md:min-h-11"
                       disabled={!canManage}
                       onClick={() => {
                         setError('')
@@ -231,11 +232,11 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
             </TableBody>
           </Table>
         </div>
-      </section>
+      </div>
       {canManage && (
-        <section>
-          <div className="section-heading">
-            <h2>待接受邀请</h2>
+        <section className="settings-section" aria-labelledby="team-invitations-title">
+          <div className="section-heading settings-heading">
+            <h3 id="team-invitations-title">待接受邀请</h3>
           </div>
           {invitations.isPending ? (
             <DelayedLoading pending>
@@ -251,26 +252,27 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
             />
           ) : invitations.data?.data.length ? (
             <div className="table-wrap">
-              <Table className="table">
+              <Table aria-label="待接受邀请" className="settings-table">
                 <TableHeader>
                   <TableRow>
                     <TableHead>邮箱</TableHead>
-                    <TableHead>角色</TableHead>
-                    <TableHead>过期时间</TableHead>
+                    <TableHead className="w-px">角色</TableHead>
+                    <TableHead className="w-px">过期时间</TableHead>
                     <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {invitations.data.data.map((invitation) => (
                     <TableRow key={invitation.id}>
-                      <TableCell>{invitation.email}</TableCell>
-                      <TableCell>{ROLE_LABELS[invitation.role]}</TableCell>
+                      <TableCell className="wrap-anywhere">{invitation.email}</TableCell>
+                      <TableCell className="whitespace-nowrap">{ROLE_LABELS[invitation.role]}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDateTime(invitation.expiresAt)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="w-px text-right">
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          variant="ghost"
+                          className="max-md:min-h-11"
                           disabled={!canManage || revoke.isPending}
                           onClick={() => revoke.mutate(invitation.id)}
                         >
@@ -283,7 +285,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
               </Table>
             </div>
           ) : (
-            <EmptyState mascot="group" title="暂无待接受邀请" description="已发出、等待对方接受的邀请会显示在这里。" />
+            <p className="settings-inline-empty">暂无待接受邀请</p>
           )}
         </section>
       )}

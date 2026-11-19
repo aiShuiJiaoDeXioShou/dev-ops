@@ -1,7 +1,7 @@
 import { useId, useState, type ReactNode } from 'react'
 import { createIdempotencyKey, type ApiSuccessData } from '@dev-ops/api-client'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plug, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
@@ -18,7 +18,7 @@ import {
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
-import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
 import { botChoicesOptions } from '../api/queries'
 
 type Server = ApiSuccessData<'/api/v1/teams/{teamId}/bot-mcp-servers', 'get'>['items'][number]
@@ -321,13 +321,12 @@ export function BotMcpServers({ teamId }: { teamId: string }) {
   })
   const items = list.data?.pages.flatMap(({ data }) => data.items) ?? []
   return (
-    <section aria-label="MCP 服务器" className="card">
-      <div className="section-heading">
+    <section aria-label="MCP 服务器" className="settings-section">
+      <div className="section-heading settings-heading">
         <h3>MCP 服务器</h3>
-        <span className="spacer" />
         {list.data?.pages[0]?.data.canManage && (
           <ServerDialog teamId={teamId}>
-            <Button variant="outline" type="button" size="sm">
+            <Button variant="outline" type="button" size="sm" className="max-md:min-h-11">
               <Plus className="size-4" aria-hidden="true" />
               添加服务器
             </Button>
@@ -343,12 +342,14 @@ export function BotMcpServers({ teamId }: { teamId: string }) {
           onRetry={() => void list.refetch()}
         />
       )}
-      {list.isSuccess && !items.length && <EmptyState icon={<Plug />} title="还没有 MCP 服务器" />}
-      <ul>
-        {items.map((server) => (
-          <ServerRow key={server.id ?? server.name} server={server} teamId={teamId} />
-        ))}
-      </ul>
+      {list.isSuccess && !items.length && <p className="settings-inline-empty">还没有 MCP 服务器</p>}
+      {items.length > 0 && (
+        <ul>
+          {items.map((server) => (
+            <ServerRow key={server.id ?? server.name} server={server} teamId={teamId} />
+          ))}
+        </ul>
+      )}
       {list.hasNextPage && (
         <Button
           variant="ghost"

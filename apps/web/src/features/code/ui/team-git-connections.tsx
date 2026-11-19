@@ -16,7 +16,7 @@ import {
 } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { gitConnectionsQueryOptions } from '../api/queries'
 
@@ -166,16 +166,15 @@ export function TeamGitConnections({
 
   return (
     <div className="repo-settings">
-      <section className="card">
-        <div className="section-heading max-md:flex-col max-md:items-start">
+      <section className="settings-section team-connection-settings">
+        <div className="section-heading settings-heading">
           <h3>Git 连接</h3>
-          <span className="spacer hidden md:block" />
           {canManage && (
             <div className="row flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
-                className="max-md:min-h-10"
+                className="max-md:min-h-11"
                 disabled={createGithub.isPending}
                 onClick={() => createGithub.mutate()}
               >
@@ -193,7 +192,7 @@ export function TeamGitConnections({
                 }}
               >
                 <DialogTrigger asChild>
-                  <Button ref={giteaTrigger} type="button" variant="outline" size="sm" className="max-md:min-h-10">
+                  <Button ref={giteaTrigger} type="button" variant="outline" size="sm" className="max-md:min-h-11">
                     添加 Gitea 连接
                   </Button>
                 </DialogTrigger>
@@ -291,14 +290,10 @@ export function TeamGitConnections({
           </p>
         )}
         {activeConnections.length === 0 ? (
-          <EmptyState
-            title="还没有可用的 Git 连接"
-            description={
-              canManage
-                ? '添加 GitHub 或 Gitea 连接并同步仓库后，项目才能关联代码仓库。'
-                : '请联系团队管理员添加并同步 Git 连接。'
-            }
-          />
+          <div className="settings-inline-empty">
+            <strong>还没有可用的 Git 连接</strong>
+            <p>{canManage ? '添加并同步连接后，项目可以关联代码仓库。' : '请联系团队管理员添加并同步 Git 连接。'}</p>
+          </div>
         ) : (
           <div className="repo-list">
             {activeConnections.map((connection) => {
@@ -329,9 +324,9 @@ export function TeamGitConnections({
                   {canManage && (
                     <div className="row flex-wrap md:ml-auto md:shrink-0">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="max-md:min-h-10"
+                        className="max-md:min-h-11"
                         disabled={checkConnection.isPending}
                         onClick={() => checkConnection.mutate(connection.id)}
                       >
@@ -340,7 +335,7 @@ export function TeamGitConnections({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="max-md:min-h-10"
+                        className="max-md:min-h-11"
                         disabled={syncRepositories.isPending}
                         onClick={() => syncRepositories.mutate(connection.id)}
                       >
@@ -349,9 +344,9 @@ export function TeamGitConnections({
                           : '同步仓库'}
                       </Button>
                       <Button
-                        variant="destructive"
+                        variant="ghost"
                         size="sm"
-                        className="max-md:min-h-10"
+                        className="text-destructive hover:text-destructive max-md:min-h-11"
                         onClick={() => {
                           setRevokeTarget({ id: connection.id, name: connection.name })
                           setRevokeReason('')

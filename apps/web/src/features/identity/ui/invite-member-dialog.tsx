@@ -33,15 +33,24 @@ function invitationErrorMessage(cause: unknown): string {
   }
 }
 
-/** 邀请成员加入团队。 */
+/**
+ * 展示邀请成员表单，提交成功后刷新邀请列表并关闭弹窗。
+ * @param props.teamId 当前团队标识。
+ * @param props.open 弹窗是否打开。
+ * @param props.onOpenChange 通知调用方更新弹窗状态。
+ * @param props.onCloseAutoFocus 可选的焦点恢复回调，由调用方将焦点归还给外部触发入口。
+ * @returns 邀请弹窗，提交失败时保留输入并显示错误。
+ */
 export function InviteMemberDialog({
   teamId,
   open,
   onOpenChange,
+  onCloseAutoFocus,
 }: {
   teamId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCloseAutoFocus?: (event: Event) => void
 }) {
   const queryClient = useQueryClient()
   const { showToast } = useToast()
@@ -69,7 +78,7 @@ export function InviteMemberDialog({
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <form className="space-y-4" onSubmit={submit}>
           <DialogHeader>
             <DialogTitle>邀请成员</DialogTitle>

@@ -61,7 +61,7 @@ export function GitHubAccountSection() {
   })
   const login = account.data?.data.login
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+    <div className="settings-profile-row">
       <div className="min-w-0 space-y-1">
         <p className="text-sm font-medium">GitHub 账号</p>
         {account.isPending ? (

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link2, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { botConnectionsOptions, connectionQueryKey, type BotConnection } from '@/features/bots/api/connections'
 import { botQueryKey } from '@/features/bots/api/queries'
 import { BotConnectionForm } from '@/features/bots/ui/bot-connection-form'
@@ -20,7 +20,8 @@ import {
 } from '@/shared/ui/controls/alert-dialog'
 import { Button } from '@/shared/ui/controls/button'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
-import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
+import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
 
 const labels = { active: '可用', disabled: '已停用', login_failed: '需重新登录' }
@@ -61,11 +62,11 @@ export function BotModelConnections({ teamId, canManage }: { teamId: string; can
   const items = query.data?.data ?? []
   return (
     <>
-      <section aria-label="模型配置">
-        <div className="row spread mb-4">
+      <section aria-label="模型配置" className="settings-list-width grid gap-3">
+        <div className="section-heading settings-heading">
           <h2>模型连接</h2>
           {canManage && (
-            <Button type="button" onClick={() => setCreateOpen(true)}>
+            <Button type="button" className="max-md:min-h-11" onClick={() => setCreateOpen(true)}>
               <Plus className="size-4" aria-hidden="true" />
               添加模型连接
             </Button>
@@ -76,34 +77,34 @@ export function BotModelConnections({ teamId, canManage }: { teamId: string; can
           <PageError title="模型连接加载失败" error={query.error} onRetry={() => void query.refetch()} />
         )}
         {query.isSuccess && items.length === 0 && (
-          <EmptyState
-            icon={<Link2 />}
-            title="还没有模型连接"
-            description={
-              canManage ? '添加 API Key 或订阅连接后即可为智能体绑定模型。' : '可用模型连接由团队管理员配置。'
-            }
-          />
+          <div className="settings-inline-empty">
+            <strong>还没有模型连接</strong>
+            <p>{canManage ? '添加 API Key 或订阅连接后即可为智能体绑定模型。' : '可用模型连接由团队管理员配置。'}</p>
+          </div>
         )}
         {items.length > 0 && (
-          <div className="connection-grid">
+          <ul className="divide-y border-y">
             {items.map((connection) => (
-              <article className="connection-card" key={connection.id}>
-                <div className="row">
-                  <h3 className="wrap-break-word">{connection.name}</h3>
-                  <span className="spacer" />
-                  <span className="badge">{labels[connection.status]}</span>
+              <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3" key={connection.id}>
+                <div className="min-w-0 flex-1 basis-32">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold wrap-anywhere">{connection.name}</h3>
+                    <Tag variant={connection.status === 'active' ? 'green' : 'neutral'}>
+                      {labels[connection.status]}
+                    </Tag>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground wrap-anywhere">
+                    {connection.authType === 'oauth' ? '订阅登录' : 'API Key'} · {connection.providerId}
+                    {connection.loginUserName && ` · ${connection.loginUserName}`}
+                  </p>
+                  {connection.disabledReason && reasons[connection.disabledReason] && (
+                    <p className="mt-1 text-xs text-muted-foreground">{reasons[connection.disabledReason]}</p>
+                  )}
                 </div>
-                <p>
-                  {connection.authType === 'oauth' ? '订阅登录' : 'API Key'} · {connection.providerId}
-                  {connection.loginUserName && ` · ${connection.loginUserName}`}
-                </p>
-                {connection.disabledReason && reasons[connection.disabledReason] && (
-                  <p>{reasons[connection.disabledReason]}</p>
-                )}
                 {canManage && connection.status === 'active' && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button type="button" variant="outline" disabled={update.isPending}>
+                      <Button type="button" variant="ghost" className="max-md:min-h-11" disabled={update.isPending}>
                         停用连接
                       </Button>
                     </AlertDialogTrigger>
@@ -123,15 +124,16 @@ export function BotModelConnections({ teamId, canManage }: { teamId: string; can
                   <Button
                     type="button"
                     variant="outline"
+                    className="max-md:min-h-11"
                     disabled={update.isPending}
                     onClick={() => update.mutate(connection)}
                   >
                     启用连接
                   </Button>
                 )}
-              </article>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </section>
       {createOpen && <BotConnectionForm teamId={teamId} onClose={() => setCreateOpen(false)} />}

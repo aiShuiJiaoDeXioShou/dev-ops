@@ -16,7 +16,7 @@ import {
 import { Input } from '@/shared/ui/controls/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { Tag, type TagVariant } from '@/shared/ui/tag'
-import { DelayedPageLoading, EmptyState, PageError } from '@/shared/ui/page-state'
+import { DelayedPageLoading, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { apiTokensQueryOptions, type ApiTokenMetadata } from '../api/tokens'
 
@@ -114,34 +114,27 @@ export function ApiTokenSection() {
 
   return (
     <section className="min-w-0 space-y-4" aria-label="API Token 列表">
-      {items.length > 0 && (
-        <div className="section-heading justify-end">
-          <Button type="button" className="min-h-11 sm:min-h-9" onClick={() => setCreateOpen(true)}>
-            新建 Token
-          </Button>
+      <div className="section-heading settings-heading">
+        <div>
+          <h2>API Token</h2>
+          <p className="mt-1 text-sm text-muted-foreground">为 CLI 或 API 请求创建和管理个人访问凭据。</p>
         </div>
-      )}
+        <Button type="button" className="max-md:min-h-11" onClick={() => setCreateOpen(true)}>
+          新建 Token
+        </Button>
+      </div>
       {items.length === 0 ? (
-        <EmptyState
-          mascot="prism"
-          title="还没有 API Token"
-          action={
-            <Button type="button" className="min-h-11 sm:min-h-9" onClick={() => setCreateOpen(true)}>
-              新建 Token
-            </Button>
-          }
-        />
+        <p className="settings-inline-empty">还没有 API Token</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
+        <div className="table-wrap">
+          <Table className="settings-table">
             <TableHeader>
               <TableRow>
                 <TableHead>名称</TableHead>
-                <TableHead className="hidden md:table-cell">前缀</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead className="hidden md:table-cell">创建时间</TableHead>
-                <TableHead>到期时间</TableHead>
-                <TableHead className="hidden md:table-cell">最后使用</TableHead>
+                <TableHead className="w-px">状态</TableHead>
+                <TableHead className="hidden w-px md:table-cell">创建时间</TableHead>
+                <TableHead className="w-px">到期时间</TableHead>
+                <TableHead className="hidden w-px md:table-cell">最后使用</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -150,34 +143,38 @@ export function ApiTokenSection() {
                 const status = STATUS_LABELS[token.status]
                 return (
                   <TableRow key={token.id}>
-                    <TableCell className="font-medium">{token.name}</TableCell>
-                    <TableCell className="hidden font-mono text-xs text-muted-foreground md:table-cell">
-                      {token.tokenPrefix}…
-                    </TableCell>
                     <TableCell>
+                      <p className="font-medium wrap-anywhere">{token.name}</p>
+                      <p className="font-mono text-xs text-muted-foreground wrap-anywhere">{token.tokenPrefix}…</p>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
                       <Tag variant={status.variant}>{status.label}</Tag>
                     </TableCell>
-                    <TableCell className="hidden text-muted-foreground md:table-cell">
+                    <TableCell className="hidden text-xs whitespace-nowrap text-muted-foreground md:table-cell">
                       {formatDateTime(token.createdAt)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{formatDateTime(token.expiresAt)}</TableCell>
-                    <TableCell className="hidden text-muted-foreground md:table-cell">
+                    <TableCell className="text-xs text-muted-foreground md:whitespace-nowrap">
+                      {formatDateTime(token.expiresAt)}
+                    </TableCell>
+                    <TableCell className="hidden text-xs whitespace-nowrap text-muted-foreground md:table-cell">
                       {formatDateTime(token.lastUsedAt)}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="min-h-11 md:min-h-0"
-                        disabled={token.status === 'revoked' || revoke.isPending}
-                        onClick={() => {
-                          setRevokeError('')
-                          setRevokeTarget(token)
-                        }}
-                      >
-                        撤销
-                      </Button>
+                    <TableCell className="w-px text-right">
+                      {token.status !== 'revoked' && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive max-md:min-h-11"
+                          disabled={revoke.isPending}
+                          onClick={() => {
+                            setRevokeError('')
+                            setRevokeTarget(token)
+                          }}
+                        >
+                          撤销
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 )

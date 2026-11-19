@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
 import { Plus, ShieldAlert } from 'lucide-react'
@@ -16,6 +16,7 @@ import { useSession } from '@/features/identity/model/session'
 import { Button } from '@/shared/ui/controls/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { EmptyState } from '@/shared/ui/page-state'
+import './settings-page.css'
 
 const TAB_VALUES = ['members', 'connections', 'models', 'agents'] as const
 type TabValue = (typeof TAB_VALUES)[number]
@@ -33,6 +34,7 @@ export function Component() {
   const { currentTeam, role } = useSession()
   const [createOpen, setCreateOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const inviteTrigger = useRef<HTMLButtonElement>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParameter = searchParams.get('tab')
@@ -64,7 +66,7 @@ export function Component() {
   const canManage = role === 'admin'
   const teamMark = currentTeam.iconText?.trim() || currentTeam.name.slice(0, 1)
   return (
-    <div className="catalog team-admin">
+    <div className="catalog settings-page team-admin">
       <h1 className="sr-only">团队管理</h1>
       <header className="team-page-head">
         <div className="team-identity">
@@ -77,14 +79,9 @@ export function Component() {
           </div>
         </div>
         {canManage && (
-          <div className="row team-head-actions">
-            <Button type="button" variant="outline" onClick={() => setInviteOpen(true)}>
-              邀请成员
-            </Button>
-            <Button type="button" variant="outline" onClick={() => setEditOpen(true)}>
-              编辑团队
-            </Button>
-          </div>
+          <Button type="button" variant="ghost" className="max-md:min-h-11" onClick={() => setEditOpen(true)}>
+            编辑团队
+          </Button>
         )}
       </header>
       <Tabs value={tab} onValueChange={changeTab} className="settings-tabs">
@@ -96,7 +93,21 @@ export function Component() {
         </TabsList>
         <TabsContent value="members">
           {canManage ? (
-            <MemberManagement teamId={currentTeam.id} canManage />
+            <section aria-labelledby="team-members-title" className="settings-list-width grid gap-3">
+              <div className="section-heading settings-heading">
+                <h2 id="team-members-title">成员与权限</h2>
+                <Button
+                  ref={inviteTrigger}
+                  type="button"
+                  className="max-md:min-h-11"
+                  onClick={() => setInviteOpen(true)}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  邀请成员
+                </Button>
+              </div>
+              <MemberManagement teamId={currentTeam.id} canManage />
+            </section>
           ) : (
             <EmptyState
               icon={<ShieldAlert />}
@@ -105,7 +116,7 @@ export function Component() {
             />
           )}
         </TabsContent>
-        <TabsContent value="connections" className="space-y-8">
+        <TabsContent value="connections">
           <TeamGitConnections
             key={currentTeam.id}
             teamId={currentTeam.id}
@@ -120,6 +131,7 @@ export function Component() {
         </TabsContent>
         <TabsContent value="agents">
           <Tabs
+            className="settings-subtabs"
             value={searchParams.get('agentTab') === 'usage' ? 'usage' : 'context'}
             onValueChange={(value) => {
               const next = new URLSearchParams(searchParams)
@@ -140,7 +152,16 @@ export function Component() {
           </Tabs>
         </TabsContent>
       </Tabs>
-      <InviteMemberDialog teamId={currentTeam.id} open={inviteOpen} onOpenChange={setInviteOpen} />
+      <InviteMemberDialog
+        teamId={currentTeam.id}
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        onCloseAutoFocus={(event) => {
+          if (!inviteTrigger.current) return
+          event.preventDefault()
+          inviteTrigger.current.focus()
+        }}
+      />
       <EditTeamDialog open={editOpen} onOpenChange={setEditOpen} />
     </div>
   )
@@ -157,19 +178,15 @@ function NodeManagementEntry({ teamId, canManage }: { teamId: string; canManage:
   const online = items.filter((node) => node.status === 'online').length
   const pending = items.filter((node) => node.status !== 'online' && node.status !== 'disabled').length
   return (
-    <section aria-label="执行节点" className="card">
-      <div className="section-heading">
+    <section aria-label="执行节点" className="settings-section">
+      <div className="section-heading settings-heading">
         <h3>执行节点</h3>
-        <span className="spacer" />
         {canManage ? (
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="max-md:min-h-11" asChild>
             <Link to="/settings/pipeline-nodes">管理执行节点</Link>
           </Button>
         ) : null}
       </div>
-      <p className="section-note">
-        内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
-      </p>
       <div className="node-summary" aria-label="执行节点概览">
         <span>
           <strong>{online}</strong>
@@ -184,6 +201,7 @@ function NodeManagementEntry({ teamId, canManage }: { teamId: string; canManage:
           待连接
         </span>
       </div>
+      <p>内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。</p>
     </section>
   )
 }

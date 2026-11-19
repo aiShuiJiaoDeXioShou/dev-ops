@@ -40,24 +40,23 @@ function ContextForm({ teamId, isAdmin }: { teamId: string; isAdmin: boolean }) 
   const { data } = details.data
   return (
     <form
-      className="card grid gap-4"
+      className="grid gap-3"
       onSubmit={(event) => {
         event.preventDefault()
         if (draft && size <= maxBytes && !save.isPending) save.mutate(draft)
       }}
     >
-      <label className="field">
-        <span>团队共用指令</span>
-        <Textarea
-          rows={10}
-          value={value}
-          readOnly={!isAdmin || save.isPending}
-          aria-invalid={size > maxBytes}
-          aria-describedby="bot-context-size"
-          placeholder={isAdmin ? '填写 Bot 在本团队中应遵循的约定' : '尚未配置团队上下文'}
-          onChange={(event) => setDraft({ content: event.target.value, version: draft?.version ?? data.version })}
-        />
-      </label>
+      <Textarea
+        aria-labelledby="team-context-title"
+        rows={8}
+        value={value}
+        readOnly={!isAdmin || save.isPending}
+        aria-invalid={size > maxBytes}
+        aria-describedby="team-context-description bot-context-size"
+        className="min-h-36 resize-y"
+        placeholder={isAdmin ? '填写 Bot 在本团队中应遵循的约定' : '尚未配置团队上下文'}
+        onChange={(event) => setDraft({ content: event.target.value, version: draft?.version ?? data.version })}
+      />
       <div className="row flex-wrap">
         <span className={size > maxBytes ? 'small field-error' : 'small muted'} id="bot-context-size">
           {size.toLocaleString('zh-CN')} / {maxBytes.toLocaleString('zh-CN')} 字节
@@ -71,6 +70,7 @@ function ContextForm({ teamId, isAdmin }: { teamId: string; isAdmin: boolean }) 
         {isAdmin && (
           <Button
             type="submit"
+            className="max-md:min-h-11"
             aria-busy={save.isPending}
             disabled={!draft || value === data.content || size > maxBytes || save.isPending}
           >
@@ -119,10 +119,14 @@ function ContextForm({ teamId, isAdmin }: { teamId: string; isAdmin: boolean }) 
  */
 export function TeamBotContext({ teamId, canManage }: { teamId: string; canManage: boolean }) {
   return (
-    <section className="grid gap-4" aria-label="团队上下文">
-      <header className="work-header">
-        <h2>团队上下文</h2>
-        <p className="muted">这些指令会提供给本团队的 Bot，用于补充团队共用约定。</p>
+    <section className="settings-form-width grid gap-3" aria-label="团队上下文">
+      <header className="settings-heading">
+        <div>
+          <h2 id="team-context-title">团队共用指令</h2>
+          <p id="team-context-description" className="mt-1 text-sm text-muted-foreground">
+            适用于本团队的 Bot，用于补充团队共用约定。
+          </p>
+        </div>
       </header>
       <ContextForm key={teamId} teamId={teamId} isAdmin={canManage} />
     </section>

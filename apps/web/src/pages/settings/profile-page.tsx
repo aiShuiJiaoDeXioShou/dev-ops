@@ -7,6 +7,7 @@ import { EditProfileDialog } from '@/features/identity/ui/edit-profile-dialog'
 import { GitHubAccountSection } from '@/features/identity/ui/github-account'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
+import './settings-page.css'
 
 /**
  * 渲染个人资料与 API Token 页签，并在 URL 中保留选中的页签。
@@ -19,7 +20,7 @@ export function Component() {
   const tab = searchParams.get('tab') === 'tokens' ? 'tokens' : 'profile'
 
   return (
-    <div className="catalog min-w-0">
+    <div className="catalog settings-page">
       <header className="page-head border-b-0 p-0">
         <h1>个人页面</h1>
       </header>
@@ -38,32 +39,43 @@ export function Component() {
           <TabsTrigger value="tokens">API Token</TabsTrigger>
         </TabsList>
         <TabsContent value="profile">
-          <section className="max-w-2xl divide-y rounded-xl border bg-card" aria-labelledby="profile-name">
-            <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
-              <div className="flex min-w-0 items-center gap-3">
-                <UserAvatar name={user.name} image={user.image} className="size-12 text-lg" />
-                <h2 id="profile-name" className="mb-0 wrap-anywhere text-base font-semibold">
-                  {user.name}
-                </h2>
+          <div className="settings-form-width">
+            <section className="grid gap-4 pb-4" aria-labelledby="profile-basics">
+              <div className="section-heading settings-heading">
+                <h2 id="profile-basics">基本资料</h2>
+                <EditProfileDialog user={user} />
               </div>
-              <EditProfileDialog user={user} />
-            </div>
-            <dl className="space-y-3 px-4 py-4 text-sm sm:px-5">
-              <div className="grid gap-1 sm:grid-cols-4 sm:gap-3">
-                <dt className="text-muted-foreground">邮箱</dt>
-                <dd className="wrap-anywhere sm:col-span-3">{user.email}</dd>
+              <div className="flex items-center gap-3">
+                <UserAvatar name={user.name} image={user.image} className="size-11 text-lg" />
+                <h3 className="text-sm font-semibold wrap-anywhere">{user.name}</h3>
               </div>
-              <div className="grid gap-1 sm:grid-cols-4 sm:gap-3">
-                <dt className="text-muted-foreground">当前团队</dt>
-                <dd className="wrap-anywhere sm:col-span-3">{currentTeam?.name ?? '未加入团队'}</dd>
+              <dl className="space-y-2 text-sm">
+                <div className="grid gap-1 sm:grid-cols-4 sm:gap-3">
+                  <dt className="text-muted-foreground">邮箱</dt>
+                  <dd className="wrap-anywhere sm:col-span-3">{user.email}</dd>
+                </div>
+                <div className="grid gap-1 sm:grid-cols-4 sm:gap-3">
+                  <dt className="text-muted-foreground">当前团队</dt>
+                  <dd className="wrap-anywhere sm:col-span-3">{currentTeam?.name ?? '未加入团队'}</dd>
+                </div>
+              </dl>
+            </section>
+            <section className="settings-section" aria-labelledby="profile-security">
+              <div className="settings-heading">
+                <h2 id="profile-security">登录安全</h2>
               </div>
-            </dl>
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-              <span className="text-sm font-medium">登录密码</span>
-              <ChangePasswordDialog />
-            </div>
-            <GitHubAccountSection />
-          </section>
+              <div className="settings-profile-row">
+                <span className="text-sm font-medium">登录密码</span>
+                <ChangePasswordDialog />
+              </div>
+            </section>
+            <section className="settings-section" aria-labelledby="profile-accounts">
+              <div className="settings-heading">
+                <h2 id="profile-accounts">关联账号</h2>
+              </div>
+              <GitHubAccountSection />
+            </section>
+          </div>
         </TabsContent>
         <TabsContent value="tokens">{tab === 'tokens' && <ApiTokenSection />}</TabsContent>
       </Tabs>

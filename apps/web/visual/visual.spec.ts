@@ -419,10 +419,10 @@ test('[desktop] [mobile] 团队邀请空态与 Bot 错误页', async ({ page }, 
       route.fulfill({ json: { success: true, code: 'OK', message: 'OK', requestId: 'visual-invitations', data: [] } }),
   )
   await page.goto('/settings/team')
-  const empty = page.locator('.empty-state').filter({ hasText: '暂无待接受邀请' })
+  const invitations = page.getByRole('region', { name: '待接受邀请' })
+  const empty = invitations.getByText('暂无待接受邀请', { exact: true })
   await expect(empty).toBeVisible()
-  await expect(empty.locator('img[src$="bot-orbit-live.svg"]')).toBeVisible()
-  await empty.screenshot({ path: testInfo.outputPath('invitation-empty.png') })
+  await invitations.screenshot({ path: testInfo.outputPath('invitation-empty.png') })
 
   await page.goto('/unknown-route')
   await expect(page.getByRole('heading', { name: '页面不存在', level: 1 })).toBeVisible()

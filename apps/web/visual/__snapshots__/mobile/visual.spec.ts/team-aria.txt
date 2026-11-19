@@ -3,7 +3,6 @@
   - heading "团队管理" [level=1]
   - text: D
   - heading "DevOps 研发团队" [level=2]
-  - button "邀请成员"
   - button "编辑团队"
   - tablist "团队设置分组":
     - tab "成员与权限"
@@ -26,15 +25,14 @@
       - heading "执行节点" [level=3]
       - link "管理执行节点":
         - /url: /settings/pipeline-nodes
-      - paragraph: 内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
       - strong: "1"
       - text: 在线
       - strong: "6"
       - text: 已注册
       - strong: "5"
       - text: 待连接
+      - paragraph: 内置流水线通过团队自托管的执行节点运行任务；注册令牌与 Agent 令牌只在创建或轮换后显示一次。
     - region "MCP 服务器":
       - heading "MCP 服务器" [level=3]
       - button "添加服务器"
-      - heading "还没有 MCP 服务器" [level=3]
-      - list
+      - paragraph: 还没有 MCP 服务器
