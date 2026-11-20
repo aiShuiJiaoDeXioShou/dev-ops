@@ -1,0 +1,14 @@
+name: deploy-macmini
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Mac mini 原生发布
+    runs-on: macmini-deploy
+    timeout-minutes: 35
+    steps:
+      - name: 构建并发布到 Mac mini
+        uses: builtin:deploy-native
+        timeout-minutes: 30

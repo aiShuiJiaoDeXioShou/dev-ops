@@ -1,6 +1,6 @@
 # pipeline-agent 执行节点
 
-V0.4a 自托管执行节点 Agent。Agent 主动外连平台，领取租约后在节点 Docker 中执行平台生成并固定的运行计划，回传步骤状态、日志与产物。Agent **不解析 YAML、不修改运行计划中的镜像/命令/环境引用**。
+自托管 Agent 主动外连平台，领取租约并执行平台固定的运行计划，回传步骤状态、日志与产物。Linux 作业在 Docker 中执行，Mac mini 原生发布调用宿主发布脚本。Agent **不解析 YAML、不修改运行计划中的镜像/命令/环境引用**。
 
 ## 职责与边界
 
@@ -18,7 +18,7 @@ V0.4a 自托管执行节点 Agent。Agent 主动外连平台，领取租约后�
 
 - Node.js 24、pnpm 11（以仓库 `.nvmrc` 与根 `package.json` 为准）。
 - 可访问平台 API 的网络。
-- 节点 Docker Engine（本机 Docker 29 验证通过）；Agent 进程用户需要访问 Docker socket 的权限。
+- 执行 Linux 作业的节点需要 Docker Engine（本机 Docker 29 验证通过）；Agent 进程用户需要访问 Docker socket 的权限。
 - 团队管理员已在平台创建执行节点，并拿到一次性注册令牌与能力标签。
 
 ## 配置
@@ -48,7 +48,7 @@ pnpm --dir apps/pipeline-agent build
 node apps/pipeline-agent/dist/index.js
 ```
 
-启动顺序：校验配置 → 创建工作目录 → 检查 Docker 可用性 → 清理遗留任务容器 → 清理遗留工作区 → 注册/复用令牌 → 心跳与租约循环。收到 `SIGINT`/`SIGTERM` 时停止领取新任务，并把当前租约按 `interrupted` 收口（尽力而为）。
+Docker 模式启动顺序：校验配置 → 创建工作目录 → 检查 Docker 可用性 → 清理遗留任务容器 → 清理遗留工作区 → 注册/复用令牌 → 心跳与租约循环。收到 `SIGINT`/`SIGTERM` 时停止领取新任务，并把当前租约按 `interrupted` 收口（尽力而为）。
 
 建议用 systemd 或容器编排守护进程；Agent 崩溃后重新启动会继续清理遗留工作区。
 

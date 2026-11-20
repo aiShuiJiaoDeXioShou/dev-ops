@@ -52,7 +52,7 @@ V0.4a 内置流水线还需要两个独立进程：调度 Worker 与自托管执
 pnpm --dir apps/server dev:worker
 ```
 
-执行节点需要一台可用的 Docker 主机（P1 为本地开发机），在团队设置 → 连接与节点中创建节点并复制一次性注册令牌，然后以环境变量启动 Agent（也可写入 agent 本地 `.env`）。平台地址、节点令牌与工作目录等配置见 [apps/pipeline-agent/README.md](apps/pipeline-agent/README.md)，日志与产物保存在 `PIPELINE_STORAGE_DIR` 指向的受控目录：
+执行 Linux 流水线的节点需要一台可用的 Docker 主机，在团队设置 → 连接与节点中创建节点并复制一次性注册令牌，然后以环境变量启动 Agent（也可写入 agent 本地 `.env`）。平台地址、节点令牌与工作目录等配置见 [apps/pipeline-agent/README.md](apps/pipeline-agent/README.md)，日志与产物保存在 `PIPELINE_STORAGE_DIR` 指向的受控目录：
 
 ```bash
 PLATFORM_URL=http://127.0.0.1:3001 \

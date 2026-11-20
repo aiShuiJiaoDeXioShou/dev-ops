@@ -11,6 +11,6 @@
 
 ## 发布
 
-从项目「流水线」手动触发 `.devops/workflows/deploy-macmini.yml`，选择 `main`。只有团队管理员能触发原生发布。节点只支持一次执行一个发布。脚本从固定仓库检出提交，在 macOS 构建，运行数据库迁移，将 `current` 切换到新版本，再重启 API 和两个 Worker。
+从项目「流水线」手动触发 [`deploy-macmini`](../../.devops/workflows/deploy-macmini.yml)，选择 `main`。只有团队管理员能触发原生发布。节点只支持一次执行一个发布。脚本从固定仓库检出提交，在 macOS 构建，运行数据库迁移，将 `current` 切换到新版本，再重启 API 和两个 Worker。
 
 运行成功以 API 就绪和登录页可访问为准。发布脚本遇到启动或就绪失败时恢复上一版本的应用目录。数据库迁移不会自动回退。Agent 独立守护，发布时保留当前运行及其日志上报，下一次启动时加载 `current` 中的 Agent 产物。
