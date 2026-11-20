@@ -220,6 +220,39 @@ export function createApiClient(options: ApiClientOptions) {
   const fetchRequest = options.fetch
   const validateResponses = options.validateResponses !== false
 
+  async function fetchResponse(
+    path: string,
+    init: Omit<RequestInit, 'headers'> & { headers: Record<string, string> },
+    signal?: AbortSignal,
+    timeoutOverrideMs?: number,
+  ): Promise<{ response: Response; timeout: AbortSignal }> {
+    const url = new URL(baseUrl)
+    const [pathname, queryString] = path.split('?')
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}${pathname ?? ''}`
+    url.search = queryString ?? ''
+    const timeout = AbortSignal.timeout(timeoutOverrideMs ?? timeoutMs)
+    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
+    const headers = {
+      ...init.headers,
+      ...(options.token === undefined ? {} : { authorization: `Bearer ${options.token}` }),
+    }
+    try {
+      const response = await (fetchRequest ?? globalThis.fetch)(url, {
+        ...init,
+        headers,
+        signal: requestSignal,
+        redirect: 'error',
+        credentials: options.credentials ?? 'omit',
+      })
+      return { response, timeout }
+    } catch (error) {
+      if (signal?.aborted) throw error
+      throw new RequestError(timeout.aborted ? '请求超时，请稍后重试。' : '无法连接后端，请检查服务地址和网络。', {
+        code: timeout.aborted ? 'TIMEOUT' : 'NETWORK_ERROR',
+      })
+    }
+  }
+
   /**
    * 发起请求并完成传输层解析；不判断业务信封。
    * @param path `/api/v1` 下的接口路径。
@@ -237,34 +270,24 @@ export function createApiClient(options: ApiClientOptions) {
     idempotencyKey?: string,
     timeoutOverrideMs?: number,
   ) {
-    const url = new URL(baseUrl)
-    const [pathname, queryString] = path.split('?')
-    url.pathname = `${url.pathname.replace(/\/+$/, '')}${pathname ?? ''}`
-    url.search = queryString ?? ''
-    const timeout = AbortSignal.timeout(timeoutOverrideMs ?? timeoutMs)
-    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
-    let response: Response
-    try {
-      response = await (fetchRequest ?? globalThis.fetch)(url, {
+    const { response, timeout } = await fetchResponse(
+      path,
+      {
         method,
-        signal: requestSignal,
-        redirect: 'error',
-        credentials: options.credentials ?? 'omit',
         headers: {
           accept: 'application/json',
-          ...(options.token === undefined ? {} : { authorization: `Bearer ${options.token}` }),
           ...(idempotencyKey === undefined ? {} : { 'idempotency-key': idempotencyKey }),
           ...(body === undefined ? {} : { 'content-type': 'application/json' }),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      })
-    } catch (error) {
-      if (signal?.aborted) throw error
-      throw new RequestError(timeout.aborted ? '请求超时，请稍后重试。' : '无法连接后端，请检查服务地址和网络。', {
-        code: timeout.aborted ? 'TIMEOUT' : 'NETWORK_ERROR',
-      })
-    }
+      },
+      signal,
+      timeoutOverrideMs,
+    )
+    return readJsonResponse(response, timeout, signal)
+  }
 
+  async function readJsonResponse(response: Response, timeout: AbortSignal, signal?: AbortSignal) {
     const headerRequestId = response.headers.get('x-request-id')
     let payload: unknown
     try {
@@ -339,6 +362,15 @@ export function createApiClient(options: ApiClientOptions) {
       options.idempotencyKey,
       options.timeoutMs,
     )
+    return checkedEnvelope<T>(method, path, payload, headerRequestId)
+  }
+
+  function checkedEnvelope<T>(
+    method: 'GET' | 'POST',
+    path: string,
+    payload: unknown,
+    headerRequestId: string | null,
+  ): { data: T; requestId: string } {
     if (isFailureEnvelope(payload)) {
       throw createBusinessError(payload, headerRequestId ?? payload.requestId)
     }
@@ -354,7 +386,129 @@ export function createApiClient(options: ApiClientOptions) {
     return { data: payload.data as T, requestId: headerRequestId ?? payload.requestId }
   }
 
+  async function downloadFile(path: string, call: ApiCallOptions) {
+    const { response, timeout } = await fetchResponse(
+      path,
+      { method: 'GET', headers: { accept: 'application/octet-stream, application/json' } },
+      call.signal,
+      call.timeoutMs,
+    )
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase()
+    const requestId = response.headers.get('x-request-id') ?? ''
+    const sha256 = response.headers.get('x-content-sha256')
+    if (
+      response.ok &&
+      contentType === 'application/octet-stream' &&
+      response.body &&
+      sha256 &&
+      /^[0-9a-f]{64}$/i.test(sha256)
+    ) {
+      return { body: response.body, sha256: sha256.toLowerCase(), requestId, timeout }
+    }
+    if (contentType === 'application/json') {
+      const envelope = await readJsonResponse(response, timeout, call.signal)
+      if (isFailureEnvelope(envelope.payload)) {
+        throw createBusinessError(envelope.payload, envelope.headerRequestId ?? envelope.payload.requestId)
+      }
+    } else {
+      await response.body?.cancel()
+    }
+    throw new RequestError('下载响应缺少有效的文件或校验值。', {
+      code: response.ok ? 'INVALID_RESPONSE' : 'HTTP_ERROR',
+      status: response.status,
+      requestId,
+    })
+  }
+
   return {
+    /**
+     * 读取项目附件大小和绑定数量限制。
+     * @param call 请求选项。
+     * @returns 已校验的附件策略和请求标识。
+     */
+    async getAttachmentPolicy(call: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/attachments/policy', 'get'>>(
+        '/api/v1/attachments/policy',
+        'GET',
+        undefined,
+        call,
+      )
+    },
+
+    /**
+     * 上传待绑定附件；通过 Blob 发送文件并由服务端检验大小与权限。
+     * @param projectId 目标项目。
+     * @param file 本地文件 Blob。
+     * @param metadata 文件名称及媒体类型。
+     * @param call 请求选项。
+     * @returns 已校验的临时附件记录和请求标识；上传失败抛出 RequestError。
+     */
+    async uploadAttachment(
+      projectId: string,
+      file: Blob,
+      metadata: { name: string; contentType: string },
+      call: ApiCallOptions = {},
+    ) {
+      const path = `/api/v1/projects/${segment(projectId)}/attachments`
+      const { response, timeout } = await fetchResponse(
+        path,
+        {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/octet-stream',
+            'x-file-name': encodeURIComponent(metadata.name),
+            'x-file-type': metadata.contentType,
+          },
+          body: file,
+        },
+        call.signal,
+        call.timeoutMs,
+      )
+      const { payload, headerRequestId } = await readJsonResponse(response, timeout, call.signal)
+      return checkedEnvelope<ApiSuccessData<'/api/v1/projects/{projectId}/attachments', 'post'>>(
+        'POST',
+        path,
+        payload,
+        headerRequestId,
+      )
+    },
+
+    /**
+     * 删除指定附件。
+     * @param attachmentId 附件标识。
+     * @param call 请求选项。
+     * @returns 删除结果和请求标识；服务端拒绝时抛出 RequestError。
+     */
+    async removeAttachment(attachmentId: string, call: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/attachments/{attachmentId}/remove', 'post'>>(
+        `/api/v1/attachments/${segment(attachmentId)}/remove`,
+        'POST',
+        undefined,
+        call,
+      )
+    },
+
+    /**
+     * 打开附件下载流。
+     * @param attachmentId 附件标识。
+     * @param call 请求选项。
+     * @returns 文件流与 SHA-256；调用者负责消费或取消响应流并核对摘要。
+     */
+    async downloadAttachment(attachmentId: string, call: ApiCallOptions = {}) {
+      return downloadFile(`/api/v1/attachments/${segment(attachmentId)}/download`, call)
+    },
+
+    /**
+     * 打开流水线产物下载流。
+     * @param artifactId 产物标识。
+     * @param call 请求选项。
+     * @returns 文件流与 SHA-256；调用者负责消费或取消响应流并核对摘要。
+     */
+    async downloadPipelineArtifact(artifactId: string, call: ApiCallOptions = {}) {
+      return downloadFile(`/api/v1/pipeline-artifacts/${segment(artifactId)}/download`, call)
+    },
+
     /**
      * 读取进程存活状态，不检查数据库。
      * @param signal 调用方取消信号，覆盖连接和响应体读取。
