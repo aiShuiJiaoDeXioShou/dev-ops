@@ -1,7 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import type { IdentityAuth } from '../identity/identity.auth.ts'
-import { requireSessionUser } from '../identity/identity.session.ts'
+import { requireHumanActor } from '../identity/identity.actor.ts'
 import {
   createStorageBucketBodySchema,
   setDefaultStorageBucketBodySchema,
@@ -17,13 +16,12 @@ import type { StorageManagementService } from './storage.management.service.ts'
 /**
  * 平台储存桶管理路由；仅平台管理员可用。
  * @param app Fastify 插件实例。
- * @param options 认证实例与储存桶管理服务。
+ * @param options 储存桶管理服务。
  * @returns 无返回值；只注册 GET 与 POST，全部返回统一信封。
  * @remarks 路由只负责 HTTP 输入输出与身份解析；平台管理员校验在 service 内再次执行，
  * 避免未来新增调用路径时绕过权限。响应只含掩码与探测结论，绝不返回凭据。
  */
 export const storageRoutes: FastifyPluginAsyncTypebox<{
-  auth: IdentityAuth
   service: StorageManagementService
 }> = async (app, options) => {
   app.get(
@@ -36,7 +34,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success({ buckets: await options.service.listBuckets(user) }, request.id)
     },
   )
@@ -52,7 +50,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.createBucket(user, request.body), request.id)
     },
   )
@@ -69,7 +67,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.updateBucket(user, request.params.bucketId, request.body), request.id)
     },
   )
@@ -85,7 +83,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.probeBucket(user, request.params.bucketId), request.id)
     },
   )
@@ -102,7 +100,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(
         await options.service.setDefaultBucket(user, request.params.bucketId, request.body.version),
         request.id,
@@ -121,7 +119,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.removeBucket(user, request.params.bucketId), request.id)
     },
   )

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import { requireActor, requireSessionActor } from '../identity/identity.actor.ts'
+import { requireActor, requireHumanActor, requireSessionActor } from '../identity/identity.actor.ts'
 import {
   connectionIdParams,
   connectionResponse,
@@ -70,7 +70,7 @@ export const botConnectionsRoutes: FastifyPluginAsyncTypebox<{
     },
     async (request) =>
       success(
-        await connections.create(await requireSessionActor(request), request.params.teamId, request.body),
+        await connections.create(await requireHumanActor(request), request.params.teamId, request.body),
         request.id,
       ),
   )
@@ -141,7 +141,7 @@ export const botConnectionsRoutes: FastifyPluginAsyncTypebox<{
       async (request) =>
         success(
           await connections.setEnabled(
-            await requireSessionActor(request),
+            await requireHumanActor(request),
             request.params.connectionId,
             request.body.version,
             enabled,

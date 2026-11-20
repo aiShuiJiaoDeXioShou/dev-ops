@@ -6,7 +6,7 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
 import { success } from '../../platform/http/response.ts'
 import { enqueueBotRun, requestBotRunStop } from '../bots/bots.run-queue.repository.ts'
-import { requireSessionActor } from '../identity/identity.actor.ts'
+import { requireHumanActor } from '../identity/identity.actor.ts'
 import { botRun } from '../bots/bots.tables.ts'
 import { botRelayResponse } from './bot-conversations.schema.ts'
 import { lockWritableBotConversation } from './bot-conversations.service.ts'
@@ -45,7 +45,7 @@ export const botRelayRoutes: FastifyPluginAsyncTypebox<{ db: Database; limits: B
         schema: { summary: label, params, body, response: { 200: botRelayResponse } },
       },
       async (request) => {
-        const actor = await requireSessionActor(request, label)
+        const actor = await requireHumanActor(request)
         const relay = await db.transaction(async (tx) => {
           const [scope] = await tx
             .select({ roomId: botRoomRelay.conversation_id, teamId: botRoomRelay.team_id })

@@ -60,6 +60,24 @@ export async function requireActor(request: FastifyRequest): Promise<SessionUser
 }
 
 /**
+ * 要求操作由成员本人通过登录会话或个人 API Token 发起。
+ * @param request 已组装认证依赖的 Fastify 请求。
+ * @returns 当前用户；资源归属和角色由各业务用例校验。
+ * @throws 无有效身份时抛出 UNAUTHENTICATED，Bot 委托身份抛出 FORBIDDEN。
+ */
+export async function requireHumanActor(request: FastifyRequest): Promise<SessionUser> {
+  const actor = await resolveActor(
+    request.server.auth,
+    request.server.tokenService,
+    request.headers,
+    request.server.botDelegation,
+  )
+  if (!actor) throw new ApiErrorClass(ERROR_CODES.UNAUTHENTICATED, '请先登录或提供有效 API Token')
+  if (actor.credential === 'bot') throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, '该操作需要成员本人执行')
+  return actor.user
+}
+
+/**
  * 要求当前请求来自登录会话，用于需要登录会话的敏感操作。
  * @param request Fastify 请求。
  * @param action 需要登录会话的操作名称，省略时用于管理 API Token。
