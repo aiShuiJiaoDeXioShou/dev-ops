@@ -167,6 +167,8 @@ Web 按项目、仓库、分支和路径缓存已读取的目录与文件正文�
 
 服务端新增 `personal_access_token` 表与 `/api/v1/me`、`/api/v1/me/tokens*` 接口；业务接口同时接受现有 Better Auth Cookie 会话和 `Authorization: Bearer devops_pat_...`。Token 只保存 SHA-256 摘要、明文仅在创建响应返回一次，管理接口只允许登录会话。CLI 使用说明见 [apps/cli/README.md](../cli/README.md)。
 
+V0.8 扩展已有个人 API Token 的可用接口。服务端按发起人的当前角色和资源范围校验任务转交与验收、群聊接力、Skills、模型 API Key 连接及启停、项目回收站与恢复、储存桶和个人 GitHub 绑定状态。具体会话专用操作和升级边界见 [V0.8 规格](../../specs/011-v08-cli-business-parity/spec.md#2-授权与调用)。
+
 ## 个人资料
 
 `POST /api/v1/auth/update-user` 使用登录 Cookie 更新当前用户的 `name` 和 `image`，省略字段表示保留原值。`image` 接受 160×160 像素的 JPEG data URL，解码后最大 32 KiB，传 `null` 可移除。保存前服务端重新编码图片以去除元数据，缩略图存入账号的 `image` 字段。`GET /api/v1/auth/get-session` 返回当前头像。两个端点均沿用 Better Auth 状态码，图片不合格时返回 HTTP 400。

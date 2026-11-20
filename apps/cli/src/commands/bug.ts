@@ -4,6 +4,7 @@ import { businessContext, printBusinessResult, readContent, type BusinessCommand
 import { resolvePagination, type GlobalOptions } from '../lib/config.ts'
 import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
+import { checkedBody, collectValues, listChange, readJsonFile } from '../lib/api-command.ts'
 import { CliError } from '../lib/errors.ts'
 
 /** 服务端 Bug 状态取值。 */
@@ -46,6 +47,7 @@ interface PageResult<T> {
 }
 
 interface ListBugOptions {
+  owner?: string
   project: string
   search?: string
   status?: string
@@ -60,11 +62,20 @@ interface CreateBugOptions {
   reproduction?: string
   reproductionUnknown?: boolean
   evidence?: string
+  evidenceUrl?: string
+  collaborator?: string[]
+  attachment?: string[]
   fixOwner?: string
   requirement?: string
 }
 
 interface UpdateBugOptions {
+  planFile?: string
+  regressionOwner?: string
+  clearRegressionOwner?: boolean
+  clearFixOwner?: boolean
+  clearCollaborators?: boolean
+  clearAttachments?: boolean
   expectedVersion?: string
   title?: string
   phenomenon?: string
@@ -72,6 +83,9 @@ interface UpdateBugOptions {
   reproduction?: string
   reproductionUnknown?: boolean
   evidence?: string
+  evidenceUrl?: string
+  collaborator?: string[]
+  attachment?: string[]
   fixOwner?: string
 }
 
@@ -232,6 +246,7 @@ function buildBugListQuery(options: ListBugOptions): BugListQuery {
   if (search !== undefined) query.search = search
   if (options.status !== undefined) query.status = validateBugStatus(options.status)
   if (options.ownerUnavailable === true) query.ownerUnavailable = true
+  if (options.owner !== undefined) query.ownerId = options.owner
   return query
 }
 
@@ -267,6 +282,9 @@ function buildCreateBugBody(options: CreateBugOptions): CreateBugBody {
   }
   const evidence = optionalOptionText(options.evidence)
   if (evidence !== undefined) body.evidenceText = evidence
+  if (options.evidenceUrl !== undefined) body.evidenceUrl = options.evidenceUrl.trim() || null
+  if (options.collaborator?.length) body.collaboratorUserIds = options.collaborator
+  if (options.attachment?.length) body.attachmentIds = options.attachment
   const fixOwnerUserId = optionalOptionText(options.fixOwner)
   if (fixOwnerUserId !== undefined) body.fixOwnerUserId = fixOwnerUserId
   const requirementId = optionalOptionText(options.requirement)
@@ -292,9 +310,22 @@ function buildUpdateBugChanges(options: UpdateBugOptions): UpdateBugChanges {
   if (evidence !== undefined) changes.evidenceText = evidence
   const fixOwnerUserId = optionalOptionText(options.fixOwner)
   if (fixOwnerUserId !== undefined) changes.fixOwnerUserId = fixOwnerUserId
-  if (Object.keys(changes).length === 0) {
-    throw new CliError('至少提供一个待更新字段', 2, { code: 'NOTHING_TO_UPDATE' })
+  if (options.evidenceUrl !== undefined) changes.evidenceUrl = options.evidenceUrl.trim() || null
+  if (options.clearFixOwner) {
+    if (fixOwnerUserId !== undefined) throw new CliError('--fix-owner 与 --clear-fix-owner 互斥', 2)
+    changes.fixOwnerUserId = null
   }
+  const regressionOwner = optionalOptionText(options.regressionOwner)
+  if (options.clearRegressionOwner && regressionOwner !== undefined) {
+    throw new CliError('--regression-owner 与 --clear-regression-owner 互斥', 2)
+  }
+  if (options.clearRegressionOwner || regressionOwner !== undefined) {
+    changes.regressionOwnerUserId = regressionOwner ?? null
+  }
+  const collaborators = listChange(options.collaborator, options.clearCollaborators, '--collaborator')
+  if (collaborators !== undefined) changes.collaboratorUserIds = collaborators
+  const attachments = listChange(options.attachment, options.clearAttachments, '--attachment')
+  if (attachments !== undefined) changes.attachmentIds = attachments
   return changes
 }
 
@@ -334,6 +365,15 @@ async function runBugCreate(context: CliContext, command: Command): Promise<void
 async function runBugUpdate(context: CliContext, bugId: string, command: Command): Promise<void> {
   const options = command.opts<UpdateBugOptions>()
   const changes = buildUpdateBugChanges(options)
+  if (options.planFile) {
+    changes.plan = checkedBody('/api/v1/bugs/{bugId}/update', {
+      version: 1,
+      plan: await readJsonFile(options.planFile, command, context),
+    }).plan
+  }
+  if (Object.keys(changes).length === 0) {
+    throw new CliError('至少提供一个待更新字段', 2, { code: 'NOTHING_TO_UPDATE' })
+  }
   const globals = command.optsWithGlobals<GlobalOptions>()
   const business = await businessContext(command, context)
   const version = await resolveVersion(business.client, bugId, options.expectedVersion)
@@ -478,6 +518,7 @@ function registerBugQueries(bug: Command, context: CliContext): void {
     .requiredOption('--project <projectId>', '项目 ID')
     .option('--search <text>', '按标题关键词搜索')
     .option('--status <status>', '状态：pending、in_fix、in_regression、resolved、closed')
+    .option('--owner <userId>', '按修复负责人筛选')
     .option('--owner-unavailable', '只列出负责人不可用的 Bug')
     .action(async (_options: unknown, command: Command) => {
       await runBugList(context, command)
@@ -528,6 +569,9 @@ function registerBugEditing(bug: Command, context: CliContext): void {
     .option('--reproduction <text>', '复现步骤')
     .option('--reproduction-unknown', '无法稳定复现时标注，与 --reproduction 互斥')
     .option('--evidence <text>', '证据文本')
+    .option('--evidence-url <url>', '证据链接；空字符串清除')
+    .option('--collaborator <userId>', '完整的协作人员列表，可重复', collectValues, [])
+    .option('--attachment <attachmentId>', '完整的附件 ID 列表，可重复', collectValues, [])
     .option('--fix-owner <userId>', '修复负责人用户 ID')
     .option('--requirement <requirementId>', '创建时关联的需求 ID')
     .action(async (_options: unknown, command: Command) => {
@@ -545,7 +589,16 @@ function registerBugEditing(bug: Command, context: CliContext): void {
     .option('--reproduction <text>', '复现步骤')
     .option('--reproduction-unknown', '无法稳定复现时标注，与 --reproduction 互斥')
     .option('--evidence <text>', '证据文本')
+    .option('--evidence-url <url>', '证据链接；空字符串清除')
+    .option('--collaborator <userId>', '完整的协作人员列表，可重复', collectValues, [])
+    .option('--attachment <attachmentId>', '完整的附件 ID 列表，可重复', collectValues, [])
     .option('--fix-owner <userId>', '修复负责人用户 ID')
+    .option('--regression-owner <userId>', '回归负责人用户 ID')
+    .option('--clear-regression-owner', '清空回归负责人')
+    .option('--clear-fix-owner', '清空修复负责人')
+    .option('--clear-collaborators', '清空协作人员')
+    .option('--clear-attachments', '解除全部附件绑定')
+    .option('--plan-file <path>', '流程节点、待办及排期 JSON 数组；- 表示标准输入')
     .action(async (bugId: string, _options: unknown, command: Command) => {
       await runBugUpdate(context, bugId, command)
     })
@@ -640,7 +693,7 @@ function registerBugRelationCommands(bug: Command, context: CliContext): void {
 }
 
 /**
- * 注册 `devops bug` 命令组，覆盖 Bug 查询、创建编辑、状态流转与需求关联。
+ * 注册 `devops bug` 命令组，覆盖 Bug 查询、创建编辑、排期与附件、状态流转及需求关联。
  * @param program 已定义全局选项的 CLI 根命令。
  * @param context CLI 上下文，提供环境变量、标准输入与输出通道。
  * @returns 无返回值；命令内错误由统一入口转换为退出码。

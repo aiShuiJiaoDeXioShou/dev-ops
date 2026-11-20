@@ -4,6 +4,7 @@ import { businessContext, collectAllPages, printBusinessResult, readContent } fr
 import { resolvePagination } from '../lib/config.ts'
 import { CliError } from '../lib/errors.ts'
 import type { CliContext } from '../lib/context.ts'
+import { registerDeliveryManagement } from './delivery-management.ts'
 
 type ReportBuildBody = ApiBody<'/api/v1/projects/{projectId}/builds', 'post'>
 type ListBuildsQuery = ApiQuery<'/api/v1/projects/{projectId}/builds', 'get'>
@@ -69,8 +70,16 @@ function parseJson(text: string): unknown {
   }
 }
 
+/**
+ * 注册构建上报、记录查询、产物目录、运行版本与审核发布管理。
+ * @param program CLI 根命令。
+ * @param context 命令执行与输入输出上下文。
+ * @returns 无返回值；业务调用仅在执行命令时发起。
+ */
 export function registerDeliveryCommands(program: Command, context: CliContext): void {
   const delivery = program.command('delivery').description('上报与查询构建、产物引用')
+
+  registerDeliveryManagement(delivery, context)
 
   delivery
     .command('report')

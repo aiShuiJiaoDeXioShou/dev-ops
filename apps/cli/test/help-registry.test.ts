@@ -48,3 +48,19 @@ test('README 中的命令组与帮助注册表一致', async () => {
     assert.ok(group === 'help' || help.stdout.includes(group), `README 命令组 ${group} 未在帮助中注册`)
   }
 })
+
+test('V0.8 覆盖清单的每个操作都有可离线解析的帮助', async () => {
+  const coverage = await readFile(
+    new URL('../../../specs/011-v08-cli-business-parity/coverage.md', import.meta.url),
+    'utf8',
+  )
+  const commands = [...coverage.matchAll(/^\| `devops ([a-z -]+)` \|/gm)].map((match) => match[1])
+  assert.ok(commands.length > 0)
+  assert.equal(new Set(commands).size, commands.length)
+  for (const path of commands) {
+    assert.ok(path)
+    const help = await execute([...path.split(' '), '--help'])
+    assert.equal(help.code, 0, `devops ${path} 应能显示帮助`)
+    assert.ok(help.stdout.startsWith(`Usage: devops ${path} `), help.stdout)
+  }
+})

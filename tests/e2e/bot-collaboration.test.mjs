@@ -6,6 +6,7 @@ import { createBotWorker } from '../../apps/server/dist/bootstrap/create-bot-wor
 import { listModelCatalog, runBotSession } from '../../packages/devops-bot/dist/index.js'
 import { createFauxBotRunner } from '../../packages/devops-bot/dist/testing.js'
 import { createLocalHttpFixture } from './support/local-http.mjs'
+import { runDevops } from './support/devops-cli.mjs'
 
 async function waitFor(read, accept, ms = 30_000) {
   const deadline = Date.now() + ms
@@ -27,7 +28,7 @@ function checked(response) {
 async function verifyBotCollaboration(t, live) {
   const fixture = await createLocalHttpFixture(t)
   if (!fixture) return
-  const { cleanup, config, env, request, post, teamId, user } = fixture
+  const { address, cleanup, config, env, request, post, teamId, user } = fixture
   assert.ok(user?.id, 'HTTP 会话应返回团队管理员')
   const configuredKey = live ? (process.env.DEEPSEEK_API_KEY ?? env.DEEPSEEK_API_KEY) : undefined
   if (live && !configuredKey) {
@@ -112,13 +113,13 @@ async function verifyBotCollaboration(t, live) {
   assert.equal(bot.modelConnectionId, connection.id)
   const room = checked(await post(`${team}/bot-conversations`, { kind: 'direct', botId: bot.id }))
   const roomPath = `/api/v1/bot-conversations/${room.id}`
+  const { token } = checked(await post('/api/v1/me/tokens', { name: '协作 CLI 验收' }))
+  const cli = { server: address, team: teamId, token }
   const sendStarted = performance.now()
-  const sent = checked(
-    await post(`${roomPath}/messages`, {
-      text: live ? '请直接回复“就绪”。' : '我当前有多少个项目？在 devop 团队当中？',
-      clientRequestId: randomUUID(),
-    }),
-  )
+  const sent = await runDevops(cli, ['conversation', 'send', room.id, '--file', '-'], {
+    text: live ? '请直接回复“就绪”。' : '我当前有多少个项目？在 devop 团队当中？',
+    clientRequestId: randomUUID(),
+  })
   const events = checked(await request(`${roomPath}/events`))
   const feedback = events.items.find(
     ({ runId, kind, payload }) =>
@@ -134,13 +135,11 @@ async function verifyBotCollaboration(t, live) {
   )
   if (!live)
     assert.match(history.items.find(({ speakerKind }) => speakerKind === 'bot')?.body.blocks[0].text, /共有 1 个项目/u)
-  const created = checked(
-    await post(`${roomPath}/tasks`, {
-      title: '核对验收项目',
-      businessOwnerId: user.id,
-      acceptanceCriteria: `调用 platform_api_call 用 GET 读取 ${projectsPath}。确认结果含“Bot 验收项目”，再调用 submit_task_result 提交中文结果、完成说明和证据，证据写入找到的项目 ID。最后简短回复完成。`,
-    }),
-  )
+  const created = await runDevops(cli, ['task', 'create', room.id, '--file', '-'], {
+    title: '核对验收项目',
+    businessOwnerId: user.id,
+    acceptanceCriteria: `调用 platform_api_call 用 GET 读取 ${projectsPath}。确认结果含“Bot 验收项目”，再调用 submit_task_result 提交中文结果、完成说明和证据，证据写入找到的项目 ID。最后简短回复完成。`,
+  })
   assert.equal(created.runStatus, 'queued')
   const taskPath = `/api/v1/bot-tasks/${created.task.id}`
   const awaiting = await waitFor(
@@ -156,7 +155,11 @@ async function verifyBotCollaboration(t, live) {
   assert.ok(awaiting.trace.some(({ kind, state }) => kind === 'platform_api' && state === 'succeeded'))
   assert.equal(awaiting.results[0].submittedByBotId, bot.id)
   assert.equal(checked(await request(`${team}/bot-inbox`)).items[0].id, created.task.id)
-  const accepted = checked(await post(`${taskPath}/accept`, { resultId: awaiting.results[0].id, comment: '验收通过' }))
+  const accepted = await runDevops(cli, ['task', 'accept', created.task.id, '--file', '-'], {
+    resultId: awaiting.results[0].id,
+    comment: '验收通过',
+  })
+  assert.equal(checked(await request(taskPath)).status, 'completed')
   assert.equal(accepted.task.status, 'completed')
   assert.equal(accepted.review.reviewerUserId, user.id)
   assert.equal(checked(await request(`${team}/bot-inbox`)).count, 0)

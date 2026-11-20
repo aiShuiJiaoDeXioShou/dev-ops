@@ -157,5 +157,5 @@ export async function createLocalHttpFixture(t) {
   function post(path, body) {
     return request(path, { method: 'POST', body, headers: { 'idempotency-key': randomUUID() } })
   }
-  return { app, cleanup, config, env, request, post, teamId, user: me.body.data.user ?? me.body.data }
+  return { app, address, cleanup, config, env, request, post, teamId, user: me.body.data.user ?? me.body.data }
 }

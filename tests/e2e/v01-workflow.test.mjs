@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { randomBytes } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
@@ -9,6 +10,7 @@ import { createHttpApp } from '../../apps/server/dist/bootstrap/create-http-app.
 import { loadConfig } from '../../apps/server/dist/platform/config/env.js'
 import { migrateDatabase } from '../../apps/server/dist/platform/database/migrate.js'
 import { seedRootAccount } from '../../apps/server/dist/modules/identity/identity.seed.js'
+import { runDevops } from './support/devops-cli.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const requireFromServer = createRequire(join(root, 'apps/server/package.json'))
@@ -90,6 +92,8 @@ test('真实 HTTP：邀请 → 项目 → 需求 → 提测 → Bug 回归 → �
       this.sent.push(message)
     },
   }
+  const localFiles = await mkdtemp(join(tmpdir(), 'devops-cli-items-'))
+  cleanup.push(() => rm(localFiles, { recursive: true, force: true }))
   const config = loadConfig({
     NODE_ENV: 'test',
     LOG_LEVEL: 'silent',
@@ -99,6 +103,7 @@ test('真实 HTTP：邀请 → 项目 → 需求 → 提测 → Bug 回归 → �
     AUTH_TRUSTED_ORIGINS: 'http://127.0.0.1:5173',
     DB_STATEMENT_TIMEOUT_MS: '2000',
     DB_LOCK_TIMEOUT_MS: '1000',
+    ATTACHMENT_STORAGE_DIR: join(localFiles, 'attachment-data'),
   })
   const app = createHttpApp(config, { mailer })
   cleanup.push(() => app.close())
@@ -209,23 +214,53 @@ test('真实 HTTP：邀请 → 项目 → 需求 → 提测 → Bug 回归 → �
   assert.equal(devSignIn.status, 200)
   const devCookie = cookieJar
   void devCookie
+  const issued = await request('/api/v1/me/tokens', { method: 'POST', body: { name: '事项 CLI 验收' } })
+  assert.equal(issued.body.success, true)
+  const cli = { server: address, team: teamId, token: issued.body.data.token }
+  const source = join(localFiles, 'evidence.txt')
+  await writeFile(source, '登录验收附件')
+  const { attachment } = await runDevops(cli, [
+    'attachment',
+    'upload',
+    projectId,
+    '--file',
+    source,
+    '--content-type',
+    'text/plain',
+  ])
+  const plan = [{ id: 'development', title: '开发', startsOn: '2026-11-20', endsOn: null, tasks: [] }]
+  const planFile = join(localFiles, 'plan.json')
+  await writeFile(planFile, JSON.stringify(plan))
+  const edited = await runDevops(cli, ['requirement', 'update', requirement.id, '--plan-file', planFile])
+  assert.deepEqual(edited.plan, plan)
+  const attached = await runDevops(cli, ['requirement', 'update', requirement.id, '--attachment', attachment.id])
+  assert.equal(attached.attachments[0].id, attachment.id)
+  const download = join(localFiles, 'download.txt')
+  await runDevops(cli, ['attachment', 'download', attachment.id, '--output', download])
+  assert.equal(await readFile(download, 'utf8'), '登录验收附件')
   const started = await request(`/api/v1/requirements/${requirement.id}/start-development`, {
     method: 'POST',
-    body: { version: requirement.version },
+    body: { version: attached.version },
   })
   assert.equal(started.body.success, true, JSON.stringify(started.body))
-  const submitted = await request(`/api/v1/requirements/${requirement.id}/submit-test`, {
-    method: 'POST',
-    body: {
-      version: started.body.data.version,
-      testOwnerUserId: adminUser.userId,
-      scopeNote: '登录范围',
-      selfTestResult: 'passed',
-    },
-    headers: { 'idempotency-key': 'e2e-submit-test' },
-  })
-  assert.equal(submitted.body.success, true, JSON.stringify(submitted.body))
-  const submittedRequirement = submitted.body.data.requirement
+  const submitted = await runDevops(cli, [
+    'requirement',
+    'submit-test',
+    requirement.id,
+    '--test-owner',
+    adminUser.userId,
+    '--test-owner',
+    devUser.userId,
+    '--scope-note',
+    '登录范围',
+    '--self-test-result',
+    'passed',
+  ])
+  const submittedRequirement = submitted.requirement
+  assert.deepEqual(
+    submittedRequirement.testOwners.map(({ userId }) => userId),
+    [adminUser.userId, devUser.userId],
+  )
 
   cookieJar = savedAdminCookie
   const startTest = await request(`/api/v1/requirements/${requirement.id}/start-test`, {

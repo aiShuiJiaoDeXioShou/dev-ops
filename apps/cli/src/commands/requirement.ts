@@ -14,6 +14,7 @@ import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
 import { CliError } from '../lib/errors.ts'
 import { normalizeList } from '../lib/output.ts'
+import { checkedBody, collectValues, listChange, readJsonFile } from '../lib/api-command.ts'
 
 /** 需求业务状态；与后端 OpenAPI 契约保持一致。 */
 const REQUIREMENT_STATUSES = ['pending', 'in_development', 'submitted', 'in_testing', 'passed', 'cancelled'] as const
@@ -73,18 +74,25 @@ interface CreateRequirementOptions extends ContentOptions {
   project?: string
   title?: string
   acceptance?: string
-  devOwner?: string
-  testOwner?: string
+  devOwner?: string[]
+  testOwner?: string[]
   collaborator?: string[]
+  attachment?: string[]
 }
 
 interface UpdateRequirementOptions extends ContentOptions {
   expectedVersion?: string
+  planFile?: string
+  clearCollaborators?: boolean
+  clearDevOwners?: boolean
+  clearTestOwners?: boolean
+  clearAttachments?: boolean
   title?: string
   acceptance?: string
-  devOwner?: string
-  testOwner?: string
+  devOwner?: string[]
+  testOwner?: string[]
   collaborator?: string[]
+  attachment?: string[]
 }
 
 interface CommentOptions {
@@ -104,7 +112,7 @@ interface ReturnToDevelopmentOptions extends ReasonOptions {
 }
 
 interface SubmitTestOptions extends VersionOption {
-  testOwner?: string
+  testOwner?: string[]
   scopeNote?: string
   selfTestResult?: string
   selfTestNote?: string
@@ -114,11 +122,6 @@ interface SubmitTestOptions extends VersionOption {
 
 interface PassTestOptions extends VersionOption {
   conclusion?: string
-}
-
-/** 一次性收集可重复选项的取值，例如多个 `--link-bug`。 */
-function collectValues(value: string, previous: string[]): string[] {
-  return [...previous, value]
 }
 
 /** 读取必填文本参数；缺省或全空白按参数错误退出 2。 */
@@ -436,17 +439,21 @@ function registerRequirementWriteCommands(requirement: Command, context: CliCont
     .option('--external-url <url>', '外部文档链接；与 --content-file 二选一')
     .option('--external-summary <text>', '外部文档摘要')
     .option('--acceptance <text>', '验收标准')
-    .option('--dev-owner <userId>', '研发负责人用户标识')
-    .option('--test-owner <userId>', '测试负责人用户标识')
+    .option('--dev-owner <userId>', '研发负责人用户标识，可重复', collectValues, [])
+    .option('--test-owner <userId>', '测试负责人用户标识，可重复', collectValues, [])
     .option('--collaborator <userId>', '协作人员用户标识，可重复指定', collectValues, [])
+    .option('--attachment <attachmentId>', '完整的附件 ID 列表，可重复指定', collectValues, [])
     .action(async (options: CreateRequirementOptions, command: Command) => {
       const projectId = requireText(options.project, '缺少 --project 参数')
       const title = requireText(options.title, '缺少 --title 参数')
       const content = await resolveCreateContent(options, context)
       const body: ApiBody<'/api/v1/projects/{projectId}/requirements', 'post'> = { title, ...content }
       if (options.acceptance !== undefined) body.acceptanceCriteria = options.acceptance
-      if (options.devOwner !== undefined) body.devOwnerUserId = options.devOwner
-      if (options.testOwner !== undefined) body.testOwnerUserId = options.testOwner
+      if (options.devOwner?.length === 1) body.devOwnerUserId = options.devOwner[0]
+      if (options.devOwner && options.devOwner.length > 1) body.devOwnerUserIds = options.devOwner
+      if (options.testOwner?.length === 1) body.testOwnerUserId = options.testOwner[0]
+      if (options.testOwner && options.testOwner.length > 1) body.testOwnerUserIds = options.testOwner
+      if (options.attachment?.length) body.attachmentIds = options.attachment
       if (options.collaborator !== undefined && options.collaborator.length > 0) {
         body.collaboratorUserIds = options.collaborator
       }
@@ -467,20 +474,37 @@ function registerRequirementWriteCommands(requirement: Command, context: CliCont
     .option('--external-url <url>', '外部文档链接')
     .option('--external-summary <text>', '外部文档摘要')
     .option('--acceptance <text>', '验收标准')
-    .option('--dev-owner <userId>', '研发负责人用户标识')
-    .option('--test-owner <userId>', '测试负责人用户标识')
+    .option('--dev-owner <userId>', '研发负责人用户标识，可重复', collectValues, [])
+    .option('--test-owner <userId>', '测试负责人用户标识，可重复', collectValues, [])
     .option('--collaborator <userId>', '协作人员用户标识，可重复指定', collectValues, [])
+    .option('--attachment <attachmentId>', '完整的附件 ID 列表，可重复指定', collectValues, [])
+    .option('--clear-collaborators', '清空协作人员')
+    .option('--clear-dev-owners', '清空研发负责人')
+    .option('--clear-test-owners', '清空测试负责人')
+    .option('--clear-attachments', '解除全部附件绑定')
+    .option('--plan-file <path>', '流程节点、待办及排期 JSON 数组；- 表示标准输入')
     .action(async (requirementId: string, options: UpdateRequirementOptions, command: Command) => {
       const title = options.title === undefined ? undefined : requireText(options.title, '--title 不能为空')
       const content = await resolveUpdateContent(options, context)
-      const collaborators = options.collaborator === undefined ? [] : options.collaborator
+      const collaborators = listChange(options.collaborator, options.clearCollaborators, '--collaborator')
+      const devOwners = listChange(options.devOwner, options.clearDevOwners, '--dev-owner')
+      const testOwners = listChange(options.testOwner, options.clearTestOwners, '--test-owner')
+      const attachments = listChange(options.attachment, options.clearAttachments, '--attachment')
+      const plan = options.planFile
+        ? checkedBody('/api/v1/requirements/{requirementId}/update', {
+            version: 1,
+            plan: await readJsonFile(options.planFile, command, context),
+          }).plan
+        : undefined
       const hasChange =
         title !== undefined ||
         content !== undefined ||
         options.acceptance !== undefined ||
-        options.devOwner !== undefined ||
-        options.testOwner !== undefined ||
-        collaborators.length > 0
+        devOwners !== undefined ||
+        testOwners !== undefined ||
+        collaborators !== undefined ||
+        attachments !== undefined ||
+        plan !== undefined
       if (!hasChange) throw new CliError('请至少提供一个需要修改的字段', 2, { code: 'INVALID_ARGUMENTS' })
       const business = await businessContext(command, context)
       const globals = globalsOf(command)
@@ -490,9 +514,19 @@ function registerRequirementWriteCommands(requirement: Command, context: CliCont
         ...(content ?? {}),
         ...(title === undefined ? {} : { title }),
         ...(options.acceptance === undefined ? {} : { acceptanceCriteria: options.acceptance }),
-        ...(options.devOwner === undefined ? {} : { devOwnerUserId: options.devOwner }),
-        ...(options.testOwner === undefined ? {} : { testOwnerUserId: options.testOwner }),
-        ...(collaborators.length === 0 ? {} : { collaboratorUserIds: collaborators }),
+        ...(devOwners === undefined
+          ? {}
+          : devOwners.length === 1
+            ? { devOwnerUserId: devOwners[0] }
+            : { devOwnerUserIds: devOwners }),
+        ...(testOwners === undefined
+          ? {}
+          : testOwners.length === 1
+            ? { testOwnerUserId: testOwners[0] }
+            : { testOwnerUserIds: testOwners }),
+        ...(collaborators === undefined ? {} : { collaboratorUserIds: collaborators }),
+        ...(attachments === undefined ? {} : { attachmentIds: attachments }),
+        ...(plan === undefined ? {} : { plan }),
       }
       const result = await business.client.updateRequirement(requirementId, body, writeCallOptions(globals))
       printBusinessResult(context, globals, result)
@@ -538,14 +572,14 @@ function registerRequirementActionCommands(requirement: Command, context: CliCon
     .description('需求提测；需要测试负责人、测试范围与自测结论')
     .argument('<requirementId>', '需求标识')
     .option('--expected-version <version>', '期望的当前版本；省略时先读取最新版本')
-    .option('--test-owner <userId>', '测试负责人用户标识（必填）')
+    .option('--test-owner <userId>', '测试负责人用户标识，至少一个，可重复', collectValues, [])
     .option('--scope-note <text>', '测试范围说明（必填）')
     .option('--self-test-result <result>', `自测结论：${SELF_TEST_RESULTS.join('、')}（必填）`)
     .option('--self-test-note <text>', '自测说明；非通过结论时必填')
     .option('--test-entry <text>', '测试入口说明')
     .option('--version-note <text>', '版本说明')
     .action(async (requirementId: string, options: SubmitTestOptions, command: Command) => {
-      const testOwnerUserId = requireText(options.testOwner, '缺少 --test-owner 参数')
+      const testOwnerUserId = requireText(options.testOwner?.[0], '缺少 --test-owner 参数')
       const scopeNote = requireText(options.scopeNote, '缺少 --scope-note 参数')
       const selfTestResult = parseSelfTestResult(options.selfTestResult)
       if (selfTestResult !== 'passed' && !options.selfTestNote?.trim()) {
@@ -559,6 +593,7 @@ function registerRequirementActionCommands(requirement: Command, context: CliCon
         {
           version: action.version,
           testOwnerUserId,
+          ...(options.testOwner && options.testOwner.length > 1 ? { testOwnerUserIds: options.testOwner } : {}),
           scopeNote,
           selfTestResult,
           ...(options.selfTestNote === undefined ? {} : { selfTestNote: options.selfTestNote }),
@@ -701,7 +736,7 @@ function registerRequirementActionCommands(requirement: Command, context: CliCon
 }
 
 /**
- * 注册需求域命令：列表/详情、创建/编辑、评论、提测历史、测试条件与状态流转。
+ * 注册需求域命令：列表/详情、创建/编辑、排期与附件、评论、提测历史及状态流转。
  * @param program CLI 根命令；子命令按 `requirement` 资源分组注册。
  * @param context 输出通道、环境变量与标准输入读取函数。
  * @returns 无返回值；命令由入口统一解析并决定退出码。
