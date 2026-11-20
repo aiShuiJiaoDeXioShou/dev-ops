@@ -66,7 +66,7 @@ export function ConversationMessages({
       box.scrollTop = box.scrollHeight - historyOffset.current
       historyOffset.current = null
     } else if (follow.current && last?.id) box.scrollTop = box.scrollHeight
-  }, [items.length, last?.id, last?.text, last?.status, loadingEarlier, isVisible])
+  }, [items.length, last?.id, last?.text, last?.status, last?.failureText, loadingEarlier, isVisible])
 
   return (
     <div
@@ -123,6 +123,11 @@ export function ConversationMessages({
                 {message.kind === 'user' ? (
                   <>
                     <div className="dsh-user-bubble">{message.text}</div>
+                    {message.failureText && (
+                      <p className="dsh-user-failure" role="status">
+                        {message.failureText}
+                      </p>
+                    )}
                     {(time || message.templateName || (!readOnly && message.isStored)) && (
                       <div className="dsh-user-meta row flex-wrap gap-2">
                         {time}

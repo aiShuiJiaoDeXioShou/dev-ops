@@ -297,6 +297,16 @@
     overflow-wrap: anywhere;
   }
 
+  /* 失败原因跟随触发消息展示：放在用户气泡下方，随历史滚动，不再常驻消息末尾。 */
+  .live-conversations .dsh-user-failure {
+    max-width: min(calc(748px * 0.7), 82%);
+    color: var(--dsh-red);
+    font-size: var(--text-xs);
+    line-height: 18px;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
   .live-conversations .dsh-answer-footer {
     min-height: 48px;
     margin-top: 12px;

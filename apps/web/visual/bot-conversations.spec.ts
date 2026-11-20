@@ -563,3 +563,100 @@ test('[desktop] [mobile] 在对话和轨迹停止生成并保留已经输出的�
   await expect(page.getByRole('button', { name: '发送消息' })).toBeDisabled()
   await page.screenshot({ path: testInfo.outputPath('bot-conversations-stopped.png'), animations: 'disabled' })
 })
+
+test('[desktop] [mobile] 运行失败的原因挂在触发消息下而不是常驻消息末尾', async ({ page }, testInfo) => {
+  await installApiMocks(page)
+  const { teamId, userId } = VISUAL_IDS
+  const stamp = '2026-11-17T08:00:00.000Z'
+  const botId = 'da55aa00-0000-4000-8000-000000000011'
+  const runId = 'da55aa00-0000-4000-8000-000000000020'
+  const messageId = 'da55aa00-0000-4000-8000-000000000021'
+  const room: Room = {
+    id: 'da55aa00-0000-4000-8000-000000000012',
+    teamId,
+    name: '验收助理',
+    kind: 'direct',
+    leaderBotId: null,
+    lastMessageAt: stamp,
+    responsibility: '',
+    instructions: '',
+    tags: [],
+    botSettings: [],
+    skillReferences: [],
+    members: [
+      { id: botId, name: '验收助理', kind: 'bot' },
+      { id: userId, name: '负责人', kind: 'user' },
+    ],
+  }
+  const list: Message[] = [
+    {
+      id: messageId,
+      sequence: '1',
+      speakerKind: 'user',
+      speakerId: userId,
+      speakerName: '负责人',
+      body: { blocks: [{ type: 'text', text: '我当前有多少个项目？' }] },
+      runId,
+      createdAt: stamp,
+    },
+  ]
+  await page.route(`**/api/v1/teams/${teamId}/bot-inbox`, (route) =>
+    route.fulfill({ json: success({ items: [], count: 0 }) }),
+  )
+  await page.route(`**/api/v1/teams/${teamId}/bot-conversations*`, (route) => {
+    if (route.request().method() === 'POST') return route.fulfill({ json: success(room) })
+    return route.fulfill({
+      json: success({
+        items: [{ ...room, botAvatars: [{ id: botId, avatarKey: null, enabled: true }], lastMessagePreview: null }],
+        nextCursor: null,
+      }),
+    })
+  })
+  await page.route(`**/api/v1/bot-conversations/${room.id}`, (route) => route.fulfill({ json: success(room) }))
+  await page.route(`**/api/v1/bot-conversations/${room.id}/messages*`, (route) =>
+    route.fulfill({ json: success({ items: list, nextBefore: null }) }),
+  )
+  await page.route(`**/api/v1/bot-conversations/${room.id}/tasks*`, (route) =>
+    route.fulfill({ json: success({ items: [], nextCursor: null }) }),
+  )
+  const failureEvent = {
+    sequence: '3',
+    kind: 'run_status',
+    runId,
+    payload: { status: 'failed', failureMessage: '执行服务已关闭，可重新运行任务' },
+    createdAt: stamp,
+  }
+  // 失败前是否有增量正文，决定原因展示在触发消息下还是已有正文的气泡里。
+  let withPartialText = false
+  await page.route(`**/api/v1/bot-conversations/${room.id}/events*`, (route) => {
+    const after = Number(new URL(route.request().url()).searchParams.get('after') ?? '0')
+    const events = [
+      { sequence: '1', kind: 'run_status', runId, payload: { status: 'running', botId }, createdAt: stamp },
+      ...(withPartialText
+        ? [{ sequence: '2', kind: 'output_delta', runId, payload: { text: '已收到的正文片段' }, createdAt: stamp }]
+        : []),
+      failureEvent,
+    ]
+    return route.fulfill({
+      json: success({ items: events.slice(after), cursor: '3', resetRequired: false, activeRuns: [] }),
+    })
+  })
+
+  const failureText = '执行失败 · 执行服务已关闭，可重新运行任务'
+  await page.goto(`/collaboration/${room.id}`)
+  const triggerMessage = page.locator(`#message-${messageId}`)
+  await expect(triggerMessage.getByText(failureText, { exact: true })).toBeVisible({ timeout: 20_000 })
+  // 失败的运行不提交助手消息：不再渲染空的助手气泡，原因随触发消息一起滚动。
+  await expect(page.locator('.dsh-message.dsh-assistant')).toHaveCount(0)
+  await page.screenshot({ path: testInfo.outputPath('bot-conversations-failed.png'), animations: 'disabled' })
+  await page.reload()
+  await expect(triggerMessage.getByText(failureText, { exact: true })).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('.dsh-message.dsh-assistant')).toHaveCount(0)
+
+  // 已有增量正文时保留气泡并只提示一次，不再把原因重复挂在触发消息下。
+  withPartialText = true
+  await page.reload()
+  await expect(page.getByText('已收到的正文片段', { exact: true })).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('.dsh-message.dsh-assistant').getByText(failureText, { exact: true })).toBeVisible()
+  await expect(triggerMessage.getByText(failureText, { exact: true })).toHaveCount(0)
+})

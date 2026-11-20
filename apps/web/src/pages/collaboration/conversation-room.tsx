@@ -185,7 +185,8 @@ export function ConversationRoom({
         : [],
     )
   const items = stored.map<MessageView>((message) => {
-    const run = message.runId && message.speakerKind === 'bot' ? runsById.get(message.runId) : undefined
+    const run = message.runId ? runsById.get(message.runId) : undefined
+    const botRun = message.speakerKind === 'bot' ? run : undefined
     return {
       id: message.id,
       kind: message.speakerKind,
@@ -202,15 +203,21 @@ export function ConversationRoom({
           : undefined,
       text: message.body.blocks.flatMap((block) => (block.type === 'tool_activity' ? [] : [block.text])).join('\n\n'),
       runId: message.speakerKind === 'bot' && message.runId ? message.runId : undefined,
-      status: run?.status,
-      elapsed: run ? runElapsed(run, now) : undefined,
+      status: botRun?.status,
+      elapsed: botRun ? runElapsed(botRun, now) : undefined,
       metrics: message.body.metrics,
       feedback: message.feedback,
       memoryChanges: message.speakerKind === 'bot' && message.runId ? memoryFor(message.runId) : undefined,
+      // 失败的运行不会提交助手消息，原因挂在触发消息下，避免空状态条一直停在消息末尾。
+      failureText:
+        message.speakerKind === 'user' && run?.status === 'failed' && !run.text.trim() ? run.statusText : undefined,
     }
   })
   const ongoing = runs.flatMap<MessageView>((run) => {
     if (!run.status || run.reply || run.status === 'succeeded') return []
+    // 已结束但没有正文的运行没有可展示内容，不再保留空的助手消息占位。
+    const isTerminal = !['running', 'queued'].includes(run.status)
+    if (isTerminal && !run.text.trim()) return []
     return [
       {
         id: run.id,
