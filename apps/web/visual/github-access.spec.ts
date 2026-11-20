@@ -117,3 +117,32 @@ test('[desktop] [mobile] 个人页面展示 GitHub 绑定与更换入口', async
   await expect(page.getByRole('button', { name: '更换 GitHub 账号' })).toBeEnabled()
   await expect(page.getByText('已绑定 @visual-developer')).toBeVisible()
 })
+
+test('[desktop] [mobile] 从团队设置选择已有 GitHub App 安装', async ({ page }, testInfo) => {
+  await installApiMocks(page)
+  await page.route('**/api/v1/teams/*/github-installations/discover', (route) =>
+    route.fulfill({
+      json: envelope([
+        { id: 13, login: 'personal' },
+        { id: 14, login: 'organization' },
+      ]),
+    }),
+  )
+
+  await page.goto('/settings/team?tab=connections')
+  const trigger = page.getByRole('button', { name: '添加 GitHub 连接' })
+  await trigger.click()
+  const dialog = page.getByRole('dialog', { name: '添加 GitHub 连接' })
+  const select = dialog.getByLabel('GitHub App 安装')
+  const submit = dialog.getByRole('button', { name: '绑定并同步' })
+  await expect(select).toBeVisible()
+  await expect(submit).toBeDisabled()
+  await select.selectOption('14')
+  await expect(submit).toBeEnabled()
+  await expect(dialog.getByRole('button', { name: '新建 GitHub App 安装' })).toBeVisible()
+  expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('github-existing-installation.png') })
+  await page.keyboard.press('Escape')
+  await expect(dialog).not.toBeVisible()
+  await expect(trigger).toBeFocused()
+})

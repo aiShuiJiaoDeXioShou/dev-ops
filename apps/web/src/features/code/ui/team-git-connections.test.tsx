@@ -44,6 +44,40 @@ describe('TeamGitConnections', () => {
     expect(screen.getByRole('button', { name: '添加 Gitea 连接' })).toBeInTheDocument()
   })
 
+  it('选择已有的 GitHub App 安装后绑定并刷新团队连接', async () => {
+    const connections: ReturnType<typeof connection>[] = []
+    const submissions: unknown[] = []
+    server.use(
+      http.get('*/api/v1/teams/team-1/git-connections', () => ok(connections)),
+      http.post('*/api/v1/teams/team-1/github-installations/discover', () =>
+        ok([
+          { id: 13, login: 'personal' },
+          { id: 14, login: 'organization' },
+        ]),
+      ),
+      http.post('*/api/v1/teams/team-1/git-connections', async ({ request }) => {
+        submissions.push(await request.json())
+        const created = connection({ name: 'GitHub organization (#14)', externalIdentity: '14' })
+        connections.push(created)
+        return ok(created)
+      }),
+    )
+    renderConnections(true)
+    const user = userEvent.setup()
+    const trigger = await screen.findByRole('button', { name: '添加 GitHub 连接' })
+    await user.click(trigger)
+    const dialog = within(await screen.findByRole('dialog', { name: '添加 GitHub 连接' }))
+    const submit = dialog.getByRole('button', { name: '绑定并同步' })
+    expect(submit).toBeDisabled()
+    const select = await dialog.findByLabelText('GitHub App 安装')
+    await user.selectOptions(select, '14')
+    await user.click(submit)
+    expect(await screen.findByText('GitHub organization (#14)')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+    expect(submissions).toEqual([{ providerKey: 'github', name: 'GitHub', installationId: 14 }])
+  })
+
   it('管理员可检查和同步可用连接，已撤销连接不再提供操作', async () => {
     server.use(
       http.get('*/api/v1/teams/team-1/git-connections', () =>

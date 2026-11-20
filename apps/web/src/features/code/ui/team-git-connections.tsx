@@ -19,6 +19,7 @@ import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageError, PageLoading } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { gitConnectionsQueryOptions } from '../api/queries'
+import { GitHubConnectionDialog } from './github-connection-dialog'
 
 const PROVIDER_LABELS = { github: 'GitHub', gitea: 'Gitea' } as const
 const AUTH_LABELS: Record<string, string> = {
@@ -72,19 +73,6 @@ export function TeamGitConnections({
     showToast(message, 'error')
   }
 
-  const createGithub = useMutation({
-    mutationFn: () => apiClient.createGitConnection(teamId, { providerKey: 'github' as const, name: 'GitHub' }),
-    onSuccess: async (result) => {
-      if ('authorizationUrl' in result.data) {
-        window.location.assign(result.data.authorizationUrl)
-        return
-      }
-      setError('')
-      await invalidate()
-      showToast('GitHub 连接已添加。', 'success')
-    },
-    onError: handleError,
-  })
   const createGitea = useMutation({
     mutationFn: () =>
       apiClient.createGitConnection(teamId, {
@@ -171,15 +159,7 @@ export function TeamGitConnections({
           <h3>Git 连接</h3>
           {canManage && (
             <div className="row flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                className="max-md:min-h-11"
-                disabled={createGithub.isPending}
-                onClick={() => createGithub.mutate()}
-              >
-                {createGithub.isPending ? '跳转中…' : '添加 GitHub 连接'}
-              </Button>
+              <GitHubConnectionDialog teamId={teamId} onConnected={invalidate} />
               <Dialog
                 open={giteaOpen}
                 onOpenChange={(next) => {
