@@ -6,7 +6,7 @@ function successBody<T>(data: T) {
   return { success: true, code: 'OK', message: 'OK', requestId: 'trace', data }
 }
 
-test('从契约验证成功信封并筛除额外字段，保留请求标识', async () => {
+test('解包就绪状态与请求标识', async () => {
   const client = createApiClient({
     baseUrl: 'https://example.test/proxy/',
     fetch: async (input) => {
@@ -17,18 +17,6 @@ test('从契约验证成功信封并筛除额外字段，保留请求标识', as
     },
   })
   assert.deepEqual(await client.ready(), { data: { status: 'ok', database: 'ok' }, requestId: 'trace' })
-})
-
-test('进程存活响应不能当成数据库就绪响应', async () => {
-  const client = createApiClient({
-    baseUrl: 'https://example.test',
-    fetch: async () => Response.json(successBody({ status: 'ok' })),
-  })
-  assert.equal((await client.health()).data.status, 'ok')
-  await assert.rejects(
-    client.ready(),
-    (error: unknown) => error instanceof RequestError && error.code === 'INVALID_RESPONSE',
-  )
 })
 
 test('业务失败返回 BUSINESS_ERROR，保留业务码且不透传服务端正文', async () => {
@@ -157,15 +145,4 @@ test('API Token 以 Bearer 头发送，未提供时不发送 Authorization', asy
     await client.health()
     assert.equal(authorization, token === undefined ? null : `Bearer ${token}`)
   }
-})
-
-test('业务响应字段不符合生成契约时返回 INVALID_RESPONSE', async () => {
-  const client = createApiClient({
-    baseUrl: 'https://example.test',
-    fetch: async () => Response.json(successBody([{ id: 'team-1' }]), { headers: { 'x-request-id': 'trace' } }),
-  })
-  await assert.rejects(
-    client.listMyTeams(),
-    (error: unknown) => error instanceof RequestError && error.code === 'INVALID_RESPONSE',
-  )
 })

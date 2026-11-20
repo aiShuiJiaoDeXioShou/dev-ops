@@ -15,7 +15,6 @@ export function createHttpClient(baseUrl: URL, timeoutMs: number, token?: string
   const options: ApiClientOptions = {
     baseUrl,
     timeoutMs,
-    ...(process.env.NODE_ENV === 'test' ? { validateResponses: false } : {}),
   }
   if (token !== undefined) options.token = token
   return createApiClient(options)

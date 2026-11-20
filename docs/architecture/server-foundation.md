@@ -49,11 +49,11 @@
 >
 > **选择：** HTTP JSON 接口使用 TypeBox schema，并由 [Swagger 插件](https://github.com/fastify/fastify-swagger) 生成 OpenAPI 文档。
 >
-> **理由：** 独立接口契约方便浏览器以外的客户端调用，并为共享 API 客户端生成类型和校验器。
+> **理由：** 独立接口契约方便浏览器以外的客户端调用，并为共享 API 客户端生成类型。
 >
-> **备选：** 直接共享 TypeScript 接口可以减少生成步骤，但无法独立承担运行时校验；当前用 schema 统一这两类约束。
+> **备选：** 直接共享 TypeScript 接口可以减少生成步骤，OpenAPI 也能向其他语言的调用方提供契约。
 >
-> **代价与退路：** 开发者需要维护请求与响应 schema。前端暂时手写调用，接口数量增长后再引入 OpenAPI 客户端生成。
+> **代价与退路：** 开发者需要维护请求与响应 schema。Web 和 CLI 使用共享客户端读取统一信封。
 
 日志采用 Fastify 提供的 Pino 集成；测试采用 Node test runner 和 `app.inject()`。应用构建与端口监听分别放在不同入口，测试可以直接创建应用。该测试方式见 [Fastify 测试指南](https://fastify.dev/docs/latest/Guides/Testing/)。
 
