@@ -1371,7 +1371,27 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
-    /** 创建 Git 连接或获取 GitHub 授权地址。 */
+    /**
+     * 查询当前团队管理员个人授权可访问的 GitHub App 安装。
+     * @param teamId 当前团队标识。
+     * @param options 调用选项，包括取消信号。
+     * @returns 已有安装列表；权限不足或个人授权失效时请求失败。
+     */
+    async discoverGitHubInstallations(teamId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/teams/{teamId}/github-installations/discover', 'post'>>(
+        `/api/v1/teams/${segment(teamId)}/github-installations/discover`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /**
+     * 创建 Git 连接、绑定已有安装或获取 GitHub 授权地址。
+     * @param teamId 当前团队标识。
+     * @param body 提供方与连接参数，已有 GitHub 安装使用 installationId。
+     * @param options 调用选项，包括取消信号。
+     * @returns 保存的连接或新安装授权地址；权限不足或同步失败时请求失败。
+     */
     async createGitConnection(
       teamId: string,
       body: ApiBody<'/api/v1/teams/{teamId}/git-connections', 'post'>,
