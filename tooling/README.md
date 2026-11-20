@@ -5,7 +5,7 @@
 | 位置                                        | 职责                                           | 验证入口                  |
 | ------------------------------------------- | ---------------------------------------------- | ------------------------- |
 | [typescript](typescript)                    | 应用共享的严格类型配置                         | 各应用 typecheck 和 build |
-| [生成脚本](scripts/generate-api-client.mjs) | 从导出的 OpenAPI 生成类型和响应校验器          | `pnpm api:generate`       |
+| [生成脚本](scripts/generate-api-client.mjs) | 从导出的 OpenAPI 生成接口类型                  | `pnpm api:generate`       |
 | [依赖规则](dependency-rules.mjs)            | Web 分层、应用与共享包边界、循环依赖           | `pnpm check:boundaries`   |
 | [规则测试](test/dependency-rules.test.mjs)  | 用临时 TypeScript 工程实际验证允许和禁止的导入 | `pnpm test:tooling`       |
 | [UI 规范检查](scripts/check-ui.mjs)         | token 同步、样式分层、存量 UI 违规基线         | `pnpm ui:check`           |

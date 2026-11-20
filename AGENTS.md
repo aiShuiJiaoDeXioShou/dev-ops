@@ -11,7 +11,7 @@
 - `apps/server/src/modules/`：业务模块；当前包含 identity、projects、requirements、bugs、code、collaboration、delivery、pipeline、configuration、integrations、knowledge、health。
 - `apps/server/src/platform/`：进程配置、HTTP 公共能力、数据库连接与迁移执行器，不依赖业务模块。
 - `apps/server/src/bootstrap/database-schema.ts`：聚合模块表定义，供 Drizzle 生成迁移；`apps/server/drizzle/` 保存版本化 SQL 与元数据。
-- `packages/api-client/`：Web 和 CLI 共用的类型化客户端，类型与运行时校验器从后端 OpenAPI 生成。
+- `packages/api-client/`：Web 和 CLI 共用的类型化客户端，接口类型从后端 OpenAPI 生成。
 - `packages/pipeline-protocol/`：Server 与 Agent 共用的流水线协议 TypeBox 类型与校验器，不依赖应用源码。
 - `tooling/`：共享 TypeScript 配置、接口生成脚本及依赖边界检查；`tests/e2e/` 验证跨应用联通。
 - `deploy/compose.yaml`、`deploy/postgres/`：本地 PostgreSQL 环境与首次初始化脚本。
@@ -28,7 +28,7 @@
 1. Web 按 app → pages → features → shared 单向依赖，允许上层直接引用下层的具体文件。跨 feature 直接引用所属功能中定义组件、查询或类型的文件。禁止反向引用上层代码及循环依赖。
 2. 后端按业务模块组织代码，模块用于组织代码而不是强制封装：跨模块可以直接导入对方 service、read、repository、表定义，也可以跨模块 SQL join。同一张表的写入逻辑优先集中在数据所属模块，避免散落；该约定靠代码评审维持，不做静态依赖限制。bootstrap 可访问路由与构造入口完成组装，platform 不反向依赖业务模块。
 3. Web、CLI 只通过 API 操作 Server；共享包不导入应用源码，Server 不依赖生成的 api-client。
-4. 生成的接口类型与校验器不手工修改、不提交。修改 TypeBox 契约后运行根目录 `pnpm api:generate`，完整检查使用 `pnpm check`。
+4. 生成的接口类型不手工修改、不提交。修改 TypeBox 契约后运行根目录 `pnpm api:generate`，完整检查使用 `pnpm check`。
 5. 新增导入须通过 `pnpm check:boundaries`；根级检查同时验证越界导入和循环依赖确实会失败。
 
 ## 项目必须遵循的规范
@@ -93,7 +93,7 @@
 3. 请求和响应使用 TypeBox schema，类型尽量从 schema 推导，避免重复维护相同结构。外部输入必须在入口校验，数据库查询结果不能未经筛选直接作为接口响应。
 4. 对外业务 HTTP 接口只使用 GET 与 POST：GET 用于读取且不得产生副作用；POST 用于创建、修改、删除、状态流转、关联调整和批量动作。禁止为业务路由定义 PUT、PATCH、DELETE 等非 GET/POST 方法，不得使用 `X-HTTP-Method-Override` 等方法覆盖；写操作通过明确动作子路径表达，例如 `/requirements/:id/submit-test`、`/resources/:id/remove`。
 5. 平台自研接口（包括 `/api/v1/health`、`/api/v1/ready`）统一返回 HTTP 200 与统一响应信封：成功为 `{ success: true, code: "OK", message, requestId, data? }`，业务失败为 `{ success: false, code: <业务错误码>, message, requestId, data? }`。不使用 201、202、204 等其他成功码；禁止用 4xx/5xx 表达可预期的业务失败。第三方认证协议端点（Better Auth）按其协议原样返回；流水线产物下载（`GET /api/v1/pipeline-artifacts/:artifactId/download`）作为登记的文件传输显式例外，成功返回二进制流并带 `X-Content-SHA256`，失败仍返回 HTTP 200 + 统一信封。以上例外在接口文档与 OpenAPI 中列明。
-6. 业务错误码在后端集中定义并登记到 OpenAPI 与接口说明，使用稳定的大写下划线命名，同一语义全项目复用同一码。Web、CLI 与生成的运行时校验器按响应信封的 `success` 与 `code` 判断成败，不得只依赖 HTTP 状态码。新增或修改接口同步维护 `/api/v1` 路由前缀下的 OpenAPI 契约与接口文档。
+6. 业务错误码在后端集中定义并登记到 OpenAPI 与接口说明，使用稳定的大写下划线命名，同一语义全项目复用同一码。Web 和 CLI 按响应信封的 `success` 与 `code` 判断成败，不得只依赖 HTTP 状态码。新增或修改接口同步维护 `/api/v1` 路由前缀下的 OpenAPI 契约与接口文档。
 7. 配置集中加载和校验，新增环境变量同步更新 `.env.example` 与说明。禁止在业务代码中散落读取环境变量或硬编码部署地址、凭据。
 8. 日志记录排障所需的业务标识和请求上下文，敏感字段脱敏；不得向客户端暴露内部堆栈、SQL 或凭据。不要在多个调用层重复记录同一异常。
 9. 涉及用户或项目资源的接口必须在服务端校验身份、资源归属和操作权限；前端隐藏按钮不能代替鉴权。

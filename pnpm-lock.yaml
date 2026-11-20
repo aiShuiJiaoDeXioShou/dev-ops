@@ -11,9 +11,6 @@ importers:
       '@eslint/js':
         specifier: ^9.39.4
         version: 9.39.4
-      ajv:
-        specifier: 8.20.0
-        version: 8.20.0
       dependency-cruiser:
         specifier: 18.7.2
         version: 18.7.2

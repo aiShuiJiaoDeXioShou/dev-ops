@@ -1,8 +1,4 @@
 import type { components, paths } from './generated/api.ts'
-import validateHealth from './generated/health.mjs'
-import validateReadiness from './generated/readiness.mjs'
-import validateError from './generated/error.mjs'
-import { validateResponse } from './generated/response-validators.mjs'
 
 export type { components, paths } from './generated/api.ts'
 
@@ -141,8 +137,6 @@ export interface ApiClientOptions {
   credentials?: RequestCredentials
   /** API Token；CLI 使用 Bearer，浏览器不设置。 */
   token?: string
-  /** 是否按生成契约校验业务响应；测试可显式关闭，运行时默认开启。 */
-  validateResponses?: boolean
   fetch?: typeof fetch
 }
 
@@ -194,7 +188,7 @@ function createBusinessError(body: ApiFailureEnvelope, requestId: string): Reque
 /**
  * 创建不依赖浏览器全局对象的 API 客户端，不发起请求。
  * @param options 服务基础地址、超时、会话策略及可替换的 fetch 实现。
- * @returns 提供已校验响应信封的健康与就绪请求；每次请求单独处理取消和超时。
+ * @returns 按接口类型解包统一响应的客户端；每次请求独立处理取消和超时。
  * @throws 地址包含凭据、查询参数或片段，协议不支持，或超时不在 1 至 300000 毫秒时抛出错误。
  */
 export function createApiClient(options: ApiClientOptions) {
@@ -218,7 +212,6 @@ export function createApiClient(options: ApiClientOptions) {
     throw new Error('请求超时必须是 1 至 300000 之间的整数毫秒')
   }
   const fetchRequest = options.fetch
-  const validateResponses = options.validateResponses !== false
 
   /**
    * 发起请求并完成传输层解析；不判断业务信封。
@@ -280,7 +273,7 @@ export function createApiClient(options: ApiClientOptions) {
     }
 
     if (!response.ok) {
-      const details = validateError(payload)
+      const details = isFailureEnvelope(payload)
         ? { responseValid: true, serverCode: payload.code }
         : { responseValid: false }
       throw new RequestError(`服务请求失败（HTTP ${response.status}），请稍后重试。`, {
@@ -295,35 +288,13 @@ export function createApiClient(options: ApiClientOptions) {
   }
 
   /**
-   * 校验统一响应信封并解包成功数据。
-   * @param path `/api/v1` 下的接口路径。
-   * @param validate 从 OpenAPI 生成的响应校验器。
-   * @param signal 调用方取消信号。
-   * @returns 成功信封中的业务数据与请求标识。
-   * @throws 契约错误、业务失败码或传输失败时抛出 RequestError。
-   */
-  async function getEnvelope<T>(
-    path: string,
-    validate: (value: unknown) => value is ApiSuccessEnvelope<T> | ApiFailureEnvelope,
-    signal?: AbortSignal,
-  ) {
-    const { payload, headerRequestId } = await requestJson(path, 'GET', undefined, signal)
-    if (!validate(payload)) {
-      throw new RequestError('后端响应不符合接口契约。', { code: 'INVALID_RESPONSE', requestId: headerRequestId })
-    }
-    const requestId = headerRequestId ?? payload.requestId
-    if (!payload.success) throw createBusinessError(payload, requestId)
-    return { data: payload.data, requestId }
-  }
-
-  /**
    * 发起业务请求并解包统一信封；调用方显式给出成功数据类型。
    * @param path `/api/v1` 下的路径。
    * @param method GET 或 POST。
    * @param body POST 请求体。
    * @param options 取消信号、幂等键与查询参数。
    * @returns 成功数据与请求标识。
-   * @throws 网络、超时、契约错误或业务失败时抛出 RequestError。
+   * @throws 网络、超时、响应格式错误或业务失败时抛出 RequestError。
    */
   async function callTyped<T>(
     path: string,
@@ -345,12 +316,6 @@ export function createApiClient(options: ApiClientOptions) {
     if (!isSuccessEnvelope(payload)) {
       throw new RequestError('后端响应不符合接口契约。', { code: 'INVALID_RESPONSE', requestId: headerRequestId })
     }
-    if (validateResponses && !validateResponse(method, path, payload)) {
-      throw new RequestError('后端响应不符合接口契约。', {
-        code: 'INVALID_RESPONSE',
-        requestId: headerRequestId ?? payload.requestId,
-      })
-    }
     return { data: payload.data as T, requestId: headerRequestId ?? payload.requestId }
   }
 
@@ -358,21 +323,25 @@ export function createApiClient(options: ApiClientOptions) {
     /**
      * 读取进程存活状态，不检查数据库。
      * @param signal 调用方取消信号，覆盖连接和响应体读取。
-     * @returns 已验证并筛选的存活状态及请求标识。
-     * @throws 请求失败、超时、业务错误或契约错误时抛出 RequestError；主动取消向上传递。
+     * @returns 成功响应中的存活状态及请求标识。
+     * @throws 请求失败、超时、业务错误或响应格式错误时抛出 RequestError；主动取消向上传递。
      */
     async health(signal?: AbortSignal) {
-      const result = await getEnvelope<{ status: 'ok' }>('/api/v1/health', validateHealth, signal)
+      const result = await callTyped<ApiSuccessData<'/api/v1/health', 'get'>>('/api/v1/health', 'GET', undefined, {
+        signal,
+      })
       return { ...result, data: { status: result.data.status } }
     },
     /**
      * 读取数据库就绪状态。
      * @param signal 调用方取消信号，覆盖连接和响应体读取。
-     * @returns 已验证并筛选的就绪状态及请求标识。
-     * @throws 请求失败、超时、业务错误或契约错误时抛出 RequestError；主动取消向上传递。
+     * @returns 成功响应中的就绪状态及请求标识。
+     * @throws 请求失败、超时、业务错误或响应格式错误时抛出 RequestError；主动取消向上传递。
      */
     async ready(signal?: AbortSignal) {
-      const result = await getEnvelope<ReadinessResponse>('/api/v1/ready', validateReadiness, signal)
+      const result = await callTyped<ApiSuccessData<'/api/v1/ready', 'get'>>('/api/v1/ready', 'GET', undefined, {
+        signal,
+      })
       return { ...result, data: { status: result.data.status, database: result.data.database } }
     },
 
