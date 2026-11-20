@@ -97,7 +97,92 @@ pnpm test:db
 
 `pnpm build` 只执行契约生成和全部构建。单独检查某个应用前先执行 `pnpm prepare:clients`；运行端到端测试 `pnpm test:e2e` 前先完成 `pnpm build`。
 
-后端配置和接口见[后端说明](apps/server/README.md)。PostgreSQL 默认监听 `127.0.0.1:5433`，部署配置位于 [deploy](deploy/README.md)，数据和迁移操作见[数据库说明](docs/architecture/database.md)。共享客户端与工程工具分别见 [API 客户端](packages/api-client/README.md)和[工程工具](tooling/README.md)。
+后端配置和接口见[后端说明](apps/server/README.md)。本地 Compose 将 PostgreSQL 绑定到 `127.0.0.1:5433`，配置见 [deploy](deploy/README.md)，数据和迁移操作见[数据库说明](docs/architecture/database.md)。共享客户端与工程工具分别见 [API 客户端](packages/api-client/README.md)和[工程工具](tooling/README.md)。
+
+## Mac mini 原生部署
+
+Mac mini 可以原生运行 HTTP API、调度 Worker 和 Bot Worker。Web 由宿主机网关直接提供 `apps/web/dist` 中的静态文件，数据库使用本机或远程 PostgreSQL 18。这些服务可以完全在 Docker 之外运行。内置流水线需要在 [Agent 执行节点](apps/pipeline-agent/README.md#前置条件)使用 Docker Engine 运行任务。Agent 可以单独部署到另一台机器。
+
+### 构建产物
+
+在仓库根目录使用 `.nvmrc` 和根 `package.json` 固定的 Node.js、pnpm 版本。首次构建先编译 API 契约生成所依赖的工作区包。
+
+```bash
+nvm use
+git submodule update --init
+pnpm install --frozen-lockfile
+pnpm --filter @dev-ops/pipeline-protocol --filter @dev-ops/devops-bot build
+pnpm build
+```
+
+部署后端时保留 `apps/server/dist`、`apps/server/drizzle` 和 Node.js 运行依赖，包括工作区包。
+
+### 数据库与应用配置
+
+本机数据库可通过 `brew install postgresql@18` 安装。先在该实例的 `postgresql.conf` 中设置 `listen_addresses = 'localhost'` 和空闲端口，再启动服务。下例使用 `5433`。宿主机已有其他 PostgreSQL 实例时，为 18 使用独立的数据目录和端口。 [Homebrew PostgreSQL 18 安装说明](https://formulae.brew.sh/formula/postgresql%4018)
+
+在空实例上，由数据库管理员创建 `dev_ops` 数据库。在执行初始化脚本的环境中提供独立的 `APP_DATABASE_PASSWORD` 和 `MIGRATION_DATABASE_PASSWORD`，脚本会安装 `pg_trgm` 并创建、授权两个登录角色。
+
+```bash
+brew services start postgresql@18
+pg18_bin="$(brew --prefix postgresql@18)/bin"
+"$pg18_bin/createdb" -h 127.0.0.1 -p 5433 dev_ops
+"$pg18_bin/psql" -h 127.0.0.1 -p 5433 -d dev_ops -v ON_ERROR_STOP=1 -f deploy/postgres/init.sql
+```
+
+使用远程 PostgreSQL 18 时，由管理员按同样的角色和扩展要求初始化，并按数据库服务要求启用 TLS。已有部署升级时，先备份，再执行迁移。权限和迁移流程见[数据库说明](docs/architecture/database.md#部署边界)。
+
+在 `apps/server/.env.database` 配置迁移账号的 `MIGRATION_DATABASE_URL`。参照[后端环境变量表](apps/server/README.md#环境变量)配置 `apps/server/.env`，供三个常驻进程使用。限制配置文件的读取权限。
+
+- 设置 `NODE_ENV=production`、`HOST=127.0.0.1` 和 API 端口。`APP_ORIGIN` 填用户实际访问的 HTTPS 源。
+- `DATABASE_URL` 使用 `dev_ops_app` 的连接地址。设置持久的 `AUTH_SECRET` 和 `GIT_CREDENTIAL_ENCRYPTION_KEY`，以便重启后继续验证会话和解密已有凭据。
+- `PIPELINE_STORAGE_DIR`、`ATTACHMENT_STORAGE_DIR` 和 `BOT_WORKSPACE_DIR` 使用发布目录外的绝对路径，授予运行用户所需权限。备份数据库时一并保留业务文件和解密所需的密钥。
+
+### 迁移与启动
+
+在三个服务启动前先迁移数据库。首次安装通过 `ROOT_EMAIL` 和 `ROOT_INITIAL_PASSWORD` 向 root 初始化命令提供凭据。
+
+```bash
+pnpm db:migrate
+pnpm --dir apps/server seed:root
+```
+
+手动验证时，在独立终端分别执行以下命令。
+
+```bash
+pnpm --dir apps/server start
+pnpm --dir apps/server start:worker
+pnpm --dir apps/server start:bot-worker
+```
+
+长驻部署使用 `launchd` 分别守护 `dist/entrypoints` 下的 `http.js`、`worker.js` 和 `bot-worker.js`。各任务以专用用户运行，将 `WorkingDirectory` 指向 `apps/server` 的绝对路径。`ProgramArguments` 依次填写 Node.js 的绝对路径、`--env-file`、应用配置文件的绝对路径和入口脚本的绝对路径。
+
+需要开机启动时，将三个配置放在 `/Library/LaunchDaemons`，各自设置独立的 `Label`、`UserName` 和 `KeepAlive`，通过 `sudo launchctl bootstrap system <plist路径>` 加载。上面的 `brew services start` 默认在用户登录时启动数据库。如果整套服务需要在登录前运行，数据库和网关也应配置为开机启动。
+
+### 网关与验证
+
+宿主机的 HTTPS 网关使用 `apps/web/dist` 作为静态根目录，并将 `/api/` 原路径转发到 `127.0.0.1:3001`。以下配置放在原生 Nginx 的 HTTPS `server` 块内。按部署路径替换 `root`，按上传限制调整 `client_max_body_size`。
+
+```nginx
+root /absolute/path/to/dev-ops/apps/web/dist;
+
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+location /api/ {
+    proxy_pass http://127.0.0.1:3001;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_request_buffering off;
+    proxy_buffering off;
+    client_max_body_size 500m;
+}
+```
+
+请求 `http://127.0.0.1:3001/api/v1/ready`，确认响应体的 `success` 为 `true`。再从公开地址验证 `/api/v1/ready` 和直接打开 `/login`，确认 API 转发与前端路由回退生效。查看两个 Worker 的启动日志，确认服务已进入轮询。启用流水线时，另行确认 [Agent 节点](apps/pipeline-agent/README.md#启动)在线。
 
 ## V0.5.0 Bot 协作
 
