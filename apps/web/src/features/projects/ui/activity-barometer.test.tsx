@@ -30,7 +30,7 @@ const activityFixture: ApiSuccessData<'/api/v1/teams/{teamId}/project-activity',
 }
 
 describe('ActivityBarometer', () => {
-  it('渲染热力图总数与项目摘要，未同步来源显示未知', () => {
+  it('渲染热力图总数并隐藏来源同步状态', () => {
     render(
       <ActivityBarometer
         result={activityFixture}
@@ -44,7 +44,8 @@ describe('ActivityBarometer', () => {
       />,
     )
     expect(screen.getByText(/过去一年 · 4 次活动/)).toBeInTheDocument()
-    expect(screen.getByText(/PR 未同步/)).toBeInTheDocument()
+    expect(screen.queryByText('代码未同步')).not.toBeInTheDocument()
+    expect(screen.queryByText('PR 未同步')).not.toBeInTheDocument()
   })
 
   it('已有结果时刷新失败保留上一份热力图并提示静默失败', () => {
