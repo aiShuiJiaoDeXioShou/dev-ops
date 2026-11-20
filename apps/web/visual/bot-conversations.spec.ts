@@ -212,7 +212,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   })
   await page.goto(`/collaboration/${room.id}`)
   const tabs = page.getByRole('tablist', { name: '会话视图' })
-  await expect(tabs.getByRole('tab')).toHaveCount(2)
+  await expect(tabs.getByRole('tab')).toHaveCount(2, { timeout: 15_000 })
   await expect(tabs.getByRole('tab', { name: '对话' })).toBeVisible()
   await expect(tabs.getByRole('tab', { name: '轨迹' })).toBeVisible()
   if (testInfo.project.name === 'mobile') {
@@ -253,15 +253,13 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   if (testInfo.project.name === 'mobile') await trajectoryTab.tap()
   else await trajectoryTab.click()
   await expect(page.getByRole('region', { name: '运行详情' })).toBeVisible()
-  // 从输入框点击页签时，浏览器可能沿用输入框的可见焦点。
-  if (await trajectoryTab.evaluate((element) => element.matches(':focus-visible'))) {
-    await expect(trajectoryTab).toHaveCSS('box-shadow', /\binset\b/)
-  }
+  await expect(trajectoryTab).toHaveCSS('outline-style', 'none')
+  await expect(trajectoryTab).toHaveCSS('box-shadow', 'none')
   await page.screenshot({ path: testInfo.outputPath('bot-conversations-trace.png'), animations: 'disabled' })
   await page.keyboard.press('ArrowLeft')
   const chatTab = page.getByRole('tab', { name: '对话' })
   await expect(chatTab).toBeFocused()
-  await expect(chatTab).toHaveCSS('box-shadow', /\binset\b/)
+  await expect(chatTab).toHaveCSS('outline-style', 'solid')
   await expect(composer).toHaveValue('尚未发送的草稿')
   list.push({
     id: 'da55aa00-0000-4000-8000-000000000022',

@@ -339,13 +339,7 @@ export function ConversationRoom({
           </div>
           <TabsList unstyled className="dsh-tabs" aria-label="会话视图">
             {tabItems.map(({ id, label }) => (
-              <TabsTrigger
-                key={id}
-                value={id}
-                variant="unstyled"
-                className="dsh-tab rounded-sm focus-visible:ring-inset"
-                aria-label={label}
-              >
+              <TabsTrigger key={id} value={id} variant="unstyled" className="dsh-tab rounded-sm" aria-label={label}>
                 <span className="dsh-tab-label">{label}</span>
                 {id === 'activity' && liveRun && <span className="dsh-tab-pulse" aria-hidden="true" />}
               </TabsTrigger>

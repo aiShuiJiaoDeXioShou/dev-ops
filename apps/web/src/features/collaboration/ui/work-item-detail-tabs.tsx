@@ -25,7 +25,7 @@ export function WorkItemDetailTabs({
           <TabsTrigger
             key={value}
             value={value}
-            className="min-h-10 shrink-0 rounded-none border-b-2 border-transparent px-1.5 text-xs focus-visible:ring-inset aria-selected:border-primary aria-selected:bg-transparent! aria-selected:text-primary! aria-selected:shadow-none! sm:px-3 sm:text-sm"
+            className="min-h-10 shrink-0 rounded-none border-b-2 border-transparent px-1.5 text-xs aria-selected:border-primary aria-selected:bg-transparent! aria-selected:text-primary! aria-selected:shadow-none! sm:px-3 sm:text-sm"
           >
             {text}
           </TabsTrigger>
