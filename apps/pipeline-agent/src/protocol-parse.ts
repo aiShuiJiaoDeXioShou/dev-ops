@@ -92,7 +92,13 @@ function expectStrategyArray(value: unknown, path: string, minimum: number, maxi
 }
 
 function expectStepKind(value: unknown, path: string): PipelineStepKind {
-  if (value === 'run' || value === 'builtin_checkout' || value === 'builtin_upload_artifact') return value
+  if (
+    value === 'run' ||
+    value === 'builtin_checkout' ||
+    value === 'builtin_upload_artifact' ||
+    value === 'builtin_deploy_native'
+  )
+    return value
   throw new AgentTransportError(`平台响应字段不合法：${path} 不是受支持的步骤类型`)
 }
 

@@ -399,12 +399,13 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       }
       const exists = tree.entries.some((entry) => entry.type === 'file' && entry.path === workflowPath)
       if (!exists) continue
-      const file = await readWorkflowFile(actor, projectId, repository.id, ref, workflowPath)
+      const commitSha = await resolveCommitSha(actor, projectId, repository.id, ref)
+      const file = await readWorkflowFile(actor, projectId, repository.id, commitSha, workflowPath)
       return {
         repositoryId: repository.id,
         repositoryFullName: `${repository.namespace}/${repository.name}`,
         ref: tree.branch,
-        commitSha: await resolveCommitSha(actor, projectId, repository.id, ref),
+        commitSha,
         path: workflowPath,
         content: file.content,
         truncated: file.truncated,
@@ -635,6 +636,12 @@ export function createPipelineService(deps: PipelineServiceDeps) {
         })
       }
       throw error
+    }
+    if (template.jobs.some((job) => job.runsOn.includes('macmini-deploy'))) {
+      await requireTeamMember(db, actor.id, project.teamId, ['admin'])
+      if (!['main', 'refs/heads/main'].includes(source.ref)) {
+        throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '原生发布只接受 main 分支')
+      }
     }
     const stepRows = template.jobs.flatMap((job) =>
       job.steps.map((step) => ({

@@ -75,3 +75,9 @@ pnpm --dir apps/pipeline-agent build
 | 一直不领取任务                              | 节点 `draining`/`disabled`/离线，或能力标签与 `runs-on` 不匹配       |
 | 取消后仍显示运行中                          | 节点未响应，平台会在租约过期后收口为 `interrupted`，不会显示成功     |
 | 日志/产物上传失败                           | 检查平台可达性、大小限制与本地磁盘；详见 Agent stderr 日志（已脱敏） |
+
+## macOS 原生发布节点
+
+设置 `AGENT_NATIVE_DEPLOY_SCRIPT`、`AGENT_NATIVE_DEPLOY_REPOSITORY`、`AGENT_NATIVE_DEPLOY_WORKFLOW` 和 `AGENT_LABELS=macmini-deploy`。宿主脚本、仓库和工作流路径由节点管理员配置。此模式不初始化 Docker，只接收 `macmini-deploy` 计划，并将固定提交作为唯一参数传给宿主脚本。
+
+每次原生发布运行包含一个 `builtin:deploy-native` 步骤。默认的 Linux 节点继续运行容器工作流。安装、启动和发布说明见 [Mac mini 原生发布](../../deploy/native/README.md)。

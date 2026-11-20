@@ -39,6 +39,8 @@ export interface AgentConfig {
   containerUser?: string
   /** Docker Engine socket 地址；缺省使用 dockerode 默认值。 */
   dockerSocketPath?: string
+  /** 原生发布宿主脚本及唯一允许发布的 Git URL，通过部署配置提供。 */
+  nativeDeployment?: { script: string; repository: string; workflow: string }
 }
 
 function required(value: string | undefined, name: string): string {
@@ -113,11 +115,29 @@ export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env): AgentConf
   if (!registrationToken && !agentToken) {
     throw new Error('必须提供 AGENT_REGISTRATION_TOKEN 或 AGENT_TOKEN')
   }
-  const labels = (env.AGENT_LABELS ?? 'linux,docker,node24')
+  const nativeScript = env.AGENT_NATIVE_DEPLOY_SCRIPT?.trim()
+  let nativeDeployment: AgentConfig['nativeDeployment']
+  if (nativeScript) {
+    if (!nativeScript.startsWith('/') || process.platform !== 'darwin') {
+      throw new Error('原生发布需要 macOS 与绝对路径的宿主脚本')
+    }
+    nativeDeployment = {
+      script: nativeScript,
+      repository: required(env.AGENT_NATIVE_DEPLOY_REPOSITORY, 'AGENT_NATIVE_DEPLOY_REPOSITORY'),
+      workflow: required(env.AGENT_NATIVE_DEPLOY_WORKFLOW, 'AGENT_NATIVE_DEPLOY_WORKFLOW'),
+    }
+  }
+  const labels = (env.AGENT_LABELS ?? (nativeDeployment ? 'macmini-deploy' : 'linux,docker,node24'))
     .split(',')
     .map((label) => label.trim())
     .filter(Boolean)
   if (labels.length === 0) throw new Error('AGENT_LABELS 不能为空')
+  if (nativeDeployment && (labels.length !== 1 || labels[0] !== 'macmini-deploy')) {
+    throw new Error('原生发布节点只接受 macmini-deploy 能力标签')
+  }
+  if (!nativeDeployment && labels.includes('macmini-deploy')) {
+    throw new Error('macmini-deploy 标签需要配置原生发布脚本')
+  }
   const nodeName = env.AGENT_NAME?.trim() || hostname()
   if (nodeName.length > 120) throw new Error('AGENT_NAME 不能超过 120 个字符')
 
@@ -176,6 +196,7 @@ export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env): AgentConf
       maximum: 262_144,
     }),
     container,
+    ...(nativeDeployment ? { nativeDeployment } : {}),
     ...(registrationToken ? { registrationToken } : {}),
     ...(agentToken ? { agentToken } : {}),
   }

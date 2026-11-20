@@ -101,7 +101,7 @@ pnpm test:db
 
 ## Mac mini 原生部署
 
-Mac mini 可以原生运行 HTTP API、调度 Worker 和 Bot Worker。Web 由宿主机网关直接提供 `apps/web/dist` 中的静态文件，数据库使用本机或远程 PostgreSQL 18。这些服务可以完全在 Docker 之外运行。内置流水线需要在 [Agent 执行节点](apps/pipeline-agent/README.md#前置条件)使用 Docker Engine 运行任务。Agent 可以单独部署到另一台机器。
+Mac mini 可以原生运行 HTTP API、调度 Worker 和 Bot Worker。Web 由宿主机网关直接提供 `apps/web/dist` 中的静态文件，数据库使用本机或远程 PostgreSQL 18。这些服务可以完全在 Docker 之外运行。Linux 流水线任务使用 Docker 执行节点。Mac mini 可以同时运行 [专用 macOS 原生发布节点](deploy/native/README.md)，构建并更新当前原生部署。
 
 ### 构建产物
 

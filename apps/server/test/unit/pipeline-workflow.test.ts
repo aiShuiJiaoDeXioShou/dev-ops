@@ -220,3 +220,29 @@ jobs:
   if (typeof line !== 'number') return
   assert.equal(line > 0, true)
 })
+
+test('原生发布工作流可以独立运行，拒绝混入命令或使用 Linux 节点', () => {
+  const path = '.devops/workflows/deploy-macmini.yml'
+  const content = `
+name: macmini
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: macmini-deploy
+    steps:
+      - uses: builtin:deploy-native
+`
+  const parsed = parseWorkflowFile({ path, content })
+  assert.equal(parsed.ok, true)
+  if (parsed.ok) assert.equal(parsed.workflow.jobs[0]?.steps[0]?.kind, 'builtin_deploy_native')
+  assert.equal(
+    parseWorkflowFile({ path, content: content.replace('runs-on: macmini-deploy', 'runs-on: linux') }).ok,
+    false,
+  )
+  assert.equal(parseWorkflowFile({ path, content: content + '      - run: echo unsafe\n' }).ok, false)
+  assert.equal(
+    parseWorkflowFile({ path, content: content.replace('builtin:deploy-native', 'builtin:checkout') }).ok,
+    false,
+  )
+})

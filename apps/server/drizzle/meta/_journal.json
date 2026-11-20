@@ -274,6 +274,13 @@
       "when": 1795100481662,
       "tag": "0038_requirement_owners",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795169989685,
+      "tag": "0039_v09_native_deploy",
+      "breakpoints": true
     }
   ]
 }

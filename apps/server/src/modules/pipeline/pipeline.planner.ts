@@ -12,13 +12,13 @@ import type {
 import { evaluateCondition, PipelineExpressionError, resolveTemplateString } from './pipeline.expressions.ts'
 import type { ParsedWorkflow, WorkflowJobDefinition, WorkflowStepDefinition } from './pipeline.workflow.ts'
 
-/** 平台标签到执行镜像的映射；P1 只支持 Node/Linux 构建。 */
+/** 执行标签、镜像或原生执行标识与能力的映射。 */
 export interface PipelineRunnerImage {
   image: string
   capabilities: string[]
 }
 
-/** P1 支持的 runs-on 标签；未列出的标签在校验阶段报错。 */
+/** 平台支持的执行标签；未列出的标签会在校验阶段报错。 */
 export const PIPELINE_RUNNER_IMAGES: Record<string, PipelineRunnerImage> = {
   linux: {
     image: 'node:24-bookworm-slim',
@@ -27,6 +27,10 @@ export const PIPELINE_RUNNER_IMAGES: Record<string, PipelineRunnerImage> = {
   node24: {
     image: 'node:24-bookworm-slim',
     capabilities: ['linux', 'docker', 'node24'],
+  },
+  'macmini-deploy': {
+    image: 'macmini-native',
+    capabilities: ['macmini-deploy'],
   },
 }
 

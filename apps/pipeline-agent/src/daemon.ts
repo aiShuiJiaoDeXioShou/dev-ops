@@ -16,6 +16,7 @@ import { createAgentLogger } from './logger.ts'
 import { createSecretMasker } from './masking.ts'
 import { cleanupStaleRunWorkspaces } from './workspace.ts'
 import { sleep } from './async.ts'
+import { executeNativeDeployment } from './native-deploy.ts'
 
 /** 租约续约间隔上限；协议建议 30 秒，TTL 较短时按 1/3 推导。 */
 const MAX_RENEW_INTERVAL_MS = 30_000
@@ -106,19 +107,21 @@ export async function runAgentDaemon(options: AgentDaemonOptions): Promise<void>
       ...(config.agentToken ? { agentToken: config.agentToken } : {}),
       artifactUploadTimeoutMs: config.artifactUploadTimeoutMs,
     })
-  const docker =
-    options.docker ??
-    createDockerRuntime({
-      ...(config.dockerSocketPath ? { socketPath: config.dockerSocketPath } : {}),
-      limits: config.container,
-      ...(config.containerUser ? { containerUser: config.containerUser } : {}),
-      logger,
-    })
-
-  await docker.ping()
-  // 上次进程被强杀时任务容器会成为孤儿；启动时先清理带 managed 标签的遗留容器，失败不阻塞启动。
-  await cleanupManagedContainers(docker, logger)
-  await cleanupStaleRunWorkspaces(config.workDir, logger)
+  const docker = config.nativeDeployment
+    ? null
+    : (options.docker ??
+      createDockerRuntime({
+        ...(config.dockerSocketPath ? { socketPath: config.dockerSocketPath } : {}),
+        limits: config.container,
+        ...(config.containerUser ? { containerUser: config.containerUser } : {}),
+        logger,
+      }))
+  if (docker) {
+    await docker.ping()
+    // 上次进程被强杀时任务容器会成为孤儿，启动时仅清理 Agent 管理的容器。
+    await cleanupManagedContainers(docker, logger)
+    await cleanupStaleRunWorkspaces(config.workDir, logger)
+  }
   const session = await client.ensureRegistered()
   logger.info(`节点 ${config.nodeName} 已启动：agent ${AGENT_VERSION}，标签 ${config.labels.join(',')}`)
 
@@ -255,6 +258,16 @@ export async function runAgentDaemon(options: AgentDaemonOptions): Promise<void>
         }
       },
     }
+    if (!docker && config.nativeDeployment) {
+      return executeNativeDeployment({
+        plan: lease.run,
+        host: config.nativeDeployment,
+        sink,
+        collector,
+        stop: run.stop,
+      })
+    }
+    if (!docker) throw new Error('执行节点没有可用的运行时')
     return executeRunPlan({
       plan: lease.run,
       workDir: config.workDir,

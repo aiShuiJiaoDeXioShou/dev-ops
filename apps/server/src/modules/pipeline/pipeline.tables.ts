@@ -98,7 +98,7 @@ export const pipelineRunStep = appSchema.table(
     ),
     check(
       'ck_pipeline_run_step_kind',
-      sql`${table.kind} in ('run', 'builtin_checkout', 'builtin_upload_artifact', 'builtin_apply_patch', 'builtin_commit_changes', 'builtin_collect_diff', 'builtin_push_branch', 'builtin_verify_service')`,
+      sql`${table.kind} in ('run', 'builtin_checkout', 'builtin_upload_artifact', 'builtin_apply_patch', 'builtin_commit_changes', 'builtin_collect_diff', 'builtin_push_branch', 'builtin_verify_service', 'builtin_deploy_native')`,
     ),
     index('idx_pipeline_run_step_run').on(table.run_id, table.step_index),
   ],

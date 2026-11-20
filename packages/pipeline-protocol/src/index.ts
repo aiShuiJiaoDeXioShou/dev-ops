@@ -37,6 +37,7 @@ export const PipelineStepKindSchema = Type.Union([
   Type.Literal('builtin_push_branch'),
   // V0.4b：部署工作流可声明的服务健康与版本验证步骤。
   Type.Literal('builtin_verify_service'),
+  Type.Literal('builtin_deploy_native'),
 ])
 export type PipelineStepKind = Static<typeof PipelineStepKindSchema>
 

@@ -27,7 +27,8 @@ export interface WorkflowInputDefinition {
   options?: string[]
 }
 
-export type WorkflowStepKind = 'run' | 'builtin_checkout' | 'builtin_upload_artifact' | 'builtin_verify_service'
+export type WorkflowStepKind =
+  'run' | 'builtin_checkout' | 'builtin_upload_artifact' | 'builtin_verify_service' | 'builtin_deploy_native'
 
 export interface WorkflowStepDefinition {
   name: string
@@ -79,7 +80,12 @@ const STEP_KEYS = new Set([
 ])
 const INPUT_KEYS = new Set(['description', 'type', 'required', 'default', 'options'])
 const INPUT_TYPES: ReadonlySet<string> = new Set(['string', 'boolean', 'number', 'choice'])
-const BUILTIN_ACTIONS = new Set(['builtin:checkout', 'builtin:upload-artifact', 'builtin:verify-service'])
+const BUILTIN_ACTIONS = new Set([
+  'builtin:checkout',
+  'builtin:upload-artifact',
+  'builtin:verify-service',
+  'builtin:deploy-native',
+])
 const JOB_ID_PATTERN = /^[A-Za-z_][A-Za-z0-9_-]{0,79}$/
 const ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/
 const ARTIFACT_NAME_PATTERN = /^[A-Za-z0-9._-]{1,80}$/
@@ -392,6 +398,23 @@ function parseSteps(value: unknown, jobPath: string, issues: WorkflowIssue[]): W
           ...(ifExpression ? { if: ifExpression } : {}),
           ...(timeoutMinutes ? { timeoutMinutes } : {}),
         })
+      } else if (raw.uses === 'builtin:deploy-native') {
+        if (
+          raw.with !== undefined ||
+          raw.env !== undefined ||
+          raw.if !== undefined ||
+          raw['continue-on-error'] !== undefined
+        ) {
+          addIssue(issues, 'WORKFLOW_UNSUPPORTED', '原生发布步骤只接受名称和超时', path)
+        }
+        steps.push({
+          name,
+          kind: 'builtin_deploy_native',
+          env: {},
+          continueOnError: false,
+          with: {},
+          ...(timeoutMinutes ? { timeoutMinutes } : {}),
+        })
       } else if (raw.uses === 'builtin:verify-service') {
         const allowedKeys = new Set(['healthUrl', 'versionUrl', 'expectedVersion', 'timeoutSeconds'])
         for (const key of Object.keys(withValues)) {
@@ -491,6 +514,7 @@ function parseSteps(value: unknown, jobPath: string, issues: WorkflowIssue[]): W
       ...(ifExpression ? { if: ifExpression } : {}),
     })
   }
+  if (steps.some((step) => step.kind === 'builtin_deploy_native')) return steps
   const checkoutIndexes = steps
     .map((step, index) => (step.kind === 'builtin_checkout' ? index : -1))
     .filter((index) => index >= 0)
@@ -569,13 +593,26 @@ function parseJobs(value: unknown, issues: WorkflowIssue[]): WorkflowJobDefiniti
     if (raw.if !== undefined && (typeof raw.if !== 'string' || raw.if.length > 4_096)) {
       addIssue(issues, 'WORKFLOW_SCHEMA_ERROR', 'if 必须是不超过 4096 字符的字符串', `${path}.if`)
     }
+    const runsOn = raw['runs-on'].trim()
+    const steps = parseSteps(raw.steps, path, issues)
+    const hasNative = steps.some((step) => step.kind === 'builtin_deploy_native')
+    if (runsOn === 'macmini-deploy' || hasNative) {
+      if (runsOn !== 'macmini-deploy' || steps.length !== 1 || !hasNative || needs.length || ids.size !== 1) {
+        addIssue(
+          issues,
+          'WORKFLOW_UNSUPPORTED',
+          '原生发布工作流只支持一个 macmini-deploy 作业和一个 builtin:deploy-native 步骤',
+          path,
+        )
+      }
+    }
     jobs.push({
       id,
       name,
-      runsOn: raw['runs-on'].trim(),
+      runsOn,
       needs: [...new Set(needs)],
       env,
-      steps: parseSteps(raw.steps, path, issues),
+      steps,
       ...(timeoutMinutes ? { timeoutMinutes } : {}),
       ...(typeof raw.if === 'string' ? { if: raw.if } : {}),
     })
