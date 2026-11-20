@@ -39,7 +39,7 @@ test('Web 使用的共享客户端操作有 CLI 入口或已登记的浏览器�
         ? node.text === 'client'
         : ts.isPropertyAccessExpression(node) && node.name.text === 'client',
     ),
-    readFile(new URL('../../specs/011-v08-cli-business-parity/coverage.md', import.meta.url), 'utf8'),
+    readFile(new URL('../../apps/cli/WEB-COVERAGE.md', import.meta.url), 'utf8'),
   ])
   const exceptions = [...coverage.matchAll(/`apiClient\.(\w+)`/g)].map((match) => match[1])
   assert.deepEqual([...web].filter((operation) => !cli.has(operation)).sort(), exceptions.sort())

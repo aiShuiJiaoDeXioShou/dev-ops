@@ -156,6 +156,7 @@
 | `apiClient.getInvitation`、`apiClient.acceptInvitation` | 打开和接受邮件邀请 |
 | `apiClient.listApiTokens`、`apiClient.createApiToken`、`apiClient.revokeApiToken` | 管理个人 API Token |
 | `apiClient.authorizeGitHubAccount` | 发起个人 GitHub 绑定 |
+| `apiClient.discoverGitHubInstallations` | 使用网页登录会话查询个人 GitHub 授权可访问的 App 安装 |
 | `apiClient.startBotOAuthLogin`、`apiClient.getBotOAuthLogin`、`apiClient.answerBotOAuthLogin`、`apiClient.cancelBotOAuthLogin` | 模型提供方订阅授权 |
 | `apiClient.openGitHubRepositoryAction` | 核对权限后跳转 GitHub 编辑或创建 PR |
 | `apiClient.revealCredentialValue` | 复验密码后查看凭据明文 |

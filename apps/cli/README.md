@@ -128,7 +128,7 @@ devops skill export <skillId> --output ./skill.zip
 
 消息请求示例为 `{"text":"检查当前交付","clientRequestId":"<每次发送唯一的 UUID>"}`。验收读取 `task get` 中的结果 ID，然后提交 `{"resultId":"<resultId>","comment":"验收通过"}`。
 
-新增命令的完整清单见 [V0.8 逐操作覆盖](../../specs/011-v08-cli-business-parity/coverage.md)。复杂请求用 `--file <path>` 提交 JSON，筛选参数用 `--query-file <path>`。具体字段见各命令 `--help` 中的接口契约。游标列表用 `--cursor` 读取下一页，或用 `--all` 逐页收集。跟踪模式持续输出文本，分页查询可用 `--json`。
+新增命令的完整清单见 [V0.8 逐操作覆盖](WEB-COVERAGE.md)。复杂请求用 `--file <path>` 提交 JSON，筛选参数用 `--query-file <path>`。具体字段见各命令 `--help` 中的接口契约。游标列表用 `--cursor` 读取下一页，或用 `--all` 逐页收集。跟踪模式持续输出文本，分页查询可用 `--json`。
 
 节点创建和轮换要求 `--token-out <path>`，命令将一次性令牌写入新文件，权限为 `0600`。新建或轮换的凭据值、模型 API Key 及储存桶密钥用 `--file -` 从标准输入读取。使用文件或环境中的个人 Token 为这些请求认证。
 
