@@ -1,0 +1,10 @@
+@layer components {
+  [data-slot='tabs-trigger'] {
+    outline: none;
+  }
+
+  [data-slot='tabs-trigger']:focus-visible:not([data-pointer-focus]) {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+}

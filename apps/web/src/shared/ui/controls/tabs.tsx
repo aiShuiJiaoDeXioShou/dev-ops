@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Tabs as TabsPrimitive } from 'radix-ui'
 import { cn } from '@/shared/lib/utils'
+import './tabs.css'
 
 /** 管理页签的选中状态与键盘交互。 */
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
@@ -32,18 +33,21 @@ function TabsList({
 /**
  * 渲染单个页签触发器。
  * @param props Radix 触发器属性与自定义类名；underline 使用目录下划线，unstyled 使用调用者的样式。
- * @returns 选中态高亮的页签按钮。
+ * @returns 选中态高亮的页签按钮；键盘操作时显示焦点轮廓。
  */
 function TabsTrigger({
   className,
   variant = 'default',
+  onMouseDown,
+  onKeyDown,
+  onBlur,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger> & { variant?: 'default' | 'underline' | 'unstyled' }) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        'outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+        'disabled:pointer-events-none disabled:opacity-50',
         variant !== 'unstyled' &&
           'inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap transition-colors',
         variant === 'underline' && 'tab',
@@ -52,6 +56,24 @@ function TabsTrigger({
         className,
       )}
       {...props}
+      onMouseDown={(event) => {
+        onMouseDown?.(event)
+        if (event.defaultPrevented || event.button !== 0 || event.ctrlKey) return
+        // Radix 会在鼠标按下时同步聚焦；触屏轻点也会派发兼容的鼠标事件。
+        const trigger = event.currentTarget
+        trigger.dataset.pointerFocus = ''
+        queueMicrotask(() => {
+          if (trigger.ownerDocument.activeElement !== trigger) delete trigger.dataset.pointerFocus
+        })
+      }}
+      onKeyDown={(event) => {
+        delete event.currentTarget.dataset.pointerFocus
+        onKeyDown?.(event)
+      }}
+      onBlur={(event) => {
+        delete event.currentTarget.dataset.pointerFocus
+        onBlur?.(event)
+      }}
     />
   )
 }
