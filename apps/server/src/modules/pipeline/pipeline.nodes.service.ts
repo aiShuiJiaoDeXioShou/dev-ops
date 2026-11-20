@@ -21,10 +21,13 @@ import {
   updatePipelineNodeStatus,
   type PipelineNodeRow,
 } from './pipeline.nodes.repository.ts'
+import { PIPELINE_RUNNER_IMAGES } from './pipeline.planner.ts'
 import type { PipelineNodeView } from './pipeline.view.ts'
 
-/** P1 允许的能力标签白名单；未知标签不能进入调度匹配，避免 Agent 自报任意能力。 */
-export const PIPELINE_NODE_CAPABILITY_WHITELIST: readonly string[] = ['linux', 'docker', 'node24']
+/** 能力标签取自调度器支持的执行方式，允许注册的能力必须能参与调度。 */
+export const PIPELINE_NODE_CAPABILITY_WHITELIST: readonly string[] = [
+  ...new Set(Object.values(PIPELINE_RUNNER_IMAGES).flatMap(({ capabilities }) => capabilities)),
+]
 
 /** Agent 协议版本；注册响应返回，供 Agent 校验兼容性。 */
 export const AGENT_PROTOCOL_VERSION = 2
@@ -97,6 +100,9 @@ export function validateNodeCapabilities(capabilities: string[]): string[] {
     if (!PIPELINE_NODE_CAPABILITY_WHITELIST.includes(capability)) {
       throw new ApiError(ERROR_CODES.VALIDATION_ERROR, `不支持的能力标签：${capability}`)
     }
+  }
+  if (unique.includes('macmini-deploy') && unique.length !== 1) {
+    throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '原生发布节点只接受 macmini-deploy 能力标签')
   }
   return unique
 }
@@ -347,6 +353,9 @@ export function createPipelineNodesService(deps: PipelineNodesServiceDeps) {
     }
     const agentVersion = validateAgentVersion(input.agentVersion)
     const osArch = validateOsArch(input.os, input.arch)
+    if (node.capabilities.includes('macmini-deploy') && osArch.os !== 'darwin') {
+      throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '原生发布节点必须在 macOS 上注册')
+    }
     const agentToken = createPlainToken('pagent')
     const now = new Date()
     await db.transaction(async (tx) => {

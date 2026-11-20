@@ -115,7 +115,9 @@ test('触发输入摘要按字段名脱敏且限制长度', () => {
 
 test('节点能力白名单与令牌哈希稳定', () => {
   assert.deepEqual(validateNodeCapabilities(['linux', 'docker', 'linux']), ['linux', 'docker'])
-  assert.deepEqual(PIPELINE_NODE_CAPABILITY_WHITELIST, ['linux', 'docker', 'node24'])
+  assert.deepEqual(PIPELINE_NODE_CAPABILITY_WHITELIST, ['linux', 'docker', 'node24', 'macmini-deploy'])
+  assert.deepEqual(validateNodeCapabilities(['macmini-deploy']), ['macmini-deploy'])
+  assert.throws(() => validateNodeCapabilities(['macmini-deploy', 'linux']), ApiError)
   assert.throws(() => validateNodeCapabilities([]), ApiError)
   assert.throws(() => validateNodeCapabilities(['kubernetes']), ApiError)
   assert.equal(hashPipelineToken('plain-token'), hashPipelineToken('plain-token'))
