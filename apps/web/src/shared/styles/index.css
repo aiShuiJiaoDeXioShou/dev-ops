@@ -1557,10 +1557,6 @@ a.skill-title:hover {
   margin: 26px 0 10px;
   font-size: 14px;
 }
-.vault-credential-note {
-  margin-top: 24px;
-  line-height: 1.7;
-}
 .vault-keychain .vault-secret {
   margin-top: 0;
 }

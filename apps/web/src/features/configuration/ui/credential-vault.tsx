@@ -366,16 +366,11 @@ export function CredentialVault() {
                 <p className="small muted">仅管理员可以轮换或撤销团队凭据；开发者可以查看被授权凭据的元数据。</p>
               )}
 
-              <p className="small muted vault-credential-note">
-                查看明文需要再次输入当前登录密码，明文只在详情中短暂展示。
-              </p>
-
               <LogSheet
                 open={usageOpen}
                 onOpenChange={setUsageOpen}
                 title="使用记录"
                 description={`${selected.name} · 最近使用与敏感操作`}
-                footer={<p className="small muted">查看明文需要再次输入当前登录密码，明文只在详情中短暂展示。</p>}
               >
                 {usage.isPending ? (
                   <DelayedLoading pending>
