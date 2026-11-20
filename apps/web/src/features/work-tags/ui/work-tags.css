@@ -1,0 +1,212 @@
+.work-tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 标签颜色只用项目色相 Token，底色按色相混入背景色，明暗主题共用同一规则。 */
+.work-tag-chip {
+  --tag-hue: var(--quiet);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--tag-hue);
+  background: color-mix(in oklch, var(--tag-hue) 12%, var(--background));
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.work-tag-chip[data-tone='blue'] {
+  --tag-hue: var(--blue);
+}
+
+.work-tag-chip[data-tone='green'] {
+  --tag-hue: var(--green);
+}
+
+.work-tag-chip[data-tone='amber'] {
+  --tag-hue: var(--amber);
+}
+
+.work-tag-chip[data-tone='red'] {
+  --tag-hue: var(--red);
+}
+
+/* 移除按钮默认隐藏，悬停或键盘聚焦标签时出现在右上角；触屏设备没有悬停，改为常显。 */
+.work-tag-chip-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--muted-foreground);
+  background: var(--background);
+  box-shadow: 0 0 0 1px var(--line);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+/* 可见区域保持小巧，透明伪元素把点击区域扩大到 32px。 */
+.work-tag-chip-remove::before {
+  position: absolute;
+  inset: -8px;
+  content: '';
+}
+
+.work-tag-chip:hover .work-tag-chip-remove,
+.work-tag-chip:focus-within .work-tag-chip-remove {
+  opacity: 1;
+}
+
+.work-tag-chip-remove:hover {
+  color: var(--foreground);
+}
+
+.work-tag-chip-remove:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.work-tag-chip-remove:disabled {
+  cursor: default;
+}
+
+@media (hover: none), (any-pointer: coarse), (width < 768px) {
+  .work-tag-chip-remove {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-tag-chip-remove {
+    transition: none;
+  }
+}
+
+.work-tag-compact .work-tag-chips {
+  margin-top: 6px;
+}
+
+.work-tag-add {
+  color: var(--quiet);
+}
+
+/* 管理工作标签弹窗：一行新建，带分隔线的紧凑列表，行操作在悬停或聚焦时出现。 */
+.work-tag-manage {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.work-tag-manage-create,
+.work-tag-manage-rename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.work-tag-manage-create > :first-child,
+.work-tag-manage-rename > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.work-tag-manage-meta {
+  margin-top: 8px;
+  color: var(--quiet);
+  font-size: 12px;
+}
+
+.work-tag-manage-empty {
+  margin: 0;
+  padding: 20px 0;
+  color: var(--quiet);
+  font-size: 13px;
+  text-align: center;
+}
+
+.work-tag-manage-list {
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  list-style: none;
+}
+
+.work-tag-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 6px 6px 12px;
+}
+
+.work-tag-manage-row + .work-tag-manage-row {
+  border-top: 1px solid var(--line);
+}
+
+.work-tag-manage-row:hover {
+  background: var(--soft);
+}
+
+.work-tag-manage-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.work-tag-manage-row:hover .work-tag-manage-actions,
+.work-tag-manage-row:focus-within .work-tag-manage-actions {
+  opacity: 1;
+}
+
+.work-tag-manage-remove:hover {
+  color: var(--destructive);
+}
+
+@media (hover: none), (any-pointer: coarse), (width < 768px) {
+  .work-tag-manage-actions {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-tag-manage-actions {
+    transition: none;
+  }
+}
+
+/* 弹窗全局把按钮设为 44px 高、最小 120px 宽，列表行内的图标按钮与改名表单需要恢复紧凑尺寸。 */
+[data-slot='dialog-content'] .work-tag-manage-actions [data-slot='button'] {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding-inline: 0;
+}
+
+[data-slot='dialog-content'] .work-tag-manage-rename [data-slot='button'] {
+  height: 32px;
+  min-width: 0;
+  padding-inline: 12px;
+  font-size: 13px;
+}
+
+[data-slot='dialog-content'] .work-tag-manage-rename input {
+  height: 32px;
+  font-size: 13px;
+}
+
+[data-slot='dialog-content'] .work-tag-manage-create [data-slot='button'] {
+  min-width: 0;
+}

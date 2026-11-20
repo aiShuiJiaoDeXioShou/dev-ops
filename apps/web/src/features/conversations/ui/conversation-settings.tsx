@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
-import { BotToolAccess } from '@/features/bots/ui/bot-tool-access'
 import { BotSettingsPanel } from '@/features/bots/ui/bot-settings-panel'
 import { botDetailQueryOptions } from '@/features/bots/api/queries'
 import { taskQueries } from '@/features/bot-tasks/api/queries'
@@ -33,9 +32,10 @@ import './conversation-settings.css'
 type Membership = { action: 'add' | 'remove'; memberId: string; kind: 'user' | 'bot' }
 
 /**
- * 在会话侧栏展示简介与紧凑标签，就地维护智能体配置、长期记忆、工具权限及群组成员。
+ * 会话侧栏：先放只影响本会话的设置（工作标签，群组还有职责、指令与成员），
+ * 再放影响智能体所有会话的配置摘要、工具权限与长期记忆，避免两种作用范围混在一起。
  * @param props 已加载的会话、当前用户、会话头像和关闭回调。
- * @returns 右侧设置面板，挂载时聚焦关闭按钮。
+ * @returns 右侧设置面板，挂载时聚焦关闭按钮；有未保存的群组设置时关闭前确认。
  */
 export function ConversationSettings({
   room,
@@ -66,8 +66,7 @@ export function ConversationSettings({
   const primary = room.kind === 'direct' ? bots[0] : undefined
   const botQuery = useQuery(botDetailQueryOptions(primary?.id ?? ''))
   const bot = botQuery.data?.data
-  const introduction =
-    room.kind === 'direct' ? bot?.instructions || bot?.responsibility : room.instructions || room.responsibility
+  const subtitle = room.kind === 'direct' ? bot?.responsibility : room.responsibility
   const refreshRoom = () =>
     Promise.all([
       client.invalidateQueries({ queryKey: conversationOptions(room.id).queryKey }),
@@ -112,6 +111,9 @@ export function ConversationSettings({
       <div className="settings-room-identity">
         {avatar}
         <strong>{bot?.name ?? room.name}</strong>
+        {subtitle && <p className="settings-room-subtitle">{subtitle}</p>}
+      </div>
+      <section className="settings-section" aria-label="工作标签">
         <WorkTagEditor
           compact
           teamId={room.teamId}
@@ -120,8 +122,7 @@ export function ConversationSettings({
           readOnly={readOnly}
           onChanged={refreshRoom}
         />
-      </div>
-      {introduction && <BotIntroduction text={introduction} />}
+      </section>
       {room.kind === 'group' && !readOnly && <GroupSettingsFields room={room} userId={userId} onSaved={onClose} />}
       {bots.map((member) => (
         <ConversationRuntimeSettings
@@ -133,14 +134,15 @@ export function ConversationSettings({
           busy={busy}
         />
       ))}
-      <section className="settings-section" aria-label="工具权限">
-        <strong>工具权限</strong>
-        {bots.map((member) => (
-          <BotToolAccess key={member.id} botId={member.id} name={member.name} />
-        ))}
-      </section>
       {bots.map((member) => (
-        <BotSettingsPanel key={member.id} botId={member.id} userId={userId} onChanged={() => void refreshRoom()} />
+        <BotSettingsPanel
+          key={member.id}
+          botId={member.id}
+          name={member.name}
+          userId={userId}
+          showName={room.kind === 'group'}
+          onChanged={() => void refreshRoom()}
+        />
       ))}
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent>
@@ -155,21 +157,6 @@ export function ConversationSettings({
         </AlertDialogContent>
       </AlertDialog>
     </aside>
-  )
-}
-
-function BotIntroduction({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false)
-  const hasMore = text.length > 100
-  return (
-    <div className="settings-bot-introduction">
-      <p>{hasMore && !expanded ? `${text.slice(0, 100).trimEnd()}…` : text}</p>
-      {hasMore && (
-        <Button type="button" variant="ghost" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
-          {expanded ? '收起介绍' : '展开介绍'}
-        </Button>
-      )}
-    </div>
   )
 }
 
@@ -235,16 +222,9 @@ function GroupSettingsFields({
   return (
     <>
       <section className="settings-section">
-        <div className="row">
-          <strong>职责与指令</strong>
-          <span className="spacer" />
-          <Button
-            unstyled
-            type="button"
-            className="text-btn"
-            aria-expanded={editing}
-            onClick={() => setEditing(!editing)}
-          >
+        <div className="settings-section-row">
+          <h4>群组职责与指令</h4>
+          <Button type="button" size="sm" variant="ghost" aria-expanded={editing} onClick={() => setEditing(!editing)}>
             {editing ? '收起' : '编辑'}
           </Button>
         </div>
@@ -299,14 +279,13 @@ function GroupSettingsFields({
         )}
       </section>
       <section className="settings-section">
-        <div className="row">
-          <strong>成员</strong>
-          <span className="spacer" />
+        <div className="settings-section-row">
+          <h4>成员</h4>
           <Button
-            unstyled
             ref={manageMembers}
             type="button"
-            className="text-btn"
+            size="sm"
+            variant="ghost"
             aria-expanded={managing}
             onClick={() => setManaging(!managing)}
           >

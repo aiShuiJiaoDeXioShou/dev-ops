@@ -55,6 +55,13 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
   const roomPath = `**/api/v1/bot-conversations/${roomId}`
   let created = false
   await page.route(`${routeBase}/bots*`, (route) => route.fulfill({ json: success({ items: bots, nextCursor: null }) }))
+  for (const bot of bots)
+    await page.route(`**/api/v1/bots/${bot.id}`, (route) =>
+      route.fulfill({ json: success({ ...bot, accessMode: 'sandbox' }) }),
+    )
+  await page.route(`${routeBase}/bot-memories*`, (route) =>
+    route.fulfill({ json: success({ items: [], nextCursor: null }) }),
+  )
   await page.route(`${routeBase}/members`, (route) => route.fulfill({ json: success([]) }))
   await page.route(`${routeBase}/bot-inbox`, (route) => route.fulfill({ json: success({ items: [], count: 0 }) }))
   await page.route(`${routeBase}/bot-conversations*`, (route) => {

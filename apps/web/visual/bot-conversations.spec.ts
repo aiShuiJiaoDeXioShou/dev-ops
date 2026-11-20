@@ -27,6 +27,29 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   })
   const stamp = '2026-11-17T08:00:00.000Z'
   const botId = 'da55aa00-0000-4000-8000-000000000011'
+  await page.route(`**/api/v1/teams/${teamId}/bot-memories*`, (route) =>
+    route.fulfill({
+      json: success({
+        items: [
+          {
+            id: 'da55aa00-0000-4000-8000-000000000092',
+            botId,
+            botName: '验收助理',
+            scope: 'user',
+            content: '验收结论先给结果，再列证据',
+            essential: true,
+            sourceUserName: '负责人',
+            sourceConversationId: null,
+            sourceConversationName: null,
+            updatedAt: stamp,
+            canEdit: true,
+            canRemove: true,
+          },
+        ],
+        nextCursor: null,
+      }),
+    }),
+  )
   const skillId = 'da55aa00-0000-4000-8000-000000000014'
   const runId = 'da55aa00-0000-4000-8000-000000000020'
   const skill = {
@@ -346,14 +369,26 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   const access = settingsPanel.getByRole('combobox', { name: /工具访问权限/ })
   await expect(access).toHaveValue('sandbox')
   await access.selectOption('full')
+  const accessConfirm = page.getByRole('alertdialog', { name: /完全访问执行主机/ })
+  await expect(accessConfirm.getByRole('button', { name: '取消' })).toBeFocused()
+  await accessConfirm.getByRole('button', { name: '取消' }).press('Enter')
+  await expect(access).toHaveValue('sandbox')
+  await expect(access).toBeFocused()
+  await access.selectOption('full')
+  await page.getByRole('alertdialog').getByRole('button', { name: '允许完全访问' }).click()
   await expect(access).toHaveValue('full')
+  await expect(access).toBeFocused()
   await expect(settingsPanel.getByText('允许工具访问执行主机上的其他目录。')).toBeVisible()
-  await settingsPanel.getByRole('combobox', { name: '选择已有工作标签' }).press('Enter')
-  await page.getByRole('option', { name: '交付', exact: true }).click()
+  // 紧凑标签编辑器的选择与新建在「+」弹出层中。
+  const tagEditor = page.getByRole('dialog', { name: '工作标签编辑' })
+  await settingsPanel.getByRole('button', { name: '编辑工作标签' }).press('Enter')
+  await tagEditor.getByRole('combobox', { name: '选择已有工作标签' }).press('Enter')
+  await page.getByRole('listbox').getByRole('option', { name: '交付', exact: true }).click()
   await expect(settingsPanel.getByRole('button', { name: '移除标签交付' })).toBeVisible()
-  await settingsPanel.getByRole('textbox', { name: '新建工作标签' }).fill('排障')
-  await settingsPanel.getByRole('textbox', { name: '新建工作标签' }).press('Enter')
+  await tagEditor.getByRole('textbox', { name: '新建工作标签' }).fill('排障')
+  await tagEditor.getByRole('textbox', { name: '新建工作标签' }).press('Enter')
   await expect(settingsPanel.getByRole('button', { name: '移除标签排障' })).toBeEnabled()
+  await page.keyboard.press('Escape')
   await settingsPanel.getByRole('button', { name: '移除标签排障' }).click()
   await expect(settingsPanel.getByRole('button', { name: '移除标签排障' })).toHaveCount(0)
   await expect(settingsPanel.getByRole('link', { name: '管理记忆' })).toHaveAttribute(
@@ -361,6 +396,42 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     `/capabilities/memory?botId=${botId}`,
   )
 
+  // 管理工作标签：一行新建、行内改名，改名时 Esc 只取消改名而不关闭弹窗。
+  await settingsPanel.getByRole('button', { name: '编辑工作标签' }).press('Enter')
+  await tagEditor.getByRole('button', { name: '管理标签' }).press('Enter')
+  const manager = page.getByRole('dialog', { name: '管理工作标签' })
+  await expect(manager.getByRole('textbox', { name: '新标签名称' })).toBeFocused()
+  const tagRow = manager.locator('.work-tag-manage-row').first()
+  if (testInfo.project.name === 'desktop') await tagRow.hover()
+  await expect(tagRow.locator('.work-tag-manage-actions')).toHaveCSS('opacity', '1')
+  await page.screenshot({ path: testInfo.outputPath('work-tag-manager.png'), animations: 'disabled' })
+  const renameDelivery = manager.getByRole('button', { name: '改名标签「交付」' })
+  await renameDelivery.press('Enter')
+  const renameInput = manager.getByRole('textbox', { name: '标签「交付」的新名称' })
+  await expect(renameInput).toHaveValue('交付')
+  await page.keyboard.press('Escape')
+  await expect(renameInput).toHaveCount(0)
+  await expect(manager).toBeVisible()
+  await expect(renameDelivery).toBeFocused()
+  const deleteDelivery = manager.getByRole('button', { name: '删除标签「交付」' })
+  await deleteDelivery.press('Enter')
+  const deleteConfirm = page.getByRole('alertdialog', { name: '删除标签「交付」？' })
+  await expect(deleteConfirm.getByRole('button', { name: '取消' })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(deleteDelivery).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(manager).toBeHidden()
+  if (await tagEditor.isVisible()) await page.keyboard.press('Escape')
+  await expect(tagEditor).toBeHidden()
+
+  // 桌面悬停标签才显示右上角的移除按钮；触屏常显。
+  const deliveryTag = settingsPanel.locator('.work-tag-chip').filter({ hasText: '交付' })
+  const removeDelivery = deliveryTag.getByRole('button', { name: '移除标签交付' })
+  if (testInfo.project.name === 'desktop') {
+    await expect(removeDelivery).toHaveCSS('opacity', '0')
+    await deliveryTag.hover()
+  }
+  await expect(removeDelivery).toHaveCSS('opacity', '1')
   await page.screenshot({ path: testInfo.outputPath('bot-direct-settings.png'), animations: 'disabled' })
   await page.keyboard.press('Escape')
   await expect(settings).toBeFocused()
