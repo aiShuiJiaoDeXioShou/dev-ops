@@ -1,5 +1,6 @@
 import type { ImportedSkillPackage, SkillFileDraft } from '../model/types'
-import { createZip } from './zip'
+
+export { base64ToBytes, createSkillPackageZip, generateSkillMarkdown } from '@dev-ops/api-client/skill-package'
 
 /** 资源文件上限，与服务端校验保持一致；客户端先提示再提交。 */
 export const SKILL_FILE_LIMITS = {
@@ -57,11 +58,6 @@ export function isEditableSkillFile(path: string, content: string, encoding: 'ut
   return TEXT_EXTENSIONS.has(extension) && content.length > 0
 }
 
-/** 生成社区格式的 SKILL.md 内容：YAML frontmatter + Markdown 正文。 */
-export function generateSkillMarkdown(identifier: string, summary: string, content: string): string {
-  return `---\nname: ${identifier}\ndescription: ${JSON.stringify(summary)}\n---\n\n${content}\n`
-}
-
 /** 从 SKILL.md 文本中提取简单 frontmatter 的 name/description 与正文。 */
 export function splitSkillFrontmatter(markdown: string): {
   name: string | null
@@ -111,14 +107,6 @@ function bytesToBase64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize))
   }
   return btoa(binary)
-}
-
-/** base64 文本转二进制。 */
-export function base64ToBytes(content: string): Uint8Array {
-  const binary = atob(content.replace(/\s+/g, ''))
-  const bytes = new Uint8Array(binary.length)
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
-  return bytes
 }
 
 /**
@@ -178,25 +166,6 @@ export async function readSkillPackageDirectory(fileList: FileList | File[]): Pr
 
 /** 目录导入允许的最大文件数，独立常量避免重复。 */
 const SKILL_LIMITS_FILES = 50
-
-/**
- * 生成技能包 ZIP：SKILL.md（含自动 frontmatter）与全部资源文件。
- * @param skill 技能标识、简述与正文。
- * @param files 资源文件。
- * @returns 可下载的 ZIP。
- */
-export function createSkillPackageZip(
-  skill: { identifier: string; summary: string; content: string },
-  files: SkillFileDraft[],
-): Blob {
-  return createZip([
-    { path: 'SKILL.md', content: generateSkillMarkdown(skill.identifier, skill.summary, skill.content) },
-    ...files.map((file) => ({
-      path: file.path,
-      content: file.encoding === 'base64' ? base64ToBytes(file.content) : file.content,
-    })),
-  ])
-}
 
 /** 触发浏览器下载。 */
 export function downloadBlob(filename: string, blob: Blob): void {

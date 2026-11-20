@@ -1,4 +1,11 @@
 import { Command, CommanderError } from 'commander'
+import { registerAttachmentCommands } from './commands/attachment.ts'
+import { registerPipelineCommands } from './commands/pipeline.ts'
+import { registerBotCommands } from './commands/bot.ts'
+import { registerCredentialCommands, registerStorageCommands } from './commands/configuration.ts'
+import { registerConversationCommands } from './commands/conversation.ts'
+import { registerTaskCommands, registerWorkTagCommands } from './commands/task.ts'
+import { registerSkillCommands } from './commands/skill.ts'
 import { registerConfigCommands } from './commands/config.ts'
 import { registerDeliveryCommands } from './commands/delivery.ts'
 import { registerSystemCommands } from './commands/system.ts'
@@ -46,6 +53,15 @@ function createProgram(context: CliContext): Command {
   registerBugCommands(program, context)
   registerDeliveryCommands(program, context)
   registerToolCommands(program, context)
+  registerAttachmentCommands(program, context)
+  registerPipelineCommands(program, context)
+  registerBotCommands(program, context)
+  registerConversationCommands(program, context)
+  registerTaskCommands(program, context)
+  registerWorkTagCommands(program, context)
+  registerSkillCommands(program, context)
+  registerCredentialCommands(program, context)
+  registerStorageCommands(program, context)
   return program
 }
 

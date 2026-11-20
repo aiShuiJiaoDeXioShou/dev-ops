@@ -1,12 +1,13 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { Type } from 'typebox'
 import { success, apiResponseSchema } from '../../platform/http/response.ts'
+import { requireHumanActor } from '../identity/identity.actor.ts'
 import type { IdentityAuth } from '../identity/identity.auth.ts'
 import { requireSessionUser } from '../identity/identity.session.ts'
 import type { GitHubAccountService } from './integrations.github-account.service.ts'
 
 /**
- * 注册 GitHub 个人绑定接口，绑定只接受已登录的浏览器会话。
+ * 注册 GitHub 个人绑定接口；成员可用 API Token 查询状态，发起绑定需要浏览器会话。
  * @param app Fastify 路由实例。
  * @param options 认证与绑定服务。
  * @returns 路由注册完成；授权回调由 Git 集成模块的共用入口处理。
@@ -30,7 +31,7 @@ export const gitHubAccountRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const actor = await requireSessionUser(auth, request.headers)
+      const actor = await requireHumanActor(request)
       return success(await service.status(actor.id), request.id)
     },
   )

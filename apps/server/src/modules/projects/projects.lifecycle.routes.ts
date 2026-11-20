@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { Type } from 'typebox'
 import { apiResponseSchema, success } from '../../platform/http/response.ts'
-import { requireSessionActor } from '../identity/identity.actor.ts'
+import { requireHumanActor, requireSessionActor } from '../identity/identity.actor.ts'
 import { projectParamsSchema, projectTeamParamsSchema } from './projects.schema.ts'
 import type { createProjectLifecycleService } from './projects.lifecycle.service.ts'
 
@@ -49,7 +49,7 @@ export const projectLifecycleRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: projectTeamParamsSchema, querystring: pageQuery, response: { 200: recycleResponse } },
     },
     async (request) => {
-      const user = await requireSessionActor(request, '查看项目回收站')
+      const user = await requireHumanActor(request)
       return success(
         await service.list(user, request.params.teamId, request.query.page ?? 1, request.query.pageSize ?? 20),
         request.id,
@@ -80,7 +80,7 @@ export const projectLifecycleRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: projectParamsSchema, body: restoreBody, response: { 200: projectResponse } },
     },
     async (request) => {
-      const user = await requireSessionActor(request, '恢复项目')
+      const user = await requireHumanActor(request)
       return success(await service.restore(user, request.params.projectId, request.body.version), request.id)
     },
   )

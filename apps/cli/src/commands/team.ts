@@ -3,6 +3,7 @@ import type { Command } from 'commander'
 import { businessContext, globalsOf, printBusinessResult, resolveTeamId } from '../lib/command.ts'
 import { printSuccess } from '../lib/output.ts'
 import type { GlobalOptions } from '../lib/config.ts'
+import { jsonAction } from '../lib/api-command.ts'
 import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
 import { CliError } from '../lib/errors.ts'
@@ -89,7 +90,7 @@ async function requireConfirmation(globals: GlobalOptions, message: string): Pro
 }
 
 /**
- * 注册 `devops team` 命令组：团队创建、成员与邀请管理。
+ * 注册 `devops team` 命令组：团队创建、资料编辑、成员与邀请管理。
  * @param program 根命令，用于挂载命令组。
  * @param context CLI 执行上下文，提供环境与输出通道。
  * @returns 无返回值；命令仅注册动作，解析时再解析认证配置并发起请求。
@@ -97,6 +98,14 @@ async function requireConfirmation(globals: GlobalOptions, message: string): Pro
  */
 export function registerTeamCommands(program: Command, context: CliContext): void {
   const team = program.command('team').description('管理团队、成员与邀请')
+
+  jsonAction(
+    team.command('update').description('修改团队资料'),
+    context,
+    '/api/v1/teams/{teamId}/update',
+    async ({ business, team: currentTeam }, body, write) =>
+      business.client.updateTeam(await currentTeam(), body, write),
+  )
 
   team
     .command('list')

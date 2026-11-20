@@ -1,7 +1,6 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
-import type { IdentityAuth } from '../identity/identity.auth.ts'
-import { requireSessionUser } from '../identity/identity.session.ts'
+import { requireHumanActor } from '../identity/identity.actor.ts'
 import type { KnowledgeService } from './knowledge.service.ts'
 import {
   activityPageResponseSchema,
@@ -22,11 +21,10 @@ import {
 /**
  * 团队技能目录、管理与历史版本路由。
  * @param app Fastify 实例。
- * @param options 认证实例与 knowledge 服务。
+ * @param options 技能服务。
  * @returns 无返回值；只注册 GET 与 POST。
  */
 export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
-  auth: IdentityAuth
   service: KnowledgeService
 }> = async (app, options) => {
   // 技能目录与检索
@@ -40,7 +38,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.listSkills(user, request.params.teamId, request.query), request.id)
     },
   )
@@ -49,7 +47,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/skills',
     { schema: { params: teamParamsSchema, body: createSkillBodySchema, response: { 200: skillDetailResponseSchema } } },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.createSkill(user, request.params.teamId, request.body), request.id)
     },
   )
@@ -58,7 +56,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/skills/:skillId',
     { schema: { params: skillParamsSchema, response: { 200: skillDetailResponseSchema } } },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.getSkill(user, request.params.skillId), request.id)
     },
   )
@@ -69,7 +67,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
       schema: { params: skillParamsSchema, body: updateSkillBodySchema, response: { 200: skillDetailResponseSchema } },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.updateSkill(user, request.params.skillId, request.body), request.id)
     },
   )
@@ -78,7 +76,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/skills/:skillId/enable',
     { schema: { params: skillParamsSchema, body: skillStateBodySchema, response: { 200: skillDetailResponseSchema } } },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.enableSkill(user, request.params.skillId, request.body.version), request.id)
     },
   )
@@ -87,7 +85,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/skills/:skillId/disable',
     { schema: { params: skillParamsSchema, body: skillStateBodySchema, response: { 200: skillDetailResponseSchema } } },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(await options.service.disableSkill(user, request.params.skillId, request.body.version), request.id)
     },
   )
@@ -102,7 +100,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(
         await options.service.listSkillVersions(
           user,
@@ -124,7 +122,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(
         await options.service.getSkillVersion(user, request.params.skillId, request.params.skillVersionId),
         request.id,
@@ -142,7 +140,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireSessionUser(options.auth, request.headers)
+      const user = await requireHumanActor(request)
       return success(
         await options.service.listSkillActivities(
           user,

@@ -189,7 +189,6 @@ export function createHttpApp(
   })
   app.register(storageRoutes, {
     prefix: '/api/v1',
-    auth: services.auth,
     service: services.storageManagement,
   })
   app.register(codeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.code })
@@ -215,7 +214,7 @@ export function createHttpApp(
   if (services.configuration) {
     app.register(configurationRoutes, { prefix: '/api/v1', service: services.configuration })
   }
-  app.register(knowledgeRoutes, { prefix: '/api/v1', auth: services.auth, service: services.knowledge })
+  app.register(knowledgeRoutes, { prefix: '/api/v1', service: services.knowledge })
   app.register(integrationsRoutes, {
     prefix: '/api/v1',
     auth: services.auth,

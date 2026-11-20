@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { success } from '../../platform/http/response.ts'
 import { conversationParams, conversationTeamParams } from '../collaboration/bot-conversations.schema.ts'
-import { requireActor, requireSessionActor } from '../identity/identity.actor.ts'
+import { requireActor, requireHumanActor } from '../identity/identity.actor.ts'
 import { botInboxResponse } from './bot-inbox.read.ts'
 import { acceptTaskResultBody, requestTaskChangesBody } from './bot-tasks.review.schema.ts'
 import {
@@ -89,10 +89,7 @@ export const botTaskRoutes: FastifyPluginAsyncTypebox<{ service: BotTasksService
       },
     },
     async (request) =>
-      success(
-        await service.handoff(await requireSessionActor(request, '转交任务'), request.params.taskId, request.body),
-        request.id,
-      ),
+      success(await service.handoff(await requireHumanActor(request), request.params.taskId, request.body), request.id),
   )
   app.post(
     '/bot-tasks/:taskId/rerun',
@@ -148,10 +145,7 @@ export const botTaskRoutes: FastifyPluginAsyncTypebox<{ service: BotTasksService
       },
     },
     async (request) =>
-      success(
-        await service.accept(await requireSessionActor(request, '验收任务'), request.params.taskId, request.body),
-        request.id,
-      ),
+      success(await service.accept(await requireHumanActor(request), request.params.taskId, request.body), request.id),
   )
   app.post(
     '/bot-tasks/:taskId/request-changes',
@@ -165,11 +159,7 @@ export const botTaskRoutes: FastifyPluginAsyncTypebox<{ service: BotTasksService
     },
     async (request) =>
       success(
-        await service.requestChanges(
-          await requireSessionActor(request, '退回任务结果'),
-          request.params.taskId,
-          request.body,
-        ),
+        await service.requestChanges(await requireHumanActor(request), request.params.taskId, request.body),
         request.id,
       ),
   )

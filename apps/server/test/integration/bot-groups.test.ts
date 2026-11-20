@@ -86,13 +86,20 @@ test('群组按 Leader 或点名路由，移出成员即拒绝读取，转交保
   assert.equal(blocked.blocked, true)
   assert.equal(blocked.runs[0].status, 'stopped')
   assert.equal(blocked.waitReason, 'executor_unavailable')
-  const handed = await post(`${taskPath}/handoff`, {
-    toBotId: otherBotId,
-    version: blocked.version,
-    reason: '原执行者已移出',
-    summary: '保留验收记录',
-    unfinished: '补充日期',
+  const { token } = await app.tokenService.create(devUser.userId, { name: '任务转交 CLI' })
+  const handoff = await app.inject({
+    method: 'POST',
+    url: `/api/v1${taskPath}/handoff`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      toBotId: otherBotId,
+      version: blocked.version,
+      reason: '原执行者已移出',
+      summary: '保留验收记录',
+      unfinished: '补充日期',
+    },
   })
+  const handed = handoff.json()
   assert.equal(handed.code, 'OK', handed.message)
   assert.equal(handed.data.task.executorBotId, otherBotId)
   assert.equal(handed.data.task.blocked, false)

@@ -8,6 +8,7 @@ import {
   type BusinessCommandContext,
 } from '../lib/command.ts'
 import { resolvePagination, type GlobalOptions } from '../lib/config.ts'
+import { apiAction } from '../lib/api-command.ts'
 import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
 import { CliError } from '../lib/errors.ts'
@@ -160,7 +161,7 @@ async function fetchAllRepositories(
 }
 
 /**
- * 注册 `devops git` 命令组：Git 提供方、连接管理与连接下仓库查询。
+ * 注册 `devops git` 命令组：Git 连接、连接下仓库查询与个人 GitHub 绑定状态。
  * @param program 根命令实例。
  * @param context CLI 上下文，提供环境变量、标准输入与输出通道。
  * @returns 无返回值；命令注册到传入的 program。
@@ -169,6 +170,11 @@ async function fetchAllRepositories(
  */
 export function registerGitCommands(program: Command, context: CliContext): void {
   const git = program.command('git').description('管理 Git 提供方、连接与仓库')
+
+  const account = git.command('account').description('查询个人 GitHub 绑定状态')
+  apiAction(account.command('status').description('查看当前账号的 GitHub 绑定状态'), context, ({ business }) =>
+    business.client.getGitHubAccount(),
+  )
 
   const provider = git.command('provider').description('Git 提供方')
   provider

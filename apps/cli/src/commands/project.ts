@@ -5,6 +5,8 @@ import { resolvePagination, type GlobalOptions } from '../lib/config.ts'
 import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
 import { CliError } from '../lib/errors.ts'
+import { checkedBody, readJsonFile } from '../lib/api-command.ts'
+import { registerProjectManagement } from './project-management.ts'
 
 /** 项目状态，与平台契约一致。 */
 type ProjectStatus = 'active' | 'paused' | 'ended'
@@ -22,6 +24,11 @@ interface ListResult<T> {
 }
 
 interface ProjectListOptions {
+  withRepository?: boolean
+  withoutRepository?: boolean
+  repository?: string
+  owner?: string
+  ownerUnavailable?: boolean
   search?: string
   status?: string
 }
@@ -33,6 +40,7 @@ interface ProjectCreateOptions {
 }
 
 interface ProjectUpdateOptions {
+  templateFile?: string
   name?: string
   description?: string
   owner?: string
@@ -129,7 +137,7 @@ async function fetchAllPages<T>(fetchPage: (page: number) => Promise<ListResult<
 }
 
 /**
- * 注册 `devops project` 命令组：项目查询、创建编辑、统计与仓库关联。
+ * 注册 `devops project` 命令组：项目查询、创建编辑、服务、流程模板、回收站及仓库关联。
  * @param program 根命令，用于挂载命令组。
  * @param context CLI 执行上下文，提供环境与输出通道。
  * @returns 无返回值；命令仅注册动作，解析时再解析认证配置并发起请求。
@@ -138,23 +146,37 @@ async function fetchAllPages<T>(fetchPage: (page: number) => Promise<ListResult<
 export function registerProjectCommands(program: Command, context: CliContext): void {
   const project = getOrCreateGroup(program, 'project', '管理项目')
   const repository = getOrCreateGroup(project, 'repository', '管理项目关联仓库')
+  registerProjectManagement(project, context)
 
   project
     .command('list')
     .description('列出当前团队项目，支持搜索、状态筛选与分页')
     .option('--search <text>', '按项目名称搜索')
     .option('--status <status>', '按状态筛选：active、paused 或 ended')
+    .option('--repository <repositoryId>', '按关联仓库筛选')
+    .option('--with-repository', '只列出已关联仓库的项目')
+    .option('--without-repository', '只列出未关联仓库的项目')
+    .option('--owner <userId>', '按项目负责人筛选')
+    .option('--owner-unavailable', '只列出负责人不可用的项目')
     .action(async (_options: unknown, command: Command) => {
       const globals = globalsOf(command)
       const options = command.opts<ProjectListOptions>()
       const search = optionalText(options.search)
       const status = options.status === undefined ? undefined : parseProjectStatus(options.status)
+      if (options.withoutRepository && (options.withRepository || options.repository)) {
+        throw new CliError('--without-repository 不能与 --repository 或 --with-repository 同用', 2)
+      }
+      const hasRepository = options.withRepository ? true : options.withoutRepository ? false : undefined
       const pagination = resolvePagination(globals)
       const business = await businessContext(command, context)
       const teamId = await resolveTeamId(context, business)
       const query = {
         ...(search === undefined ? {} : { search }),
         ...(status === undefined ? {} : { status }),
+        repositoryId: options.repository,
+        hasRepository,
+        ownerId: options.owner,
+        ownerUnavailable: options.ownerUnavailable,
         page: pagination.page,
         pageSize: pagination.pageSize,
       }
@@ -207,6 +229,7 @@ export function registerProjectCommands(program: Command, context: CliContext): 
     .option('--status <status>', '新的项目状态：active、paused 或 ended')
     .option('--reason <reason>', '状态变更原因，必须与 --status 一起使用')
     .option('--expected-version <version>', '期望的项目版本号，用于乐观锁校验')
+    .option('--template-file <path>', '流程模板 JSON，含 kind 与 nodes；- 表示标准输入')
     .action(async (projectId: string, _options: unknown, command: Command) => {
       const globals = globalsOf(command)
       const options = command.opts<ProjectUpdateOptions>()
@@ -215,6 +238,7 @@ export function registerProjectCommands(program: Command, context: CliContext): 
       const ownerUserId = optionalText(options.owner)
       const rawStatus = optionalText(options.status)
       const reason = optionalText(options.reason)
+      const template = options.templateFile ? await readJsonFile(options.templateFile, command, context) : undefined
       const expectedVersion =
         options.expectedVersion === undefined
           ? undefined
@@ -231,8 +255,14 @@ export function registerProjectCommands(program: Command, context: CliContext): 
         }
         statusReason = reason
       }
-      if (name === undefined && description === undefined && ownerUserId === undefined && status === undefined) {
-        throw new CliError('至少需要提供一个更新字段：--name、--description、--owner 或 --status', 2, {
+      if (
+        name === undefined &&
+        description === undefined &&
+        ownerUserId === undefined &&
+        status === undefined &&
+        template === undefined
+      ) {
+        throw new CliError('至少需要提供一个更新字段：--name、--description、--owner、--status 或 --template-file', 2, {
           code: 'NO_UPDATE_FIELDS',
         })
       }
@@ -246,6 +276,12 @@ export function registerProjectCommands(program: Command, context: CliContext): 
         ...(ownerUserId === undefined ? {} : { ownerUserId }),
         ...(status === undefined ? {} : { status }),
         ...(statusReason === undefined ? {} : { statusReason }),
+      }
+      if (template !== undefined) {
+        body.workItemTemplate = checkedBody('/api/v1/projects/{projectId}/update', {
+          version,
+          workItemTemplate: template,
+        }).workItemTemplate
       }
       const result = await business.client.updateProject(projectId, body, writeOptions(globals))
       printBusinessResult(context, globals, result)

@@ -14,6 +14,7 @@ import { team, teamMember } from '../../apps/server/dist/modules/identity/identi
 import { project } from '../../apps/server/dist/modules/projects/projects.tables.js'
 import { gitConnection } from '../../apps/server/dist/modules/integrations/integrations.tables.js'
 import { gitRepository } from '../../apps/server/dist/modules/code/code.tables.js'
+import { runDevops } from './support/devops-cli.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const requireFromServer = createRequire(join(root, 'apps/server/package.json'))
@@ -307,6 +308,18 @@ test(
     })
     assert.equal(linked.body.success, true, JSON.stringify(linked.body))
 
+    const { token } = successData(
+      (
+        await api('/api/v1/me/tokens', {
+          method: 'POST',
+          cookie,
+          body: { name: '流水线 CLI 验收' },
+        })
+      ).body,
+      '签发 CLI 个人令牌',
+    )
+    const cli = { server: address, token, team: teamId }
+
     await t.test('T038/quickstart 步骤 1–2：工作流发现与解析状态', async () => {
       const workflows = await api(`/api/v1/projects/${projectId}/pipeline-workflows`, { cookie })
       const data = successData(workflows.body, '工作流列表')
@@ -319,17 +332,24 @@ test(
     })
 
     await t.test('T038/quickstart 步骤 5：触发→调度→Agent 领取租约', async () => {
-      const triggered = await api(`/api/v1/projects/${projectId}/pipeline-runs`, {
-        method: 'POST',
-        cookie,
-        body: {
-          workflowPath: '.devops/workflows/ci.yml',
-          ref: 'main',
-          inputs: { target: 'web' },
-          idempotencyKey: 'e2e-001',
-        },
-      })
-      const run = successData(triggered.body, '触发运行')
+      const run = await runDevops(
+        cli,
+        [
+          'pipeline',
+          'run',
+          'trigger',
+          projectId,
+          '--workflow',
+          '.devops/workflows/ci.yml',
+          '--ref',
+          'main',
+          '--idempotency-key',
+          'e2e-001',
+          '--inputs-file',
+          '-',
+        ],
+        { target: 'web' },
+      )
       assert.equal(run.status, 'queued')
       assert.equal(run.commitSha, COMMIT_SHA)
       const runId = run.runId
@@ -432,6 +452,39 @@ test(
       assert.equal(download.status, 200)
       assert.equal(download.headers.get('x-content-sha256'), sha)
       assert.deepEqual(Buffer.from(await download.arrayBuffer()), Buffer.from('e2e-artifact'))
+
+      const cliRun = await runDevops(cli, ['pipeline', 'run', 'wait', runId])
+      assert.equal(cliRun.runId, runId)
+      const cliLogs = await runDevops(cli, ['pipeline', 'run', 'logs', runId, '--step', '1'])
+      assert.deepEqual(cliLogs.items, logData.items)
+      const output = join(storageDir, 'cli-artifact.tar')
+      const cliArtifact = await runDevops(cli, [
+        'pipeline',
+        'artifact',
+        'download',
+        artifact.artifactId,
+        '--output',
+        output,
+      ])
+      assert.equal(cliArtifact.sha256, sha)
+      assert.equal(await readFile(output, 'utf8'), 'e2e-artifact')
+
+      const service = await runDevops(cli, ['project', 'service', 'create', projectId, '--file', '-'], { name: 'Web' })
+      const version = await runDevops(
+        cli,
+        ['delivery', 'version', 'confirm', projectId, service.id, 'test', '--file', '-'],
+        {
+          version: 0,
+          versionLabel: 'e2e-artifact',
+          source: 'manual',
+          verificationStatus: 'confirmed',
+        },
+      )
+      assert.equal(version.versionLabel, 'e2e-artifact')
+      const runVersions = await api(`/api/v1/projects/${projectId}/services/${service.id}/run-versions`, { cookie })
+      assert.ok(
+        successData(runVersions.body, 'Web 运行版本列表').items.some((item) => item.versionLabel === 'e2e-artifact'),
+      )
 
       const duplicate = await api(`/api/v1/projects/${projectId}/pipeline-runs`, {
         method: 'POST',

@@ -4,6 +4,7 @@ import type { ApiBody } from '@dev-ops/api-client'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { Command } from 'commander'
 import { businessContext, printBusinessResult, readContent } from '../lib/command.ts'
+import { apiAction } from '../lib/api-command.ts'
 import type { CliContext } from '../lib/context.ts'
 import { confirmDangerous } from '../lib/confirm.ts'
 import { CliError } from '../lib/errors.ts'
@@ -39,12 +40,20 @@ async function readPatch(path: string, context: CliContext): Promise<{ patch: st
 }
 
 /**
- * 注册项目写能力与远端写命令组。
+ * 注册项目写能力、调用记录与远端写命令组。
  * @param program 根命令。
  * @param context CLI 上下文。
+ * @returns 无返回值；通过平台 API 查询或执行请求。
  */
 export function registerToolCommands(program: Command, context: CliContext): void {
   const tool = program.command('tool').description('项目写能力：代码修改、PR、Issue、评论与授权')
+
+  apiAction(
+    tool.command('invocations').description('查询项目写工具调用记录').argument('<projectId>', '项目 ID'),
+    context,
+    ({ business, arg }) => business.client.listToolInvocations(arg()),
+    { list: true },
+  )
 
   tool
     .command('capabilities')
