@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { eq } from 'drizzle-orm'
+import { GitAdapterError } from '../../src/adapters/git/git.types.ts'
 import { gitRepository } from '../../src/modules/code/code.tables.ts'
 import { teamMember } from '../../src/modules/identity/identity.tables.ts'
 import { createIntegrationsService } from '../../src/modules/integrations/integrations.service.ts'
@@ -57,6 +58,22 @@ test('GitHub App 多安装绑定、用户授权范围与重复授权', { timeout
           ]
         },
       }
+    },
+    githubInstallations: {
+      async list(userId) {
+        assert.equal(userId, actor.id)
+        return [
+          { id: 13, login: 'personal' },
+          { id: 14, login: 'organization' },
+        ]
+      },
+      async verify(userId, installationId) {
+        assert.equal(userId, actor.id)
+        if (installationId !== 13 && installationId !== 14) {
+          throw new GitAdapterError('auth_failed', '当前 GitHub 用户无法访问该安装')
+        }
+        return { login: `account-${installationId}`, repositoryIds: new Set(installationId === 13 ? ['13'] : []) }
+      },
     },
     async verifyGitHubInstallation(input) {
       assert.equal(
@@ -120,4 +137,29 @@ test('GitHub App 多安装绑定、用户授权范围与重复授权', { timeout
     (row) => row.externalIdentity === '11' || row.externalIdentity === '12',
   )
   assert.deepEqual(new Set(appConnections.map((row) => row.id)), new Set([first.id, second.id]))
+
+  const bindExisting = (installationId: number, user = actor) =>
+    service.createConnection(user, context.teamId, { providerKey: 'github', name: 'GitHub', installationId })
+  await assert.rejects(() => service.discoverGitHubInstallations(developer, context.teamId), denied)
+  assert.deepEqual(await service.discoverGitHubInstallations(actor, context.teamId), [
+    { id: 13, login: 'personal' },
+    { id: 14, login: 'organization' },
+  ])
+  await assert.rejects(() => bindExisting(13, developer), denied)
+  await assert.rejects(() => bindExisting(99), denied)
+  await assert.rejects(() => bindExisting(14), denied)
+  const existing = await bindExisting(13)
+  assert.ok('id' in existing)
+  assert.equal(existing.externalIdentity, '13')
+  assert.deepEqual(await bindExisting(13).then((result) => 'id' in result && result.id), existing.id)
+  const synced = await db
+    .select({ remoteId: gitRepository.remote_repository_id })
+    .from(gitRepository)
+    .where(eq(gitRepository.connection_id, existing.id))
+  assert.deepEqual(synced, [{ remoteId: '13' }])
+  const linked = await service.listConnections(actor, context.teamId)
+  assert.equal(
+    linked.some((item) => item.externalIdentity === '14' || item.externalIdentity === '99'),
+    false,
+  )
 })

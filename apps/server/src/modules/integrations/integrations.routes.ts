@@ -15,6 +15,7 @@ import {
   connectionRepositoryQuerySchema,
   createConnectionBodySchema,
   createConnectionResponseSchema,
+  githubInstallationListResponseSchema,
   providerListResponseSchema,
   revokeConnectionBodySchema,
   revokeConnectionResponseSchema,
@@ -52,6 +53,21 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
   )
 
   app.post(
+    '/teams/:teamId/github-installations/discover',
+    {
+      schema: {
+        description: '查询团队管理员可访问的现有 GitHub App 安装，必要时刷新个人授权令牌。',
+        params: teamParamsSchema,
+        response: { 200: githubInstallationListResponseSchema },
+      },
+    },
+    async (request) => {
+      const user = await requireSessionUser(options.auth, request.headers)
+      return success(await options.service.discoverGitHubInstallations(user, request.params.teamId), request.id)
+    },
+  )
+
+  app.post(
     '/teams/:teamId/git-connections',
     {
       schema: {
@@ -61,7 +77,10 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       },
     },
     async (request) => {
-      const user = await requireActor(request)
+      const user =
+        request.body.installationId === undefined
+          ? await requireActor(request)
+          : await requireSessionUser(options.auth, request.headers)
       return success(await options.service.createConnection(user, request.params.teamId, request.body), request.id)
     },
   )

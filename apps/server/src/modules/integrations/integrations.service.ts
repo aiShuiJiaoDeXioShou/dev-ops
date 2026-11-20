@@ -85,6 +85,10 @@ export interface IntegrationsServiceDeps {
   configuration: ConfigurationService | null
   adapterFactory?: GitAdapterFactory
   verifyGitHubInstallation?: GitHubInstallationVerifier
+  githubInstallations?: {
+    list(userId: string): Promise<Array<{ id: number; login: string }>>
+    verify(userId: string, installationId: number): ReturnType<GitHubInstallationVerifier>
+  }
 }
 
 function normalizeName(name: string): string {
@@ -246,6 +250,41 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
     }
   }
 
+  function requireGitHubInstallations() {
+    githubAuthorizationConfig()
+    if (!deps.githubInstallations) throw new ApiError(ERROR_CODES.PRECONDITION_FAILED, '已有 GitHub 安装查询尚未配置')
+    return deps.githubInstallations
+  }
+
+  /**
+   * 列出团队管理员可通过个人 GitHub 授权访问的 App 安装。
+   * @param actor 当前登录的团队管理员。
+   * @param teamId 要添加连接的团队。
+   * @returns 可供选择的安装标识和所属账号。
+   * @throws 缺少权限、未绑定个人账号或 GitHub 不可用时拒绝查询。
+   */
+  async function discoverGitHubInstallations(actor: SessionUser, teamId: string) {
+    await requireTeamMember(db, actor.id, teamId, ['admin'])
+    const installations = requireGitHubInstallations()
+    try {
+      return await installations.list(actor.id)
+    } catch (error) {
+      if (error instanceof ApiError) throw error
+      if (gitErrorCode(error) === 'auth_failed') {
+        throw new ApiError(ERROR_CODES.GITHUB_ACCOUNT_REQUIRED, '请重新授权你的 GitHub 账号')
+      }
+      throw new ApiError(ERROR_CODES.EXTERNAL_UNAVAILABLE, '暂时无法读取 GitHub App 安装')
+    }
+  }
+
+  /**
+   * 建立团队 Git 连接，或生成新 GitHub App 安装的授权地址。
+   * @param actor 当前登录的团队管理员。
+   * @param teamId 接收仓库连接的团队标识。
+   * @param input 连接提供方、名称及对应的安装标识或 Gitea 凭据。
+   * @returns 已添加并同步的连接，或待用户完成的安装授权地址。
+   * @throws 权限不足、配置不可用或无法确认安装仓库的访问范围时拒绝创建。
+   */
   async function createConnection(
     actor: SessionUser,
     teamId: string,
@@ -254,10 +293,28 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
       name: string
       instanceUrl?: string
       token?: string
+      installationId?: number
     },
   ): Promise<CreateConnectionResult> {
     await requireTeamMember(db, actor.id, teamId, ['admin'])
     const name = normalizeName(input.name)
+    if (input.installationId !== undefined) {
+      if (input.providerKey !== 'github' || !Number.isSafeInteger(input.installationId) || input.installationId <= 0) {
+        throw new ApiError(ERROR_CODES.VALIDATION_ERROR, 'GitHub 安装标识不合法')
+      }
+      const installations = requireGitHubInstallations()
+      let verified: Awaited<ReturnType<GitHubInstallationVerifier>>
+      try {
+        verified = await installations.verify(actor.id, input.installationId)
+      } catch (error) {
+        if (error instanceof ApiError) throw error
+        if (gitErrorCode(error) === 'auth_failed') {
+          throw new ApiError(ERROR_CODES.FORBIDDEN, '当前 GitHub 用户无法访问所选安装')
+        }
+        throw new ApiError(ERROR_CODES.EXTERNAL_UNAVAILABLE, '暂时无法核对 GitHub App 安装')
+      }
+      return bindGitHubInstallation(actor.id, teamId, input.installationId, verified)
+    }
     if (input.providerKey === 'github') {
       const { slug, secret } = githubAuthorizationConfig()
       const exp = Math.floor(Date.now() / 1000) + 600
@@ -341,9 +398,18 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
       code: input.code,
       codeVerifier: githubCodeVerifier(input.state, secret),
     })
+    return bindGitHubInstallation(actor.id, payload.teamId, installationId, verified)
+  }
+
+  async function bindGitHubInstallation(
+    userId: string,
+    teamId: string,
+    installationId: number,
+    verified: Awaited<ReturnType<GitHubInstallationVerifier>>,
+  ) {
     const candidate = {
       id: randomUUID(),
-      team_id: payload.teamId,
+      team_id: teamId,
       provider_key: 'github',
       instance_url: 'https://github.com',
       auth_kind: 'github_app_installation',
@@ -359,28 +425,28 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
     const name = normalizeName(`GitHub ${verified.login} (#${installationId})`)
     return db.transaction(async (tx) => {
       // 同团队重复授权保留连接和仓库标识，项目关联仍指向同一安装。
-      await lockTeam(tx, payload.teamId)
-      const membership = await findMembership(tx, payload.teamId, actor.id)
+      await lockTeam(tx, teamId)
+      const membership = await findMembership(tx, teamId, userId)
       if (membership?.status !== 'active' || membership.role !== 'admin') {
         throw new ApiError(ERROR_CODES.FORBIDDEN, '需要团队管理员权限')
       }
-      const previous = await findGitHubInstallation(tx, payload.teamId, candidate.external_identity)
+      const previous = await findGitHubInstallation(tx, teamId, candidate.external_identity)
       const connection =
         previous ??
         (await insertGitConnection(tx, {
           id: candidate.id,
-          teamId: payload.teamId,
+          teamId,
           providerKey: candidate.provider_key,
           instanceUrl: candidate.instance_url,
           name,
           authKind: candidate.auth_kind,
           secretId: null,
           externalIdentity: candidate.external_identity,
-          createdByUserId: actor.id,
+          createdByUserId: userId,
         }))
       if (!connection) throw new Error('GitHub 连接保存失败')
       await upsertGitRepositories(tx, {
-        teamId: payload.teamId,
+        teamId,
         connectionId: connection.id,
         providerKey: candidate.provider_key,
         repositories,
@@ -506,6 +572,7 @@ export function createIntegrationsService(deps: IntegrationsServiceDeps) {
     },
     listConnections,
     createConnection,
+    discoverGitHubInstallations,
     completeAuthorization,
     checkConnection,
     syncRepositories,

@@ -136,37 +136,77 @@ export async function verifyGitHubInstallation(input: {
   fetcher?: typeof fetch
 }): Promise<{ login: string; repositoryIds: Set<string> }> {
   const fetcher = input.fetcher ?? fetch
-  const signal = AbortSignal.timeout(TIMEOUT_MS)
-  const token = await exchangeGitHubUserTokens({
+  const tokens = await exchangeGitHubUserTokens({
     clientId: input.clientId,
     clientSecret: input.clientSecret,
     grant: { code: input.code, codeVerifier: input.codeVerifier, redirectUri: input.redirectUri },
     fetcher,
   })
+  return verifyGitHubInstallationAccess(tokens.accessToken, input.installationId, fetcher)
+}
+
+function installationPageReader(accessToken: string, fetcher: typeof fetch) {
   const auth = {
-    headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token.accessToken}` },
-    signal,
+    headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   }
-  const listPage = (path: string, page: number) =>
+  return (path: string, page: number) =>
     readJson(fetcher, `https://api.github.com${path}?per_page=${PAGE_SIZE}&page=${page}`, auth)
-  let login: string | undefined
+}
+
+/**
+ * 列出当前 GitHub 用户可访问的 App 安装，最多读取十页。
+ * @param accessToken 仅供服务端使用的个人授权令牌。
+ * @param fetcher 可替换的 HTTP 客户端。
+ * @returns 未暂停安装的 ID 和所属账号。
+ * @throws 响应不合法、范围无法完整读取或 GitHub 拒绝授权时抛出错误。
+ */
+export async function listGitHubUserInstallations(accessToken: string, fetcher: typeof fetch = fetch) {
+  const listPage = installationPageReader(accessToken, fetcher)
+  const installations: Array<{ id: number; login: string }> = []
   for (let page = 1; page <= MAX_PAGES; page += 1) {
     const result = await listPage('/user/installations', page)
     if (!Array.isArray(result.installations)) throw new GitAdapterError('invalid_response', 'GitHub 安装列表不合法')
-    const installation: unknown = result.installations.find(
-      (item: unknown) => isRecord(item) && item.id === input.installationId,
-    )
-    if (isRecord(installation) && isRecord(installation.account) && typeof installation.account.login === 'string') {
-      login = installation.account.login
-      break
+    for (const item of result.installations) {
+      if (
+        !isRecord(item) ||
+        typeof item.id !== 'number' ||
+        !Number.isSafeInteger(item.id) ||
+        item.id <= 0 ||
+        !isRecord(item.account) ||
+        typeof item.account.login !== 'string' ||
+        !item.account.login
+      ) {
+        throw new GitAdapterError('invalid_response', 'GitHub 安装信息不合法')
+      }
+      if (!item.suspended_at) installations.push({ id: item.id, login: item.account.login })
     }
-    if (result.installations.length < PAGE_SIZE) break
+    if (result.installations.length < PAGE_SIZE || result.total_count === page * PAGE_SIZE) return installations
   }
-  if (!login) throw new GitAdapterError('auth_failed', '当前 GitHub 用户无法访问该安装')
+  throw new GitAdapterError('invalid_response', 'GitHub 安装列表无法完整读取')
+}
 
+/**
+ * 用个人授权核对选中的安装和当前用户可访问的仓库。
+ * @param accessToken 仅供服务端使用的个人授权令牌。
+ * @param installationId 要绑定的安装标识，必须出现在用户可访问的安装中。
+ * @param fetcher 可替换的 HTTP 客户端。
+ * @returns 安装所属账号及用户可访问的仓库 ID。
+ * @throws 当前用户无权使用安装、验证超时或范围无法完整读取时抛出错误。
+ */
+export async function verifyGitHubInstallationAccess(
+  accessToken: string,
+  installationId: number,
+  fetcher: typeof fetch = fetch,
+): Promise<{ login: string; repositoryIds: Set<string> }> {
+  const installation = (await listGitHubUserInstallations(accessToken, fetcher)).find(
+    (item) => item.id === installationId,
+  )
+  if (!installation) throw new GitAdapterError('auth_failed', '当前 GitHub 用户无法访问该安装')
+  const listPage = installationPageReader(accessToken, fetcher)
   const repositoryIds = new Set<string>()
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const result = await listPage(`/user/installations/${input.installationId}/repositories`, page)
+    const result = await listPage(`/user/installations/${installationId}/repositories`, page)
     if (!Array.isArray(result.repositories) || typeof result.total_count !== 'number') {
       throw new GitAdapterError('invalid_response', 'GitHub 仓库授权范围不完整')
     }
@@ -176,7 +216,7 @@ export async function verifyGitHubInstallation(input: {
       }
       repositoryIds.add(String(item.id))
     }
-    if (repositoryIds.size === result.total_count) return { login, repositoryIds }
+    if (repositoryIds.size === result.total_count) return { login: installation.login, repositoryIds }
     if (result.repositories.length < PAGE_SIZE) break
   }
   throw new GitAdapterError('invalid_response', 'GitHub 仓库授权范围无法完整核对')

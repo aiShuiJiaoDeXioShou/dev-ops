@@ -37,11 +37,16 @@ export const providerListResponseSchema = apiResponseSchema(Type.Array(providerS
 export const connectionListResponseSchema = apiResponseSchema(Type.Array(connectionSchema))
 export const teamParamsSchema = Type.Object({ teamId: uuidSchema })
 export const connectionParamsSchema = Type.Object({ connectionId: uuidSchema })
+const installationIdSchema = Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
+export const githubInstallationListResponseSchema = apiResponseSchema(
+  Type.Array(Type.Object({ id: installationIdSchema, login: Type.String() })),
+)
 export const createConnectionBodySchema = Type.Object(
   {
     providerKey: Type.Union([Type.Literal('github'), Type.Literal('gitea')]),
     name: Type.String({ minLength: 1, maxLength: 120 }),
     instanceUrl: Type.Optional(Type.String({ maxLength: 2048 })),
+    installationId: Type.Optional(installationIdSchema),
     token: Type.Optional(Type.String({ maxLength: 100000 })),
   },
   { additionalProperties: false },

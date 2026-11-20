@@ -310,7 +310,8 @@ PostgreSQL 持久作业记录领取租约、尝试次数和安全错误，中断
 | API 分组 | 建议路由范围 | 访问规则 |
 | --- | --- | --- |
 | 可用提供方 | `/api/v1/git-providers` | 返回已注册提供方及能力描述；首批仅返回 GitHub、Gitea，预留来源不能伪装为可接入 |
-| 团队连接 | `/api/v1/teams/:teamId/git-connections` | 管理员创建连接；GitHub 返回 App 安装 URL，Gitea 接受实例地址与 Token |
+| 团队连接 | `/api/v1/teams/:teamId/git-connections` | 管理员创建连接。GitHub 可提交 `installationId` 绑定已有安装，省略时返回新安装地址。Gitea 接受实例地址与 Token。 |
+| 发现已有 GitHub App 安装 | `POST /api/v1/teams/:teamId/github-installations/discover` | 使用管理员的个人 GitHub 授权列出可访问的安装 ID 及所属账号，必要时刷新令牌。 |
 | 授权回调 | `/api/v1/git-authorizations/:providerKey/callback` | 校验有时限的签名 state、发起人及团队角色，使用一次性 OAuth 授权码核对安装归属及仓库范围 |
 | 项目仓库 | `/api/v1/projects/:projectId/repositories` | 只允许选择开放且来源仍授权的仓库，按项目返回有效能力 |
 | 可选本人绑定 | `/api/v1/me/git-accounts` | 后续本人来源模式，当前用户只能绑定自己 |
@@ -353,6 +354,8 @@ V0.1 落地了团队 Git 连接、仓库同步、项目仓库关系、代码引�
 ## 团队连接与项目仓库操作
 
 团队管理员可以连接多个 GitHub 个人账号或组织的 App 安装，以及多个 Gitea 账号。每个 GitHub 连接保存独立的安装 ID，并按该安装的授权范围访问仓库。同一个 GitHub 安装在同一团队重新授权时复用原连接和仓库标识。Gitea 每条连接使用对应账号签发的 Token，连接名称在团队内唯一。
+
+团队管理员在「添加 GitHub 连接」中可选择已有安装并同步仓库。绑定前需在个人设置授权 GitHub。服务端重新检查团队管理员权限、所选安装和安装范围，确认管理员的个人授权能访问将同步的全部仓库后才保存连接。新建 GitHub App 安装仍通过 Setup URL 回跳完成。
 
 GitHub App 需要配置 `GITHUB_APP_ID`、`GITHUB_APP_PRIVATE_KEY_PATH`、`GITHUB_APP_SLUG`、`GITHUB_APP_CLIENT_ID` 和 `GITHUB_APP_CLIENT_SECRET`。在 GitHub App 设置中，把 Setup URL 和用户 Callback URL 都设为 `<APP_ORIGIN>/api/v1/git-authorizations/github/callback`，关闭「安装期间请求用户授权」，由 Setup 回调确认 DevOps 会话后发起带 PKCE 的用户授权。要连接其他个人账号或组织，应允许 GitHub App 安装到其他账号。`GITHUB_ALLOWED_REPOS` 可额外限制 DevOps 能同步和访问的仓库，留空时由每个安装的仓库授权范围决定。
 

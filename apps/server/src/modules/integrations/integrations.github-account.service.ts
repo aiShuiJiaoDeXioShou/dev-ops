@@ -181,6 +181,12 @@ export function createGitHubAccountService(deps: {
     throw requiresAccount()
   }
 
+  /**
+   * 获取服务端访问 GitHub 所需的个人令牌，过期时协调并发刷新。
+   * @param userId 平台当前会话的用户标识。
+   * @returns 仅供服务端调用 GitHub 的令牌。
+   * @throws 尚未绑定、需要重新授权或凭据不可用时抛出错误。
+   */
   async function userToken(userId: string): Promise<string> {
     const row = await findAuthorization(userId)
     if (!row) throw requiresAccount()
@@ -319,7 +325,7 @@ export function createGitHubAccountService(deps: {
     }
   }
 
-  return { status, start, complete, authorizeRepository }
+  return { status, start, complete, authorizeRepository, userToken }
 }
 
 export type GitHubAccountService = ReturnType<typeof createGitHubAccountService>

@@ -14,7 +14,9 @@ import {
   exchangeGitHubUserTokens,
   getGitHubRepositoryPermissions,
   getGitHubUser,
+  listGitHubUserInstallations,
   verifyGitHubInstallation,
+  verifyGitHubInstallationAccess,
 } from '../adapters/git/github-authorization.ts'
 import { findGitConnectionById } from '../modules/integrations/integrations.repository.ts'
 import { createConfigurationService } from '../modules/configuration/configuration.service.ts'
@@ -85,13 +87,6 @@ export function createServices(
       db: database.db,
       cipher: secretCipher,
     })
-  const integrations = createIntegrationsService({
-    db: database.db,
-    config,
-    configuration,
-    adapterFactory: gitAdapterFactory,
-    verifyGitHubInstallation,
-  })
   const githubAccount = createGitHubAccountService({
     db: database.db,
     config,
@@ -101,6 +96,23 @@ export function createServices(
       getUser: (accessToken) => getGitHubUser(accessToken, options.githubUserFetcher),
       getRepositoryPermissions: (input) =>
         getGitHubRepositoryPermissions({ ...input, fetcher: options.githubUserFetcher }),
+    },
+  })
+  const integrations = createIntegrationsService({
+    db: database.db,
+    config,
+    configuration,
+    adapterFactory: gitAdapterFactory,
+    verifyGitHubInstallation,
+    githubInstallations: {
+      list: async (userId) =>
+        listGitHubUserInstallations(await githubAccount.userToken(userId), options.githubUserFetcher),
+      verify: async (userId, installationId) =>
+        verifyGitHubInstallationAccess(
+          await githubAccount.userToken(userId),
+          installationId,
+          options.githubUserFetcher,
+        ),
     },
   })
   const code = createCodeService({
