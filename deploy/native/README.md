@@ -7,7 +7,7 @@
 1. 先上线支持 `macmini-deploy` 的平台和数据库迁移。
 2. 从团队设置注册能力标签为 `macmini-deploy` 的专用执行节点。把长期节点令牌写入权限为 0600 的宿主环境文件。
 3. 将 `release-main.sh` 安装到部署目录的 `scripts/`，使用 [Agent 配置](../../apps/pipeline-agent/.env.example)固定宿主脚本、允许发布的仓库 HTTPS URL 与工作流路径。GitHub URL 包含 `.git` 后缀。
-4. 用 launchd 启动 Agent。例如使用 `node --env-file <部署目录>/shared/pipeline-agent.env <部署目录>/current/apps/pipeline-agent/dist/index.js`。仓库和私有 Bot 子模块需同属可读取的 GitHub App 安装。同机可通过 Nginx 的本机地址访问 API，`PATH` 需包含 Node、Corepack、Git 和宿主工具。可选 `DEVOPS_DEPLOY_GIT_PROXY` 只供 GitHub Git 操作使用。
+4. 用 launchd 启动 Agent。例如使用 `node --env-file <部署目录>/shared/pipeline-agent.env <部署目录>/current/apps/pipeline-agent/dist/index.js`。仓库和私有 Bot 子模块需同属可读取的 GitHub App 安装。同机可通过 Nginx 的本机地址访问 API。先运行 `corepack enable pnpm`，然后在 launchd 的 `PATH` 中包含 Node、Corepack、pnpm、Git 和宿主工具。可选 `DEVOPS_DEPLOY_GIT_PROXY` 只供 GitHub Git 操作使用。
 
 ## 发布
 
