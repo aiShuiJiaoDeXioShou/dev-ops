@@ -210,11 +210,43 @@ test('[desktop] [mobile] 智能体目录创建、打开私聊、刷新、详情�
   await expect(detail.getByRole('tab', { name: '运行记录' })).toHaveCount(0)
   await expect(detail.getByRole('tab', { name: '项目' })).toHaveCount(0)
   await expect(detail.getByRole('definition').filter({ hasText: modelId })).toBeVisible()
+  const modelRow = detail.getByRole('definition').filter({ hasText: modelId })
+  const bindButton = detail.getByRole('button', { name: '绑定模型' })
+  const [detailBox, rowBox, bindBox] = await Promise.all([
+    detail.boundingBox(),
+    modelRow.boundingBox(),
+    bindButton.boundingBox(),
+  ])
+  const viewport = page.viewportSize()
+  if (!detailBox || !rowBox || !bindBox || !viewport) throw new Error('未找到详情栏或模型行布局')
+  // 详情栏由右侧宿主撑满视口，不沿用列表页头部的偏移高度。
+  expect(Math.abs(detailBox.height - viewport.height)).toBeLessThan(1)
+  // 绑定入口与模型值同行，并贴在值列右边缘。
+  expect(Math.abs(bindBox.y - rowBox.y)).toBeLessThan(1)
+  expect(Math.abs(bindBox.x + bindBox.width - (rowBox.x + rowBox.width))).toBeLessThan(1)
   await page.screenshot({ path: testInfo.outputPath('bot-detail.png') })
-  await detail.getByRole('button', { name: '绑定模型' }).click()
+  await bindButton.click()
   const modelForm = page.getByRole('dialog', { name: '绑定模型' })
   await expect(modelForm.getByRole('combobox', { name: '模型', exact: true })).toHaveValue(modelId)
   await modelForm.getByRole('button', { name: '取消' }).click()
+  // 未绑定模型时用弱化占位说明，绑定入口仍位于值列右侧。
+  const bound = { ...fixture }
+  fixture.modelId = null
+  fixture.modelConnectionId = null
+  fixture.connectionName = null
+  await page.reload()
+  await expect(detail.getByText('未绑定模型')).toBeVisible()
+  const unboundButton = detail.getByRole('button', { name: '绑定模型' })
+  await expect(unboundButton).toBeVisible()
+  const unboundRow = detail.getByRole('definition').filter({ hasText: '未绑定模型' })
+  const [unboundRowBox, unboundButtonBox] = await Promise.all([unboundRow.boundingBox(), unboundButton.boundingBox()])
+  if (!unboundRowBox || !unboundButtonBox) throw new Error('未找到未绑定模型行布局')
+  expect(Math.abs(unboundButtonBox.x + unboundButtonBox.width - (unboundRowBox.x + unboundRowBox.width))).toBeLessThan(
+    1,
+  )
+  Object.assign(fixture, bound)
+  await page.reload()
+  await expect(detail.getByRole('definition').filter({ hasText: modelId })).toBeVisible()
   await page.getByRole('button', { name: '停用智能体' }).click()
   const alert = page.getByRole('alertdialog')
   await expect(alert.getByRole('button', { name: '取消' })).toBeFocused()

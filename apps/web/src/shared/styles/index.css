@@ -1927,6 +1927,10 @@ a.skill-title:hover {
 .details .detail-scroll {
   min-height: 0;
 }
+/* 能力中心详情栏由右侧宿主撑满视口，不再预留列表页头部高度。 */
+.agent-details {
+  height: 100%;
+}
 
 /* 事项详情覆盖列表，标题区固定，长正文在浮层内独立滚动。 */
 .work-item-detail-sheet[data-side='right'] {

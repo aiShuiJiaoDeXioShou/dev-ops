@@ -83,7 +83,7 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
   return (
     <aside
       ref={detailRef}
-      className="details agent-details h-dvh min-h-0 bg-background"
+      className="details agent-details min-h-0 bg-background"
       aria-label="智能体详情"
       onKeyDown={(event) => {
         if (event.defaultPrevented || !detailRef.current?.contains(event.target instanceof Node ? event.target : null))
@@ -154,20 +154,30 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
                 <Cpu className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
                 模型
               </dt>
-              <dd className="wrap-break-word">
-                {bot.modelId ?? '未绑定模型'}
-                {bot.connectionName && <span className="small quiet block">{bot.connectionName}</span>}
-                {canBindModel && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => setBindingModel(true)}
-                  >
-                    绑定模型
-                  </Button>
-                )}
+              <dd>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    {bot.modelId ? (
+                      <>
+                        <span className="wrap-break-word font-medium">{bot.modelId}</span>
+                        {bot.connectionName && <span className="small quiet block">{bot.connectionName}</span>}
+                      </>
+                    ) : (
+                      <span className="quiet">未绑定模型</span>
+                    )}
+                  </div>
+                  {canBindModel && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => setBindingModel(true)}
+                    >
+                      绑定模型
+                    </Button>
+                  )}
+                </div>
               </dd>
               <dt>
                 <Shield className="icon fill-none stroke-current stroke-2" aria-hidden="true" />
