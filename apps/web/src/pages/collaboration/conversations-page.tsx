@@ -6,11 +6,11 @@ import { botInboxOptions, taskQueries } from '@/features/bot-tasks/api/queries'
 import { BotInbox } from '@/features/bot-tasks/ui/bot-inbox'
 import { conversationsOptions, conversationsQueryKey } from '@/features/conversations/api/queries'
 import { ConversationAvatar } from '@/features/conversations/ui/conversation-avatar'
+import { ConversationFilter } from '@/features/conversations/ui/conversation-filter'
 import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
 import { DirectConversationPicker } from '@/features/conversations/ui/direct-conversation-picker'
 import { NewGroupDialog } from '@/features/conversations/ui/new-group-dialog'
 import { useSession } from '@/features/identity/model/session'
-import { workTagsOptions } from '@/features/work-tags/api/queries'
 import { WorkTagDialog } from '@/features/work-tags/ui/work-tag-dialog'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
@@ -21,7 +21,6 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/controls/dropdown-menu'
 import { Input } from '@/shared/ui/controls/input'
-import { Select } from '@/shared/ui/controls/select'
 import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { ConversationRoom } from './conversation-room'
@@ -47,11 +46,6 @@ function TeamConversations({
   const [tagDialogOpen, setTagDialogOpen] = useState(false)
   const tagOpener = useRef<HTMLButtonElement>(null)
   const [tagId, setTagId] = useState('')
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const shouldShowFilters = filtersOpen || !!tagId
-  const tags = useInfiniteQuery(workTagsOptions(teamId))
-  const tagItems = tags.data?.pages.flatMap(({ data }) => data.items) ?? []
-  const activeTag = tagItems.some(({ id }) => id === tagId) ? tagId : ''
 
   const conversationOpener = useRef<HTMLButtonElement>(null)
   const client = useQueryClient()
@@ -65,12 +59,12 @@ function TeamConversations({
   const linkedTask = params.get('task') ?? undefined
   const linkedSkill = params.get('skill') ?? undefined
   const skillSearch = linkedSkill ? `?skill=${encodeURIComponent(linkedSkill)}` : ''
-  const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim()), activeTag || undefined))
+  const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim()), tagId || undefined))
   const rooms = list.data?.pages.flatMap(({ data }) => data.items) ?? []
-  const defaultId = !isInbox && !linkedSkill && !filter && !activeTag ? rooms[0]?.id : undefined
+  const defaultId = !isInbox && !linkedSkill && !filter && !tagId ? rooms[0]?.id : undefined
   const selectedId = id ?? defaultId
   const showListErrorInMain = !isInbox && !selectedId && rooms.length === 0 && list.isError
-  const hasNoConversations = list.isSuccess && rooms.length === 0 && !filter && !activeTag
+  const hasNoConversations = list.isSuccess && rooms.length === 0 && !filter && !tagId
   let emptyDescription = '从会话列表选择要继续的对话。'
   if (hasNoConversations) {
     emptyDescription = readOnly ? '加入会话后，可在这里查看对话。' : '使用会话列表中的加号新建私聊或群组。'
@@ -159,20 +153,14 @@ function TeamConversations({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button
-            unstyled
-            type="button"
-            ref={tagOpener}
-            className="icon-btn room-filter-toggle"
-            aria-label="会话筛选"
-            aria-expanded={shouldShowFilters}
-            onClick={() => {
-              if (tagId) setTagId('')
-              setFiltersOpen(!shouldShowFilters)
-            }}
-          >
-            <ConversationIcon name="more" />
-          </Button>
+          <ConversationFilter
+            teamId={teamId}
+            value={tagId}
+            readOnly={readOnly}
+            triggerRef={tagOpener}
+            onApply={setTagId}
+            onManageTags={() => setTagDialogOpen(true)}
+          />
           {listOpen && (
             <Button
               ref={listCloseRef}
@@ -202,33 +190,6 @@ function TeamConversations({
           待你处理
           {inbox.isSuccess && <span className="counter">{inbox.data.data.count}</span>}
         </Button>
-        {shouldShowFilters && (
-          <div className="row flex-wrap">
-            <Select aria-label="按工作标签筛选" value={activeTag} onChange={(event) => setTagId(event.target.value)}>
-              <option value="">全部标签</option>
-              {tagItems.map(({ id, name }) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-            {!readOnly && (
-              <Button type="button" variant="ghost" onClick={() => setTagDialogOpen(true)}>
-                管理标签
-              </Button>
-            )}
-            {tags.hasNextPage && (
-              <Button type="button" variant="ghost" onClick={() => void tags.fetchNextPage()}>
-                更多标签
-              </Button>
-            )}
-            {tags.isError && (
-              <Button type="button" variant="ghost" onClick={() => void tags.refetch()}>
-                重试加载标签
-              </Button>
-            )}
-          </div>
-        )}
         {list.isPending && <DelayedPageSkeleton />}
         {list.isError && !showListErrorInMain && (
           <div className="row flex-wrap small muted" role="status">
@@ -245,7 +206,24 @@ function TeamConversations({
           </div>
         )}
         {hasNoConversations && <EmptyState mascot="orbit" title="暂无会话" className="conversation-list-empty" />}
-        {list.isSuccess && rooms.length === 0 && !hasNoConversations && <p className="small muted">没有匹配的会话</p>}
+        {list.isSuccess && rooms.length === 0 && !hasNoConversations && (
+          <div className="row flex-wrap small muted" role="status">
+            没有匹配的会话
+            {tagId && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setTagId('')
+                  tagOpener.current?.focus()
+                }}
+              >
+                清除筛选
+              </Button>
+            )}
+          </div>
+        )}
         {rooms.map((room) => (
           <Button
             key={room.id}

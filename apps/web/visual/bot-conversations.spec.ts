@@ -358,8 +358,14 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await page.locator('.conversation-item').filter({ hasText: room.name }).press('Enter')
   await expect(composer).toHaveValue('尚未发送的草稿')
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '打开会话列表' }).press('Enter')
-  await page.getByRole('button', { name: '会话筛选' }).press('Enter')
-  await page.getByRole('combobox', { name: '按工作标签筛选' }).selectOption(tagId)
+  const filterTrigger = page.getByRole('button', { name: '会话筛选' })
+  // 筛选入口只放漏斗图标，不再占用文字宽度。
+  await expect(filterTrigger).toHaveText('')
+  await filterTrigger.press('Enter')
+  const filterPanel = page.getByRole('dialog', { name: '会话筛选' })
+  await filterPanel.getByRole('combobox', { name: '工作标签' }).selectOption(tagId)
+  await filterPanel.getByRole('button', { name: '应用筛选' }).press('Enter')
+  await expect(page.getByRole('button', { name: '会话筛选，已应用 1 个条件' })).toBeVisible()
   await expect(page.getByText('没有匹配的会话')).toBeVisible()
 
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: '收起会话列表' }).press('Enter')
