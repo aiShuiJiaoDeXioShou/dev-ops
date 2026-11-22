@@ -132,7 +132,7 @@ pg18_bin="$(brew --prefix postgresql@18)/bin"
 
 使用远程 PostgreSQL 18 时，由管理员按同样的角色和扩展要求初始化，并按数据库服务要求启用 TLS。已有部署升级时，先备份，再执行迁移。权限和迁移流程见[数据库说明](docs/architecture/database.md#部署边界)。
 
-在 `apps/server/.env.database` 配置迁移账号的 `MIGRATION_DATABASE_URL`。参照[后端环境变量表](apps/server/README.md#环境变量)配置 `apps/server/.env`，供三个常驻进程使用。限制配置文件的读取权限。
+手动部署时，在 `apps/server/.env.database` 配置迁移账号的 `MIGRATION_DATABASE_URL`，并参照[后端环境变量表](apps/server/README.md#环境变量)配置 `apps/server/.env`，供三个常驻进程使用。使用 `deploy-macmini` 自举发布时，将应用配置保存在部署目录的 `shared/app.env`，供 launchd 启动应用时读取。迁移脚本读取 `shared/migration.env`。限制配置文件的读取权限，邮件相关设置见[生产邮件配置](deploy/native/README.md#生产邮件配置)。
 
 - 设置 `NODE_ENV=production`、`HOST=127.0.0.1` 和 API 端口。`APP_ORIGIN` 填用户实际访问的 HTTPS 源。
 - `DATABASE_URL` 使用 `dev_ops_app` 的连接地址。设置持久的 `AUTH_SECRET` 和 `GIT_CREDENTIAL_ENCRYPTION_KEY`，以便重启后继续验证会话和解密已有凭据。

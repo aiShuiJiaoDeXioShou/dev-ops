@@ -14,3 +14,15 @@
 从项目「流水线」手动触发 [`deploy-macmini`](../../.devops/workflows/deploy-macmini.yml)，选择 `main`。只有团队管理员能触发原生发布。节点只支持一次执行一个发布。脚本从固定仓库检出提交，在 macOS 构建，运行数据库迁移，将 `current` 切换到新版本，再重启 API 和两个 Worker。
 
 运行成功以 API 就绪和登录页可访问为准。发布脚本遇到启动或就绪失败时恢复上一版本的应用目录。数据库迁移不会自动回退。Agent 独立守护，发布时保留当前运行及其日志上报，下一次启动时加载 `current` 中的 Agent 产物。
+
+## 生产邮件配置
+
+生产环境通过已验证的 Resend 发件域名 `mail.hehui666.top` 发送团队邀请和密码重置邮件。将 `SMTP_URL` 和 `MAIL_FROM` 写在 Mac mini 部署目录的 `shared/app.env`，文件权限设为 `0600`。当前使用 `smtp.resend.com:465` 的 SMTPS 服务，`MAIL_FROM` 填纯邮箱地址 `noreply@mail.hehui666.top`。SMTP 凭据保存在宿主机的共享配置文件中。
+
+`deploy-macmini` 把新版本构建到 `releases/<提交 SHA>`，切换 `current` 后重启应用。launchd 通过 `--env-file` 读取发布目录外的 `shared/app.env`，因此正常发布和应用版本回滚均保留发件地址及 SMTP 配置。
+
+手动修改发件配置后，以部署用户重启 HTTP API，再检查 `/api/v1/ready`。
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.apple-macmini.devops.http"
+```
