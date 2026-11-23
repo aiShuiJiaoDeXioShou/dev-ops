@@ -385,8 +385,11 @@ function parseSteps(value: unknown, jobPath: string, issues: WorkflowIssue[]): W
         if (withValues['fetch-depth'] !== undefined && withValues['fetch-depth'] !== '1') {
           addIssue(issues, 'WORKFLOW_UNSUPPORTED', 'P1 只支持 fetch-depth: 1', `${path}.with.fetch-depth`)
         }
+        if (withValues.submodules !== undefined && !['true', 'false'].includes(withValues.submodules)) {
+          addIssue(issues, 'WORKFLOW_SCHEMA_ERROR', 'submodules 必须为 true 或 false', `${path}.with.submodules`)
+        }
         for (const key of Object.keys(withValues)) {
-          if (key !== 'fetch-depth')
+          if (key !== 'fetch-depth' && key !== 'submodules')
             addIssue(issues, 'WORKFLOW_UNSUPPORTED', `checkout 不支持参数：${key}`, `${path}.with.${key}`)
         }
         steps.push({
@@ -596,14 +599,21 @@ function parseJobs(value: unknown, issues: WorkflowIssue[]): WorkflowJobDefiniti
     const runsOn = raw['runs-on'].trim()
     const steps = parseSteps(raw.steps, path, issues)
     const hasNative = steps.some((step) => step.kind === 'builtin_deploy_native')
-    if (runsOn === 'macmini-deploy' || hasNative) {
-      if (runsOn !== 'macmini-deploy' || steps.length !== 1 || !hasNative || needs.length || ids.size !== 1) {
-        addIssue(
-          issues,
-          'WORKFLOW_UNSUPPORTED',
-          '原生发布工作流只支持一个 macmini-deploy 作业和一个 builtin:deploy-native 步骤',
-          path,
-        )
+    if (hasNative && (runsOn !== 'macmini-deploy' || steps.length !== 1 || needs.length || ids.size !== 1)) {
+      addIssue(issues, 'WORKFLOW_UNSUPPORTED', '旧版原生发布动作必须独占一个 macmini-deploy 作业', path)
+    }
+    if (runsOn === 'macmini-deploy' && !hasNative) {
+      const checkout = steps[0]
+      if (
+        ids.size !== 1 ||
+        needs.length ||
+        checkout?.kind !== 'builtin_checkout' ||
+        checkout.if !== undefined ||
+        checkout.continueOnError ||
+        !steps.some((step) => step.kind === 'run') ||
+        steps.slice(1).some((step) => step.kind !== 'run' && step.kind !== 'builtin_upload_artifact')
+      ) {
+        addIssue(issues, 'WORKFLOW_UNSUPPORTED', '原生作业先无条件检出代码，再执行 run 或上传产物步骤', path)
       }
     }
     jobs.push({

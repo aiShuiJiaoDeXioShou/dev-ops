@@ -246,3 +246,34 @@ jobs:
     false,
   )
 })
+
+test('原生作业接受检出子模块与 run，要求先无条件检出代码', () => {
+  const path = '.devops/workflows/deploy-macmini.yml'
+  const content = `
+name: macmini
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: macmini-deploy
+    steps:
+      - uses: builtin:checkout
+        with:
+          submodules: true
+      - run: bash .devops/scripts/release-main.sh
+`
+  const parsed = parseWorkflowFile({ path, content })
+  assert.equal(parsed.ok, true)
+  if (parsed.ok) {
+    assert.deepEqual(
+      parsed.workflow.jobs[0]?.steps.map((step) => step.kind),
+      ['builtin_checkout', 'run'],
+    )
+    assert.equal(parsed.workflow.jobs[0]?.steps[0]?.with.submodules, 'true')
+  }
+  assert.equal(parseWorkflowFile({ path, content: content.replace('submodules: true', 'submodules: other') }).ok, false)
+  assert.equal(
+    parseWorkflowFile({ path, content: content.replace('        with:', "        if: 'false'\n        with:") }).ok,
+    false,
+  )
+})

@@ -1,5 +1,5 @@
-import { writeFile } from 'node:fs/promises'
-import { join, posix } from 'node:path'
+import { realpath, writeFile } from 'node:fs/promises'
+import { isAbsolute, join, posix, relative, resolve } from 'node:path'
 
 import type {
   AgentStepStatusRequest,
@@ -13,7 +13,9 @@ import { ArtifactError, packArtifact, removePackedArtifact, validateArtifactName
 import { AsyncAbortError, AsyncTimeoutError, withDeadline } from './async.ts'
 import { CONTAINER_WORKSPACE_DIR } from './docker.ts'
 import type { DockerRuntime, JobContainer } from './docker.ts'
+import type { AgentConfig } from './config.ts'
 import { describeError, isLeaseLostError } from './errors.ts'
+import { executeHostCommand } from './host-command.ts'
 import type { LogCollector } from './logs.ts'
 import type { AgentLogger } from './logger.ts'
 import type { SecretMasker } from './masking.ts'
@@ -65,11 +67,10 @@ export interface RunReportSink {
   uploadArtifact(input: ArtifactUploadRequest): Promise<void>
 }
 
-export interface ExecuteRunPlanOptions {
+interface RunExecutionOptions {
   plan: RunPlan
   /** Agent 工作根目录；执行器在其中创建本次运行的隔离工作区。 */
   workDir: string
-  docker: DockerRuntime
   sink: RunReportSink
   collector: LogCollector
   masker: SecretMasker
@@ -82,6 +83,12 @@ export interface ExecuteRunPlanOptions {
   /** 工作区创建函数；缺省使用真实实现，测试可替换以验证超时分类。 */
   createWorkspace?: (options: RunWorkspaceOptions) => Promise<RunWorkspace>
 }
+
+type NativeConfig = NonNullable<AgentConfig['nativeDeployment']>
+
+/** 单次运行使用 Docker 容器或原生宿主，二者共用租约、日志及步骤状态。 */
+export type ExecuteRunPlanOptions = RunExecutionOptions &
+  ({ docker: DockerRuntime; native?: never } | { docker?: never; native: NativeConfig })
 
 /** 运行执行结果；status 只允许四种终态，不把失败/中断写成成功。 */
 export interface RunExecutionResult {
@@ -216,7 +223,8 @@ interface StepContext {
   plan: RunPlan
   job: RunPlanJob
   step: RunPlanStep
-  container: JobContainer
+  container?: JobContainer
+  native?: NativeConfig
   workspace: RunWorkspace
   sink: RunReportSink
   collector: LogCollector
@@ -235,13 +243,29 @@ async function executeCheckoutStep(context: StepContext): Promise<StepResult> {
   }
   if (context.stop.reason) return cancelledResult(null)
   if (remainingMs(context.deadlineAt) <= 0) return timeoutFailure('运行超过运行级超时')
+  const submodules = context.step.with?.submodules
+  if (submodules !== undefined && submodules !== 'true' && submodules !== 'false') {
+    return failure(context.step, 'UNSUPPORTED_STEP_OPTION', 'submodules 必须为 true 或 false')
+  }
   context.collector.append(context.step.index, `检出提交 ${context.plan.git.commitSha}\n`)
+  const checkoutTimeout = context.native
+    ? AbortSignal.timeout(
+        Math.max(1, Math.min(remainingMs(context.deadlineAt), (context.step.timeoutSeconds ?? Infinity) * 1000)),
+      )
+    : undefined
   try {
-    await context.workspace.ensureCheckout(context.plan.git, remainingMs(context.deadlineAt))
+    await context.workspace.ensureCheckout(context.plan.git, remainingMs(context.deadlineAt), {
+      submodules: submodules === 'true',
+      scoped: !!context.native,
+      proxy: context.native?.gitProxy,
+      signal: checkoutTimeout ? AbortSignal.any([checkoutTimeout, context.stop.signal]) : undefined,
+    })
   } catch (error) {
     if (context.stop.reason) return cancelledResult(null)
     // 运行截止或检出等待被超时中断时属于运行级超时，不能误报成 Git 失败。
     if (isDeadlineExceeded(context.deadlineAt, error)) return timeoutFailure('运行超过运行级超时，代码检出被中断')
+    if (checkoutTimeout?.aborted)
+      return { ...failure(context.step, 'STEP_TIMEOUT', '代码检出超过步骤级超时'), canContinue: false }
     return failure(context.step, 'GIT_CHECKOUT_FAILED', truncateMessage(context.masker, describeError(error)))
   }
   if (isDeadlineExceeded(context.deadlineAt)) return timeoutFailure('运行超过运行级超时，代码检出完成后无剩余时间')
@@ -502,7 +526,18 @@ async function executeArtifactStep(context: StepContext): Promise<StepResult> {
   return { status: 'succeeded', exitCode: null, errorCode: null, errorMessage: null, canContinue: true }
 }
 
-/** 执行 run 步骤：在容器内以 sh -c 执行平台固定命令。 */
+async function resolveHostWorkingDirectory(workspace: string, workingDirectory = '.'): Promise<string> {
+  if (isAbsolute(workingDirectory)) throw new StepOptionError('INVALID_WORKING_DIRECTORY', '步骤工作目录不能是绝对路径')
+  const root = await realpath(workspace)
+  const target = await realpath(resolve(root, workingDirectory))
+  const path = relative(root, target)
+  if (path === '..' || path.startsWith('../') || isAbsolute(path)) {
+    throw new StepOptionError('INVALID_WORKING_DIRECTORY', '步骤工作目录不能逃逸工作区')
+  }
+  return target
+}
+
+/** 执行 run 步骤：在容器或宿主工作区执行平台固定命令。 */
 async function executeCommandStep(context: StepContext): Promise<StepResult> {
   const script = context.step.run
   if (!script) return failure(context.step, 'INVALID_STEP_OPTION', 'run 步骤缺少命令')
@@ -512,7 +547,9 @@ async function executeCommandStep(context: StepContext): Promise<StepResult> {
   let workingDirectory: string
   let env: Record<string, string>
   try {
-    workingDirectory = resolveContainerWorkingDirectory(context.step.workingDirectory)
+    workingDirectory = context.native
+      ? await resolveHostWorkingDirectory(context.workspace.checkoutDir, context.step.workingDirectory)
+      : resolveContainerWorkingDirectory(context.step.workingDirectory)
     env = mergeEnvironment(context.plan, context.job, context.step)
   } catch (error) {
     if (error instanceof StepOptionError) return failure(context.step, error.code, error.message)
@@ -523,14 +560,35 @@ async function executeCommandStep(context: StepContext): Promise<StepResult> {
   context.collector.append(context.step.index, `开始步骤：${context.step.name}\n`)
   let result
   try {
-    result = await context.container.exec({
+    const command = {
       script,
       env,
       workingDirectory,
       timeoutMs,
       signal: context.stop.signal,
       onOutput: (text: string) => context.collector.append(context.step.index, text),
-    })
+    }
+    if (context.native) {
+      if (context.workspace.checkedOutCommit !== context.plan.commitSha) {
+        return failure(context.step, 'GIT_CHECKOUT_FAILED', '原生步骤要求先检出固定提交')
+      }
+      result = await executeHostCommand({
+        ...command,
+        args: ['--noprofile', '--norc', '-eo', 'pipefail', '-c', script],
+        cwd: workingDirectory,
+        env: {
+          HOME: process.env.HOME,
+          PATH: process.env.PATH,
+          ...env,
+          DEVOPS_DEPLOY_ROOT: context.native.deployRoot,
+          DEVOPS_DEPLOY_GIT_PROXY: context.native.gitProxy,
+          DEVOPS_DEPLOY_REPOSITORY: context.native.repository,
+        },
+      })
+    } else {
+      if (!context.container) throw new Error('任务容器不可用')
+      result = await context.container.exec(command)
+    }
   } catch (error) {
     if (context.stop.reason) return cancelledResult(null)
     return failure(context.step, 'COMMAND_START_FAILED', truncateMessage(context.masker, describeError(error)))
@@ -542,7 +600,7 @@ async function executeCommandStep(context: StepContext): Promise<StepResult> {
       status: 'failed',
       exitCode: null,
       errorCode: runTimedOut ? 'RUN_TIMEOUT' : 'STEP_TIMEOUT',
-      errorMessage: runTimedOut ? '运行超过运行级超时，容器已终止' : '步骤超过步骤级超时，容器已终止',
+      errorMessage: runTimedOut ? '运行超过运行级超时，命令已终止' : '步骤超过步骤级超时，命令已终止',
       canContinue: false,
     }
   }
@@ -613,12 +671,12 @@ async function reportSkippedSteps(
 }
 
 /**
- * 在隔离工作区与单容器内串行执行平台固定的运行计划。
- * @param options 运行计划、Docker 运行时、上报接口、日志收集器、停止信号与大小上限。
+ * 在独立工作区内串行执行平台固定的运行计划。
+ * @param options 运行计划、执行环境、上报接口、日志收集器、停止信号与大小上限。
  * @returns 终态结果与清理失败清单；清理失败不改变步骤事实，但必须随完成上报。
  * @remarks
- * - 运行级超时优先于步骤级超时；超时或取消都会终止当前容器。
- * - 步骤超时会终止容器，因此即使 continue-on-error 为真也不再执行同一 job 的后续步骤。
+ * - 运行级超时优先于步骤级超时；超时或取消会停止当前命令。
+ * - 步骤超时后不再执行同一 job 的后续步骤。
  * - 无论成功、失败、取消还是异常，finally 都会删除容器与工作区并 flush 日志。
  */
 export async function executeRunPlan(options: ExecuteRunPlanOptions): Promise<RunExecutionResult> {
@@ -647,18 +705,21 @@ export async function executeRunPlan(options: ExecuteRunPlanOptions): Promise<Ru
         result = { status: stop.reason, cleanupFailures }
         break
       }
-      const jobContainer = await withDeadline(
-        options.docker.ensureImage(job.image).then(() =>
-          options.docker.createJobContainer({
-            image: job.image,
-            runId: plan.runId,
-            jobId: job.id,
-            workspaceDir: runWorkspace.checkoutDir,
-          }),
-        ),
-        { timeoutMs: Math.max(1, remainingMs(deadlineAt)), signal: stop.signal, label: '准备任务容器' },
-      )
-      container = jobContainer
+      const docker = options.docker
+      container = docker
+        ? await withDeadline(
+            docker.ensureImage(job.image).then(() =>
+              docker.createJobContainer({
+                image: job.image,
+                runId: plan.runId,
+                jobId: job.id,
+                workspaceDir: runWorkspace.checkoutDir,
+              }),
+            ),
+            { timeoutMs: Math.max(1, remainingMs(deadlineAt)), signal: stop.signal, label: '准备任务容器' },
+          )
+        : undefined
+      const jobDeadlineAt = options.native ? Math.min(deadlineAt, Date.now() + job.timeoutSeconds * 1000) : deadlineAt
       let jobFinished = false
       for (const step of job.steps) {
         if (stop.reason) {
@@ -666,7 +727,7 @@ export async function executeRunPlan(options: ExecuteRunPlanOptions): Promise<Ru
           jobFinished = true
           break
         }
-        const stepRemaining = remainingMs(deadlineAt)
+        const stepRemaining = remainingMs(jobDeadlineAt)
         if (stepRemaining <= 0) {
           const timeoutResult = timeoutFailure('运行超过运行级超时')
           reported.set(step.index, 'failed')
@@ -686,19 +747,20 @@ export async function executeRunPlan(options: ExecuteRunPlanOptions): Promise<Ru
           plan,
           job,
           step,
-          container: jobContainer,
+          container,
+          native: options.native,
           workspace: runWorkspace,
           sink,
           collector,
           masker,
           logger,
           stop,
-          deadlineAt,
+          deadlineAt: jobDeadlineAt,
           artifactMaxBytes: options.artifactMaxBytes,
         })
         // 运行级超时优先：即使步骤本身成功返回，超过运行截止也按 RUN_TIMEOUT 收口。
         const stepResult =
-          executed.status === 'succeeded' && isDeadlineExceeded(deadlineAt)
+          executed.status === 'succeeded' && isDeadlineExceeded(jobDeadlineAt)
             ? timeoutFailure('运行超过运行级超时')
             : executed
         reported.set(step.index, stepResult.status)

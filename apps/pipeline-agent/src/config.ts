@@ -39,8 +39,14 @@ export interface AgentConfig {
   containerUser?: string
   /** Docker Engine socket 地址；缺省使用 dockerode 默认值。 */
   dockerSocketPath?: string
-  /** 原生发布宿主脚本及唯一允许发布的 Git URL，通过部署配置提供。 */
-  nativeDeployment?: { script: string; repository: string; workflow: string }
+  /** 原生节点的仓库与工作流白名单，旧版工作流可选用已安装的宿主脚本。 */
+  nativeDeployment?: {
+    script?: string
+    repository: string
+    workflow: string
+    deployRoot?: string
+    gitProxy?: string
+  }
 }
 
 function required(value: string | undefined, name: string): string {
@@ -117,14 +123,15 @@ export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env): AgentConf
   }
   const nativeScript = env.AGENT_NATIVE_DEPLOY_SCRIPT?.trim()
   let nativeDeployment: AgentConfig['nativeDeployment']
-  if (nativeScript) {
-    if (!nativeScript.startsWith('/') || process.platform !== 'darwin') {
-      throw new Error('原生发布需要 macOS 与绝对路径的宿主脚本')
-    }
+  if (nativeScript || env.AGENT_NATIVE_DEPLOY_REPOSITORY?.trim()) {
+    if (process.platform !== 'darwin') throw new Error('原生发布需要 macOS')
+    if (nativeScript && !nativeScript.startsWith('/')) throw new Error('旧版原生发布脚本必须使用绝对路径')
     nativeDeployment = {
-      script: nativeScript,
+      ...(nativeScript ? { script: nativeScript } : {}),
       repository: required(env.AGENT_NATIVE_DEPLOY_REPOSITORY, 'AGENT_NATIVE_DEPLOY_REPOSITORY'),
       workflow: required(env.AGENT_NATIVE_DEPLOY_WORKFLOW, 'AGENT_NATIVE_DEPLOY_WORKFLOW'),
+      deployRoot: env.DEVOPS_DEPLOY_ROOT?.trim() || undefined,
+      gitProxy: env.DEVOPS_DEPLOY_GIT_PROXY?.trim() || undefined,
     }
   }
   const labels = (env.AGENT_LABELS ?? (nativeDeployment ? 'macmini-deploy' : 'linux,docker,node24'))
@@ -136,7 +143,7 @@ export function loadAgentConfig(env: NodeJS.ProcessEnv = process.env): AgentConf
     throw new Error('原生发布节点只接受 macmini-deploy 能力标签')
   }
   if (!nativeDeployment && labels.includes('macmini-deploy')) {
-    throw new Error('macmini-deploy 标签需要配置原生发布脚本')
+    throw new Error('macmini-deploy 标签需要配置原生发布的仓库和工作流')
   }
   const nodeName = env.AGENT_NAME?.trim() || hostname()
   if (nodeName.length > 120) throw new Error('AGENT_NAME 不能超过 120 个字符')

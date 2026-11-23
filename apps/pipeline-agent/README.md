@@ -78,6 +78,6 @@ pnpm --dir apps/pipeline-agent build
 
 ## macOS 原生发布节点
 
-设置 `AGENT_NATIVE_DEPLOY_SCRIPT`、`AGENT_NATIVE_DEPLOY_REPOSITORY`、`AGENT_NATIVE_DEPLOY_WORKFLOW` 和 `AGENT_LABELS=macmini-deploy`。宿主脚本、仓库和工作流路径由节点管理员配置。此模式不初始化 Docker，只接收 `macmini-deploy` 计划，并将固定提交作为唯一参数传给宿主脚本。
+设置 `AGENT_NATIVE_DEPLOY_REPOSITORY`、`AGENT_NATIVE_DEPLOY_WORKFLOW` 和 `AGENT_LABELS=macmini-deploy`。原生模式在 macOS 上领取指定仓库与工作流的 `main` 运行，在独立目录检出固定提交，用 Bash 执行 `run`，并沿用步骤超时、日志、取消和产物功能。
 
-每次原生发布运行包含一个 `builtin:deploy-native` 步骤。默认的 Linux 节点继续运行容器工作流。安装、启动和发布说明见 [Mac mini 原生发布](../../deploy/native/README.md)。
+旧工作流的 `builtin:deploy-native` 仍可通过 `AGENT_NATIVE_DEPLOY_SCRIPT` 调用已安装的宿主脚本，便于先升级平台与 Agent。默认的 Linux 节点继续运行容器工作流。安装、启动和发布说明见 [Mac mini 原生发布](../../deploy/native/README.md)。

@@ -49,7 +49,7 @@ export interface RunWorkspaceOptions {
 export interface RunWorkspace {
   /** 运行工作区根目录（run 级）。 */
   readonly rootDir: string
-  /** Git 检出的仓库目录，挂载进任务容器。 */
+  /** Git 检出的仓库目录，供任务容器或原生执行使用。 */
   readonly checkoutDir: string
   /** 产物打包临时目录，随运行一起清理。 */
   readonly tempDir: string
@@ -59,9 +59,10 @@ export interface RunWorkspace {
    * 确保仓库检出到租约固定提交；同一提交重复调用不重复执行 git。
    * @param git 平台签发的短期 Git 凭据与固定提交。
    * @param timeoutMs 可选的本次操作超时；运行级超时剩余时间不足时由执行器传入。
+   * @param options 是否检出子模块、限定 Git 认证范围及中止信号。
    * @throws 凭据过期、远端不可达、提交不存在或 HEAD 校验失败时抛出，错误信息已脱敏。
    */
-  ensureCheckout(git: RunPlanGit, timeoutMs?: number): Promise<void>
+  ensureCheckout(git: RunPlanGit, timeoutMs?: number, options?: CheckoutOptions): Promise<void>
   /**
    * 校验并应用统一差异补丁。
    * @param patch 补丁正文。
@@ -95,6 +96,14 @@ export interface RunWorkspace {
    * @throws 删除失败时抛出，调用方需要把清理失败上报平台。
    */
   remove(): Promise<void>
+}
+
+/** 检出步骤的附加参数，代理只应用于主仓库所在的源。 */
+interface CheckoutOptions {
+  submodules?: boolean
+  scoped?: boolean
+  proxy?: string
+  signal?: AbortSignal
 }
 
 /** 运行标识只能包含安全字符，避免拼接出工作区外的路径。 */
@@ -131,6 +140,7 @@ function errorDetail(error: unknown, masker: SecretMasker): string {
  * @param username 平台签发的短期 Git 用户名。
  * @param password 平台签发的短期 Git 密码；仅通过临时 http.extraHeader 注入。
  * @param sourceEnv 环境变量来源，默认进程环境；测试可注入。
+ * @param scope 可选的远端和代理；限定认证头与代理的来源，并禁止 HTTP 重定向。
  * @returns 仅包含 PATH、隔离 HOME、Git 安全配置、凭据头与代理变量的环境。
  */
 export function buildGitProcessEnv(
@@ -138,6 +148,7 @@ export function buildGitProcessEnv(
   username: string,
   password: string,
   sourceEnv: NodeJS.ProcessEnv = process.env,
+  scope?: { remoteUrl: string; proxy?: string },
 ): NodeJS.ProcessEnv {
   const basic = Buffer.from(`${username}:${password}`, 'utf8').toString('base64')
   const env: NodeJS.ProcessEnv = {
@@ -157,6 +168,21 @@ export function buildGitProcessEnv(
     const value = sourceEnv[key]
     if (value !== undefined && value !== '') env[key] = value
   }
+  if (scope) {
+    const { origin } = new URL(scope.remoteUrl)
+    if (origin === 'null') {
+      env.GIT_CONFIG_VALUE_0 = ''
+    } else {
+      env.GIT_CONFIG_KEY_0 = `http.${origin}/.extraHeader`
+      env.GIT_CONFIG_COUNT = scope.proxy ? '4' : '3'
+      env.GIT_CONFIG_KEY_2 = 'http.followRedirects'
+      env.GIT_CONFIG_VALUE_2 = 'false'
+      if (scope.proxy) {
+        env.GIT_CONFIG_KEY_3 = `http.${origin}/.proxy`
+        env.GIT_CONFIG_VALUE_3 = scope.proxy
+      }
+    }
+  }
   return env
 }
 
@@ -175,13 +201,19 @@ export async function createRunWorkspace(options: RunWorkspaceOptions): Promise<
   await mkdir(checkoutDir, { recursive: true })
   await mkdir(tempDir, { recursive: true })
   let checkedOutCommit: string | undefined
+  let checkedOutSubmodules = false
 
   /** 构造最小 git 环境：凭据只经进程环境传入，不写入命令行与仓库配置。 */
   function gitEnv(username: string, password: string): NodeJS.ProcessEnv {
     return buildGitProcessEnv(rootDir, username, password)
   }
 
-  async function runGit(args: readonly string[], env: NodeJS.ProcessEnv, timeoutMs: number): Promise<string> {
+  async function runGit(
+    args: readonly string[],
+    env: NodeJS.ProcessEnv,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<string> {
     try {
       const { stdout } = await execFileAsync('git', [...args], {
         cwd: checkoutDir,
@@ -189,6 +221,7 @@ export async function createRunWorkspace(options: RunWorkspaceOptions): Promise<
         timeout: timeoutMs,
         maxBuffer: GIT_MAX_BUFFER_BYTES,
         windowsHide: true,
+        signal,
       })
       return stdout
     } catch (error) {
@@ -196,36 +229,53 @@ export async function createRunWorkspace(options: RunWorkspaceOptions): Promise<
     }
   }
 
-  async function fetchCommit(git: RunPlanGit, env: NodeJS.ProcessEnv, timeoutMs: number): Promise<void> {
+  async function fetchCommit(
+    git: RunPlanGit,
+    env: NodeJS.ProcessEnv,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
     options.masker.addSecrets([git.password])
     try {
       // 优先只拉取固定提交的浅历史；远端不允许按 SHA 拉取时退回完整拉取再校验。
-      await runGit(['fetch', '-q', '--depth=1', 'origin', git.commitSha], env, timeoutMs)
+      await runGit(['fetch', '-q', '--depth=1', 'origin', git.commitSha], env, timeoutMs, signal)
     } catch (depthError) {
+      if (signal?.aborted) throw depthError
       options.logger.warn(`按提交浅拉取失败，回退完整拉取：${errorDetail(depthError, options.masker)}`)
-      await runGit(['fetch', '-q', 'origin'], env, timeoutMs)
+      await runGit(['fetch', '-q', 'origin'], env, timeoutMs, signal)
     }
   }
 
-  async function checkout(git: RunPlanGit, timeoutMs?: number): Promise<void> {
-    if (checkedOutCommit === git.commitSha) return
+  async function checkout(git: RunPlanGit, timeoutMs?: number, checkoutOptions: CheckoutOptions = {}): Promise<void> {
+    const { submodules, scoped, proxy, signal } = checkoutOptions
+    if (checkedOutCommit === git.commitSha && (!submodules || checkedOutSubmodules)) return
     const remoteUrl = validateRemoteUrl(git.remoteUrl)
     if (Date.parse(git.expiresAt) <= Date.now()) throw new Error('Git 短期凭据已过期，无法检出代码')
     await mkdir(join(rootDir, 'home'), { recursive: true })
-    const env = gitEnv(git.username, git.password)
+    const env = buildGitProcessEnv(
+      rootDir,
+      git.username,
+      git.password,
+      process.env,
+      scoped || submodules ? { remoteUrl, proxy } : undefined,
+    )
     const perCallTimeoutMs = Math.max(1_000, Math.min(gitTimeoutMs, timeoutMs ?? gitTimeoutMs))
     const insideGit = await hasGitDirectory(checkoutDir)
     if (!insideGit) {
-      await runGit(['init', '-q'], env, perCallTimeoutMs)
-      await runGit(['remote', 'add', 'origin', remoteUrl], env, perCallTimeoutMs)
+      await runGit(['init', '-q'], env, perCallTimeoutMs, signal)
+      await runGit(['remote', 'add', 'origin', remoteUrl], env, perCallTimeoutMs, signal)
     }
-    await fetchCommit(git, env, perCallTimeoutMs)
-    await runGit(['checkout', '-q', '--detach', git.commitSha], env, perCallTimeoutMs)
-    const head = (await runGit(['rev-parse', 'HEAD'], env, perCallTimeoutMs)).trim()
+    await fetchCommit(git, env, perCallTimeoutMs, signal)
+    await runGit(['checkout', '-q', '--detach', git.commitSha], env, perCallTimeoutMs, signal)
+    const head = (await runGit(['rev-parse', 'HEAD'], env, perCallTimeoutMs, signal)).trim()
     if (!head.startsWith(git.commitSha) && !git.commitSha.startsWith(head)) {
       throw new Error('Git 检出的提交与运行计划固定的提交不一致')
     }
+    if (submodules) {
+      await runGit(['submodule', 'update', '--init', '--recursive'], env, perCallTimeoutMs, signal)
+    }
     checkedOutCommit = head
+    checkedOutSubmodules = submodules === true
     options.logger.info(`已检出提交 ${head.slice(0, 12)}`)
   }
 

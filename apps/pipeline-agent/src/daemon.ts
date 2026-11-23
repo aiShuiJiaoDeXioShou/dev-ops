@@ -120,8 +120,8 @@ export async function runAgentDaemon(options: AgentDaemonOptions): Promise<void>
     await docker.ping()
     // 上次进程被强杀时任务容器会成为孤儿，启动时仅清理 Agent 管理的容器。
     await cleanupManagedContainers(docker, logger)
-    await cleanupStaleRunWorkspaces(config.workDir, logger)
   }
+  await cleanupStaleRunWorkspaces(config.workDir, logger)
   const session = await client.ensureRegistered()
   logger.info(`节点 ${config.nodeName} 已启动：agent ${AGENT_VERSION}，标签 ${config.labels.join(',')}`)
 
@@ -258,27 +258,19 @@ export async function runAgentDaemon(options: AgentDaemonOptions): Promise<void>
         }
       },
     }
-    if (!docker && config.nativeDeployment) {
-      return executeNativeDeployment({
-        plan: lease.run,
-        host: config.nativeDeployment,
-        sink,
-        collector,
-        stop: run.stop,
-      })
-    }
-    if (!docker) throw new Error('执行节点没有可用的运行时')
-    return executeRunPlan({
+    const execution = {
       plan: lease.run,
       workDir: config.workDir,
-      docker,
       sink,
       collector,
       masker,
       logger,
       stop: run.stop,
       artifactMaxBytes: config.artifactMaxBytes,
-    })
+    }
+    if (config.nativeDeployment) return executeNativeDeployment({ ...execution, host: config.nativeDeployment })
+    if (!docker) throw new Error('执行节点没有可用的运行时')
+    return executeRunPlan({ ...execution, docker })
   }
 
   async function executeLease(lease: PipelineLease): Promise<void> {
