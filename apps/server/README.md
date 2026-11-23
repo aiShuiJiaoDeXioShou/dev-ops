@@ -343,6 +343,13 @@ Bot 默认启用 pi 的全部本地工具，`accessMode` 默认 `sandbox`。`BOT
 
 成功回复的消息体包含 `metrics`（真实 Token、缓存用量、费用、轮次和耗时）；旧消息可不包含。`POST /api/v1/bot-conversations/:conversationId/messages/:messageId/feedback` 接收 `{ rating: "helpful" | "unhelpful" | null }`，仅允许有写权限的当前会话成员评价 Bot 回复；`null` 取消评价。消息读取返回当前用户的 `feedback`，不同用户的评价相互隔离。两个新增接口都使用 HTTP 200 和统一业务响应信封。
 
+### 会话附件
+
+- `POST /api/v1/bot-conversations/:conversationId/attachments` 允许会话内有写权限的成员使用 `application/octet-stream` 暂存文件，需设置 `X-File-Name`（URI 编码）、`Content-Length`，可选 `X-File-Type`。沿用平台附件策略与临时清理周期。
+- `POST /api/v1/bot-conversations/:conversationId/messages` 可传入有序的 `attachmentIds`。允许仅发附件。服务端在同一事务中校验并绑定当前成员在该会话上传的暂存文件，返回 `message.body.attachments` 摘要。
+- `GET /api/v1/bot-conversations/:conversationId/messages/:messageId/attachments/:attachmentId/download` 校验会话成员关系及消息引用。按附件下载例外返回原文件与 `X-Content-SHA256`，业务失败仍返回 HTTP 200 统一信封。未发送附件可由上传者使用原附件移除接口取消。
+- 智能体可按需读取 UTF-8 文本（前 48 KB）及 8 MB 以内的 JPEG、PNG、WebP、GIF 图片。其他格式仍可随消息上传和下载。
+
 ## V0.6 Bot 会话存储
 
 Worker 使用 Pi 内存会话，按会话与 Bot 将脱敏条目、分支叶子和房间同步游标写入 PostgreSQL。新会话首次取最近 24 条房间消息。后续最多同步 50 条新消息，并排除本 Bot 自己的回复。默认运行超时为 1800 秒。

@@ -9,6 +9,7 @@ export type BotApiExclusion =
   | 'skills_management'
   | 'bot_management'
   | 'authentication'
+  | 'binary_transfer'
 
 type Rule = {
   category: BotApiExclusion
@@ -45,6 +46,11 @@ const rules: readonly Rule[] = [
   { category: 'bot_management', path: /^\/bot-tasks\/[^/]+\/(?:accept|request-changes|handoff)$/u },
   { category: 'bot_management', methods: ['POST'], path: /^\/bot-relays\/[^/]+\/(?:continue|end|stop)$/u },
   { category: 'bot_management', methods: ['POST'], path: /^\/teams\/[^/]+\/(?:bot-context|bot-budget)$/u },
+  // 会话附件使用原始流；模型读取需经过有独立大小限制的会话工具。
+  {
+    category: 'binary_transfer',
+    path: /^\/bot-conversations\/[^/]+\/(?:attachments|messages\/[^/]+\/attachments\/[^/]+\/download)$/u,
+  },
   { category: 'authentication', path: /^\/auth(?:\/|$)/u },
 ]
 

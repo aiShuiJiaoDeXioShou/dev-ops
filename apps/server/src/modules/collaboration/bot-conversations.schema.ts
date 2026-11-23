@@ -170,7 +170,8 @@ export const createDirectConversationBody = Type.Object(
 export const sendBotMessageBody = Type.Object(
   {
     clientRequestId: uuid,
-    text: Type.String({ minLength: 1, maxLength: 16000 }),
+    text: Type.String({ maxLength: 16000 }),
+    attachmentIds: Type.Optional(Type.Array(uuid, { maxItems: 50, uniqueItems: true })),
     mentionBotIds: Type.Optional(Type.Array(uuid, { maxItems: 100 })),
     mentionAll: Type.Optional(Type.Boolean()),
     promptTemplateId: Type.Optional(uuid),

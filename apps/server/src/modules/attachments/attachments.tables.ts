@@ -11,7 +11,8 @@ export const attachment = appSchema.table(
   {
     id: uuid('id').notNull(),
     team_id: uuid('team_id').notNull(),
-    project_id: uuid('project_id').notNull(),
+    project_id: uuid('project_id'),
+    conversation_id: uuid('conversation_id'),
     bucket_id: uuid('bucket_id').notNull(),
     storage_key: text('storage_key').notNull(),
     file_name: text('file_name').notNull(),
@@ -32,13 +33,15 @@ export const attachment = appSchema.table(
     unique('uk_attachment_storage_key').on(table.bucket_id, table.storage_key),
     check('ck_attachment_status', sql`${table.status} in ('temp', 'bound', 'removed')`),
     check('ck_attachment_size', sql`${table.size_bytes} > 0`),
+    check('ck_attachment_scope', sql`(${table.project_id} IS NOT NULL) <> (${table.conversation_id} IS NOT NULL)`),
     check(
       'ck_attachment_target',
       sql`(
     (${table.status} = 'temp' AND ${table.target_type} IS NULL AND ${table.target_id} IS NULL
       AND ${table.bound_at} IS NULL)
-    OR (${table.status} in ('bound', 'removed') AND ${table.target_type} in ('requirement', 'bug')
-      AND ${table.target_id} IS NOT NULL AND ${table.bound_at} IS NOT NULL)
+    OR (${table.status} in ('bound', 'removed') AND ((${table.project_id} IS NOT NULL AND ${table.target_type} in ('requirement', 'bug'))
+        OR (${table.conversation_id} IS NOT NULL AND ${table.target_type} = 'bot_message'))
+      AND ${table.target_type} IS NOT NULL AND ${table.target_id} IS NOT NULL AND ${table.bound_at} IS NOT NULL)
   )`,
     ),
     index('idx_attachment_target')
@@ -56,7 +59,7 @@ export const attachment = appSchema.table(
 )
 
 /** 附件目标类型；与契约取值保持一致。 */
-export type AttachmentTargetType = 'requirement' | 'bug'
+export type AttachmentTargetType = 'requirement' | 'bug' | 'bot_message'
 
 /** 附件状态；由服务端状态机维护。 */
 export type AttachmentStatus = 'temp' | 'bound' | 'removed'

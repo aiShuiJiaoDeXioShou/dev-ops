@@ -6,7 +6,7 @@ import { enqueueBotRun, requestBotRunStop, type BotRunTransaction } from '../bot
 import { requireRunnableBot } from '../bots/bots.service.ts'
 import { botApiCall, botRun } from '../bots/bots.tables.ts'
 import { redactChatContent } from '../bots/runtime/content.ts'
-import { lockWritableBotConversation, requireBotConversation } from '../collaboration/bot-conversations.service.ts'
+import { lockWritableBotConversation, requireBotConversation } from '../collaboration/bot-conversations.access.ts'
 import { botConversationMember, botEvent } from '../collaboration/bot-conversations.tables.ts'
 import { readTargetWorkTags } from '../collaboration/work-tags.repository.ts'
 import type { SessionUser } from '../identity/identity.session.ts'

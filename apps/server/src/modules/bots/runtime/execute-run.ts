@@ -13,6 +13,7 @@ import {
 import { resolve } from 'node:path'
 import type { Database } from '../../../platform/database/client.ts'
 import type { AppConfig } from '../../../platform/config/env.ts'
+import { createStorageService } from '../../storage/storage.service.ts'
 import type { SecretCipher } from '../../configuration/configuration.crypto.ts'
 import {
   finishBotRun,
@@ -26,6 +27,7 @@ import {
 import type { BotCallLog } from './api-invoker.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
+import { createConversationAttachmentTool } from './conversation-attachment-tool.ts'
 import { createCurrentContextTool } from './current-context-tool.ts'
 import { readBotMcpServers } from './mcp-configuration.ts'
 import { fetchBotMcp } from './mcp-fetch.ts'
@@ -150,6 +152,11 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         return tool.execute(args, toolSignal)
       },
     }))
+    const attachmentStorage = createStorageService({
+      db,
+      cipher: options.cipher,
+      config: { localDir: config.ATTACHMENT_STORAGE_DIR, probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS },
+    })
     const settings: CompactBotSessionOptions = {
       model: input.model,
       workspace: { directory, access: input.accessMode },
@@ -168,6 +175,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       },
       tools: [
         createCurrentContextTool(db, lease),
+        createConversationAttachmentTool(db, run, lease, attachmentStorage),
         ...tools,
         ...memoryTools(memory),
         createSkillViewTool(db, run, lease, input.skillVersions),

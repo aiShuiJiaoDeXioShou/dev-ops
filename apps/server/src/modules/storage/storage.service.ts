@@ -35,8 +35,14 @@ export interface StorageService {
   adapterFor(bucket: StorageBucketRow): StorageAdapter
   /** 按记录固化的桶标识构造适配器；桶缺失或停用时返回附件存储不可用业务错误。 */
   adapterForBucketId(bucketId: string): Promise<StorageAdapter>
-  /** 生成附件对象键：不包含用户文件名。 */
-  attachmentStorageKey(input: { teamId: string; projectId: string; attachmentId: string }): string
+  /**
+   * 生成只包含平台标识的附件对象键。
+   * @param input 上传目标项目或会话及附件标识。
+   * @returns 储存桶内的对象键；项目对象键保持与已有记录兼容。
+   */
+  attachmentStorageKey(
+    input: { teamId: string; attachmentId: string } & ({ projectId: string } | { conversationId: string }),
+  ): string
 }
 
 /**
@@ -141,7 +147,10 @@ export function createStorageService(options: StorageServiceOptions): StorageSer
     resolveDefaultBucket,
     adapterFor,
     adapterForBucketId,
-    attachmentStorageKey: ({ teamId, projectId, attachmentId }) => `attachments/${teamId}/${projectId}/${attachmentId}`,
+    attachmentStorageKey: (input) =>
+      'projectId' in input
+        ? `attachments/${input.teamId}/${input.projectId}/${input.attachmentId}`
+        : `conversation-attachments/${input.teamId}/${input.conversationId}/${input.attachmentId}`,
   }
 }
 

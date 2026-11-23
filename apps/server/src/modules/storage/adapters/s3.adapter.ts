@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { Readable, Transform, Writable } from 'node:stream'
+import { addAbortSignal, Readable, Transform, Writable } from 'node:stream'
 import { pipeline as pipelineAsync } from 'node:stream/promises'
 import {
   DeleteObjectCommand,
@@ -46,8 +46,13 @@ export interface S3PutObjectInput {
 export interface S3ObjectClient {
   /** 流式写入对象；必须携带内容长度，SDK 才能采用流式上传。 */
   putObject(input: S3PutObjectInput): Promise<void>
-  /** 读取对象流。 */
-  getObject(key: string): Promise<Readable>
+  /**
+   * 打开对象流，调用方需消费或关闭返回的流。
+   * @param key 桶内含前缀的对象键。
+   * @param signal 可选的取消或超时信号。
+   * @returns 响应对象流；打开失败时抛出错误。
+   */
+  getObject(key: string, signal?: AbortSignal): Promise<Readable>
   /** 删除对象；对象不存在时视为成功。 */
   removeObject(key: string): Promise<void>
 }
@@ -173,7 +178,7 @@ function describeFailure(kind: S3FailureKind): string {
 /**
  * 基于 @aws-sdk/client-s3 创建对象客户端。
  * @param options 接入配置与超时。
- * @returns 每次操作独立创建并销毁 S3Client，避免长连接与句柄泄漏。
+ * @returns 每次操作独立创建 S3Client，流式读取结束或失败时释放连接。
  */
 export function createDefaultS3ObjectClient(options: S3ObjectClientOptions): S3ObjectClient {
   async function withClient<T>(operation: (client: S3Client) => Promise<T>): Promise<T> {
@@ -198,13 +203,21 @@ export function createDefaultS3ObjectClient(options: S3ObjectClientOptions): S3O
         ),
       )
     },
-    async getObject(key) {
-      return withClient(async (client) => {
-        const response = await client.send(new GetObjectCommand({ Bucket: options.bucketName, Key: key }))
+    async getObject(key, signal) {
+      const client = new S3Client(buildS3ClientConfig(options))
+      try {
+        const response = await client.send(new GetObjectCommand({ Bucket: options.bucketName, Key: key }), {
+          abortSignal: signal,
+        })
         const body: unknown = response.Body
         if (!isReadable(body)) throw new Error('储存桶响应缺少可读对象流')
-        return body
-      })
+        // 对象响应头到达后仍需保持连接，直至调用方读完或关闭对象流。
+        body.once('close', () => client.destroy())
+        return signal ? addAbortSignal(signal, body) : body
+      } catch (error) {
+        client.destroy()
+        throw error
+      }
     },
     async removeObject(key) {
       await withClient((client) => client.send(new DeleteObjectCommand({ Bucket: options.bucketName, Key: key })))
@@ -352,8 +365,8 @@ export function createS3StorageAdapter(options: S3StorageAdapterOptions): Storag
       return { sizeBytes: written, sha256: hash.digest('hex') }
     },
 
-    async get(key) {
-      return objectClient.getObject(objectKey(options.pathPrefix, key))
+    async get(key, signal) {
+      return objectClient.getObject(objectKey(options.pathPrefix, key), signal)
     },
 
     async remove(key) {

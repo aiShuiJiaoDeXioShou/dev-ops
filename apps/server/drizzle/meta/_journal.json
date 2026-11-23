@@ -281,6 +281,13 @@
       "when": 1795169989685,
       "tag": "0039_v09_native_deploy",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795424705606,
+      "tag": "0040_bot_conversation_attachments",
+      "breakpoints": true
     }
   ]
 }

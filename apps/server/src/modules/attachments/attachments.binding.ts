@@ -31,10 +31,17 @@ export type AttachmentBindingPolicy = Pick<
 >
 
 /** 绑定临时附件到业务目标的输入。 */
-export interface AttachmentBindRequest {
+export type AttachmentBindRequest = (
+  | {
+      projectId: string
+      targetType: Exclude<AttachmentTargetType, 'bot_message'>
+    }
+  | {
+      conversationId: string
+      targetType: 'bot_message'
+    }
+) & {
   teamId: string
-  projectId: string
-  targetType: AttachmentTargetType
   targetId: string
   /** 本次请求新增的临时附件标识，不是最终集合。 */
   attachmentIds: string[]
@@ -63,7 +70,7 @@ export interface AttachmentDeleteAuthority {
 }
 
 const TEMP_RETENTION_MESSAGE = '临时附件已超过保留期，请重新上传'
-const TARGET_MISMATCH_MESSAGE = '附件不属于当前项目，无法绑定'
+const TARGET_MISMATCH_MESSAGE = '附件不属于当前项目或会话，无法绑定'
 const CONCURRENT_STATE_MESSAGE = '附件状态已变化，请刷新后重试'
 
 /**
@@ -96,7 +103,9 @@ function assertBindable(row: AttachmentRow, request: AttachmentBindRequest, expi
   if (row.uploaded_by_user_id !== request.actor.userId) {
     throw new ApiError(ERROR_CODES.FORBIDDEN, `只能绑定本人上传的临时附件「${row.file_name}」`)
   }
-  if (row.team_id !== request.teamId || row.project_id !== request.projectId) {
+  const matchesScope =
+    'projectId' in request ? row.project_id === request.projectId : row.conversation_id === request.conversationId
+  if (row.team_id !== request.teamId || !matchesScope) {
     throw new ApiError(ERROR_CODES.ATTACHMENT_INVALID, TARGET_MISMATCH_MESSAGE)
   }
   if (row.created_at.getTime() < expiresBeforeMs) {
@@ -105,16 +114,19 @@ function assertBindable(row: AttachmentRow, request: AttachmentBindRequest, expi
 }
 
 /**
- * 在业务事务内把临时附件绑定到需求或缺陷。
+ * 在业务事务内把临时附件绑定到需求、缺陷或会话消息。
  * @param tx 业务事务连接；调用方负责提交，附件与业务记录必须同成同败。
  * @param request 目标、临时附件集合、操作者与数量策略。
- * @returns 绑定完成后无返回值。
+ * @returns 依输入顺序返回绑定的附件记录。
  * @throws 附件不存在、非本人上传、跨项目、超过保留期、数量超限或并发状态冲突时抛出业务错误；整次绑定失败。
- * @remarks 每个附件单独写 `attachment_bound` 活动；activity.entityId 为附件标识，便于按附件追溯。
+ * @remarks 项目附件单独写 `attachment_bound` 活动；activity.entityId 为附件标识，便于按附件追溯。
  */
-export async function bindAttachments(tx: AttachmentTransaction, request: AttachmentBindRequest): Promise<void> {
+export async function bindAttachments(
+  tx: AttachmentTransaction,
+  request: AttachmentBindRequest,
+): Promise<AttachmentRow[]> {
   const attachmentIds = [...new Set(request.attachmentIds)]
-  if (attachmentIds.length === 0) return
+  if (attachmentIds.length === 0) return []
 
   const currentCount = await countBoundAttachments(tx, request.targetType, request.targetId)
   assertSubmitAttachmentCount(attachmentIds.length, currentCount, request.policy)
@@ -127,6 +139,7 @@ export async function bindAttachments(tx: AttachmentTransaction, request: Attach
   const now = request.now ?? new Date()
   const expiresBeforeMs = now.getTime() - request.policy.tempRetentionHours * 60 * 60 * 1000
 
+  const result: AttachmentRow[] = []
   for (const attachmentId of attachmentIds) {
     const row = rowsById.get(attachmentId)
     if (!row) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
@@ -137,6 +150,8 @@ export async function bindAttachments(tx: AttachmentTransaction, request: Attach
       targetId: request.targetId,
     })
     if (!bound) throw new ApiError(ERROR_CODES.ATTACHMENT_STATE_CONFLICT, CONCURRENT_STATE_MESSAGE)
+    result.push(bound)
+    if (!('projectId' in request)) continue
     await appendActivity(tx, {
       teamId: request.teamId,
       projectId: request.projectId,
@@ -147,6 +162,7 @@ export async function bindAttachments(tx: AttachmentTransaction, request: Attach
       changes: { targetType: request.targetType, targetId: request.targetId },
     })
   }
+  return result
 }
 
 /**
@@ -199,7 +215,10 @@ export async function unbindAttachments(tx: AttachmentTransaction, request: Atta
 /** 已注入数量与保留期策略的绑定用例，供需求与缺陷服务按依赖注入使用。 */
 export interface AttachmentBindingUseCases {
   /** 在业务事务内绑定临时附件；策略由工厂注入。 */
-  bindAttachments(tx: AttachmentTransaction, input: Omit<AttachmentBindRequest, 'policy'>): Promise<void>
+  bindAttachments(
+    tx: AttachmentTransaction,
+    input: Omit<Extract<AttachmentBindRequest, { projectId: string }>, 'policy'>,
+  ): Promise<void>
   /** 在业务事务内解绑最终集合中缺失的附件。 */
   unbindAttachments(tx: AttachmentTransaction, input: AttachmentUnbindRequest): Promise<void>
   /** 读取业务目标的已绑定附件摘要。 */
@@ -217,7 +236,9 @@ export interface AttachmentBindingUseCases {
  */
 export function createAttachmentBinding(options: { policy: AttachmentBindingPolicy }): AttachmentBindingUseCases {
   return {
-    bindAttachments: (tx, input) => bindAttachments(tx, { ...input, policy: options.policy }),
+    bindAttachments: async (tx, input) => {
+      await bindAttachments(tx, { ...input, policy: options.policy })
+    },
     unbindAttachments,
     listAttachmentsForTarget,
   }

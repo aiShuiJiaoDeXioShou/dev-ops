@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import { Check } from 'typebox/value'
 import type { Database } from '../../../platform/database/client.ts'
 import { botMessage } from '../../collaboration/bot-conversations.tables.ts'
+import { describeMessageAttachments } from './conversation-attachment-tool.ts'
 import { botMessageBodySchema } from '../../collaboration/bot-message-body.ts'
 import { authUser } from '../../identity/identity.tables.ts'
 import { lockBotRunLease, type BotRunLease, type ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
@@ -59,7 +60,7 @@ export function createPgRunInputQueue(
           return {
             messageId,
             mode,
-            text: `${name}：${body.blocks.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n')}`,
+            text: `${name}：${body.blocks.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('\n')}${describeMessageAttachments(messageId, body.attachments)}`,
           }
         })
       })

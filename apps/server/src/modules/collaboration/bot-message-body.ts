@@ -2,6 +2,15 @@ import { Type, type Static } from 'typebox'
 
 /** 会话持久化与响应使用同一中立消息体，工具调用只保留摘要。 */
 export const botMessageBodySchema = Type.Object({
+  attachments: Type.Optional(
+    Type.Array(
+      Type.Object({
+        id: Type.String({ format: 'uuid' }),
+        fileName: Type.String(),
+        sizeBytes: Type.Integer({ minimum: 1 }),
+      }),
+    ),
+  ),
   metrics: Type.Optional(
     Type.Object({
       inputTokens: Type.Integer({ minimum: 0 }),

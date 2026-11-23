@@ -167,7 +167,7 @@ export function createHttpApp(
   app.register(botRelayRoutes, { prefix: '/api/v1', db: services.database.db, limits: relayLimits })
   app.register(botConversationsRoutes, {
     prefix: '/api/v1',
-    service: createBotConversationsService(services.database.db, relayLimits),
+    service: createBotConversationsService(services.database.db, relayLimits, services.attachments.getPolicy()),
     groups: createBotGroupsService(services.database.db),
   })
   app.register(workTagRoutes, { prefix: '/api/v1', service: createWorkTagsService(services.database.db) })

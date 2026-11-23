@@ -5,6 +5,7 @@ import { Check } from 'typebox/value'
 import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
+import { bindAttachments, type AttachmentBindingPolicy } from '../attachments/attachments.binding.ts'
 import { isBotBudgetExhausted } from '../bots/bots.budget-read.ts'
 import { requireBotPromptTemplate } from '../bots/bots.prompt-templates.ts'
 import { readBotSessionSettings, saveBotSessionSetting } from '../bots/bots.session-settings.ts'
@@ -15,7 +16,7 @@ import { readBotSkillCandidates } from '../bots/bots.skills.ts'
 import { bot, botRun } from '../bots/bots.tables.ts'
 import { redactChatContent } from '../bots/runtime/content.ts'
 import { requireTeamMember, type SessionUser, type TeamRole } from '../identity/identity.session.ts'
-import { authUser, teamMember } from '../identity/identity.tables.ts'
+import { authUser } from '../identity/identity.tables.ts'
 import {
   botConversation,
   botConversationMember,
@@ -50,6 +51,12 @@ import {
   updateBotRelay,
 } from './bot-relay.repository.ts'
 import { forkBotConversation } from './bot-fork.service.ts'
+import {
+  accessError,
+  lockWritableBotConversation,
+  membershipQuery,
+  requireBotConversation,
+} from './bot-conversations.access.ts'
 import { botMessageBodySchema } from './bot-message-body.ts'
 import { readTargetWorkTags } from './work-tags.repository.ts'
 
@@ -60,10 +67,6 @@ const MAX_SEQUENCE = 9223372036854775807n
 
 type ReadDb = Pick<Database, 'select'>
 type ConversationRow = typeof botConversation.$inferSelect
-
-function accessError(): never {
-  throw new ApiError(ERROR_CODES.BOT_CONVERSATION_NOT_FOUND, '会话不存在或不可见')
-}
 
 function viewOf(row: ConversationRow): BotConversationView {
   const kind = row.kind
@@ -211,14 +214,17 @@ async function listConversationPreviews(db: ReadDb, teamId: string, rooms: Conve
   return rooms.map((room) => {
     const body = latestByRoom.get(room.id)
     const preview = Check(botMessageBodySchema, body)
-      ? body.blocks
-          .flatMap((block) => (block.type === 'tool_activity' ? [] : [block.text]))
-          .join(' ')
-          .replace(/```[\s\S]*?```/gu, ' ')
-          .replace(/[#>*_`|~]/gu, ' ')
-          .replace(/\s+/gu, ' ')
-          .trim()
-          .slice(0, 72)
+      ? (
+          body.blocks
+            .flatMap((block) => (block.type === 'tool_activity' ? [] : [block.text]))
+            .join(' ')
+            .replace(/```[\s\S]*?```/gu, ' ')
+            .replace(/[#>*_`|~]/gu, ' ')
+            .replace(/\s+/gu, ' ')
+            .trim() ||
+          body.attachments?.[0]?.fileName ||
+          ''
+        ).slice(0, 72)
       : ''
     const bots = members.filter(({ roomId }) => roomId === room.id)
     const leader = bots.find(({ id }) => id === room.leader_bot_id)
@@ -281,64 +287,6 @@ function messageReceivers(text: string, members: ConversationMemberView[], expli
   return [...new Set([...explicit, ...matches])]
 }
 
-function membershipQuery(db: ReadDb, actor: SessionUser) {
-  return db
-    .select({ row: botConversation, role: teamMember.role })
-    .from(botConversation)
-    .innerJoin(
-      botConversationMember,
-      and(
-        eq(botConversationMember.conversation_id, botConversation.id),
-        eq(botConversationMember.team_id, botConversation.team_id),
-        eq(botConversationMember.member_kind, 'user'),
-        eq(botConversationMember.member_id, actor.id),
-        isNull(botConversationMember.removed_at),
-      ),
-    )
-    .innerJoin(
-      teamMember,
-      and(
-        eq(teamMember.team_id, botConversation.team_id),
-        eq(teamMember.user_id, actor.id),
-        eq(teamMember.status, 'active'),
-      ),
-    )
-}
-
-/**
- * 校验用户当前具备会话可见权限。团队或平台级角色不替代成员关系。
- * @param db 数据库或当前事务。
- * @param actor 当前认证成员。
- * @param conversationId 会话标识。
- * @param edit 是否要求写权限。
- * @returns 有效会话；失去成员资格时以不可见处理。
- */
-export async function requireBotConversation(db: ReadDb, actor: SessionUser, conversationId: string, edit = false) {
-  const [member] = await membershipQuery(db, actor).where(eq(botConversation.id, conversationId))
-  if (!member) accessError()
-  if (edit && member.role !== 'admin' && member.role !== 'developer') {
-    throw new ApiError(ERROR_CODES.FORBIDDEN, '当前角色只可阅读此会话')
-  }
-  return member.row
-}
-
-/**
- * 先锁会话行再读取编辑权限，用于串行分配消息序号与变更关联成员。
- * @param tx 将执行写入的事务。
- * @param actor 当前认证成员。
- * @param conversationId 会话标识。
- * @returns 已锁定且当前可写的会话。
- */
-export async function lockWritableBotConversation(tx: BotRunTransaction, actor: SessionUser, conversationId: string) {
-  const [locked] = await tx
-    .select({ id: botConversation.id })
-    .from(botConversation)
-    .where(eq(botConversation.id, conversationId))
-    .for('update')
-  if (!locked) accessError()
-  return requireBotConversation(tx, actor, conversationId, true)
-}
-
 async function lockBotSessionMaintenance(
   tx: BotRunTransaction,
   actor: SessionUser,
@@ -382,9 +330,15 @@ async function requireIdleConversation(tx: BotRunTransaction, room: Conversation
 /**
  * 组装 Bot 私聊、消息与事件端口。
  * @param db 平台数据库连接。
+ * @param limits 群聊接力上限。
+ * @param attachmentPolicy 会话附件绑定策略；未配置时禁止绑定。
  * @returns 会话用例，读写均校验当前成员与角色权限。
  */
-export function createBotConversationsService(db: Database, limits = defaultBotRelayLimits) {
+export function createBotConversationsService(
+  db: Database,
+  limits = defaultBotRelayLimits,
+  attachmentPolicy?: AttachmentBindingPolicy,
+) {
   return {
     /** 列出当前成员在本团队可见的会话。 */
     async list(actor: SessionUser, teamId: string, filters: ConversationListFilters) {
@@ -652,6 +606,8 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
           .orderBy(desc(botMessage.sequence))
           .limit(1)
         const branchId = randomUUID()
+        if (!Check(botMessageBodySchema, original.body)) throw new Error('数据库中的 Bot 消息格式不合法')
+        const attachments = original.body.attachments
         const [replacement] = await tx
           .insert(botMessage)
           .values({
@@ -661,7 +617,7 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
             sequence: (latest?.sequence ?? 0n) + 1n,
             speaker_kind: 'user',
             speaker_id: actor.id,
-            body: { blocks: [{ type: 'text', text }] },
+            body: { blocks: [{ type: 'text', text }], ...(attachments?.length ? { attachments } : {}) },
             client_request_id: input.clientRequestId,
             branch_id: branchId,
             edited_from_message_id: rootId,
@@ -812,10 +768,18 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
         return { botId }
       })
     },
-    /** 发送消息并排队；重复请求复用已保存的同一次运行。 */
+    /**
+     * 保存会话消息，将本人的临时附件同时转为会话成员可读，并排队或追加到当前运行。
+     * @param actor 有会话写权限的认证成员。
+     * @param conversationId 发送目标会话。
+     * @param input 正文、附件及引用标识、投递方式和去重标识。
+     * @returns 已保存的消息和运行；重复请求复用原消息与运行。
+     * @throws 会话不可写、附件不匹配、请求内容冲突或没有可接收的智能体时抛出业务错误。
+     */
     async send(actor: SessionUser, conversationId: string, input: SendBotMessageInput): Promise<SendBotMessageResult> {
       const sourceText = redactChatContent(input.text.trim())
-      if (!sourceText) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '消息不能为空')
+      const attachmentIds = input.attachmentIds ?? []
+      if (!sourceText && !attachmentIds.length) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '请输入消息或添加附件')
       const deliveryMode = input.deliveryMode ?? 'auto'
       const mentionsAll = input.mentionAll || /(?:^|\s)@全部(?=$|[\s，。,.!?；;:：、！？])/u.test(sourceText)
       const references = {
@@ -840,6 +804,7 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
             message.body.references?.promptTemplate?.id !== input.promptTemplateId ||
             (message.body.references?.mentionBotIds ?? []).join(',') !== references.mentionBotIds.join(',') ||
             (message.body.references?.mentionAll ?? false) !== references.mentionAll ||
+            (message.body.attachments ?? []).map(({ id }) => id).join(',') !== attachmentIds.join(',') ||
             (message.body.references?.deliveryMode ?? 'auto') !== deliveryMode ||
             (message.body.references?.skillIds ?? []).join(',') !== references.skillIds.join(',') ||
             !same.run_id
@@ -865,7 +830,7 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
                 : [template.body, args].filter(Boolean).join('\n\n'),
             ).trim()
           : sourceText
-        if (!text || text.length > 16_000)
+        if ((!text && !attachmentIds.length) || text.length > 16_000)
           throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '模板展开后消息为零或超过长度上限')
         const members = await readMembers(tx, conversation)
         const group = conversation.kind === 'group'
@@ -907,9 +872,26 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
           .where(scope)
           .orderBy(desc(botMessage.sequence))
           .limit(1)
+        const messageId = randomUUID()
+        if (attachmentIds.length && !attachmentPolicy) {
+          throw new ApiError(ERROR_CODES.ATTACHMENT_STORAGE_UNAVAILABLE, '会话附件储存未启用')
+        }
+        const attached =
+          attachmentIds.length && attachmentPolicy
+            ? await bindAttachments(tx, {
+                teamId: conversation.team_id,
+                conversationId,
+                targetType: 'bot_message',
+                targetId: messageId,
+                actor: { userId: actor.id },
+                attachmentIds,
+                policy: attachmentPolicy,
+              })
+            : []
         const [message] = await tx
           .insert(botMessage)
           .values({
+            id: messageId,
             team_id: conversation.team_id,
             conversation_id: conversationId,
             sequence: (latest?.sequence ?? 0n) + 1n,
@@ -919,6 +901,15 @@ export function createBotConversationsService(db: Database, limits = defaultBotR
             branch_id: conversation.active_branch_id,
             body: {
               blocks: [{ type: 'text', text }],
+              ...(attached.length
+                ? {
+                    attachments: attached.map((row) => ({
+                      id: row.id,
+                      fileName: row.file_name,
+                      sizeBytes: row.size_bytes,
+                    })),
+                  }
+                : {}),
               references: {
                 ...references,
                 ...(group ? { relayRecipients: recipients } : {}),

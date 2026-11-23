@@ -9,7 +9,7 @@ import { enqueueBotRun, requestBotRunStop } from '../bots/bots.run-queue.reposit
 import { requireHumanActor } from '../identity/identity.actor.ts'
 import { botRun } from '../bots/bots.tables.ts'
 import { botRelayResponse } from './bot-conversations.schema.ts'
-import { lockWritableBotConversation } from './bot-conversations.service.ts'
+import { lockWritableBotConversation } from './bot-conversations.access.ts'
 import {
   advanceBotRelay,
   botRelayView,

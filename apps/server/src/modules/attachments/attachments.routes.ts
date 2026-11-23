@@ -1,5 +1,6 @@
 import { Readable } from 'node:stream'
 import type { IncomingHttpHeaders } from 'node:http'
+import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
@@ -11,9 +12,11 @@ import {
   attachmentPolicyResponseSchema,
   attachmentRemoveResponseSchema,
   attachmentUploadResponseSchema,
+  conversationAttachmentParamsSchema,
+  conversationMessageAttachmentParamsSchema,
   projectAttachmentParamsSchema,
 } from './attachments.schema.ts'
-import type { AttachmentsService } from './attachments.service.ts'
+import type { AttachmentDownload, AttachmentsService } from './attachments.service.ts'
 
 /** 附件路由依赖。 */
 export interface AttachmentRoutesOptions {
@@ -33,6 +36,15 @@ function headerValue(headers: IncomingHttpHeaders, name: string): string | undef
 function contentDisposition(fileName: string): string {
   const fallback = fileName.replace(/[^A-Za-z0-9._-]/g, '_') || 'attachment'
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`
+}
+
+function sendDownload(reply: FastifyReply, download: AttachmentDownload) {
+  return reply
+    .header('Content-Type', 'application/octet-stream')
+    .header('Content-Disposition', contentDisposition(download.fileName))
+    .header('Content-Length', String(download.sizeBytes))
+    .header('X-Content-SHA256', download.sha256)
+    .send(download.stream)
 }
 
 /**
@@ -58,37 +70,51 @@ async function drainRequestBody(stream: Readable): Promise<void> {
  * 下载是继流水线产物之后的第二条例外：成功返回二进制流，失败仍返回 HTTP 200 + 统一信封。
  */
 export const attachmentRoutes: FastifyPluginAsyncTypebox<AttachmentRoutesOptions> = async (app, options) => {
+  const uploadRouteOptions = {
+    config: { idempotency: false },
+    bodyLimit: options.maxFileBytes + 1024 * 1024,
+  }
+  async function upload(request: FastifyRequest, scope: { projectId: string } | { conversationId: string }) {
+    const stream = request.body instanceof Readable ? request.body : null
+    try {
+      const actor = await requireActor(request)
+      if (!stream) {
+        throw new ApiError(ERROR_CODES.ATTACHMENT_INVALID, '上传请求体必须是 application/octet-stream 流')
+      }
+      const result = await options.service.uploadAttachment(actor, {
+        ...scope,
+        fileNameHeader: headerValue(request.headers, 'x-file-name'),
+        contentTypeHeader: headerValue(request.headers, 'x-file-type'),
+        contentLengthHeader: headerValue(request.headers, 'content-length'),
+        source: stream,
+      })
+      return success(result, request.id)
+    } catch (error) {
+      // 提前拒绝上传时仍需消费请求体，以便返回业务错误信封。
+      if (stream) await drainRequestBody(stream)
+      throw error
+    }
+  }
+
   app.post(
     '/projects/:projectId/attachments',
     {
-      config: { idempotency: false },
-      bodyLimit: options.maxFileBytes + 1024 * 1024,
+      ...uploadRouteOptions,
+      schema: { params: projectAttachmentParamsSchema, response: { 200: attachmentUploadResponseSchema } },
+    },
+    (request) => upload(request, request.params),
+  )
+  app.post(
+    '/bot-conversations/:conversationId/attachments',
+    {
+      ...uploadRouteOptions,
       schema: {
-        params: projectAttachmentParamsSchema,
+        description: '以 application/octet-stream 上传会话临时附件，通过发送消息的 attachmentIds 绑定。',
+        params: conversationAttachmentParamsSchema,
         response: { 200: attachmentUploadResponseSchema },
       },
     },
-    async (request) => {
-      const stream = request.body instanceof Readable ? request.body : null
-      try {
-        const actor = await requireActor(request)
-        if (!stream) {
-          throw new ApiError(ERROR_CODES.ATTACHMENT_INVALID, '上传请求体必须是 application/octet-stream 流')
-        }
-        const result = await options.service.uploadAttachment(actor, {
-          projectId: request.params.projectId,
-          fileNameHeader: headerValue(request.headers, 'x-file-name'),
-          contentTypeHeader: headerValue(request.headers, 'x-file-type'),
-          contentLengthHeader: headerValue(request.headers, 'content-length'),
-          source: stream,
-        })
-        return success(result, request.id)
-      } catch (error) {
-        // 超限、权限或元信息错误可能发生在读取请求体之前；先 drain 再回信封，避免连接重置。
-        if (stream) await drainRequestBody(stream)
-        throw error
-      }
-    },
+    (request) => upload(request, request.params),
   )
 
   app.get('/attachments/policy', { schema: { response: { 200: attachmentPolicyResponseSchema } } }, async (request) => {
@@ -108,12 +134,22 @@ export const attachmentRoutes: FastifyPluginAsyncTypebox<AttachmentRoutesOptions
     async (request, reply) => {
       const actor = await requireActor(request)
       const download = await options.service.openDownload(actor, request.params.attachmentId)
-      return reply
-        .header('Content-Type', 'application/octet-stream')
-        .header('Content-Disposition', contentDisposition(download.fileName))
-        .header('Content-Length', String(download.sizeBytes))
-        .header('X-Content-SHA256', download.sha256)
-        .send(download.stream)
+      return sendDownload(reply, download)
+    },
+  )
+
+  app.get(
+    '/bot-conversations/:conversationId/messages/:messageId/attachments/:attachmentId/download',
+    {
+      schema: {
+        params: conversationMessageAttachmentParamsSchema,
+        description:
+          '会话附件下载使用文件传输例外：成功返回 application/octet-stream 流与 X-Content-SHA256，失败返回 HTTP 200 与统一 JSON 信封。',
+      },
+    },
+    async (request, reply) => {
+      const actor = await requireActor(request)
+      return sendDownload(reply, await options.service.openConversationDownload(actor, request.params))
     },
   )
 

@@ -37,9 +37,10 @@ export interface StorageAdapter {
   /**
    * 读取对象流。
    * @param key 桶内对象键。
-   * @returns 可读流；对象不存在时抛错。
+   * @param signal 可选的取消或超时信号。
+   * @returns 可读流；对象不存在或读取被取消时抛错。
    */
-  get(key: string): Promise<Readable>
+  get(key: string, signal?: AbortSignal): Promise<Readable>
   /**
    * 删除对象；对象不存在视为成功。
    * @param key 桶内对象键。
@@ -101,10 +102,10 @@ export function createLocalStorageAdapter(options: LocalStorageAdapterOptions): 
       }
     },
 
-    async get(key) {
+    async get(key, signal) {
       const target = resolveInsideRoot(rootDir, key)
       await stat(target)
-      return createReadStream(target)
+      return createReadStream(target, { signal })
     },
 
     async remove(key) {

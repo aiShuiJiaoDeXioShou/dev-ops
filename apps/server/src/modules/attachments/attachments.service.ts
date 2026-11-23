@@ -14,6 +14,8 @@ import type { StorageBucketRow, StorageService } from '../storage/storage.servic
 import type { SessionUser } from '../identity/identity.session.ts'
 import { requireTeamMember } from '../identity/identity.session.ts'
 import { getProjectContext, lockProjectForWrite } from '../projects/projects.access.ts'
+import { lockWritableBotConversation, requireBotConversation } from '../collaboration/bot-conversations.access.ts'
+import { findConversationMessageAttachment } from './conversation-attachments.read.ts'
 import { appendActivity } from '../collaboration/collaboration.service.ts'
 import {
   normalizeAttachmentFileName,
@@ -44,8 +46,7 @@ export interface AttachmentsServiceOptions {
 }
 
 /** 原始流上传请求；请求头由路由原样传入，解析与校验集中在服务层。 */
-export interface AttachmentUploadRequest {
-  projectId: string
+export type AttachmentUploadRequest = ({ projectId: string } | { conversationId: string }) & {
   /** `X-File-Name`，URI 编码的 UTF-8 文件名。 */
   fileNameHeader: string | undefined
   /** `X-File-Type`，仅作展示的原始 MIME。 */
@@ -78,6 +79,16 @@ export interface AttachmentsService {
   getPolicy(): AttachmentPolicy
   /** 上传临时附件；成功后返回摘要。 */
   uploadAttachment(actor: SessionUser, request: AttachmentUploadRequest): Promise<AttachmentUploadResult>
+  /**
+   * 打开已发送附件的下载流。
+   * @param actor 当前用户。
+   * @param input 会话、消息及附件标识。
+   * @returns 下载元数据和对象流；非成员或消息未引用附件时抛出业务错误。
+   */
+  openConversationDownload(
+    actor: SessionUser,
+    input: { conversationId: string; messageId: string; attachmentId: string },
+  ): Promise<AttachmentDownload>
   /** 打开附件下载流；项目成员可下载，removed 附件视为不存在。 */
   openDownload(actor: SessionUser, attachmentId: string): Promise<AttachmentDownload>
   /** 删除附件；事务内置 removed，对象删除在提交后执行。 */
@@ -171,15 +182,20 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
     actor: SessionUser,
     request: AttachmentUploadRequest,
   ): Promise<AttachmentUploadResult> {
-    const project = await requireProjectWrite(actor, request.projectId)
+    const scope: ({ projectId: string } | { conversationId: string }) & { teamId: string } =
+      'projectId' in request
+        ? { projectId: request.projectId, teamId: (await requireProjectWrite(actor, request.projectId)).teamId }
+        : {
+            conversationId: request.conversationId,
+            teamId: (await requireBotConversation(db, actor, request.conversationId, true)).team_id,
+          }
     const contentLength = parseAttachmentContentLength(request.contentLengthHeader, policy.maxFileBytes)
     const fileName = normalizeAttachmentFileName(decodeFileNameHeader(request.fileNameHeader))
     const contentType = normalizeContentType(request.contentTypeHeader)
     const bucket = await resolveDefaultBucket()
     const attachmentId = randomUUID()
     const storageKey = storage.attachmentStorageKey({
-      teamId: project.teamId,
-      projectId: project.id,
+      ...scope,
       attachmentId,
     })
     const tempDir = await mkdtemp(join(tmpdir(), 'dev-ops-attachment-'))
@@ -220,11 +236,11 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
       let row: AttachmentRow
       try {
         row = await db.transaction(async (tx) => {
-          await lockProjectForWrite(tx, project.id)
+          if ('projectId' in scope) await lockProjectForWrite(tx, scope.projectId)
+          else await lockWritableBotConversation(tx, actor, scope.conversationId)
           const inserted = await insertAttachment(tx, {
             id: attachmentId,
-            teamId: project.teamId,
-            projectId: project.id,
+            ...scope,
             bucketId: bucket.id,
             storageKey,
             fileName,
@@ -233,15 +249,16 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
             sha256: written.sha256,
             uploadedByUserId: actor.id,
           })
-          await appendActivity(tx, {
-            teamId: project.teamId,
-            projectId: project.id,
-            entityType: 'attachment',
-            entityId: inserted.id,
-            action: 'attachment_uploaded',
-            actorUserId: actor.id,
-            changes: { fileName: inserted.file_name, sizeBytes: inserted.size_bytes },
-          })
+          if ('projectId' in scope)
+            await appendActivity(tx, {
+              teamId: scope.teamId,
+              projectId: scope.projectId,
+              entityType: 'attachment',
+              entityId: inserted.id,
+              action: 'attachment_uploaded',
+              actorUserId: actor.id,
+              changes: { fileName: inserted.file_name, sizeBytes: inserted.size_bytes },
+            })
           return inserted
         })
       } catch (error) {
@@ -257,7 +274,7 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
 
   async function openDownload(actor: SessionUser, attachmentId: string): Promise<AttachmentDownload> {
     const row = await findAttachmentById(db, attachmentId)
-    if (!row) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
+    if (!row?.project_id) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     const project = await getProjectContext(db, row.project_id)
     if (!project) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     // 下载权限只要求项目成员（含浏览者）；跨团队与非成员一律拒绝。
@@ -270,6 +287,20 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
       throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     }
 
+    return openObject(row)
+  }
+
+  async function openConversationDownload(
+    actor: SessionUser,
+    input: { conversationId: string; messageId: string; attachmentId: string },
+  ) {
+    const room = await requireBotConversation(db, actor, input.conversationId)
+    const row = await findConversationMessageAttachment(db, { ...input, teamId: room.team_id })
+    if (!row) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '消息附件不存在')
+    return openObject(row)
+  }
+
+  async function openObject(row: AttachmentRow): Promise<AttachmentDownload> {
     let stream: Readable
     try {
       const adapter = await storage.adapterForBucketId(row.bucket_id)
@@ -291,7 +322,22 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
   async function removeAttachment(actor: SessionUser, attachmentId: string): Promise<{ id: string; removed: true }> {
     const row = await findAttachmentById(db, attachmentId)
     if (!row) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
-    const project = await getProjectContext(db, row.project_id)
+    if (row.conversation_id && row.status === 'temp' && row.uploaded_by_user_id === actor.id) {
+      const conversationId = row.conversation_id
+      const removed = await db.transaction(async (tx) => {
+        await lockWritableBotConversation(tx, actor, conversationId)
+        return deleteTempAttachmentRecord(tx, row.id)
+      })
+      if (!removed) throw new ApiError(ERROR_CODES.ATTACHMENT_STATE_CONFLICT, '附件状态已变化，请刷新后重试')
+      try {
+        const adapter = await storage.adapterForBucketId(removed.bucket_id)
+        await removeObjectQuietly(adapter, removed.storage_key)
+      } catch (error) {
+        log?.('会话临时附件对象清理失败', { attachmentId, error: error instanceof Error ? error.message : '未知错误' })
+      }
+      return { id: removed.id, removed: true }
+    }
+    const project = row.project_id ? await getProjectContext(db, row.project_id) : undefined
     if (!project) throw new ApiError(ERROR_CODES.ATTACHMENT_NOT_FOUND, '附件不存在或已被删除')
     // 临时附件只有上传者本人可删除；管理员与项目负责人也不能删除他人未提交的附件。
     if (row.status === 'temp' && row.uploaded_by_user_id !== actor.id) {
@@ -354,6 +400,7 @@ export function createAttachmentsService(options: AttachmentsServiceOptions): At
     getPolicy: () => ({ ...policy }),
     uploadAttachment,
     openDownload,
+    openConversationDownload,
     removeAttachment,
   }
 }

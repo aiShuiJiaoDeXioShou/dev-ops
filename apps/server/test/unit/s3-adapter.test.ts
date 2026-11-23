@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { Readable, Writable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { test } from 'node:test'
 import {
   buildS3ClientConfig,
   classifyS3Failure,
+  createDefaultS3ObjectClient,
   createS3StorageAdapter,
   type S3ObjectClient,
   type S3PutObjectInput,
@@ -25,6 +28,35 @@ async function readAll(stream: Readable): Promise<Buffer> {
   await pipeline(stream, sink)
   return Buffer.concat(chunks)
 }
+
+test('S3 客户端保持下载连接，直到响应对象流读完', async (t) => {
+  const responseStream: { finish?: () => void } = {}
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'content-length': String(Buffer.byteLength('首段数据')) })
+    response.write('首')
+    responseStream.finish = () => response.end('段数据')
+  })
+  server.listen(0, '127.0.0.1')
+  t.after(() => {
+    server.closeAllConnections()
+    return new Promise<void>((resolve) => server.close(() => resolve()))
+  })
+  await once(server, 'listening')
+  const address = server.address()
+  assert.ok(address && typeof address === 'object')
+  const client = createDefaultS3ObjectClient({
+    endpoint: `http://127.0.0.1:${address.port}`,
+    region: 'us-east-1',
+    bucketName: 'dev-ops-test',
+    credentials: CREDENTIALS,
+    connectionTimeoutMs: 1_000,
+    requestTimeoutMs: 2_000,
+  })
+  const stream = await client.getObject('conversation-attachment.txt')
+  assert.ok(responseStream.finish)
+  responseStream.finish()
+  assert.equal((await readAll(stream)).toString(), '首段数据')
+})
 
 /** 构造带 smithy 错误字段的异常；测试错误归因。 */
 function s3Error(name: string, properties: Record<string, unknown> = {}): Error {

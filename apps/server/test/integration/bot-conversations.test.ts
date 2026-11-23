@@ -1,20 +1,32 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { and, eq, lte } from 'drizzle-orm'
 import { createHttpApp } from '../../src/bootstrap/create-http-app.ts'
 import { publishBotModelCatalog } from '../../src/modules/bots/bots.catalog.ts'
 import { isConversationBotRun, claimBotRun } from '../../src/modules/bots/bots.run-queue.repository.ts'
 import { botModelCatalog } from '../../src/modules/bots/bots.tables.ts'
+import { createConversationAttachmentTool } from '../../src/modules/bots/runtime/conversation-attachment-tool.ts'
+import { createPgRunInputQueue } from '../../src/modules/bots/runtime/run-input-queue.ts'
 import { createPgRunSink } from '../../src/modules/bots/runtime/run-sink.ts'
 import { botEvent } from '../../src/modules/collaboration/bot-conversations.tables.ts'
 import { platformAdmin, teamMember } from '../../src/modules/identity/identity.tables.ts'
+import { createStorageService } from '../../src/modules/storage/storage.service.ts'
 import { createBotTestDatabase } from '../support/bot-database.ts'
 import { seedKnowledgeFixture } from '../support/knowledge-fixtures.ts'
 
 test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增量读取', async (t) => {
   const { db, config, cleanup } = await createBotTestDatabase(t)
-  const app = createHttpApp({ ...config, GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 23).toString('base64') })
+  const storageDir = await mkdtemp(join(tmpdir(), 'dev-ops-bot-attachments-test-'))
+  cleanup.push(() => rm(storageDir, { recursive: true, force: true }))
+  const app = createHttpApp({
+    ...config,
+    ATTACHMENT_STORAGE_DIR: storageDir,
+    GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 23).toString('base64'),
+  })
   cleanup.push(() => app.close())
   const { adminUser, devUser, viewerUser, otherUser, teamId } = await seedKnowledgeFixture(app)
   const teamPath = `/api/v1/teams/${teamId}`
@@ -158,6 +170,73 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
     { id: second.data.runId, botId, status: 'queued', teamQueuePosition: 1, queueReason: 'worker_offline' },
   ])
 
+  const file = Buffer.from('这是只在当前会话共享的附件')
+  const fileName = '验收记录.md'
+  async function upload(user: { cookie: string }) {
+    const response = await app.inject({
+      method: 'POST',
+      url: `${roomPath}/attachments`,
+      payload: file,
+      headers: {
+        cookie: user.cookie,
+        'content-type': 'application/octet-stream',
+        'x-file-name': encodeURIComponent(fileName),
+        'x-file-type': 'text/markdown',
+        'content-length': String(file.length),
+      },
+    })
+    assert.equal(response.statusCode, 200)
+    return response.json()
+  }
+
+  assert.equal((await upload(adminUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
+  const uploaded = await upload(devUser)
+  assert.equal(uploaded.code, 'OK', uploaded.message)
+  const attachmentId = String(uploaded.data.attachment.id)
+  assert.equal((await get(`/api/v1/attachments/${attachmentId}/download`, devUser)).code, 'ATTACHMENT_NOT_FOUND')
+  const attachmentsInput = { text: '', clientRequestId: randomUUID(), attachmentIds: [attachmentId] }
+  assert.equal(
+    (await post(messagePath, devUser, { ...attachmentsInput, attachmentIds: [attachmentId, randomUUID()] })).code,
+    'ATTACHMENT_NOT_FOUND',
+  )
+  const [attached, sameAttachment] = await Promise.all([
+    post(messagePath, devUser, attachmentsInput),
+    post(messagePath, devUser, attachmentsInput),
+  ])
+  assert.equal(attached.code, 'OK', attached.message)
+  assert.equal(attached.data.message.id, sameAttachment.data.message.id)
+  assert.equal(attached.data.delivery, 'follow_up')
+  assert.deepEqual(attached.data.message.body.attachments, [{ id: attachmentId, fileName, sizeBytes: file.length }])
+  const messageId = String(attached.data.message.id)
+  const download = await app.inject({
+    url: `${messagePath}/${messageId}/attachments/${attachmentId}/download`,
+    headers: { cookie: devUser.cookie },
+  })
+  assert.deepEqual(download.rawPayload, file)
+  assert.equal(download.headers['x-content-sha256'], createHash('sha256').update(file).digest('hex'))
+  assert.equal(
+    (await get(`${messagePath}/${messageId}/attachments/${attachmentId}/download`, adminUser)).code,
+    'BOT_CONVERSATION_NOT_FOUND',
+  )
+  assert.equal(
+    (await get(`${messagePath}/${first.data.message.id}/attachments/${attachmentId}/download`, devUser)).code,
+    'ATTACHMENT_NOT_FOUND',
+  )
+  assert.equal((await post(`/api/v1/attachments/${attachmentId}/remove`, devUser, {})).code, 'ATTACHMENT_NOT_FOUND')
+
+  const lease = { id: claimed.id, owner: 'chat-test', epoch: claimed.lease_epoch }
+  const pending = await createPgRunInputQueue(db, claimed, lease).take()
+  assert.ok(pending.some((item) => item.messageId === messageId && item.text.includes(attachmentId)))
+  const storage = createStorageService({
+    db,
+    cipher: null,
+    config: { localDir: storageDir, probeTimeoutMs: config.STORAGE_PROBE_TIMEOUT_MS },
+  })
+  const tool = createConversationAttachmentTool(db, claimed, lease, storage)
+  const signal = new AbortController().signal
+  assert.deepEqual(await tool.execute({ messageId, attachmentId }, signal), { text: `${fileName}\n${file.toString()}` })
+  assert.equal((await tool.execute({ messageId: first.data.message.id, attachmentId }, signal)).isError, true)
+
   const usage = { inputTokens: 32, outputTokens: 12, cacheReadTokens: 8, cacheWriteTokens: 0, costUsd: 0.001 }
   assert.equal(
     await sink.finish({
@@ -210,6 +289,7 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   await db.update(teamMember).set({ role: 'viewer' }).where(eq(teamMember.user_id, devUser.userId))
   assert.equal((await post(feedbackPath, devUser, { rating: 'helpful' })).code, 'FORBIDDEN')
   assert.equal((await get(messagePath, devUser)).code, 'OK')
+  assert.equal((await upload(devUser)).code, 'FORBIDDEN')
   assert.equal((await post(messagePath, devUser, { ...message, clientRequestId: randomUUID() })).code, 'FORBIDDEN')
   assert.equal((await get(eventsPath, otherUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
 })

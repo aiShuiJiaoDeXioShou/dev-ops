@@ -1,4 +1,4 @@
-import { and, asc, count, eq, exists, inArray, isNull, lt, ne } from 'drizzle-orm'
+import { and, asc, count, eq, exists, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { project } from '../projects/projects.tables.ts'
 import { attachment, type AttachmentTargetType } from './attachments.tables.ts'
@@ -19,10 +19,11 @@ export interface AttachmentObjectRef {
 }
 
 /** 新建临时附件的输入。 */
-export interface NewAttachment {
+export type NewAttachment = (
+  { projectId: string; conversationId?: never } | { projectId?: never; conversationId: string }
+) & {
   id: string
   teamId: string
-  projectId: string
   bucketId: string
   storageKey: string
   fileName: string
@@ -73,6 +74,7 @@ export async function insertAttachment(executor: AttachmentExecutor, input: NewA
       id: input.id,
       team_id: input.teamId,
       project_id: input.projectId,
+      conversation_id: input.conversationId,
       bucket_id: input.bucketId,
       storage_key: input.storageKey,
       file_name: input.fileName,
@@ -221,11 +223,14 @@ export async function findExpiredTempAttachments(
     .where(
       and(
         isNull(attachment.purged_at),
-        exists(
-          executor
-            .select({ id: project.id })
-            .from(project)
-            .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+        or(
+          isNotNull(attachment.conversation_id),
+          exists(
+            executor
+              .select({ id: project.id })
+              .from(project)
+              .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+          ),
         ),
         and(eq(attachment.status, 'temp'), lt(attachment.created_at, cutoff)),
       ),
@@ -250,11 +255,14 @@ export async function deleteExpiredTempAttachment(
     .where(
       and(
         isNull(attachment.purged_at),
-        exists(
-          executor
-            .select({ id: project.id })
-            .from(project)
-            .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+        or(
+          isNotNull(attachment.conversation_id),
+          exists(
+            executor
+              .select({ id: project.id })
+              .from(project)
+              .where(and(eq(project.id, attachment.project_id), isNull(project.deleted_at))),
+          ),
         ),
 
         and(

@@ -1,6 +1,7 @@
 import { and, desc, eq, gt, inArray, lt, lte, ne, notExists, or, sql } from 'drizzle-orm'
 import { Check } from 'typebox/value'
 import type { Database } from '../../../platform/database/client.ts'
+import { describeMessageAttachments } from './conversation-attachment-tool.ts'
 import { botMessageBodySchema } from '../../collaboration/bot-message-body.ts'
 import { activeBotBranchScope } from '../../collaboration/bot-branches.repository.ts'
 import { botConversation, botMessage } from '../../collaboration/bot-conversations.tables.ts'
@@ -118,7 +119,7 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
     const name = row.speakerId ? names.get(row.speakerId) : undefined
     const speaker = name ?? (row.kind === 'bot' ? 'Bot' : row.kind === 'user' ? '成员' : '系统')
     const text = row.body.blocks.map((item) => (item.type === 'tool_activity' ? item.summary : item.text)).join('\n')
-    return `${speaker}：${text}`
+    return `${speaker}：${text}${describeMessageAttachments(row.id, row.body.attachments)}`
   }
 
   const history = [
