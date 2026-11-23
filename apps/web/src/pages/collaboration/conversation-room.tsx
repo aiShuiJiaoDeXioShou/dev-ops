@@ -190,6 +190,7 @@ export function ConversationRoom({
       canEdit: room.kind === 'direct' && message.speakerKind === 'user' && message.speakerId === userId,
       branchSiblings: message.branchSiblings,
       templateName: message.body.references?.promptTemplate?.name,
+      attachments: message.body.attachments,
       name: message.speakerName ?? '会话通知',
       time: message.createdAt,
       bot:

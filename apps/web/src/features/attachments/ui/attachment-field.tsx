@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode, type RefObject } from 'react'
 import { Button } from '@/shared/ui/controls/button'
 import { FormField } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
@@ -16,9 +16,10 @@ import { AttachmentPreviewButton } from './attachment-preview'
 const MAX_CONCURRENT_UPLOADS = 3
 
 /** 附件表单区属性。 */
-export interface AttachmentFieldProps {
-  /** 目标项目标识；临时附件归属该项目。 */
-  projectId: string
+export type AttachmentFieldProps = (
+  | { projectId: string; conversationId?: never; pickerRef?: never; isSubmitting?: never }
+  | { projectId?: never; conversationId: string; pickerRef: RefObject<HTMLInputElement | null>; isSubmitting: boolean }
+) & {
   /** 当前附件行，受控于父表单。 */
   value: PendingAttachment[]
   /** 附件行变化回调；重试、取消、移除都通过它同步给父表单。 */
@@ -46,11 +47,14 @@ function createClientId(): string {
 /**
  * 渲染附件表单区：前置校验 → 并发上传 → 进度/取消/失败重试 → 完成后进入提交集合。
  * 上限来自策略接口，零字节与超限文件在发请求前被拒绝。
- * @param props 项目、附件行、变更回调与只读/错误状态。
+ * @param props 上传范围、附件行、变更和提交状态；会话模式由输入区菜单触发文件选择。
  * @returns 附件选择、行状态列表与上限说明。
  */
 export function AttachmentField({
   projectId,
+  conversationId,
+  pickerRef,
+  isSubmitting = false,
   value,
   onChange,
   disabled = false,
@@ -62,7 +66,8 @@ export function AttachmentField({
   const policy = useAttachmentPolicy()
   const [limitError, setLimitError] = useState('')
   const containerRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const localInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = pickerRef ?? localInputRef
   const labelId = useId()
   const valueRef = useRef(value)
   const filesRef = useRef(new Map<string, File>())
@@ -120,7 +125,7 @@ export function AttachmentField({
    * @param file 本地文件。
    */
   const startUpload = (clientId: string, file: File) => {
-    const handle = uploadAttachment({ projectId, file })
+    const handle = uploadAttachment(conversationId === undefined ? { projectId, file } : { conversationId, file })
     handlesRef.current.set(clientId, handle)
     handle.onProgress((progress) => patchRow(clientId, { progress }))
     handle.promise
@@ -179,9 +184,13 @@ export function AttachmentField({
     // 清空输入值，保证连续选择同一文件时仍触发变更事件。
     event.target.value = ''
     const currentPolicy = policy.data
-    if (selectedFiles.length === 0 || !currentPolicy) return
+    if (selectedFiles.length === 0 || !currentPolicy || isSubmitting) return
     const rejectionMessages: string[] = []
     const acceptedFiles: Array<{ clientId: string; file: File }> = []
+    const maxCount =
+      conversationId === undefined
+        ? currentPolicy.maxFilesPerSubmit
+        : Math.min(currentPolicy.maxFilesPerSubmit, currentPolicy.maxFilesPerRecord)
     let plannedCount = valueRef.current.length
     for (const file of selectedFiles) {
       if (file.size === 0) {
@@ -192,8 +201,8 @@ export function AttachmentField({
         rejectionMessages.push(`文件「${file.name}」超过单文件上限 ${formatFileSize(currentPolicy.maxFileBytes)}。`)
         continue
       }
-      if (plannedCount >= currentPolicy.maxFilesPerSubmit) {
-        rejectionMessages.push(`一次最多上传 ${currentPolicy.maxFilesPerSubmit} 个附件。`)
+      if (plannedCount >= maxCount) {
+        rejectionMessages.push(`一次最多上传 ${maxCount} 个附件。`)
         continue
       }
       acceptedFiles.push({ clientId: createClientId(), file })
@@ -249,6 +258,11 @@ export function AttachmentField({
       cancelUpload(clientId)
       return
     }
+    if (conversationId && row?.attachmentId) {
+      void removeAttachment(row.attachmentId).catch((cause: unknown) => {
+        console.warn('移除会话草稿附件后清理临时文件失败', cause)
+      })
+    }
     filesRef.current.delete(clientId)
     handlesRef.current.delete(clientId)
     cancelledRef.current.delete(clientId)
@@ -268,6 +282,7 @@ export function AttachmentField({
         data-status={row.status}
         className={cn(
           'flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2',
+          pickerRef && 'conversation-attachment-card',
           isFailed ? 'border-destructive/40 bg-destructive/10' : 'border-border bg-muted/40',
         )}
       >
@@ -299,7 +314,7 @@ export function AttachmentField({
           )}
         </div>
         <div className="flex items-center gap-1">
-          {row.status === 'done' && row.attachmentId && (
+          {!pickerRef && row.status === 'done' && row.attachmentId && (
             <AttachmentPreviewButton
               file={{ id: row.attachmentId, fileName: row.fileName, contentType: row.contentType ?? null }}
             />
@@ -331,6 +346,7 @@ export function AttachmentField({
               type="button"
               variant="ghost"
               size="xs"
+              disabled={isSubmitting}
               aria-label={`移除 ${row.fileName}`}
               onClick={() => removeRow(row.clientId)}
             >
@@ -346,6 +362,36 @@ export function AttachmentField({
     ? `单个文件不超过 ${formatFileSize(policy.data.maxFileBytes)}，一次最多 ${policy.data.maxFilesPerSubmit} 个；上传完成后才能保存。`
     : undefined
   const unfinished = hasUnfinishedAttachments(value)
+
+  const fileInput = (
+    <Input
+      ref={fileInputRef}
+      type="file"
+      multiple
+      className={pickerRef ? 'hidden' : 'sr-only'}
+      aria-label="选择文件"
+      disabled={isSubmitting || policy.isPending || policy.isError}
+      onChange={handleFilesSelected}
+    />
+  )
+
+  if (pickerRef) {
+    return (
+      <>
+        {fileInput}
+        {value.length > 0 && (
+          <ul className="conversation-attachment-rail" aria-label={label}>
+            {value.map(renderRow)}
+          </ul>
+        )}
+        {limitError && (
+          <p role="alert" className="text-xs text-destructive">
+            {limitError}
+          </p>
+        )}
+      </>
+    )
+  }
 
   return (
     <FormField label={label} labelId={labelId} help={policyHelp} error={error ?? (limitError || null)}>
@@ -364,15 +410,7 @@ export function AttachmentField({
         ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="sr-only"
-                aria-label="选择文件"
-                disabled={policy.isPending || policy.isError}
-                onChange={handleFilesSelected}
-              />
+              {fileInput}
               <Button
                 type="button"
                 variant="outline"

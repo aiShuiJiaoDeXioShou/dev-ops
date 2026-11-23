@@ -1,0 +1,204 @@
+@layer components {
+  .live-conversations .conversation-composer {
+    max-width: 780px;
+    border-color: var(--input);
+    border-radius: var(--radius-2xl);
+  }
+
+  .live-conversations .conversation-composer:focus-within {
+    border-color: color-mix(in srgb, var(--primary) 50%, var(--input));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+  }
+
+  .conversation-composer .dsh-composer-input {
+    max-height: min(336px, 34dvh);
+    overflow-y: auto;
+  }
+
+  .conversation-composer .dsh-composer-input::placeholder {
+    color: var(--muted-foreground);
+  }
+
+  .conversation-composer :is(.composer-add, .dsh-send) {
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .conversation-attachment-rail {
+    display: flex;
+    gap: 8px;
+    padding-bottom: 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .conversation-attachment-card {
+    flex: 0 0 min(240px, 92%);
+    min-height: 64px;
+  }
+
+  .conversation-attachment-card [data-slot='button'] {
+    min-height: 32px;
+  }
+
+  .conversation-message-files {
+    display: flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .conversation-message-files > li {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .conversation-file-link {
+    display: flex;
+    min-height: 36px;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--secondary);
+    color: var(--foreground);
+    font-size: var(--text-sm);
+  }
+
+  .conversation-file-link:is(:hover, :focus-visible) {
+    background: var(--accent);
+  }
+
+  .conversation-file-link :is(svg, small) {
+    flex: none;
+    color: var(--muted-foreground);
+  }
+
+  .conversation-file-link span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dsh-markdown ul {
+    list-style: disc outside;
+  }
+
+  .dsh-markdown ol {
+    list-style: decimal outside;
+  }
+
+  .dsh-markdown ul ul {
+    list-style-type: circle;
+  }
+
+  .dsh-markdown .task-list-item {
+    list-style-type: none;
+  }
+
+  .dsh-markdown .task-list-item input {
+    margin-inline-end: 8px;
+    accent-color: var(--primary);
+  }
+
+  .dsh-markdown li {
+    margin: 0;
+  }
+
+  .dsh-markdown li + li {
+    margin-top: 6px;
+  }
+
+  .dsh-markdown li > :first-child {
+    margin-top: 0;
+  }
+
+  .dsh-markdown li > :last-child {
+    margin-bottom: 0;
+  }
+
+  .dsh-markdown :is(h4, h5, h6) + :is(ul, ol) {
+    margin-top: 8px;
+  }
+
+  .dsh-markdown :is(h4, h5, h6):has(+ :is(ul, ol)) {
+    margin-bottom: 8px;
+  }
+
+  .dsh-markdown blockquote {
+    margin-block: 16px;
+    padding-inline-start: 14px;
+    border-color: var(--input);
+  }
+
+  .dsh-markdown [data-slot='table-container'] {
+    margin-block: 16px;
+    overscroll-behavior-x: contain;
+  }
+
+  .dsh-markdown :is(th, td) {
+    min-width: 96px;
+    max-width: 280px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    font-size: var(--text-sm);
+    line-height: 22px;
+  }
+
+  .dsh-markdown :is(th, td):first-child {
+    padding-inline-start: 0;
+  }
+
+  .dsh-markdown th {
+    color: var(--foreground);
+  }
+
+  .conversation-code {
+    margin-block: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--muted);
+  }
+
+  .conversation-code-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 2px 8px 2px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted-foreground);
+    font: var(--text-xs)/18px var(--md-code-font);
+  }
+
+  .conversation-code-bar > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-conversations .dsh-markdown .conversation-code pre {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 0;
+    background: var(--secondary);
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
+    font: var(--text-xs)/19px var(--md-code-font);
+  }
+
+  @media (pointer: coarse) {
+    .live-conversations .conversation-composer :is(.composer-add, .dsh-send),
+    .conversation-file-link {
+      min-height: 44px;
+    }
+
+    .live-conversations .conversation-composer :is(.composer-add, .dsh-send) {
+      min-width: 44px;
+    }
+  }
+}

@@ -1318,7 +1318,7 @@
 }
 
 /* Markdown 预览：md-body 提供正文/行内代码样式，这里补齐 fenced code block。 */
-.md-body pre {
+.md-body pre:not(.conversation-code-body) {
   margin: 16px 0;
   padding: 16px;
   overflow-x: auto;

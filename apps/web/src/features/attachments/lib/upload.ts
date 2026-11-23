@@ -31,9 +31,7 @@ export interface AttachmentUploadHandle {
   onProgress: (listener: (progress: number) => void) => void
 }
 
-interface UploadAttachmentInput {
-  /** 目标项目标识；附件先落入该项目临时区，提交业务记录时再绑定。 */
-  projectId: string
+type UploadAttachmentInput = ({ projectId: string } | { conversationId: string }) & {
   /** 用户选择的本地文件。 */
   file: File
   /** 超时毫秒数；测试可注入更短的值。 */
@@ -80,12 +78,16 @@ function isUploadSuccessEnvelope(value: unknown): value is { success: true; data
 
 /**
  * 用 XHR 上传单个附件。必须使用 XHR 而不是 api-client：上传需要进度事件与更长的独立超时。
- * @param input 项目标识、文件与可选超时。
+ * @param input 项目或会话标识、文件与可选超时。
  * @returns 上传句柄；promise 在成功、失败或取消时结算，进度监听按需注册。
  * @sideEffect 发起带 Cookie 的同源 POST 请求，发送后由服务端写入临时附件。
  */
 export function uploadAttachment(input: UploadAttachmentInput): AttachmentUploadHandle {
-  const { projectId, file, timeoutMs = ATTACHMENT_UPLOAD_TIMEOUT_MS } = input
+  const { file, timeoutMs = ATTACHMENT_UPLOAD_TIMEOUT_MS } = input
+  const target =
+    'projectId' in input
+      ? `projects/${encodeURIComponent(input.projectId)}`
+      : `bot-conversations/${encodeURIComponent(input.conversationId)}`
   const xhr = new XMLHttpRequest()
   const progressListeners: Array<(progress: number) => void> = []
   let settled = false
@@ -94,7 +96,7 @@ export function uploadAttachment(input: UploadAttachmentInput): AttachmentUpload
   }
   const promise = new Promise<UploadedAttachment>((resolve, reject) => {
     // 相对路径保证同源；Cookie 由 withCredentials 携带，不使用 api-client 的 JSON 管线。
-    xhr.open('POST', `/api/v1/projects/${encodeURIComponent(projectId)}/attachments`)
+    xhr.open('POST', `/api/v1/${target}/attachments`)
     xhr.withCredentials = true
     xhr.timeout = timeoutMs
     xhr.setRequestHeader('Content-Type', 'application/octet-stream')

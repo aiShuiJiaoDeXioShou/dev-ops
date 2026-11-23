@@ -21,8 +21,9 @@ export function attachmentPolicyQueryOptions() {
 
 /**
  * 在附件表单中读取上传策略，用于前置校验与上限提示。
+ * @param enabled 当前界面是否需要上传策略；只读时可关闭查询。
  * @returns 包含 loading/error/data 的策略查询结果。
  */
-export function useAttachmentPolicy() {
-  return useQuery(attachmentPolicyQueryOptions())
+export function useAttachmentPolicy(enabled = true) {
+  return useQuery({ ...attachmentPolicyQueryOptions(), enabled })
 }

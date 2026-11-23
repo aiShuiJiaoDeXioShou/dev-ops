@@ -19,6 +19,7 @@ export type MessageView = {
   canEdit?: boolean
   branchSiblings?: ConversationMessage['branchSiblings']
   templateName?: string
+  attachments?: ConversationMessage['body']['attachments']
   memoryChanges?: string[]
   metrics?: ConversationMessage['body']['metrics']
   feedback?: ConversationMessage['feedback']

@@ -3,12 +3,21 @@ import { cn } from '@/shared/lib/utils'
 
 /**
  * 渲染可横向滚动的数据表格容器。
- * @param props 原生 div 属性与自定义类名。
+ * @param props 表格属性与可选的滚动容器属性。
  * @returns 包裹表格的滚动区域。
  */
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+function Table({
+  className,
+  containerProps,
+  ...props
+}: React.ComponentProps<'table'> & { containerProps?: React.ComponentProps<'div'> }) {
+  const { className: containerClassName, ...scrollProps } = containerProps ?? {}
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div
+      {...scrollProps}
+      data-slot="table-container"
+      className={cn('relative w-full overflow-x-auto', containerClassName)}
+    >
       <table data-slot="table" className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   )

@@ -1,13 +1,12 @@
 import { useLayoutEffect, useRef } from 'react'
 import { Link } from 'react-router'
-import ReactMarkdown from 'react-markdown'
-import rehypeSanitize from 'rehype-sanitize'
-import remarkGfm from 'remark-gfm'
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/shared/ui/controls/table'
+import { Download } from 'lucide-react'
+import { formatFileSize, truncateFileName } from '@/features/attachments/lib/display'
 import { AnswerFooter } from './answer-footer'
 import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
+import { ConversationMarkdown } from './conversation-markdown'
 import { ConversationMessageActions } from './conversation-message-actions'
 import type { MessageView } from './conversation-message.view'
 
@@ -68,6 +67,17 @@ export function ConversationMessages({
     } else if (follow.current && last?.id) box.scrollTop = box.scrollHeight
   }, [items.length, last?.id, last?.text, last?.status, last?.failureText, loadingEarlier, isVisible])
 
+  useLayoutEffect(() => {
+    const box = scrollBox.current
+    if (!box || !isVisible) return
+    // 草稿或附件撑高输入区时，只跟随原本就在消息末尾的读者。
+    const observer = new ResizeObserver(() => {
+      if (follow.current && historyOffset.current === null) box.scrollTop = box.scrollHeight
+    })
+    observer.observe(box)
+    return () => observer.disconnect()
+  }, [isVisible])
+
   return (
     <div
       className={cn('dsh-chat-scroll', isEmpty && 'is-empty')}
@@ -122,7 +132,26 @@ export function ConversationMessages({
               >
                 {message.kind === 'user' ? (
                   <>
-                    <div className="dsh-user-bubble">{message.text}</div>
+                    {message.attachments?.length ? (
+                      <ul className="conversation-message-files" aria-label="消息附件">
+                        {message.attachments.map(({ id, fileName, sizeBytes }) => (
+                          <li key={id}>
+                            <a
+                              className="conversation-file-link"
+                              href={`/api/v1/bot-conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(message.id)}/attachments/${encodeURIComponent(id)}/download`}
+                              download={fileName}
+                              aria-label={`下载 ${fileName}`}
+                              title={fileName}
+                            >
+                              <Download size={16} aria-hidden="true" />
+                              <span>{truncateFileName(fileName)}</span>
+                              <small>{formatFileSize(sizeBytes)}</small>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {message.text && <div className="dsh-user-bubble">{message.text}</div>}
                     {message.failureText && (
                       <p className="dsh-user-failure" role="status">
                         {message.failureText}
@@ -150,31 +179,8 @@ export function ConversationMessages({
                       )}
                       <span className="dsh-author">{message.name}</span>
                     </div>
-                    {message.text && message.runId ? (
-                      <div className="md-body dsh-markdown">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeSanitize]}
-                          components={{
-                            table: ({ children }) => <Table>{children}</Table>,
-                            thead: ({ children }) => <TableHeader>{children}</TableHeader>,
-                            tbody: ({ children }) => <TableBody>{children}</TableBody>,
-                            tr: ({ children }) => <TableRow>{children}</TableRow>,
-                            th: ({ children }) => <TableHead scope="col">{children}</TableHead>,
-                            td: ({ children }) => <TableCell>{children}</TableCell>,
-                            p: ({ children, node }) => (
-                              <p>
-                                {children}
-                                {running && node?.position?.end.offset === message.text.trimEnd().length && (
-                                  <span className="dsh-cursor" aria-hidden="true" />
-                                )}
-                              </p>
-                            ),
-                          }}
-                        >
-                          {message.text.trimEnd()}
-                        </ReactMarkdown>
-                      </div>
+                    {message.text && message.kind === 'bot' ? (
+                      <ConversationMarkdown text={message.text} running={running} />
                     ) : (
                       message.text && <div className="dsh-plain-text">{message.text}</div>
                     )}

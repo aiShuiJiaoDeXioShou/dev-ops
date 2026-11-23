@@ -1,7 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { Paperclip } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAttachmentPolicy } from '@/features/attachments/api/queries'
+import { describeAttachmentError } from '@/features/attachments/lib/errors'
+import { doneAttachmentIds, hasUnfinishedAttachments } from '@/features/attachments/lib/pending'
+import type { PendingAttachment } from '@/features/attachments/model/types'
+import { AttachmentField } from '@/features/attachments/ui/attachment-field'
 import { apiClient } from '@/shared/api/client'
-import { describeRequestError } from '@/shared/api/errors'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
 import {
@@ -14,6 +19,7 @@ import { Switch } from '@/shared/ui/controls/switch'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import type { BotConversation } from '../api/queries'
 import { ConversationIcon } from './conversation-icon'
+import './conversation-content.css'
 
 type Candidate = { id: string; kind: 'bot' | 'skill' | 'all' | 'template'; name: string; token: string }
 
@@ -29,7 +35,7 @@ function mentionAt(text: string, caret: number) {
   return match ? { query: match[1] ?? '', start: match.index + match[0].indexOf('@'), symbol: '@' } : undefined
 }
 
-type StoredDraft = { text: string; requestId?: string }
+type StoredDraft = { text: string; requestId?: string; attachments?: PendingAttachment[] }
 
 function mentionsIn(text: string, candidates: Candidate[]) {
   const ordered = candidates.slice().sort((left, right) => right.token.length - left.token.length)
@@ -42,7 +48,7 @@ function mentionsIn(text: string, candidates: Candidate[]) {
 }
 
 /**
- * 显示原型输入区、引用菜单和同位置的发送／停止按钮。
+ * 显示支持附件、引用菜单和发送／停止操作的会话输入区。
  * @param props 当前会话、只读权限、运行停止标记和可补充的任务版本。
  * @returns 会话输入区。发送失败保留草稿，同一内容重试沿用请求标识。
  */
@@ -79,6 +85,9 @@ export function ConversationComposer({
     const cached = cachedDraft?.text ?? ''
     return prefix && !cached.includes(prefix) ? prefix + cached : cached
   })
+  const [attachments, setAttachments] = useState(() => cachedDraft?.attachments ?? [])
+  const picker = useRef<HTMLInputElement>(null)
+  const attachmentPolicy = useAttachmentPolicy(!readOnly)
   const [caret, setCaret] = useState(draft.length)
   const [hideMentions, setHideMentions] = useState(false)
   const [steering, setSteering] = useState(false)
@@ -90,6 +99,8 @@ export function ConversationComposer({
   const requestId = useRef(cachedDraft?.text === draft ? cachedDraft?.requestId : undefined)
   const menuOpenedMention = useRef(false)
   const supplement = task && task.id === supplementId ? task : undefined
+  const attachmentIds = supplement ? [] : doneAttachmentIds(attachments)
+  const hasDraftContent = !!draft.trim() || (!supplement && attachments.length > 0)
   const mention = supplement || hideMentions ? undefined : mentionAt(draft, caret)
   const botCandidates: Candidate[] = room.members
     .filter(({ kind, enabled }) => kind === 'bot' && enabled !== false)
@@ -133,7 +144,11 @@ export function ConversationComposer({
     mutationFn: async () => {
       const id = requestId.current ?? crypto.randomUUID()
       requestId.current = id
-      client.setQueryData<StoredDraft>(draftKey, { text: draft, requestId: id })
+      client.setQueryData<StoredDraft>(draftKey, {
+        text: draft,
+        requestId: id,
+        attachments: attachments.filter(({ status }) => status === 'done'),
+      })
       if (supplement) {
         await apiClient.appendBotTask(
           supplement.id,
@@ -147,6 +162,7 @@ export function ConversationComposer({
         {
           text: draft,
           clientRequestId: id,
+          ...(attachmentIds.length ? { attachmentIds } : {}),
           ...(selectedBots.length && !mentionAll ? { mentionBotIds: selectedBots } : {}),
           ...(mentionAll ? { mentionAll: true } : {}),
           ...(runningId && steering ? { deliveryMode: 'steer' } : {}),
@@ -159,7 +175,11 @@ export function ConversationComposer({
     onSuccess: () => {
       setDraft('')
       setCaret(0)
-      client.setQueryData<StoredDraft>(draftKey, { text: '' })
+      if (!supplement) setAttachments([])
+      client.setQueryData<StoredDraft>(draftKey, (current) => ({
+        text: '',
+        attachments: supplement ? current?.attachments : [],
+      }))
       setSupplementId(undefined)
       setSteering(false)
       requestId.current = undefined
@@ -176,11 +196,20 @@ export function ConversationComposer({
 
   const change = (value: string, position: number) => {
     setDraft(value)
-    client.setQueryData<StoredDraft>(draftKey, { text: value })
+    client.setQueryData<StoredDraft>(draftKey, (current) => ({ text: value, attachments: current?.attachments }))
     setReferenceError(false)
     setCaret(position)
     setHideMentions(false)
     setCandidateIndex(0)
+    requestId.current = undefined
+    if (send.isError) send.reset()
+  }
+  const changeAttachments = (next: PendingAttachment[]) => {
+    setAttachments(next)
+    client.setQueryData<StoredDraft>(draftKey, (current) => ({
+      text: current?.text ?? draft,
+      attachments: next.filter(({ status }) => status === 'done'),
+    }))
     requestId.current = undefined
     if (send.isError) send.reset()
   }
@@ -194,12 +223,17 @@ export function ConversationComposer({
     const start = `${draft.slice(0, mention.start)}${mention.symbol}${candidate.token} `
     replace(start + draft.slice(caret), start.length)
   }
+  const cannotSend =
+    !hasDraftContent ||
+    send.isPending ||
+    (!supplement && hasUnfinishedAttachments(attachments)) ||
+    (draft.startsWith('/') && templates.isPending)
   const submit = () => {
     if (mention && activeCandidate) {
       insert(activeCandidate)
       return
     }
-    if (!draft.trim() || send.isPending || (draft.startsWith('/') && templates.isPending)) return
+    if (cannotSend) return
     if (hasUnknownReference) {
       setReferenceError(true)
       return
@@ -209,7 +243,7 @@ export function ConversationComposer({
   if (readOnly) return <p className="dsh-readonly-note">浏览者只读</p>
   return (
     <form
-      className={cn('dsh-composer', runningId && 'is-generating')}
+      className={cn('dsh-composer conversation-composer', runningId && 'is-generating')}
       onSubmit={(event) => {
         event.preventDefault()
         submit()
@@ -272,10 +306,20 @@ export function ConversationComposer({
           </Button>
         </div>
       )}
+      <div hidden={!!supplement}>
+        <AttachmentField
+          conversationId={room.id}
+          label="待发送附件"
+          value={attachments}
+          onChange={changeAttachments}
+          pickerRef={picker}
+          isSubmitting={send.isPending}
+        />
+      </div>
       <Textarea
         ref={input}
-        rows={1}
-        className="dsh-composer-input min-h-7 resize-none! rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+        rows={2}
+        className="dsh-composer-input min-h-15 resize-none! rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
         maxLength={16000}
         aria-label="协作消息"
         placeholder={
@@ -313,7 +357,7 @@ export function ConversationComposer({
       )}
       {send.isError && (
         <p className="field-error" role="alert">
-          {describeRequestError(send.error).description}
+          {describeAttachmentError(send.error)}
         </p>
       )}
       <div className="dsh-composer-bar">
@@ -342,6 +386,20 @@ export function ConversationComposer({
               input.current?.focus()
             }}
           >
+            <DropdownMenuItem
+              disabled={!!supplement || attachmentPolicy.isPending}
+              onSelect={() => {
+                if (attachmentPolicy.isError) void attachmentPolicy.refetch()
+                else picker.current?.click()
+              }}
+            >
+              <Paperclip />
+              {attachmentPolicy.isPending
+                ? '正在读取上传限制…'
+                : attachmentPolicy.isError
+                  ? '重试读取上传限制'
+                  : '上传文件'}
+            </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onNewTask(addTrigger.current)}>
               <ConversationIcon name="file" />
               新建任务
@@ -403,14 +461,14 @@ export function ConversationComposer({
             <ConversationIcon name="stop" />
           </Button>
         )}
-        {(!runningId || !!draft.trim()) && (
+        {(!runningId || hasDraftContent) && (
           <Button
             unstyled
             type="submit"
             className="dsh-send"
             size="icon"
             aria-label={supplement ? '保存补充' : '发送消息'}
-            disabled={!draft.trim() || send.isPending || (draft.startsWith('/') && templates.isPending)}
+            disabled={cannotSend}
           >
             <ConversationIcon name="send" />
           </Button>
