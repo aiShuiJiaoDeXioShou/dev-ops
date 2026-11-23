@@ -250,8 +250,7 @@ pnpm --dir apps/server dev:bot-worker   # Bot 执行服务（私聊/群聊、任
 │   ├── nginx-devops.conf    # 生成的 Nginx 配置片段
 │   └── services/            # 生成的 launchd plist 或 systemd unit 文件
 ├── data/                    # 发布目录外的持久化业务数据（pipeline / attachments / bot）
-├── logs/                    # 三个常驻进程日志
-└── scripts/release-main.sh  # 自举发布脚本
+└── logs/                    # 三个常驻进程日志
 ```
 
 ### 第一步：初始化目录、密钥与 PostgreSQL 18
@@ -332,7 +331,7 @@ Linux 实例手动升级时，在同步源码与子模块后再次运行 `./.dev
 
 ### Mac mini 流水线自举发布
 
-完成首次原生部署后，在团队设置中注册能力标签为 `macmini-deploy` 的专用执行节点。后续应用发布在平台手动触发 [`.devops/workflows/deploy-macmini.yml`](.devops/workflows/deploy-macmini.yml)，由宿主安装的 [`.devops/scripts/release-main.sh`](.devops/scripts/release-main.sh) 构建、迁移、切换版本和检查就绪，异常时恢复上一版本。详见 [Mac mini 原生发布文档](deploy/native/README.md)。
+完成首次原生部署后，在团队设置中注册能力标签为 `macmini-deploy` 的专用执行节点。在平台手动触发 [`.devops/workflows/deploy-macmini.yml`](.devops/workflows/deploy-macmini.yml)，Agent 检出固定提交，并执行仓库中的 [`.devops/scripts/release-main.sh`](.devops/scripts/release-main.sh)，完成构建、迁移、版本切换和就绪检查。异常时恢复上一版本。详见 [Mac mini 原生发布文档](deploy/native/README.md)。
 
 ---
 

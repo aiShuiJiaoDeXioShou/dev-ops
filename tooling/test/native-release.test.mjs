@@ -35,6 +35,8 @@ test('原生发布在构建失败时清理临时目录，在登录页异常时�
   git('add', '.')
   git('-c', 'user.name=DevOps', '-c', 'user.email=test@example.com', 'commit', '-m', '测试发布')
   const commit = git('rev-parse', 'HEAD')
+  const remoteUrl = pathToFileURL(source).href
+  git('remote', 'add', 'origin', remoteUrl)
 
   function stub(name, commands) {
     return writeFile(join(executables, name), `#!/bin/bash\nset -eu\n${commands}\n`, { mode: 0o700 })
@@ -76,13 +78,14 @@ esac`,
   delete testEnv.DEVOPS_DEPLOY_GIT_TOKEN
   function publish(mode, { servicePrefix = 'com.devops', origin = 'http://127.0.0.1:8080' } = {}) {
     const result = spawnSync('/bin/bash', [script, commit], {
+      cwd: source,
       encoding: 'utf8',
       timeout: 15_000,
       env: {
         ...testEnv,
         PATH: [executables, dirname(process.execPath), process.env.PATH].join(delimiter),
         DEVOPS_DEPLOY_ROOT: deployRoot,
-        DEVOPS_DEPLOY_REPOSITORY: pathToFileURL(source).href,
+        DEVOPS_DEPLOY_REPOSITORY: remoteUrl,
         PREVIOUS_RELEASE: previous,
         RELEASE_MODE: mode,
         RELEASE_ORIGIN: origin,

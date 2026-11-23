@@ -1,23 +1,21 @@
 # Mac mini 原生发布
 
-用于已经在 Mac mini 上运行的 DevOps。平台调度 Agent，Agent 在 macOS 上调用固定的发布脚本。Docker 只用于选择 Linux 执行方式的工作流。
+用于已经在 Mac mini 上运行的 DevOps。平台调度 Agent，Agent 在 macOS 独立工作区检出源码并执行 YAML 中的 `run` 步骤。Docker 用于 Linux 执行节点。
 
 ## 安装原生节点
 
 1. 首次安装使用仓库的 [`.devops/scripts/deploy.sh`](../../.devops/scripts/deploy.sh) 初始化。先上线支持 `macmini-deploy` 的平台和数据库迁移。
 2. 从团队设置注册能力标签为 `macmini-deploy` 的专用执行节点。把长期节点令牌写入权限为 0600 的宿主环境文件。
-3. 初始化脚本会把 [`.devops/scripts/release-main.sh`](../../.devops/scripts/release-main.sh) 安装为部署目录的 `scripts/release-main.sh`。使用 [Agent 配置](../../apps/pipeline-agent/.env.example)固定此宿主路径、允许发布的仓库 HTTPS URL 与工作流路径。GitHub URL 包含 `.git` 后缀。发布脚本更新时，以部署用户在宿主机从已审查的检出版本更新这个文件。
+3. 使用 [Agent 配置](../../apps/pipeline-agent/.env.example)设置 `AGENT_NATIVE_DEPLOY_REPOSITORY` 和 `AGENT_NATIVE_DEPLOY_WORKFLOW`，限定生产节点可执行的仓库与工作流。GitHub URL 包含 `.git` 后缀。原生命令以 Agent 的系统账号运行，生产节点仅用于可信的发布工作流。
 4. 用 launchd 启动 Agent。例如使用 `node --env-file <部署目录>/shared/pipeline-agent.env <部署目录>/current/apps/pipeline-agent/dist/index.js`。仓库和私有 Bot 子模块需同属可读取的 GitHub App 安装。同机可通过 Nginx 的本机地址访问 API。先运行 `corepack enable pnpm`，然后在 launchd 的 `PATH` 中包含 Node、Corepack、pnpm、Git 和宿主工具。可选 `DEVOPS_DEPLOY_GIT_PROXY` 只供 GitHub Git 操作使用。
 
-更新宿主发布脚本时，从已审查的仓库根目录运行以下命令，目标路径应与 `AGENT_NATIVE_DEPLOY_SCRIPT` 一致。
+### 从旧版工作流升级
 
-```bash
-install -m 0700 .devops/scripts/release-main.sh "$HOME/deploy/dev-ops/scripts/release-main.sh"
-```
+先发布支持原生 `run` 且仍使用 `builtin:deploy-native` 的兼容版本。旧流水线完成后，重启 launchd 管理的 Agent，使其加载新版执行器。随后将含 `run` 步骤的工作流发布到 `main`。升级完成后可移除旧版专用配置 `AGENT_NATIVE_DEPLOY_SCRIPT`。
 
 ## 发布
 
-从项目「流水线」手动触发 [`deploy-macmini`](../../.devops/workflows/deploy-macmini.yml)，选择 `main`。只有团队管理员能触发原生发布。节点只支持一次执行一个发布。脚本从固定仓库检出提交，在 macOS 构建，运行数据库迁移，将 `current` 切换到新版本，再重启 API 和两个 Worker。
+从项目「流水线」手动触发 [`deploy-macmini`](../../.devops/workflows/deploy-macmini.yml)，选择 `main`。只有团队管理员能触发原生发布。节点每次执行一个发布，先检出固定提交和子模块，然后通过 `run` 直接调用该提交里的 [`.devops/scripts/release-main.sh`](../../.devops/scripts/release-main.sh)。脚本使用已检出的源码构建，执行数据库迁移、切换 `current`，再重启 API 和两个 Worker。
 
 新安装的 `com.devops.*` 服务按共享配置 `APP_ORIGIN` 检查对外网关。已有 `com.apple-macmini.devops.*` 部署继续通过本机网关端口 `18080` 检查。发布脚本根据 launchd 服务参数核对部署目录后再重启服务。
 

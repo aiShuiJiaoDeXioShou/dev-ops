@@ -6,8 +6,6 @@ commit="${1:?请提供流水线固定的提交 SHA}"
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || { echo '提交 SHA 不合法' >&2; exit 2; }
 base="${DEVOPS_DEPLOY_ROOT:-$HOME/deploy/dev-ops}"
 repo="${DEVOPS_DEPLOY_REPOSITORY:?缺少部署仓库地址}"
-git_token="${DEVOPS_DEPLOY_GIT_TOKEN:-}"
-unset DEVOPS_DEPLOY_GIT_TOKEN
 target="$base/releases/$commit"
 shared="$base/shared"
 domain="gui/$(id -u)"
@@ -100,7 +98,16 @@ trap cleanup EXIT
 trap 'exit 143' TERM
 trap 'exit 130' INT
 
-# Agent 只传入固定的提交，发布脚本从指定仓库的 main 获取源码。
+# 在 Agent 已完成检出的工作区运行。核对来源后只打包这一份源码。
+source_dir="$(git rev-parse --show-toplevel)"
+[[ "$(git -C "$source_dir" rev-parse HEAD)" == "$commit" ]] || {
+  echo '工作区提交与流水线固定的 SHA 不一致' >&2
+  exit 1
+}
+[[ "$(git -C "$source_dir" remote get-url origin)" == "$repo" ]] || {
+  echo '工作区仓库与节点配置不一致' >&2
+  exit 1
+}
 head_sha="$("${git_command[@]}" ls-remote --exit-code "$repo" refs/heads/main | cut -f1)"
 [[ "$head_sha" == "$commit" ]] || { echo '待发布提交不是当前 main 的 HEAD' >&2; exit 1; }
 [[ -L "$current" && -d "$previous" ]] || { echo '当前原生部署损坏或尚未初始化' >&2; exit 1; }
@@ -113,20 +120,8 @@ fi
 
 stage="$(mktemp -d "$base/releases/.native-release.XXXXXXXX")"
 if [[ ! -e "$target" ]]; then
-  "${git_command[@]}" clone --depth 1 --single-branch --branch main "$repo" "$stage/source"
-  [[ "$(git -C "$stage/source" rev-parse HEAD)" == "$commit" ]] || { echo '构建前 main 已更新' >&2; exit 1; }
-  if [[ -n "$git_token" ]]; then
-    # 私有 Bot 子模块使用同一安装的短期令牌，并限定到该子模块的 HTTPS 地址。
-    submodule_url="${repo%/*}/devops-bot.git"
-    auth_header="$(printf 'x-access-token:%s' "$git_token" | base64 | tr -d '\n')"
-    GIT_CONFIG_COUNT=1 \
-      GIT_CONFIG_KEY_0="http.$submodule_url.extraHeader" \
-      GIT_CONFIG_VALUE_0="Authorization: Basic $auth_header" \
-      "${git_command[@]}" -C "$stage/source" submodule update --init --recursive
-    unset auth_header git_token
-  else
-    "${git_command[@]}" -C "$stage/source" submodule update --init --recursive
-  fi
+  # 构建产物必须留在发布目录，Agent 在运行结束后会清理检出工作区。
+  cp -RP "$source_dir" "$stage/source"
   (
     cd "$stage/source"
     corepack pnpm install --frozen-lockfile

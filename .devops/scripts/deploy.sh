@@ -51,8 +51,7 @@ DevOps 平台生产部署脚本
   ├── current -> ...    当前生效版本软链
   ├── shared/           app.env / migration.env / 服务模板与 Nginx 配置（0600 保护敏感配置）
   ├── data/             pipeline / attachments / bot 持久化业务数据目录
-  ├── logs/             服务运行日志
-  └── scripts/          release-main.sh 自举发布脚本
+  └── logs/             服务运行日志
 EOF
 }
 
@@ -161,7 +160,6 @@ SHARED_DIR="$DEPLOY_ROOT/shared"
 RELEASES_DIR="$DEPLOY_ROOT/releases"
 DATA_DIR="$DEPLOY_ROOT/data"
 LOGS_DIR="$DEPLOY_ROOT/logs"
-SCRIPTS_DIR="$DEPLOY_ROOT/scripts"
 CURRENT_LINK="$DEPLOY_ROOT/current"
 
 # 1. 创建标准部署目录结构。
@@ -171,11 +169,7 @@ mkdir -p \
   "$DATA_DIR/pipeline" \
   "$DATA_DIR/attachments" \
   "$DATA_DIR/bot" \
-  "$LOGS_DIR" \
-  "$SCRIPTS_DIR"
-
-# 安装到发布目录之外，让 Agent 始终调用由宿主管理的脚本。
-install -m 0700 "$SCRIPT_DIR/release-main.sh" "$SCRIPTS_DIR/release-main.sh"
+  "$LOGS_DIR"
 
 # 2. 首次初始化生成强随机密钥的共享环境配置，已有配置绝不覆盖。
 APP_ENV="$SHARED_DIR/app.env"
