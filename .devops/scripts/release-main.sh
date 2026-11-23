@@ -13,8 +13,13 @@ shared="$base/shared"
 domain="gui/$(id -u)"
 node="$(command -v node)"
 current="$base/current"
-current_url="http://127.0.0.1:18080"
+current_url=""
+service_prefix=""
 lock="$shared/native-release.lock"
+[[ -d "$base/releases" && -f "$shared/app.env" && -f "$shared/migration.env" ]] || {
+  echo '部署目录或共享配置未初始化' >&2
+  exit 1
+}
 mkdir "$lock" 2>/dev/null || { echo '已有原生发布正在执行' >&2; exit 1; }
 
 stage=""
@@ -30,10 +35,30 @@ switch_release() {
   mv -fh "$stage/current" "$current"
 }
 
+select_deployment() {
+  local prefix job
+  for prefix in com.apple-macmini.devops com.devops; do
+    job="$(launchctl print "$domain/$prefix.http" 2>/dev/null)" || continue
+    # 同一用户可能运行多个实例，只重启当前部署目录下的服务。
+    if [[ "$job" != *"$shared/app.env"* || "$job" != *"$current/apps/server/dist/entrypoints/http.js"* ]]; then
+      continue
+    fi
+    service_prefix="$prefix"
+    if [[ "$prefix" == com.apple-macmini.devops ]]; then
+      current_url="http://127.0.0.1:18080"
+    else
+      current_url="$("$node" --env-file "$shared/app.env" -e 'process.stdout.write(new URL(process.env.APP_ORIGIN).origin)')"
+    fi
+    return
+  done
+  echo '未找到使用当前部署目录的 launchd HTTP 服务' >&2
+  return 1
+}
+
 restart_app() {
   local service
   for service in http worker bot-worker; do
-    launchctl kickstart -k "$domain/com.apple-macmini.devops.$service" || return
+    launchctl kickstart -k "$domain/$service_prefix.$service" || return
   done
 }
 
@@ -52,17 +77,23 @@ check_ready() {
   return 1
 }
 
+check_release() {
+  check_ready && curl --noproxy '*' -fsS --max-time 8 "$current_url/login" | grep 'id="root"' >/dev/null
+}
+
 cleanup() {
   local status=$?
   trap - EXIT
   if [[ "$status" -ne 0 && "$activated" -eq 1 ]]; then
     echo '发布未通过，恢复上一版本' >&2
-    if ! switch_release "$previous" || ! restart_app || ! check_ready; then
+    if ! switch_release "$previous" || ! restart_app || ! check_release; then
       echo '上一版本未恢复就绪，请检查 launchd 和部署日志' >&2
     fi
   fi
-  if [[ -n "$stage" && -d "$stage" ]]; then rmdir "$stage" 2>/dev/null || true; fi
-  rmdir "$lock"
+  if [[ -n "$stage" ]] && ! rm -rf -- "$stage"; then
+    echo "无法清理发布临时目录 $stage" >&2
+  fi
+  if ! rmdir "$lock"; then echo "无法解除发布锁 $lock" >&2; fi
   exit "$status"
 }
 trap cleanup EXIT
@@ -73,8 +104,9 @@ trap 'exit 130' INT
 head_sha="$("${git_command[@]}" ls-remote --exit-code "$repo" refs/heads/main | cut -f1)"
 [[ "$head_sha" == "$commit" ]] || { echo '待发布提交不是当前 main 的 HEAD' >&2; exit 1; }
 [[ -L "$current" && -d "$previous" ]] || { echo '当前原生部署损坏或尚未初始化' >&2; exit 1; }
+select_deployment
 if [[ "$previous" == "$target" ]]; then
-  check_ready
+  check_release
   echo "当前已运行 $commit"
   exit 0
 fi
@@ -111,10 +143,12 @@ fi
   "$node" --env-file "$shared/migration.env" dist/entrypoints/migrate.js
 )
 # 构建期间若 main 前进，等待该提交自己的流水线接管发布。
-[[ "$("${git_command[@]}" ls-remote --exit-code "$repo" refs/heads/main | cut -f1)" == "$commit" ]]
+[[ "$("${git_command[@]}" ls-remote --exit-code "$repo" refs/heads/main | cut -f1)" == "$commit" ]] || {
+  echo '构建期间 main 已更新，请发布新的提交' >&2
+  exit 1
+}
 switch_release "$target"
 activated=1
 restart_app
-check_ready
-curl --noproxy '*' -fsS --max-time 8 "$current_url/login" | grep -q 'id="root"'
+check_release
 echo "已发布 $commit"

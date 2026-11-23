@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 # DevOps 平台原生部署与初始化脚本（支持 macOS launchd 与 Linux systemd）。
-# 目录结构与 deploy/native/release-main.sh 保持一致，首次部署后可直接接入 Mac mini 自举发布。
+# 目录结构与同目录下的 release-main.sh 保持一致，便于接入 Mac mini 自举发布。
 
 DEPLOY_ROOT="${DEVOPS_DEPLOY_ROOT:-$HOME/deploy/dev-ops}"
 APP_ORIGIN="${DEVOPS_APP_ORIGIN:-http://127.0.0.1:8080}"
@@ -23,7 +23,7 @@ usage() {
 DevOps 平台生产部署脚本
 
 用法:
-  ./scripts/deploy.sh [选项]
+  ./.devops/scripts/deploy.sh [选项]
 
 选项:
   --root <目录>         部署根目录（默认: ~/deploy/dev-ops）
@@ -129,7 +129,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SOURCE_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SOURCE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 [[ -f "$SOURCE_DIR/apps/server/package.json" && -f "$SOURCE_DIR/apps/web/package.json" ]] || \
   die "请在 dev-ops 仓库内运行本脚本（当前路径: ${SOURCE_DIR}）"
 
@@ -174,11 +174,8 @@ mkdir -p \
   "$LOGS_DIR" \
   "$SCRIPTS_DIR"
 
-# 同步 Mac mini 原生发布脚本，便于后续接入流水线自举发布。
-if [[ -f "$SOURCE_DIR/deploy/native/release-main.sh" ]]; then
-  cp "$SOURCE_DIR/deploy/native/release-main.sh" "$SCRIPTS_DIR/release-main.sh"
-  chmod 0700 "$SCRIPTS_DIR/release-main.sh"
-fi
+# 安装到发布目录之外，让 Agent 始终调用由宿主管理的脚本。
+install -m 0700 "$SCRIPT_DIR/release-main.sh" "$SCRIPTS_DIR/release-main.sh"
 
 # 2. 首次初始化生成强随机密钥的共享环境配置，已有配置绝不覆盖。
 APP_ENV="$SHARED_DIR/app.env"
@@ -328,7 +325,7 @@ fi
 
 if [[ "$INIT_ONLY" -eq 1 ]]; then
   log '已完成目录、配置与服务模板初始化（--init-only）。'
-  log "请先用 deploy/postgres/init.sql 初始化 PostgreSQL 18 并核对 $APP_ENV 与 $MIGRATION_ENV 中的数据库密码，再执行 ./scripts/deploy.sh 完成发布。"
+  log "请先用 deploy/postgres/init.sql 初始化 PostgreSQL 18 并核对 $APP_ENV 与 $MIGRATION_ENV 中的数据库密码，再执行 ./.devops/scripts/deploy.sh 完成发布。"
   exit 0
 fi
 

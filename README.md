@@ -197,7 +197,7 @@ pnpm --dir apps/server dev:bot-worker   # Bot 执行服务（私聊/群聊、任
 
 生产环境由 **PostgreSQL 18**、**三个常驻 Node.js 进程**（`http.js`、`worker.js`、`bot-worker.js`）以及托管 `apps/web/dist` 并反代 `/api/` 的 **HTTPS Nginx 网关**组成。
 
-仓库提供开箱即用的生产部署脚本 [`scripts/deploy.sh`](scripts/deploy.sh)，支持 **macOS（`launchd`）** 与 **Linux（`systemd`）**，并采用与 [Mac mini 原生自举发布](deploy/native/README.md)兼容的目录结构：
+仓库提供生产初始化脚本 [`.devops/scripts/deploy.sh`](.devops/scripts/deploy.sh)，支持 **macOS（`launchd`）** 与 **Linux（`systemd`）**，并采用与 [Mac mini 原生自举发布](deploy/native/README.md)兼容的目录结构。
 
 ```text
 ~/deploy/dev-ops/
@@ -220,7 +220,7 @@ git clone --recurse-submodules https://github.com/aiShuiJiaoDeXioShou/dev-ops.gi
 cd dev-ops
 
 # 1. 初始化部署目录、随机密钥配置（0600）、Nginx 与系统服务模板
-./scripts/deploy.sh \
+./.devops/scripts/deploy.sh \
   --root "$HOME/deploy/dev-ops" \
   --origin "https://devops.example.com" \
   --port 3001 \
@@ -252,15 +252,13 @@ psql -h 127.0.0.1 -p 5433 -d dev_ops -v ON_ERROR_STOP=1 -f deploy/postgres/init.
 # 首次部署：构建全量产物、执行迁移、初始化平台 root 并原子切换 current
 ROOT_EMAIL="admin@example.com" \
 ROOT_INITIAL_PASSWORD="YourStrongPassword!" \
-./scripts/deploy.sh \
+./.devops/scripts/deploy.sh \
   --root "$HOME/deploy/dev-ops" \
   --origin "https://devops.example.com" \
   --seed-root
-
-# 后续手动升级（保留 shared/*.env 与 data/）
-git pull --ff-only && git submodule update --init --recursive
-./scripts/deploy.sh --root "$HOME/deploy/dev-ops" --origin "https://devops.example.com"
 ```
+
+Linux 实例手动升级时，在同步源码与子模块后再次运行 `./.devops/scripts/deploy.sh`。Mac mini 的后续发布见下文。
 
 ### 第三步：启动守护进程并配置网关
 
@@ -293,7 +291,7 @@ git pull --ff-only && git submodule update --init --recursive
 
 ### Mac mini 流水线自举发布
 
-完成首次原生部署后，可在团队设置中注册能力标签为 `macmini-deploy` 的专用执行节点，直接通过仓库内的 [`.devops/workflows/deploy-macmini.yml`](.devops/workflows/deploy-macmini.yml) 与 [`deploy/native/release-main.sh`](deploy/native/release-main.sh) 在平台内一键构建、迁移、重启并在就绪失败时自动回滚上一版本。详见 [Mac mini 原生发布文档](deploy/native/README.md)。
+完成首次原生部署后，在团队设置中注册能力标签为 `macmini-deploy` 的专用执行节点。后续应用发布在平台手动触发 [`.devops/workflows/deploy-macmini.yml`](.devops/workflows/deploy-macmini.yml)，由宿主安装的 [`.devops/scripts/release-main.sh`](.devops/scripts/release-main.sh) 构建、迁移、切换版本和检查就绪，异常时恢复上一版本。详见 [Mac mini 原生发布文档](deploy/native/README.md)。
 
 ---
 
@@ -358,10 +356,10 @@ devops code tree <projectId> --repository <repositoryId> --ref main
 devops delivery report --project <projectId> --file ./build.json --json
 devops delivery version list <projectId> <serviceId>
 
-# 内置流水线触发与日志跟踪
+# Mac mini 生产流水线触发与日志跟踪（团队管理员）
 devops pipeline workflow list <projectId> --json
-devops pipeline run trigger <projectId> --workflow .devops/workflows/platform-smoke.yml --ref main
-devops pipeline run logs <runId> --step 1 --follow
+devops pipeline run trigger <projectId> --workflow .devops/workflows/deploy-macmini.yml --ref main
+devops pipeline run logs <runId> --follow
 devops pipeline run wait <runId> --json
 
 # Bot 协作与任务验收

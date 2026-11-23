@@ -9,6 +9,6 @@ jobs:
     runs-on: macmini-deploy
     timeout-minutes: 35
     steps:
-      - name: 构建并发布到 Mac mini
+      - name: 构建、迁移并切换生产版本
         uses: builtin:deploy-native
         timeout-minutes: 30

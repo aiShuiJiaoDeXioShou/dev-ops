@@ -50,5 +50,5 @@
 
 - 认证四页、项目/需求/Bug 列表、项目头部、侧栏、团队页与系统连接状态迁移到 shared UI；`ui-baseline` 从 96 处降至 15 处，剩余 `code-page` 待迁移。
 - 设计 token 与文档校准：侧栏 232px、桌面 padding 24px、移动端 16px、页面标题 19px，和 1440/390 实测一致。
-- 新增 Playwright 视觉与布局回归：`apps/web/visual/`，覆盖 16 个桌面页面、3 个关键弹窗与 4 个移动场景；用脱敏 mock API 保证不依赖本机数据库，CI 工作流为 `.github/workflows/web-visual.yml`。
-- 视觉回归采用「布局不变量 + ARIA 快照」而不是跨平台像素比对，避免 macOS/Linux 中文字体渲染差异误报；截图仍作为失败排查与人工评审产物上传。
+- Playwright 视觉与布局回归位于 `apps/web/visual/`，覆盖 16 个桌面页面、3 个关键弹窗与 4 个移动场景。测试使用脱敏 mock API，可从仓库根目录运行 `pnpm test:visual`。
+- 视觉回归检查布局不变量与 ARIA 快照，以减少 macOS 和 Linux 之间字体渲染差异造成的误报。截图可用于排查失败和人工评审。
