@@ -11,7 +11,12 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)](docs/architecture/database.md)
 [![pnpm](https://img.shields.io/badge/pnpm-11%20Workspace-F69220?logo=pnpm&logoColor=white)](pnpm-workspace.yaml)
 
-[核心能力](#核心能力) · [系统架构](#系统架构) · [快速开始](#快速开始本地开发) · [生产部署](#生产部署) · [安装 CLI](#安装与使用-cli) · [执行节点](#自托管流水线执行节点) · [文档索引](#文档索引)
+[界面预览](#界面预览设计稿) · [核心能力](#核心能力) · [系统架构](#系统架构) · [快速开始](#快速开始本地开发) · [生产部署](#生产部署) · [安装 CLI](#安装与使用-cli) · [执行节点](#自托管流水线执行节点) · [文档索引](#文档索引)
+
+<br />
+<br />
+
+<img src="docs/assets/screenshots/collaboration-group-task.png" alt="dev-ops 多 Bot 群聊协作与显式任务工作台" width="100%" />
 
 </div>
 
@@ -27,6 +32,42 @@
 - **AI Bot 协作与项目管理解耦**：团队 Bot 拥有独立身份、长期记忆、技能库与隔离沙盒工具，以**触发人当前权限**委托调用平台 API（高危接口强制列入排除名单），既能跨项目群聊接力协作，又不会污染项目业务状态。
 - **业务流转与内置流水线严格解耦**：提测、回归与验收由团队显式维护；仓库内的 `.devops/workflows/*.yml` 由平台调度到自托管执行节点运行，构建结果不会自动改写需求或缺陷状态。
 - **单一契约驱动全端一致**：后端 TypeBox 路由导出唯一 OpenAPI 契约，自动生成类型化客户端、CLI 校验器与 Bot API 目录，确保 Web、CLI 与智能体共享同一套业务规则与权限校验。
+
+---
+
+## 界面预览（设计稿）
+
+以下截图截取自仓库内置的 [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html)（含本地演示数据，实际产品以运行中的 Web 服务为准）。克隆仓库并安装依赖后，可直接本地预览完整交互设计稿：
+
+```bash
+pnpm dev:prototype
+# 浏览器打开 http://127.0.0.1:4178/（演示边界见 docs/desgin/interactive-prototype-v1/README.md）
+```
+
+|                       项目列表与活动晴雨表                        |                               需求管理与代码关联                               |
+| :---------------------------------------------------------------: | :----------------------------------------------------------------------------: |
+| ![项目列表与活动晴雨表](docs/assets/screenshots/project-list.png) |     ![需求管理与代码关联](docs/assets/screenshots/requirement-detail.png)      |
+|             **Bot 执行轨迹（工具调用与耗时时间线）**              |                           **AI 协作回复与代码建议**                            |
+|     ![Bot 执行轨迹](docs/assets/screenshots/ai-trace-tab.png)     |       ![AI 协作回复与代码建议](docs/assets/screenshots/ai-complete.png)        |
+|                          **智能体管理**                           |                             **团队 Skills 技能库**                             |
+|   ![智能体管理](docs/assets/screenshots/capability-agents.png)    |      ![团队 Skills 技能库](docs/assets/screenshots/capability-skills.png)      |
+|                       **外部仓库代码浏览**                        |                        **服务交付：构建产物与运行版本**                        |
+|   ![外部仓库代码浏览](docs/assets/screenshots/project-code.png)   | ![服务交付：构建产物与运行版本](docs/assets/screenshots/project-artifacts.png) |
+
+<details>
+<summary>查看更多截图：团队凭据库 &amp; 移动端响应式适配（390×844）</summary>
+
+<br />
+
+|         团队凭据库（授权引用与轮换撤销）         |
+| :----------------------------------------------: |
+| ![团队凭据库](docs/assets/screenshots/vault.png) |
+
+|                                       移动端项目晴雨表                                       |                                         移动端 Bot 协作会话                                          |
+| :------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------: |
+| <img src="docs/assets/screenshots/projects-mobile.png" alt="移动端项目晴雨表" width="320" /> | <img src="docs/assets/screenshots/collaboration-mobile.png" alt="移动端 Bot 协作会话" width="320" /> |
+
+</details>
 
 ---
 
@@ -417,3 +458,4 @@ pnpm format                # 统一 Prettier 格式化
 | 应用文档   | [Web 前端](apps/web/README.md) · [Server 后端](apps/server/README.md) · [CLI](apps/cli/README.md) · [Agent](apps/pipeline-agent/README.md) | 各应用运行命令、环境变量与接口说明           |
 | 部署运维   | [本地与网关部署](deploy/README.md) · [Mac mini 原生发布](deploy/native/README.md)                                                          | Compose、Nginx 网关、邮件与自举发布运维手册  |
 | 工程规范   | [项目协作与开发规范](AGENTS.md) · [Web 设计规范](docs/design/DESIGN.md)                                                                    | 编码约定、PostgreSQL 规范、UI 与提交门禁     |
+| 设计原型   | [HTML 交互原型](docs/desgin/interactive-prototype-v1/index.html) · [原型说明](docs/desgin/interactive-prototype-v1/README.md)              | 本地交互设计稿入口（`pnpm dev:prototype`）   |
