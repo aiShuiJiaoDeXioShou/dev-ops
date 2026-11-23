@@ -1,10 +1,12 @@
+import type { ReactNode } from 'react'
 import { DelayedLoading } from './delayed-loading'
 
 /**
  * 首屏会话/团队加载时保持与工作区一致的外壳，避免全屏加载态与最终布局错位。
+ * @param props.children 与当前路由对应的内容占位，缺省时使用通用页面骨架。
  * @returns 侧栏与主内容骨架屏。
  */
-export function AppShellSkeleton() {
+export function AppShellSkeleton({ children = <PageSkeleton /> }: { children?: ReactNode }) {
   return (
     <div className="shell" role="status" aria-label="页面加载中">
       <aside className="sidebar">
@@ -25,9 +27,7 @@ export function AppShellSkeleton() {
         </div>
       </aside>
       <div className="surface">
-        <main className="main">
-          <PageSkeleton />
-        </main>
+        <main className="main">{children}</main>
       </div>
     </div>
   )

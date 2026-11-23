@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { Folder, LayoutGrid, LogOut, Menu, PanelLeft, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
+import { isCollaborationPath } from '@/app/router/collaboration-path'
+import { CollaborationPageSkeleton } from '@/pages/collaboration/conversation-loading'
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
@@ -57,7 +59,8 @@ export function AppLayout() {
   }, [isPlatformAdmin, location.pathname])
   const menuButtonRef = useRef<HTMLElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
-  const isCollaboration = currentTeam && isReady && /^\/collaboration(?:\/|$)/u.test(location.pathname)
+  const isCollaboration = isCollaborationPath(location.pathname)
+  const isLoadingCollaboration = isCollaboration && !isReady
   const openNavigation = (opener: HTMLElement | null) => {
     menuButtonRef.current = opener
     setMenuOpen(true)
@@ -262,7 +265,7 @@ export function AppLayout() {
       </aside>
       <div className="surface">
         <main className="main">
-          {!isCollaboration && (
+          {!isLoadingCollaboration && (!isCollaboration || !currentTeam) && (
             <Button
               type="button"
               variant="ghost"
@@ -274,7 +277,25 @@ export function AppLayout() {
               <Menu className="size-5" aria-hidden="true" />
             </Button>
           )}
-          {isReady ? <Outlet context={openNavigation} /> : <DelayedPageSkeleton />}
+          {isReady ? (
+            <Outlet context={openNavigation} />
+          ) : isLoadingCollaboration ? (
+            <CollaborationPageSkeleton
+              mobileNavigation={
+                <Button
+                  unstyled
+                  type="button"
+                  className="dsh-icon-btn dsh-room-toggle"
+                  aria-label="打开导航"
+                  onClick={(event) => openNavigation(event.currentTarget)}
+                >
+                  <Menu className="size-5" aria-hidden="true" />
+                </Button>
+              }
+            />
+          ) : (
+            <DelayedPageSkeleton />
+          )}
           <div id="workspace-detail-host" />
         </main>
       </div>

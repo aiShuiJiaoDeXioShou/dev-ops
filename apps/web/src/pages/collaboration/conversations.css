@@ -45,6 +45,37 @@
     text-align: left;
   }
 
+  .conversation-loading-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .live-conversations .conversation-loading-rows .conversation-item:hover {
+    background: transparent;
+  }
+
+  .conversation-placeholder {
+    display: block;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+  }
+
+  .conversation-loading-room .dsh-tab {
+    cursor: default;
+  }
+
+  .conversation-loading-status {
+    display: grid;
+    flex: 1;
+    min-height: 0;
+    place-items: center;
+  }
+
+  .conversation-trace-scroll .conversation-loading-status {
+    min-height: 8rem;
+  }
+
   .live-conversations .conversation-list-empty {
     /* 侧栏使用共享空状态的紧凑尺寸。 */
     padding: 20px 12px !important;

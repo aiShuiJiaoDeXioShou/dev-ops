@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { botTasksOptions, taskQueries } from '@/features/bot-tasks/api/queries'
@@ -30,8 +30,8 @@ import { Button } from '@/shared/ui/controls/button'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
+import { ConversationLoading, ConversationRoomSkeleton } from './conversation-loading'
 
 const tabItems = [
   { id: 'chat', label: '对话' },
@@ -47,9 +47,7 @@ export function ConversationRoom({
   id,
   userId,
   readOnly,
-  listOpen,
-  openList,
-  listToggleRef,
+  listToggle,
   initialTaskId,
   initialSkillId,
   onSkillUsed,
@@ -57,9 +55,7 @@ export function ConversationRoom({
   id: string
   userId: string
   readOnly: boolean
-  listOpen: boolean
-  openList: () => void
-  listToggleRef: React.RefObject<HTMLButtonElement | null>
+  listToggle: ReactNode
   initialTaskId?: string
   initialSkillId?: string
   onSkillUsed: () => void
@@ -121,7 +117,7 @@ export function ConversationRoom({
     }
   }, [client, events.data?.cursor])
 
-  if (detail.isPending) return <DelayedPageSkeleton />
+  if (detail.isPending) return <ConversationRoomSkeleton listToggle={listToggle} readOnly={readOnly} />
   if (detail.isError)
     return <PageError title="会话加载失败" error={detail.error} onRetry={() => void detail.refetch()} />
   const room = detail.data.data
@@ -281,18 +277,7 @@ export function ConversationRoom({
       <Tabs className="conversation-main dsh-chat gap-0" value={tab} onValueChange={setTab} aria-label="当前会话">
         <header className="dsh-chat-header">
           <div className="dsh-title-row">
-            <Button
-              unstyled
-              ref={listToggleRef}
-              type="button"
-              className="dsh-icon-btn dsh-room-toggle"
-              aria-label="打开会话列表"
-              aria-expanded={listOpen}
-              aria-controls="team-conversations"
-              onClick={openList}
-            >
-              <ConversationIcon name="menu" />
-            </Button>
+            {listToggle}
             {!readOnly ? (
               <Button
                 unstyled
@@ -354,7 +339,7 @@ export function ConversationRoom({
           </TabsList>
         </header>
         <TabsContent value="chat" forceMount className="dsh-scroll-area">
-          {messages.isPending && <DelayedPageSkeleton />}
+          {messages.isPending && <ConversationLoading message="正在加载消息…" />}
           {messages.isError && (
             <PageError title="消息加载失败" error={messages.error} onRetry={() => void messages.refetch()} />
           )}
@@ -417,7 +402,7 @@ export function ConversationRoom({
         <TabsContent value="activity" className="dsh-tab-panel">
           <div className="dsh-panel-scroll conversation-trace-scroll">
             {!traceRun && (events.isPending || messages.isPending) ? (
-              <DelayedPageSkeleton />
+              <ConversationLoading message="正在加载轨迹…" />
             ) : !traceRun && (events.isError || messages.isError) ? (
               <PageError
                 title="轨迹加载失败"

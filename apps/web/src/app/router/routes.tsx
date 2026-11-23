@@ -1,10 +1,13 @@
 import { Navigate, Outlet, type RouteObject } from 'react-router'
 import { AppLayout } from '@/app/layouts/app-layout'
+import { WorkspaceShellSkeleton } from '@/app/layouts/workspace-loading'
 import { RequireAuth } from '@/features/identity/ui/require-auth'
 import { useSession } from '@/features/identity/model/session'
 import { DelayedPageLoading } from '@/shared/ui/page-state'
-import { DelayedAppShellSkeleton, DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CollaborationPageSkeleton } from '@/pages/collaboration/conversation-loading'
 import { NotFoundPage } from '@/pages/not-found'
+import { collaborationRoutePath } from './collaboration-path'
 import { RouteErrorPage } from './route-error'
 
 function RequirePlatformRoot() {
@@ -35,8 +38,8 @@ export function createAppRoutes(): RouteObject[] {
       HydrateFallback: DelayedPageLoading,
     },
     {
-      element: <RequireAuth />,
-      HydrateFallback: DelayedAppShellSkeleton,
+      element: <RequireAuth sessionFallback={<WorkspaceShellSkeleton />} />,
+      HydrateFallback: WorkspaceShellSkeleton,
       children: [
         {
           path: '/',
@@ -46,9 +49,9 @@ export function createAppRoutes(): RouteObject[] {
           children: [
             { index: true, element: <Navigate to="/collaboration" replace /> },
             {
-              path: 'collaboration/:conversationId?',
+              path: collaborationRoutePath,
               lazy: () => import('@/pages/collaboration/conversations-page'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: CollaborationPageSkeleton,
             },
             {
               path: 'projects',

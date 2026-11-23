@@ -21,10 +21,9 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/controls/dropdown-menu'
 import { Input } from '@/shared/ui/controls/input'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { CollaborationPageSkeleton, ConversationListSkeleton, ConversationRoomSkeleton } from './conversation-loading'
 import { ConversationRoom } from './conversation-room'
-import './conversations.css'
 
 const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
 
@@ -81,6 +80,20 @@ function TeamConversations({
   useEffect(() => {
     if (listOpen) listCloseRef.current?.focus()
   }, [listOpen])
+  const listToggle = (
+    <Button
+      unstyled
+      ref={listToggleRef}
+      type="button"
+      className="dsh-icon-btn dsh-room-toggle"
+      aria-label="打开会话列表"
+      aria-expanded={listOpen}
+      aria-controls="team-conversations"
+      onClick={() => setListOpen(true)}
+    >
+      <ConversationIcon name="menu" />
+    </Button>
+  )
   return (
     <div
       className={cn('collab-layout live-conversations', listOpen && 'mobile-rooms-open')}
@@ -190,7 +203,7 @@ function TeamConversations({
           待你处理
           {inbox.isSuccess && <span className="counter">{inbox.data.data.count}</span>}
         </Button>
-        {list.isPending && <DelayedPageSkeleton />}
+        {list.isPending && <ConversationListSkeleton />}
         {list.isError && !showListErrorInMain && (
           <div className="row flex-wrap small muted" role="status">
             会话列表加载失败
@@ -276,28 +289,13 @@ function TeamConversations({
 
           userId={userId}
           readOnly={readOnly}
-          listOpen={listOpen}
-          openList={() => setListOpen(true)}
-          listToggleRef={listToggleRef}
+          listToggle={listToggle}
         />
+      ) : list.isPending && !isInbox ? (
+        <ConversationRoomSkeleton listToggle={listToggle} readOnly={readOnly} />
       ) : (
         <section className="conversation-main dsh-chat">
-          <header className="dsh-chat-header">
-            <Button
-              unstyled
-              ref={listToggleRef}
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="dsh-icon-btn dsh-room-toggle"
-              aria-label="打开会话列表"
-              aria-expanded={listOpen}
-              aria-controls="team-conversations"
-              onClick={() => setListOpen(true)}
-            >
-              <ConversationIcon name="menu" />
-            </Button>
-          </header>
+          <header className="dsh-chat-header">{listToggle}</header>
           {isInbox ? (
             <BotInbox teamId={teamId} />
           ) : showListErrorInMain ? (
@@ -307,8 +305,6 @@ function TeamConversations({
               retrying={list.isFetching}
               onRetry={() => void list.refetch()}
             />
-          ) : list.isPending ? (
-            <DelayedPageSkeleton />
           ) : (
             <EmptyState
               mascot={hasNoConversations ? 'orbit' : undefined}
@@ -376,11 +372,14 @@ function TeamConversations({
   )
 }
 
-/** 查看当前团队的协作会话及消息，切换团队时清理当前会话的本地交互状态。 */
+/**
+ * 查看当前团队的协作会话及消息，切换团队时清理当前会话的本地交互状态。
+ * @returns 协作会话界面、团队加载占位或无团队提示。
+ */
 export function Component() {
   const { currentTeam, user, role, isReady } = useSession()
   const { conversationId } = useParams()
-  if (!isReady) return <DelayedPageSkeleton />
+  if (!isReady) return <CollaborationPageSkeleton />
   if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
   return (
     <TeamConversations
