@@ -2278,6 +2278,35 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
+    /** 读取本人尚未被运行领取的排队消息。 */
+    async listBotQueuedInputs(conversationId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/queued-inputs', 'get'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/queued-inputs`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
+    /** 撤回尚未被运行领取的消息，成功后返回可恢复的草稿。 */
+    async withdrawBotQueuedInput(conversationId: string, messageId: string, options: ApiCallOptions = {}) {
+      return callTyped<
+        ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/messages/{messageId}/withdraw', 'post'>
+      >(
+        `/api/v1/bot-conversations/${segment(conversationId)}/messages/${segment(messageId)}/withdraw`,
+        'POST',
+        undefined,
+        options,
+      )
+    },
+    /** 读取当前会话所有运行累计用量。 */
+    async getBotConversationUsage(conversationId: string, options: ApiCallOptions = {}) {
+      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/usage', 'get'>>(
+        `/api/v1/bot-conversations/${segment(conversationId)}/usage`,
+        'GET',
+        undefined,
+        options,
+      )
+    },
     /** 读取会话及可见成员。 */
     async getBotConversation(conversationId: string, options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}', 'get'>>(
@@ -2714,19 +2743,7 @@ export function createApiClient(options: ApiClientOptions) {
         { ...options, query },
       )
     },
-    /** 创建会话任务并尝试安排首次运行。 */
-    async createBotTask(
-      conversationId: string,
-      body: ApiBody<'/api/v1/bot-conversations/{conversationId}/tasks', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/bot-conversations/{conversationId}/tasks', 'post'>>(
-        `/api/v1/bot-conversations/${segment(conversationId)}/tasks`,
-        'POST',
-        body,
-        options,
-      )
-    },
+
     /** 查看任务和最近的运行轨迹。 */
     async getBotTask(taskId: string, options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}', 'get'>>(
@@ -2736,58 +2753,7 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
-    /** 为等待中的任务补充执行要求。 */
-    async appendBotTask(
-      taskId: string,
-      body: ApiBody<'/api/v1/bot-tasks/{taskId}/append', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/append', 'post'>>(
-        `/api/v1/bot-tasks/${segment(taskId)}/append`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 将任务转交给另一位会话内智能体。 */
-    async handoffBotTask(
-      taskId: string,
-      body: ApiBody<'/api/v1/bot-tasks/{taskId}/handoff', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/handoff', 'post'>>(
-        `/api/v1/bot-tasks/${segment(taskId)}/handoff`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 使用当前任务输入创建一次新的运行。 */
-    async rerunBotTask(
-      taskId: string,
-      body: ApiBody<'/api/v1/bot-tasks/{taskId}/rerun', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/rerun', 'post'>>(
-        `/api/v1/bot-tasks/${segment(taskId)}/rerun`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 结束任务并请求其在途运行停止。 */
-    async cancelBotTask(
-      taskId: string,
-      body: ApiBody<'/api/v1/bot-tasks/{taskId}/cancel', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/cancel', 'post'>>(
-        `/api/v1/bot-tasks/${segment(taskId)}/cancel`,
-        'POST',
-        body,
-        options,
-      )
-    },
+
     /** 停止正在排队或执行的 Bot 运行。 */
     async stopBotRun(runId: string, options: ApiCallOptions = {}) {
       return callTyped<ApiSuccessData<'/api/v1/bot-runs/{runId}/stop', 'post'>>(
@@ -2806,32 +2772,7 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       )
     },
-    /** 验收任务的最新结果。 */
-    async acceptBotTask(
-      taskId: string,
-      body: ApiBody<'/api/v1/bot-tasks/{taskId}/accept', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/accept', 'post'>>(
-        `/api/v1/bot-tasks/${segment(taskId)}/accept`,
-        'POST',
-        body,
-        options,
-      )
-    },
-    /** 退回任务结果并说明原因。 */
-    async requestBotTaskChanges(
-      taskId: string,
-      body: ApiBody<'/api/v1/bot-tasks/{taskId}/request-changes', 'post'>,
-      options: ApiCallOptions = {},
-    ) {
-      return callTyped<ApiSuccessData<'/api/v1/bot-tasks/{taskId}/request-changes', 'post'>>(
-        `/api/v1/bot-tasks/${segment(taskId)}/request-changes`,
-        'POST',
-        body,
-        options,
-      )
-    },
+
     /** 分页读取当前团队的工作标签。 */
     async listWorkTags(
       teamId: string,
