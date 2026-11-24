@@ -7,7 +7,7 @@ import { botRun } from '../../src/modules/bots/bots.tables.ts'
 import { createBotTestDatabase } from '../support/bot-database.ts'
 import { seedBotWorkflowFixture } from '../support/bot-workflow-fixtures.ts'
 
-test('群组按 Leader 或点名路由，移出成员即拒绝读取，转交保留已有历史', async (t) => {
+test('群组按 Leader 或点名路由，移出成员即拒绝读取，停止移出 Bot 的工作', async (t) => {
   const { db, config, cleanup } = await createBotTestDatabase(t)
   const app = createHttpApp({ ...config, GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 90).toString('base64') })
   cleanup.push(() => app.close())
@@ -71,42 +71,8 @@ test('群组按 Leader 或点名路由，移出成员即拒绝读取，转交保
     'FORBIDDEN',
   )
 
-  const generated = await post(`${room}/tasks`, {
-    title: '验证交付',
-    acceptanceCriteria: '保留证据',
-    businessOwnerId: devUser.userId,
-  })
-  assert.equal(generated.code, 'OK', generated.message)
-  assert.equal(generated.data.task.executorBotId, botId)
-  const taskPath = `/bot-tasks/${generated.data.task.id}`
   assert.equal((await post(`${room}/update`, { leaderBotId: otherBotId })).data.leaderBotId, otherBotId)
-  assert.equal((await get(taskPath)).data.executorBotId, botId)
   assert.equal((await post(`${room}/members/remove`, { kind: 'bot', memberId: botId })).code, 'OK')
-  const blocked = (await get(taskPath)).data
-  assert.equal(blocked.blocked, true)
-  assert.equal(blocked.runs[0].status, 'stopped')
-  assert.equal(blocked.waitReason, 'executor_unavailable')
-  const { token } = await app.tokenService.create(devUser.userId, { name: '任务转交 CLI' })
-  const handoff = await app.inject({
-    method: 'POST',
-    url: `/api/v1${taskPath}/handoff`,
-    headers: { authorization: `Bearer ${token}` },
-    payload: {
-      toBotId: otherBotId,
-      version: blocked.version,
-      reason: '原执行者已移出',
-      summary: '保留验收记录',
-      unfinished: '补充日期',
-    },
-  })
-  const handed = handoff.json()
-  assert.equal(handed.code, 'OK', handed.message)
-  assert.equal(handed.data.task.executorBotId, otherBotId)
-  assert.equal(handed.data.task.blocked, false)
-  const history = (await get(taskPath)).data
-  assert.equal(history.handoffs[0].fromBotId, botId)
-  assert.equal(history.handoffs[0].toBotId, otherBotId)
-  assert.equal(history.runs.length, 2)
   assert.equal((await post(`${room}/members/remove`, { kind: 'user', memberId: viewerUser.userId })).code, 'OK')
   assert.equal((await get(messages, viewerUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
   const disabled = await post(otherBotPath + '/disable', { configVersion: binding.data.configVersion }, devUser)

@@ -91,10 +91,60 @@ test('从 V0.4a 迁移升级：保留流水线、版本历史和模型凭据并�
   await migrateDatabase(migration.href, subset)
   await seedBeforeOperationsRetirement(migration.href, { teamId, projectId, actorId, runId, modelKeyId })
 
+  // 模拟 V0.10 前仍有旧任务运行，升级不能再执行这些工作，也不能停止普通会话。
+  await writeJournal(journal.entries.filter((entry) => entry.tag < '0042'))
+  await migrateDatabase(migration.href, subset)
+  const oldTasks = new Client({ connectionString: migration.href })
+  await oldTasks.connect()
+  const taskRunIds = [randomUUID(), randomUUID(), randomUUID()]
+  const historicalTaskId = randomUUID()
+  try {
+    await oldTasks.query(
+      `INSERT INTO app.bot_task (id, team_id, conversation_id, title, acceptance_criteria, business_owner_id, executor_bot_id, created_by)
+       VALUES ($1, $2, $3, '历史任务', '保留', $4, $5, $4)`,
+      [historicalTaskId, teamId, randomUUID(), actorId, randomUUID()],
+    )
+    for (const [index, id] of taskRunIds.entries()) {
+      await oldTasks.query(
+        `INSERT INTO app.bot_run (id, team_id, conversation_id, task_id, bot_id, trigger_user_id, input_version, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 1, $7)`,
+        [
+          id,
+          teamId,
+          randomUUID(),
+          index < 2 ? historicalTaskId : null,
+          randomUUID(),
+          actorId,
+          index === 1 ? 'running' : 'queued',
+        ],
+      )
+    }
+  } finally {
+    await oldTasks.end()
+  }
+
   await migrateDatabase(migration.href, sourceDrizzle)
   const verify = new Client({ connectionString: migration.href })
   await verify.connect()
   try {
+    const retiredRuns = await verify.query<{
+      id: string
+      status: string
+      stop_requested: boolean
+      finished_at: Date | null
+    }>('SELECT id, status, stop_requested, finished_at FROM app.bot_run WHERE id = ANY($1::uuid[])', [taskRunIds])
+    const queuedTask = retiredRuns.rows.find(({ id }) => id === taskRunIds[0])
+    const runningTask = retiredRuns.rows.find(({ id }) => id === taskRunIds[1])
+    const conversationRun = retiredRuns.rows.find(({ id }) => id === taskRunIds[2])
+    assert.equal(queuedTask?.status, 'stopped')
+    assert.ok(queuedTask?.finished_at)
+    assert.equal(runningTask?.status, 'running')
+    assert.equal(runningTask?.stop_requested, true)
+    assert.equal(conversationRun?.status, 'queued')
+    const preserved = await verify.query<{ id: string }>('SELECT id FROM app.bot_task WHERE id = $1', [
+      historicalTaskId,
+    ])
+    assert.equal(preserved.rows.length, 1)
     const run = await verify.query<{ run_kind: string; secret_environment: string }>(
       'SELECT run_kind, secret_environment FROM app.pipeline_run WHERE idempotency_key = $1',
       ['upgrade-1'],

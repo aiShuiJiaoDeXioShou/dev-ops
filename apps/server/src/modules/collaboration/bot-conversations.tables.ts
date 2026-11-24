@@ -31,6 +31,10 @@ export const botConversation = appSchema.table(
     forked_from_conversation_id: uuid('forked_from_conversation_id'),
     forked_from_message_id: uuid('forked_from_message_id'),
     active_branch_id: text('active_branch_id'),
+    reply_requested_run_id: uuid('reply_requested_run_id'),
+    todos: jsonb('todos')
+      .notNull()
+      .default(sql`'[]'::jsonb`),
   },
   (table) => [
     primaryKey({ name: 'pk_bot_conversation_id', columns: [table.id] }),

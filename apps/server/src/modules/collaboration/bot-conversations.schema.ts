@@ -1,3 +1,4 @@
+import { conversationTodos } from './bot-todos.ts'
 import { Type, type Static } from 'typebox'
 import { apiResponseSchema } from '../../platform/http/response.ts'
 import { botSessionSettingBody, effectiveBotThinkingLevel } from '../bots/bots.session-settings.ts'
@@ -189,6 +190,12 @@ export const conversationListResponse = apiResponseSchema(
         botAvatars: Type.Array(
           Type.Object({ id: uuid, avatarKey: Type.Union([Type.String(), Type.Null()]), enabled: Type.Boolean() }),
         ),
+        workStatus: Type.Union([
+          Type.Null(),
+          Type.Literal('running'),
+          Type.Literal('awaiting_reply'),
+          Type.Literal('completed'),
+        ]),
         lastMessagePreview: Type.Union([Type.String(), Type.Null()]),
       }),
     ),
@@ -198,6 +205,7 @@ export const conversationListResponse = apiResponseSchema(
 export const conversationResponse = apiResponseSchema(
   Type.Object({
     ...conversation.properties,
+    todos: conversationTodos,
     botSettings: Type.Array(botSetting),
     activeRelay: Type.Optional(botRelaySchema),
     members: Type.Array(member),

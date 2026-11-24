@@ -1,3 +1,5 @@
+import { conversationWorkStatus, readConversationWorkStatus } from './bot-conversation-status.ts'
+import { readConversationTodos } from './bot-todos.ts'
 import { randomUUID } from 'node:crypto'
 import { and, asc, count, desc, eq, exists, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
@@ -205,7 +207,7 @@ async function listConversationPreviews(db: ReadDb, teamId: string, rooms: Conve
       )
       .orderBy(asc(botConversationMember.created_at), asc(botConversationMember.id)),
     db
-      .select({ roomId: botConversation.id, body: latest.body })
+      .select({ roomId: botConversation.id, body: latest.body, workStatus: conversationWorkStatus() })
       .from(botConversation)
       .leftJoinLateral(latest, sql`true`)
       .where(and(eq(botConversation.team_id, teamId), inArray(botConversation.id, ids))),
@@ -231,6 +233,7 @@ async function listConversationPreviews(db: ReadDb, teamId: string, rooms: Conve
     const ordered = leader ? [leader, ...bots.filter(({ id }) => id !== leader.id)] : bots
     return {
       ...viewOf(room),
+      workStatus: readConversationWorkStatus(messages.find(({ roomId }) => roomId === room.id)?.workStatus ?? null),
       botAvatars: ordered
         .slice(0, 4)
         .map(({ id, avatarKey, status }) => ({ id, avatarKey, enabled: status === 'enabled' })),
@@ -265,6 +268,7 @@ export async function readBotConversationView(db: ReadDb, row: ConversationRow, 
     row.kind === 'group' ? await readActiveBotRelay(db, { teamId: row.team_id, conversationId: row.id }) : undefined
   return {
     ...viewOf(row),
+    todos: readConversationTodos(row.todos),
     members,
     tags,
     skillReferences,

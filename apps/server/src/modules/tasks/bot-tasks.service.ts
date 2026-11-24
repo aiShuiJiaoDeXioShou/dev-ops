@@ -1,19 +1,17 @@
-import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, lt, or } from 'drizzle-orm'
 import type { Database } from '../../platform/database/client.ts'
 import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import { ApiError } from '../../platform/http/errors.ts'
-import { enqueueBotRun, requestBotRunStop, type BotRunTransaction } from '../bots/bots.run-queue.repository.ts'
-import { requireRunnableBot } from '../bots/bots.service.ts'
-import { botApiCall, botRun } from '../bots/bots.tables.ts'
+import { requestBotRunStop } from '../bots/bots.run-queue.repository.ts'
 import { redactChatContent } from '../bots/runtime/content.ts'
+import { botApiCall, botRun } from '../bots/bots.tables.ts'
 import { lockWritableBotConversation, requireBotConversation } from '../collaboration/bot-conversations.access.ts'
-import { botConversationMember, botEvent } from '../collaboration/bot-conversations.tables.ts'
+import { botEvent } from '../collaboration/bot-conversations.tables.ts'
 import { readTargetWorkTags } from '../collaboration/work-tags.repository.ts'
 import type { SessionUser } from '../identity/identity.session.ts'
-import { teamMember } from '../identity/identity.tables.ts'
 import { readBotInbox } from './bot-inbox.read.ts'
-import { readTaskReviews, reviewBotTask } from './bot-tasks.review.service.ts'
-import type { AppendBotTaskInput, BotTaskHandoffInput, CreateBotTaskInput, TaskTraceView } from './bot-tasks.schema.ts'
+import { readTaskReviews } from './bot-tasks.review.service.ts'
+import type { TaskTraceView } from './bot-tasks.schema.ts'
 import { botTask, botTaskHandoff, botTaskInput } from './bot-tasks.tables.ts'
 import { botTaskView, taskRunView } from './bot-tasks.view.ts'
 
@@ -27,59 +25,10 @@ function taskMissing(): never {
   throw new ApiError(ERROR_CODES.NOT_FOUND, '任务不存在或不可见')
 }
 
-function stateConflict(message: string): never {
-  throw new ApiError(ERROR_CODES.BOT_TASK_STATE_CONFLICT, message)
-}
-
 async function taskRowFor(db: ReadDb, taskId: string) {
   const [row] = await db.select().from(botTask).where(eq(botTask.id, taskId))
   if (!row) taskMissing()
   return row
-}
-
-function compareVersion(row: TaskRow, version: number) {
-  if (row.version !== version) throw new ApiError(ERROR_CODES.VERSION_CONFLICT, '任务已更新，请刷新后重试')
-}
-
-async function taskInWritableConversation(tx: BotRunTransaction, actor: SessionUser, taskId: string) {
-  const row = await taskRowFor(tx, taskId)
-  const room = await lockWritableBotConversation(tx, actor, row.conversation_id)
-  if (room.team_id !== row.team_id) taskMissing()
-  return { row: await taskRowFor(tx, taskId), room }
-}
-
-async function activeTaskRuns(tx: BotRunTransaction, row: TaskRow) {
-  return tx
-    .select({ id: botRun.id, status: botRun.status })
-    .from(botRun)
-    .where(
-      and(eq(botRun.team_id, row.team_id), eq(botRun.task_id, row.id), inArray(botRun.status, ['queued', 'running'])),
-    )
-    .orderBy(asc(botRun.id))
-    .limit(20)
-    .for('update')
-}
-
-async function enqueueTask(tx: BotRunTransaction, row: TaskRow, actor: SessionUser) {
-  const run = await enqueueBotRun(tx, {
-    team_id: row.team_id,
-    conversation_id: row.conversation_id,
-    task_id: row.id,
-    bot_id: row.executor_bot_id,
-    trigger_user_id: actor.id,
-    input_version: row.input_version,
-  })
-  return { task: botTaskView(row), runId: run.id, runStatus: 'queued' as const }
-}
-
-async function canExecute(tx: BotRunTransaction, teamId: string, botId: string) {
-  try {
-    await requireRunnableBot(tx, teamId, botId, { allowOffline: true })
-    return true
-  } catch (error) {
-    if (error instanceof ApiError && error.code === ERROR_CODES.BOT_UNAVAILABLE) return false
-    throw error
-  }
 }
 
 function safeString(payload: unknown, key: string): string | null {
@@ -138,73 +87,10 @@ async function loadTaskTrace(db: Database, row: TaskRow, runIds: string[]): Prom
 /**
  * 组装会话任务、执行历史与停止接口。
  * @param db 平台业务数据库。
- * @returns 按当前会话成员校验，任务变更与调度状态在同一事务提交。
+ * @returns 按当前会话成员校验，旧任务仅可读，运行停止在事务中提交。
  */
 export function createBotTasksService(db: Database) {
   return {
-    /** 显式创建一项任务，私聊 Bot 或群组 Leader 可作为默认执行者。 */
-    async create(actor: SessionUser, conversationId: string, input: CreateBotTaskInput) {
-      const title = redactChatContent(input.title.trim())
-      const criteria = redactChatContent(input.acceptanceCriteria.trim())
-      if (!title || !criteria) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '请输入目标和验收条件')
-      return db.transaction(async (tx) => {
-        const room = await lockWritableBotConversation(tx, actor, conversationId)
-        const members = await tx
-          .select({ id: botConversationMember.member_id, kind: botConversationMember.member_kind })
-          .from(botConversationMember)
-          .where(
-            and(
-              eq(botConversationMember.team_id, room.team_id),
-              eq(botConversationMember.conversation_id, room.id),
-              isNull(botConversationMember.removed_at),
-            ),
-          )
-          .limit(200)
-        const [businessOwner] = await tx
-          .select({ id: teamMember.id })
-          .from(teamMember)
-          .where(
-            and(
-              eq(teamMember.team_id, room.team_id),
-              eq(teamMember.user_id, input.businessOwnerId),
-              eq(teamMember.status, 'active'),
-            ),
-          )
-        if (!businessOwner || !members.some(({ id, kind }) => kind === 'user' && id === input.businessOwnerId))
-          throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '业务负责人必须是会话中的有效成员')
-        const executor =
-          input.executorBotId ??
-          (room.kind === 'group' ? room.leader_bot_id : members.find(({ kind }) => kind === 'bot')?.id)
-        if (!executor || !members.some(({ id, kind }) => kind === 'bot' && id === executor))
-          throw new ApiError(ERROR_CODES.BOT_NO_RECEIVER, '请选择当前会话中的智能体作为执行者')
-        const runnable = await canExecute(tx, room.team_id, executor)
-        const [row] = await tx
-          .insert(botTask)
-          .values({
-            team_id: room.team_id,
-            conversation_id: room.id,
-            title,
-            acceptance_criteria: criteria,
-            business_owner_id: input.businessOwnerId,
-            executor_bot_id: executor,
-            created_by: actor.id,
-            status: runnable ? 'pending' : 'waiting',
-            blocked: !runnable,
-            wait_reason: runnable ? null : 'executor_unavailable',
-          })
-          .returning()
-        if (!row) throw new Error('未能创建 Bot 任务')
-        await tx.insert(botTaskInput).values({
-          team_id: row.team_id,
-          task_id: row.id,
-          input_version: row.input_version,
-          content: redactChatContent(input.input?.trim() || title),
-          created_by: actor.id,
-        })
-        if (!runnable) return { task: botTaskView(row), runId: null, runStatus: null }
-        return enqueueTask(tx, row, actor)
-      })
-    },
     /** 按会话列出可见任务，游标必须属于该会话。 */
     async list(actor: SessionUser, conversationId: string, cursor?: string) {
       const room = await requireBotConversation(db, actor, conversationId)
@@ -284,168 +170,6 @@ export function createBotTasksService(db: Database) {
           runs.map(({ id }) => id),
         ),
       }
-    },
-    /** 为未结束的任务追加一版要求；已领取的运行继续使用领取时的输入版本。 */
-    async append(actor: SessionUser, taskId: string, input: AppendBotTaskInput) {
-      const content = redactChatContent(input.content.trim())
-      if (!content) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '补充要求不能为空')
-      return db.transaction(async (tx) => {
-        const { row } = await taskInWritableConversation(tx, actor, taskId)
-        compareVersion(row, input.version)
-        if (!['pending', 'in_progress', 'waiting'].includes(row.status)) stateConflict('任务当前阶段不可补充要求')
-        const runs = await activeTaskRuns(tx, row)
-        for (const run of runs) {
-          if (run.status === 'queued') await requestBotRunStop(tx, run.id, actor.id, false)
-        }
-        // 领取中的运行保持原版本并继续留下轨迹，最终结果不能覆盖刚保存的新要求。
-        const [updated] = await tx
-          .update(botTask)
-          .set({
-            status: 'waiting',
-            wait_reason: row.wait_reason ?? 'needs_input',
-            input_version: row.input_version + 1,
-            version: row.version + 1,
-            updated_at: sql`clock_timestamp()`,
-          })
-          .where(and(eq(botTask.id, row.id), eq(botTask.version, row.version), eq(botTask.status, row.status)))
-          .returning()
-        if (!updated) stateConflict('任务状态已变化，请刷新后重试')
-        await tx.insert(botTaskInput).values({
-          team_id: row.team_id,
-          task_id: row.id,
-          input_version: updated.input_version,
-          content,
-          created_by: actor.id,
-        })
-        return botTaskView(updated)
-      })
-    },
-    /** 转交给会话内可用的另一位智能体，同时追加交接和新输入。 */
-    async handoff(actor: SessionUser, taskId: string, input: BotTaskHandoffInput) {
-      const reason = redactChatContent(input.reason.trim())
-      const summary = redactChatContent(input.summary.trim())
-      const unfinished = redactChatContent(input.unfinished.trim())
-      if (!reason || !summary) throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '请输入转交原因和交接摘要')
-      return db.transaction(async (tx) => {
-        const { row, room } = await taskInWritableConversation(tx, actor, taskId)
-        compareVersion(row, input.version)
-        if (!['pending', 'waiting', 'in_progress'].includes(row.status)) stateConflict('任务当前阶段不可转交')
-        if (row.executor_bot_id === input.toBotId)
-          throw new ApiError(ERROR_CODES.VALIDATION_ERROR, '请选择另一位执行者')
-        const [receiver] = await tx
-          .select({ id: botConversationMember.id })
-          .from(botConversationMember)
-          .where(
-            and(
-              eq(botConversationMember.team_id, room.team_id),
-              eq(botConversationMember.conversation_id, room.id),
-              eq(botConversationMember.member_kind, 'bot'),
-              eq(botConversationMember.member_id, input.toBotId),
-              isNull(botConversationMember.removed_at),
-            ),
-          )
-        if (!receiver) throw new ApiError(ERROR_CODES.BOT_NOT_FOUND, '执行者须是当前会话成员')
-        await requireRunnableBot(tx, room.team_id, input.toBotId)
-        for (const run of await activeTaskRuns(tx, row)) await requestBotRunStop(tx, run.id, actor.id, false)
-        const [updated] = await tx
-          .update(botTask)
-          .set({
-            executor_bot_id: input.toBotId,
-            status: 'pending',
-            wait_reason: null,
-            blocked: false,
-            input_version: row.input_version + 1,
-            version: row.version + 1,
-            updated_at: sql`clock_timestamp()`,
-          })
-          .where(and(eq(botTask.id, row.id), eq(botTask.team_id, row.team_id), eq(botTask.version, input.version)))
-          .returning()
-        if (!updated) stateConflict('任务状态已变化，请刷新后重试')
-        await tx.insert(botTaskHandoff).values({
-          team_id: row.team_id,
-          task_id: row.id,
-          from_bot_id: row.executor_bot_id,
-          to_bot_id: input.toBotId,
-          reason,
-          summary,
-          unfinished,
-          created_by: actor.id,
-        })
-        await tx.insert(botTaskInput).values({
-          team_id: row.team_id,
-          task_id: row.id,
-          input_version: updated.input_version,
-          content: `转交原因：${reason}\n交接摘要：${summary}\n未完成事项：${unfinished}`,
-          created_by: actor.id,
-        })
-        return enqueueTask(tx, updated, actor)
-      })
-    },
-    /** 让等待中的任务使用当前输入版本进入队列，已有运行时拒绝重复入队。 */
-    async rerun(actor: SessionUser, taskId: string, version: number) {
-      return db.transaction(async (tx) => {
-        const { row } = await taskInWritableConversation(tx, actor, taskId)
-        compareVersion(row, version)
-        if (row.status !== 'waiting') stateConflict('只可重新运行处于等待中的任务')
-        if ((await activeTaskRuns(tx, row)).length) stateConflict('任务已有排队或执行中的运行')
-        const [executor] = await tx
-          .select({ id: botConversationMember.id })
-          .from(botConversationMember)
-          .where(
-            and(
-              eq(botConversationMember.team_id, row.team_id),
-              eq(botConversationMember.conversation_id, row.conversation_id),
-              eq(botConversationMember.member_kind, 'bot'),
-              eq(botConversationMember.member_id, row.executor_bot_id),
-              isNull(botConversationMember.removed_at),
-            ),
-          )
-        if (!executor) stateConflict('执行者已离开会话，请先转交任务')
-        await requireRunnableBot(tx, row.team_id, row.executor_bot_id, { allowOffline: true })
-        const [updated] = await tx
-          .update(botTask)
-          .set({
-            status: 'pending',
-            blocked: false,
-            wait_reason: null,
-            version: row.version + 1,
-            updated_at: sql`clock_timestamp()`,
-          })
-          .where(and(eq(botTask.id, row.id), eq(botTask.version, version), eq(botTask.status, 'waiting')))
-          .returning()
-        if (!updated) stateConflict('任务状态已变化，请刷新后重试')
-        return enqueueTask(tx, updated, actor)
-      })
-    },
-    /** 取消任务并停止相关运行，已结束的任务保持原状态。 */
-    async cancel(actor: SessionUser, taskId: string, version: number) {
-      return db.transaction(async (tx) => {
-        const { row } = await taskInWritableConversation(tx, actor, taskId)
-        compareVersion(row, version)
-        if (row.status === 'completed' || row.status === 'cancelled') stateConflict('任务已经结束')
-        for (const run of await activeTaskRuns(tx, row)) await requestBotRunStop(tx, run.id, actor.id, false)
-        const [updated] = await tx
-          .update(botTask)
-          .set({
-            status: 'cancelled',
-            blocked: false,
-            wait_reason: null,
-            version: row.version + 1,
-            updated_at: sql`clock_timestamp()`,
-          })
-          .where(and(eq(botTask.id, row.id), eq(botTask.version, version)))
-          .returning()
-        if (!updated) stateConflict('任务状态已变化，请刷新后重试')
-        return botTaskView(updated)
-      })
-    },
-    /** 由当前人类成员验收提交的结果。 */
-    accept(actor: SessionUser, taskId: string, input: { resultId: string; comment?: string }) {
-      return reviewBotTask(db, actor, taskId, 'accepted', input)
-    },
-    /** 退回最新结果，填写原因并开启新的任务输入版本。 */
-    requestChanges(actor: SessionUser, taskId: string, input: { resultId: string; comment: string }) {
-      return reviewBotTask(db, actor, taskId, 'changes_requested', input)
     },
     /** 派生团队中当前成员可见的待处理任务。 */
     inbox(actor: SessionUser, teamId: string) {
