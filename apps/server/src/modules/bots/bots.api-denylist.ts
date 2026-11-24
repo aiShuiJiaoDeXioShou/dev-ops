@@ -11,10 +11,11 @@ type Rule = {
 // 运行令牌只排除成员、登录、凭据明文和令牌签发；业务权限由路由继续校验。
 const rules: readonly Rule[] = [
   { category: 'tokens', methods: ['POST'], path: /^\/teams\/[^/]+\/pipeline-nodes$/u },
-  { category: 'tokens', path: /^\/agent(?:\/|$)/u },
+  { category: 'tokens', methods: ['POST'], path: /^\/agent\/register$/u },
   { category: 'team_membership', path: /^\/(?:teams|projects|bot-conversations)\/[^/]+\/members(?:\/|$)/u },
   { category: 'team_membership', path: /^\/(?:teams\/[^/]+\/)?invitations(?:\/|$)/u },
-  { category: 'tokens', path: /^\/(?:me|pipeline-nodes\/[^/]+)\/tokens(?:\/|$)/u },
+  { category: 'tokens', methods: ['POST'], path: /^\/me\/tokens$/u },
+  { category: 'tokens', methods: ['POST'], path: /^\/pipeline-nodes\/[^/]+\/tokens\/rotate$/u },
   { category: 'credentials', path: /^\/credentials\/[^/]+\/reveal-value$/u },
   { category: 'authentication', path: /^\/me\/github-account\/(?:authorize|disconnect)$/u },
   { category: 'authentication', path: /^\/auth(?:\/|$)/u },

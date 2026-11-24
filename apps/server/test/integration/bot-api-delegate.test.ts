@@ -18,7 +18,7 @@ test('运行令牌跨 HTTP 校验、按成员授权、审计并随停止和租�
     GIT_CREDENTIAL_ENCRYPTION_KEY: Buffer.alloc(32, 72).toString('base64'),
   })
   cleanup.push(() => app.close())
-  const { teamPath, roomPath, post } = await seedBotWorkflowFixture(app)
+  const { teamPath, roomPath, post, otherUser } = await seedBotWorkflowFixture(app)
   await post(`${roomPath}/messages`, { clientRequestId: randomUUID(), text: '查询项目' })
   const run = await claimBotRun(db, 'run-token-test', { global: 3, perTeam: 2, ttlSeconds: 60 })
   assert.ok(run)
@@ -35,12 +35,29 @@ test('运行令牌跨 HTTP 校验、按成员授权、审计并随停止和租�
     app.inject({ method: 'GET', url: `/api/v1${url}`, headers: { authorization: `Bearer ${token}` } })
   assert.equal((await request(`${teamPath}/projects`)).json().code, 'OK')
   assert.equal((await request(`${teamPath}/members`)).json().code, 'BOT_API_FORBIDDEN')
-  assert.equal((await request('/me/tokens')).json().code, 'BOT_API_FORBIDDEN')
+  assert.equal((await request('/me/tokens')).json().code, 'OK')
+  const ownToken = await app.tokenService.create(run.trigger_user_id, { name: '可撤销的个人令牌' })
+  const foreignToken = await app.tokenService.create(otherUser.userId, { name: '其他成员令牌' })
+  const write = (url: string, payload: object = {}) =>
+    app.inject({
+      method: 'POST',
+      url: `/api/v1${url}`,
+      payload,
+      headers: { authorization: `Bearer ${token}` },
+    })
+  assert.equal((await write(`/me/tokens/${ownToken.metadata.id}/revoke`)).json().code, 'OK')
+  assert.equal(await app.tokenService.authenticate(ownToken.token), null)
+  assert.equal((await write(`/me/tokens/${foreignToken.metadata.id}/revoke`)).json().code, 'TOKEN_NOT_FOUND')
+  assert.ok(await app.tokenService.authenticate(foreignToken.token))
+  assert.equal((await write('/me/tokens', { name: '不允许签发' })).json().code, 'BOT_API_FORBIDDEN')
+  assert.equal((await write(`/pipeline-nodes/${randomUUID()}/tokens/rotate`)).json().code, 'BOT_API_FORBIDDEN')
+  assert.equal((await write(`${teamPath}/pipeline-nodes`)).json().code, 'BOT_API_FORBIDDEN')
+  assert.equal((await write('/agent/register')).json().code, 'BOT_API_FORBIDDEN')
   const records = await db
     .select({ target: botApiCall.target, result: botApiCall.result_ref })
     .from(botApiCall)
     .where(eq(botApiCall.run_id, run.id))
-  assert.equal(records.length, 3)
+  assert.equal(records.length, 9)
   assert.ok(records.every(({ result }) => result && typeof result === 'object' && 'elapsedMs' in result))
   await db.update(botRun).set({ stop_requested: true }).where(eq(botRun.id, run.id))
   assert.equal(await authenticateBotRunToken(db, token), null)
@@ -59,11 +76,19 @@ test('运行令牌跨 HTTP 校验、按成员授权、审计并随停止和租�
   assert.equal(await authenticateBotRunToken(db, token), null)
   assert.equal(botApiExclusion('POST', '/api/v1/teams/{teamId}/pipeline-nodes'), 'tokens')
   assert.equal(botApiExclusion('POST', '/api/v1/agent/register'), 'tokens')
+  assert.equal(botApiExclusion('POST', '/api/v1/agent/heartbeat'), undefined)
+  assert.equal(botApiExclusion('POST', '/api/v1/agent/lease'), undefined)
   assert.equal(botApiExclusion('POST', '/api/v1/teams/{teamId}/bot-model-connections/oauth-login'), 'authentication')
   for (const [path, operations] of Object.entries(app.swagger().paths ?? {})) {
     for (const method of ['GET', 'POST'] as const) {
       if (!(method.toLowerCase() in (operations ?? {}))) continue
-      if (/\/auth(?:\/|$)|\/invitations(?:\/|$)|\/members(?:\/|$)|\/tokens(?:\/|$)|\/reveal-value$/u.test(path)) {
+      if (/\/tokens(?:\/|$)/u.test(path)) {
+        const issuesToken =
+          method === 'POST' &&
+          (path === '/api/v1/me/tokens' || path === '/api/v1/pipeline-nodes/{nodeId}/tokens/rotate')
+        assert.equal(botApiExclusion(method, path), issuesToken ? 'tokens' : undefined, `${method} ${path}`)
+      }
+      if (/\/auth(?:\/|$)|\/invitations(?:\/|$)|\/members(?:\/|$)|\/reveal-value$/u.test(path)) {
         assert.ok(botApiExclusion(method, path), `${method} ${path}`)
       }
     }
