@@ -49,7 +49,8 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
     '- 核对项目状态\n- 确认交付记录\n  1. 查阅验收记录',
     '> 部署窗口待确认。',
     '| 方法 | 路径 | 用途 |\n| --- | --- | --- |\n| GET | `/api/v1/projects` | 查看项目 |',
-    '```ts\nconst approved = true\n```',
+    '行内公式 $x^2 + y^2$',
+    '```python\nimport json\napproved = True\n```',
   ].join('\n\n')
   const messages: Message[] = [
     {
@@ -64,6 +65,7 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
     },
   ]
   const attachment = { id: 'da55aa00-0000-4000-8000-000000000040', fileName: '验收记录.md', sizeBytes: 4 }
+  const pastedImage = { id: 'da55aa00-0000-4000-8000-000000000041', fileName: '剪贴板截图.png', sizeBytes: 3 }
   const base = `**/api/v1/bot-conversations/${room.id}`
   const messageId = 'da55aa00-0000-4000-8000-000000000022'
   let uploadAttempts = 0
@@ -89,6 +91,14 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
     }),
   )
   await page.route(`${base}/attachments`, (route) => {
+    if (route.request().headers()['x-file-type'] === 'image/png') {
+      expect(route.request().postDataBuffer()).toEqual(Buffer.from([137, 80, 78]))
+      return route.fulfill({
+        json: success({
+          attachment: { ...pastedImage, status: 'temp', contentType: 'image/png', sha256: 'test', uploadedAt: stamp },
+        }),
+      })
+    }
     expect(route.request().postData()).toBe('test')
     expect(route.request().headers()['x-file-name']).toBe(encodeURIComponent(attachment.fileName))
     uploadAttempts += 1
@@ -111,7 +121,7 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
     if (route.request().method() === 'GET')
       return route.fulfill({ json: success({ items: messages, nextBefore: null }) })
     const request = route.request().postDataJSON()
-    expect(request).toMatchObject({ text: '请查看附件', attachmentIds: [attachment.id] })
+    expect(request).toMatchObject({ text: '请查看附件', attachmentIds: [attachment.id, pastedImage.id] })
     expect(request.clientRequestId).toBeTruthy()
     if (!firstClientRequestId) {
       firstClientRequestId = request.clientRequestId
@@ -124,7 +134,7 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
       speakerKind: 'user',
       speakerId: userId,
       speakerName: '负责人',
-      body: { blocks: [{ type: 'text', text: request.text }], attachments: [attachment] },
+      body: { blocks: [{ type: 'text', text: request.text }], attachments: [attachment, pastedImage] },
       runId,
       createdAt: stamp,
     }
@@ -143,7 +153,11 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
 
   await expect(page.locator('.dsh-markdown ul')).toHaveCSS('list-style-type', 'disc')
   await expect(page.locator('.dsh-markdown ol')).toHaveCSS('list-style-type', 'decimal')
-  await expect(page.locator('.conversation-code pre')).toHaveText('const approved = true')
+  const code = page.locator('.conversation-code pre')
+  await code.scrollIntoViewIfNeeded()
+  await expect(code).toHaveText(/import json\s+approved = True/u)
+  await expect(code.locator('.conversation-code-token').first()).toBeVisible()
+  await expect(page.locator('.katex').first()).toBeVisible()
   await expect(page.getByRole('region', { name: '回复表格' })).toHaveAttribute('tabindex', '0')
   await expect(page.getByRole('table').getByRole('cell', { name: '查看项目' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('conversation-markdown.png'), animations: 'disabled' })
@@ -152,6 +166,12 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
   await actions.press('Enter')
   const uploadAction = page.getByRole('menuitem', { name: '上传文件' })
   await expect(uploadAction).toBeEnabled()
+  const iconSizes = await page
+    .getByRole('menu')
+    .locator('[role="menuitem"] > svg')
+    .evaluateAll((icons) => icons.map((icon) => [getComputedStyle(icon).width, getComputedStyle(icon).height]))
+  expect(iconSizes).toEqual(Array.from({ length: 4 }, () => ['16px', '16px']))
+  await page.screenshot({ path: testInfo.outputPath('conversation-menu.png'), animations: 'disabled' })
   const choosing = page.waitForEvent('filechooser')
   await uploadAction.press('Enter')
   await (await choosing).setFiles({ name: attachment.fileName, mimeType: 'text/markdown', buffer: Buffer.from('test') })
@@ -162,6 +182,21 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
   await expect(send).toBeDisabled()
   await retryUpload.click()
   await expect(uploadRail.getByText('已上传', { exact: false })).toBeVisible()
+  const passthrough = await composer.evaluate((element) => {
+    const data = new DataTransfer()
+    data.setData('text/plain', '普通文本')
+    return element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  })
+  expect(passthrough).toBe(true)
+  const imageOnly = await composer.evaluate((element) => {
+    const data = new DataTransfer()
+    data.items.add(new File([new Uint8Array([137, 80, 78])], '剪贴板截图.png', { type: 'image/png' }))
+    return element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  })
+  expect(imageOnly).toBe(false)
+  await expect(uploadRail.getByText(pastedImage.fileName)).toBeVisible()
+  await expect(uploadRail.getByText('已上传', { exact: false })).toHaveCount(2)
+  await expect(composer).toHaveValue('请查看附件')
   await page.screenshot({ path: testInfo.outputPath('conversation-attachment-draft.png'), animations: 'disabled' })
 
   await send.press('Enter')
@@ -173,6 +208,7 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
     'href',
     `/api/v1/bot-conversations/${room.id}/messages/${messageId}/attachments/${attachment.id}/download`,
   )
+  await expect(page.getByRole('link', { name: '下载 剪贴板截图.png' })).toBeVisible()
   await expect(uploadRail).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath('conversation-attachment-sent.png'), animations: 'disabled' })

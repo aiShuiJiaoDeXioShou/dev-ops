@@ -191,9 +191,186 @@
     font: var(--text-xs)/19px var(--md-code-font);
   }
 
+  .conversation-composer-menu [data-slot='dropdown-menu-item'] > svg {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    stroke-width: 1.75;
+    color: var(--muted-foreground);
+  }
+
+  .conversation-work {
+    margin-bottom: 12px;
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+  }
+
+  .conversation-work-header {
+    display: flex;
+    width: 100%;
+    min-height: 32px;
+    align-items: center;
+    gap: 6px;
+    padding-block: 2px 6px;
+    border-bottom: 1px solid var(--border);
+    color: inherit;
+    text-align: start;
+  }
+
+  .conversation-work-header:is(:hover, :focus-visible) {
+    color: var(--foreground);
+  }
+
+  .conversation-work-bot {
+    min-width: 0;
+    margin-inline-start: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conversation-work-expand {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    transition: transform 150ms ease;
+  }
+
+  .conversation-work-header[aria-expanded='true'] .conversation-work-expand,
+  .conversation-work-note[open] .conversation-work-expand {
+    transform: rotate(180deg);
+  }
+
+  .conversation-work-content {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      grid-template-rows 200ms ease,
+      opacity 150ms ease,
+      visibility 0s 200ms;
+  }
+
+  .conversation-work-content[data-open='true'] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .conversation-work-content > div {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .conversation-work-steps {
+    padding-block-start: 6px;
+  }
+
+  .conversation-work-row {
+    display: flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 8px;
+    line-height: 20px;
+  }
+
+  .conversation-work-row > svg,
+  .conversation-work-state svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+
+  .conversation-work-row small {
+    margin-inline-start: 8px;
+  }
+
+  .conversation-work-state {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    font-size: var(--text-xs);
+  }
+
+  .conversation-work-state[data-state='failed'] {
+    color: var(--destructive);
+  }
+
+  .conversation-work-preview {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conversation-work-note > summary {
+    cursor: pointer;
+  }
+
+  .conversation-work-note > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .conversation-work-note > .dsh-markdown,
+  .conversation-work-draft {
+    padding-block: 6px;
+    padding-inline-start: 22px;
+  }
+
+  .live-conversations .dsh-markdown[data-compact] {
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+  }
+
+  .conversation-answer[data-reveal] {
+    animation: conversation-answer-reveal 200ms ease-out both;
+  }
+
+  @keyframes conversation-answer-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .conversation-code-token {
+    color: var(--code-light, currentColor);
+  }
+
+  .dark .conversation-code-token {
+    color: var(--code-dark, currentColor);
+  }
+
+  .dsh-markdown .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .conversation-work-expand,
+    .conversation-work-content {
+      transition: none;
+    }
+
+    .conversation-answer[data-reveal],
+    .dsh-markdown .dsh-cursor {
+      animation: none;
+    }
+  }
+
   @media (pointer: coarse) {
     .live-conversations .conversation-composer :is(.composer-add, .dsh-send),
-    .conversation-file-link {
+    .conversation-file-link,
+    .conversation-composer-menu [data-slot='dropdown-menu-item'],
+    .conversation-work-header[aria-expanded],
+    .conversation-work-note > summary {
       min-height: 44px;
     }
 

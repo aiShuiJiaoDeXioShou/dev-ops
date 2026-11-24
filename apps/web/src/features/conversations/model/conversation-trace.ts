@@ -281,3 +281,24 @@ export function traceSteps(
     return left === right ? 0 : left < right ? -1 : 1
   })
 }
+
+/**
+ * 从共享轨迹取出对话内可公开的工作步骤和未提交的部分回答。
+ * @param run 正在显示的运行；存在正式回复时使用该回复作为总结。
+ * @param events 属于这次运行的已脱敏事件。
+ * @returns 按执行顺序排列的工具和阶段说明，以及停止或失败时可保留的最后输出。
+ */
+export function conversationWork(run: Pick<ConversationRun, 'id' | 'status'>, events: ConversationEvents['items']) {
+  const steps = traceSteps({ id: run.id, status: run.status }, events).filter(
+    (step) => step.kind === 'tool' || (step.kind === 'model' && !step.runtimeStage && step.text?.trim()),
+  )
+  const last = steps.at(-1)
+  const isActive = run.status === 'running' || run.status === 'queued'
+  if (last?.kind !== 'model' || isActive) return { steps, partialText: '' }
+
+  // 工具调用之前的公开说明留在工作过程，最后一段正文交给正式消息或中断后的部分结果。
+  return {
+    steps: steps.slice(0, -1),
+    partialText: run.status === 'succeeded' ? '' : (last.text ?? ''),
+  }
+}

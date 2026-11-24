@@ -6,6 +6,7 @@ const POLL_WHILE_ACTIVE_MS = 1000
 const POLL_WHILE_IDLE_MS = 10_000
 const POLL_EVENT_BACKLOG_MS = 150
 const EVENT_PAGE_SIZE = 100
+const INLINE_ACTIVITY_LIMIT = 500
 
 export type BotConversation = ApiSuccessData<'/api/v1/bot-conversations/{conversationId}', 'get'>
 export type ConversationMessage = ApiSuccessData<
@@ -77,6 +78,24 @@ export function conversationEventText(payload: unknown, property: string) {
   return typeof value === 'string' ? value : undefined
 }
 
+function recordActivity(activity: ConversationEvents['items'], event: ConversationEvents['items'][number]) {
+  if (event.kind === 'output_delta') {
+    const previous = activity.at(-1)
+    if (previous?.kind === event.kind && previous.runId === event.runId) {
+      // 同一段输出只占一个位置，保留首个事件的时间和稳定标识。
+      const text =
+        (conversationEventText(previous.payload, 'text') ?? '') + (conversationEventText(event.payload, 'text') ?? '')
+      activity[activity.length - 1] = { ...previous, payload: { text } }
+      return
+    }
+    activity.push(event)
+    return
+  }
+  if (event.kind === 'tool_activity' || event.kind === 'mcp_call_started' || event.kind === 'mcp_call_finished') {
+    activity.push(event)
+  }
+}
+
 /** 按事件游标更新运行状态与增量正文；最终消息从历史记录重新同步。 */
 export function conversationEventsOptions(client: QueryClient, id: string) {
   const queryKey = ['bot-conversation-events', id]
@@ -90,7 +109,7 @@ export function conversationEventsOptions(client: QueryClient, id: string) {
       let shouldReloadMessages = data.resetRequired
       let shouldReloadSettings = false
       for (const event of data.items) {
-        if (event.kind === 'tool_activity' || event.kind === 'mcp_call_finished') activity.push(event)
+        recordActivity(activity, event)
         if (event.kind === 'tool_activity' && conversationEventText(event.payload, 'state') === 'model_selected') {
           shouldReloadSettings = true
         }
@@ -130,7 +149,7 @@ export function conversationEventsOptions(client: QueryClient, id: string) {
         activeRuns: data.activeRuns,
         activeRelay: data.activeRelay,
         progress: Object.fromEntries(Object.entries(progress).slice(-200)),
-        activity: activity.slice(-100),
+        activity: activity.slice(-INLINE_ACTIVITY_LIMIT),
         hasMore: data.items.length >= EVENT_PAGE_SIZE,
       }
     },

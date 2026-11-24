@@ -89,6 +89,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     ],
   }
   let stage: 'empty' | 'queued' | 'running' | 'complete' = 'empty'
+  let activeAt = stamp
   const list: Message[] = []
   await page.route(`**/api/v1/teams/${teamId}/bot-inbox`, (route) =>
     route.fulfill({ json: success({ items: [], count: 0 }) }),
@@ -200,12 +201,27 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     const after = Number(new URL(route.request().url()).searchParams.get('after') ?? '0')
     const allEvents = [
       { sequence: '1', kind: 'run_status', runId, payload: { status: 'queued' }, createdAt: stamp },
-      { sequence: '2', kind: 'run_status', runId, payload: { status: 'running', botId }, createdAt: stamp },
-      { sequence: '3', kind: 'output_delta', runId, payload: { text: '正在检查' }, createdAt: stamp },
-      { sequence: '4', kind: 'run_status', runId, payload: { status: 'succeeded' }, createdAt: stamp },
-      { sequence: '5', kind: 'message_committed', runId, payload: {}, createdAt: stamp },
+      { sequence: '2', kind: 'run_status', runId, payload: { status: 'running', botId }, createdAt: activeAt },
+      { sequence: '3', kind: 'output_delta', runId, payload: { text: '正在检查' }, createdAt: activeAt },
+      {
+        sequence: '4',
+        kind: 'tool_activity',
+        runId,
+        payload: { state: 'started', callId: 'read-1', name: 'read' },
+        createdAt: activeAt,
+      },
+      {
+        sequence: '5',
+        kind: 'tool_activity',
+        runId,
+        payload: { state: 'finished', callId: 'read-1', name: 'read', ok: true },
+        createdAt: activeAt,
+      },
+      { sequence: '6', kind: 'output_delta', runId, payload: { text: '正在整理结果' }, createdAt: activeAt },
+      { sequence: '7', kind: 'run_status', runId, payload: { status: 'succeeded' }, createdAt: activeAt },
+      { sequence: '8', kind: 'message_committed', runId, payload: {}, createdAt: activeAt },
     ]
-    const cursor = { empty: 0, queued: 1, running: 3, complete: 5 }[stage]
+    const cursor = { empty: 0, queued: 1, running: 6, complete: 8 }[stage]
     const activeRuns =
       stage === 'empty' || stage === 'complete'
         ? []
@@ -261,15 +277,21 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(page.getByText('排队中 · 执行服务离线 · 团队队列第 2 位', { exact: true })).toBeVisible({
     timeout: 3000,
   })
+  activeAt = new Date(Date.now() - 12_000).toISOString()
   stage = 'running'
-  await expect(page.getByText('正在检查', { exact: true })).toBeVisible()
+  const work = page.getByRole('region', { name: '工作过程' })
+  await expect(work.locator('summary').getByText('正在检查', { exact: true })).toBeVisible()
+  await expect(work.getByText('read', { exact: true })).toBeVisible()
+  await expect(work.getByText('正在整理结果', { exact: true })).toBeVisible()
+  await expect(work.getByRole('button', { name: '正在工作' })).toHaveAttribute('aria-expanded', 'true')
+  await expect(page.locator('.dsh-assistant-head')).toHaveCount(0)
   await expect(page.getByRole('button', { name: '停止生成' })).toBeVisible()
   await expect(page.getByRole('button', { name: '发送消息' })).toHaveCount(0)
   await expect(page.locator('.dsh-send-ring')).toBeVisible()
   await expect(page.locator('.dsh-cursor')).toBeVisible()
   await expect(page.getByText('正在准备回复…', { exact: true })).toHaveCount(0)
   await expect(page.locator('.dsh-running')).toHaveCount(0)
-  await expect(page.locator('.dsh-message-foot .dsh-running-time')).toBeVisible()
+  await expect(page.locator('.conversation-work-header .dsh-running-time')).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('bot-conversations-running.png'), animations: 'disabled' })
   await composer.fill('尚未发送的草稿')
   const trajectoryTab = page.getByRole('tab', { name: '轨迹' })
@@ -312,7 +334,16 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   })
   stage = 'complete'
   await expect(page.getByText('验收结果', { exact: true })).toBeVisible()
-  await expect(page.getByText('正在检查', { exact: true })).toHaveCount(0)
+  const workToggle = work.getByRole('button', { name: /已工作/ })
+  await expect(workToggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(work.locator('summary').getByText('正在检查', { exact: true })).toBeHidden()
+  await workToggle.press('Enter')
+  await expect(work.locator('summary').getByText('正在检查', { exact: true })).toBeVisible()
+  await expect(work.getByText('正在整理结果', { exact: true })).toHaveCount(0)
+  await workToggle.press('Enter')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await expect(work.locator('.conversation-work-content')).toHaveCSS('transition-duration', '0s')
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
   await expect(page.getByText('查看轨迹', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Enter 发送 · Shift+Enter 换行', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('table').getByRole('columnheader')).toHaveCount(3)

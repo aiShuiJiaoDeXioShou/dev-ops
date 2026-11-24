@@ -11,8 +11,9 @@ import {
   conversationsQueryKey,
   messagesOptions,
   type ConversationMessage,
+  type ConversationEvents,
 } from '@/features/conversations/api/queries'
-import type { ConversationRun } from '@/features/conversations/model/conversation-trace'
+import { conversationWork, type ConversationRun } from '@/features/conversations/model/conversation-trace'
 import { ConversationAvatar } from '@/features/conversations/ui/conversation-avatar'
 import { ConversationComposer } from '@/features/conversations/ui/conversation-composer'
 import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
@@ -153,7 +154,7 @@ export function ConversationRoom({
     const input = inputs.get(runId)
     const reply = replies.get(runId)
     const botId = live?.botId ?? saved?.botId ?? reply?.speakerId ?? leader?.id
-    const status = live?.status ?? (reply ? 'succeeded' : saved?.status)
+    const status = reply ? 'succeeded' : (live?.status ?? saved?.status)
     const reason = live?.queueReason === 'worker_offline' ? '执行服务离线' : undefined
     const position = live?.teamQueuePosition ? `团队队列第 ${live.teamQueuePosition} 位` : undefined
     const label = saved?.stopRequested && status === 'running' ? '正在停止…' : runLabels[status ?? '']
@@ -171,12 +172,20 @@ export function ConversationRoom({
     }
   })
   const runsById = new Map(runs.map((run) => [run.id, run]))
+  const eventsByRun = new Map<string, ConversationEvents['items']>()
+  for (const event of activity) {
+    const group = eventsByRun.get(event.runId)
+    if (group) group.push(event)
+    else eventsByRun.set(event.runId, [event])
+  }
+  const workByRun = new Map(runs.map((run) => [run.id, conversationWork(run, eventsByRun.get(run.id) ?? [])]))
+
   const liveRun = running && runsById.get(running.id)
   const traceRun = liveRun ?? runs.slice().sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))[0]
   const stopping = !!running && (liveRun?.stopRequested === true || stop.isPending)
   const memoryFor = (runId: string) =>
-    activity.flatMap(({ runId: id, payload }) =>
-      id === runId && conversationEventText(payload, 'state') === 'memory_written'
+    (eventsByRun.get(runId) ?? []).flatMap(({ payload }) =>
+      conversationEventText(payload, 'state') === 'memory_written'
         ? [conversationEventText(payload, 'action') ?? 'create']
         : [],
     )
@@ -193,28 +202,29 @@ export function ConversationRoom({
       attachments: message.body.attachments,
       name: message.speakerName ?? '会话通知',
       time: message.createdAt,
-      bot:
-        message.speakerKind === 'bot'
-          ? (bots.find(({ id }) => id === message.speakerId) ??
-            (message.speakerId ? { id: message.speakerId } : undefined))
-          : undefined,
       text: message.body.blocks.flatMap((block) => (block.type === 'tool_activity' ? [] : [block.text])).join('\n\n'),
       runId: message.speakerKind === 'bot' && message.runId ? message.runId : undefined,
       status: botRun?.status,
       elapsed: botRun ? runElapsed(botRun, now) : undefined,
+      workSteps: botRun && workByRun.get(botRun.id)?.steps,
       metrics: message.body.metrics,
       feedback: message.feedback,
       memoryChanges: message.speakerKind === 'bot' && message.runId ? memoryFor(message.runId) : undefined,
       // 失败的运行不会提交助手消息，原因挂在触发消息下，避免空状态条一直停在消息末尾。
       failureText:
-        message.speakerKind === 'user' && run?.status === 'failed' && !run.text.trim() ? run.statusText : undefined,
+        message.speakerKind === 'user' &&
+        run?.status === 'failed' &&
+        !workByRun.get(run.id)?.steps.length &&
+        !workByRun.get(run.id)?.partialText
+          ? run.statusText
+          : undefined,
     }
   })
   const ongoing = runs.flatMap<MessageView>((run) => {
     if (!run.status || run.reply || run.status === 'succeeded') return []
-    // 已结束但没有正文的运行没有可展示内容，不再保留空的助手消息占位。
+    const work = workByRun.get(run.id)
     const isTerminal = !['running', 'queued'].includes(run.status)
-    if (isTerminal && !run.text.trim()) return []
+    if (isTerminal && !work?.steps.length && !work?.partialText) return []
     return [
       {
         id: run.id,
@@ -222,15 +232,10 @@ export function ConversationRoom({
         name: run.name,
         kind: 'bot',
         time: run.createdAt,
-        bot: bots.find(({ id }) => id === run.botId) ?? (run.botId ? { id: run.botId } : undefined),
-        text: run.text,
+        text: work?.partialText ?? '',
+        workSteps: work?.steps,
         status: run.status,
         statusText: stopping && run.id === running?.id ? '正在停止…' : run.statusText,
-        toolCalls: activity.filter(
-          ({ runId, kind, payload }) =>
-            runId === run.id &&
-            (kind === 'mcp_call_finished' || conversationEventText(payload, 'state') === 'finished'),
-        ).length,
         elapsed: runElapsed(run, now),
         memoryChanges: memoryFor(run.id),
       },
@@ -348,6 +353,7 @@ export function ConversationRoom({
             <ConversationMessages
               items={[...items, ...ongoing]}
               roomName={room.name}
+              showBotNames={room.kind === 'group'}
               intro={room.responsibility || leader?.responsibility}
               avatar={avatar}
               hasEarlier={messages.hasNextPage}

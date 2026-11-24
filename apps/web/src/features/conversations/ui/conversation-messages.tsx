@@ -1,17 +1,29 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { Download } from 'lucide-react'
 import { formatFileSize, truncateFileName } from '@/features/attachments/lib/display'
 import { AnswerFooter } from './answer-footer'
-import { BotAvatar } from '@/features/bots/ui/bot-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
 import { ConversationMarkdown } from './conversation-markdown'
+import { ConversationWork } from './conversation-work'
 import { ConversationMessageActions } from './conversation-message-actions'
 import type { MessageView } from './conversation-message.view'
 
 const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
 const FOLLOW_DISTANCE_PX = 72
+
+function BotAnswer({ message }: { message: MessageView }) {
+  const active = message.status === 'running' || message.status === 'queued'
+  const [wasActive, setWasActive] = useState(active)
+  if (active && !wasActive) setWasActive(true)
+  if (!message.text) return null
+  return (
+    <div className="conversation-answer" data-reveal={wasActive || undefined}>
+      <ConversationMarkdown text={message.text} running={false} />
+    </div>
+  )
+}
 
 /**
  * 以原型的消息流显示对话、输出进度和历史状态。
@@ -21,6 +33,7 @@ const FOLLOW_DISTANCE_PX = 72
 export function ConversationMessages({
   items,
   roomName,
+  showBotNames,
   intro,
   avatar,
   hasEarlier,
@@ -33,6 +46,7 @@ export function ConversationMessages({
 }: {
   items: MessageView[]
   roomName: string
+  showBotNames: boolean
   intro?: string
   avatar: React.ReactNode
   hasEarlier: boolean
@@ -44,6 +58,7 @@ export function ConversationMessages({
   isVisible: boolean
 }) {
   const scrollBox = useRef<HTMLDivElement>(null)
+  const transcript = useRef<HTMLDivElement>(null)
   const follow = useRef(true)
   const linkedMessage = useRef<string | null>(null)
   const historyOffset = useRef<number | null>(null)
@@ -75,8 +90,9 @@ export function ConversationMessages({
       if (follow.current && historyOffset.current === null) box.scrollTop = box.scrollHeight
     })
     observer.observe(box)
+    if (transcript.current) observer.observe(transcript.current)
     return () => observer.disconnect()
-  }, [isVisible])
+  }, [isVisible, isEmpty])
 
   return (
     <div
@@ -111,7 +127,7 @@ export function ConversationMessages({
           {intro && <p>{intro}</p>}
         </div>
       ) : (
-        <div className="dsh-messages">
+        <div className="dsh-messages" ref={transcript}>
           {items.map((message) => {
             const running = message.status === 'running'
             const time = message.time && (
@@ -121,7 +137,8 @@ export function ConversationMessages({
             )
             return (
               <article
-                key={message.id}
+                key={message.runId ?? message.id}
+                aria-label={message.kind === 'bot' ? message.name : undefined}
                 id={`message-${message.id}`}
                 className={cn(
                   'dsh-message',
@@ -169,48 +186,13 @@ export function ConversationMessages({
                   </>
                 ) : (
                   <>
-                    <div className="dsh-assistant-head">
-                      {message.bot && (
-                        <BotAvatar
-                          botId={message.bot.id}
-                          avatarKey={message.bot.avatarKey ?? null}
-                          enabled={message.bot.enabled}
-                        />
-                      )}
-                      <span className="dsh-author">{message.name}</span>
-                    </div>
-                    {message.text && message.kind === 'bot' ? (
-                      <ConversationMarkdown text={message.text} running={running} />
+                    {message.kind === 'bot' && (
+                      <ConversationWork message={message} conversationId={conversationId} showBotName={showBotNames} />
+                    )}
+                    {message.kind === 'bot' ? (
+                      <BotAnswer message={message} />
                     ) : (
                       message.text && <div className="dsh-plain-text">{message.text}</div>
-                    )}
-                    {message.status && ['running', 'queued', 'stopped', 'failed'].includes(message.status) && (
-                      <div className="dsh-message-foot" role="status">
-                        {['running', 'queued'].includes(message.status ?? '') && (
-                          <span className="dsh-pulse" aria-hidden="true" />
-                        )}
-                        {message.statusText && (
-                          <span className={message.status === 'stopped' ? 'dsh-stopped' : undefined}>
-                            {message.statusText}
-                          </span>
-                        )}
-                        {['running', 'queued'].includes(message.status ?? '') && (
-                          <>
-                            {message.elapsed && (
-                              <span className="dsh-running-time" aria-hidden="true">
-                                {message.elapsed}
-                              </span>
-                            )}
-                            {!!message.toolCalls && (
-                              <>
-                                <span className="dsh-sep" aria-hidden="true" />
-                                <span className="dsh-running-steps">{message.toolCalls} 次工具调用</span>
-                              </>
-                            )}
-                          </>
-                        )}
-                        {message.status === 'stopped' && message.text && <span>已保留部分结果</span>}
-                      </div>
                     )}
                     {message.text && message.runId && !['running', 'queued'].includes(message.status ?? '') && (
                       <AnswerFooter message={message} conversationId={conversationId} readOnly={readOnly} busy={busy} />

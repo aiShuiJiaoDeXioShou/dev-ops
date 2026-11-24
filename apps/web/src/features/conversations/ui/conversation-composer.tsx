@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { Paperclip } from 'lucide-react'
+import { ClipboardPlus, FileText, Link2, Paperclip } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAttachmentPolicy } from '@/features/attachments/api/queries'
 import { describeAttachmentError } from '@/features/attachments/lib/errors'
@@ -87,6 +87,7 @@ export function ConversationComposer({
   })
   const [attachments, setAttachments] = useState(() => cachedDraft?.attachments ?? [])
   const picker = useRef<HTMLInputElement>(null)
+  const addFiles = useRef<((files: File[]) => void) | null>(null)
   const attachmentPolicy = useAttachmentPolicy(!readOnly)
   const [caret, setCaret] = useState(draft.length)
   const [hideMentions, setHideMentions] = useState(false)
@@ -313,6 +314,7 @@ export function ConversationComposer({
           value={attachments}
           onChange={changeAttachments}
           pickerRef={picker}
+          addFilesRef={addFiles}
           isSubmitting={send.isPending}
         />
       </div>
@@ -326,6 +328,21 @@ export function ConversationComposer({
           supplement ? `补充任务「${supplement.title}」` : `发消息给 ${room.name}，输入 @ 引用资源或 / 选择模板`
         }
         value={draft}
+        onPaste={(event) => {
+          if (supplement || send.isPending) return
+          const clipboard = event.clipboardData
+          const files = clipboard.files.length
+            ? Array.from(clipboard.files)
+            : Array.from(clipboard.items).flatMap((item) => {
+                const file = item.kind === 'file' ? item.getAsFile() : null
+                return file ? [file] : []
+              })
+          const images = files.filter(({ type }) => type.startsWith('image/'))
+          if (!images.length) return
+          // 仅含图片时接管粘贴；混合剪贴板仍由浏览器按光标位置插入普通文本。
+          if (!event.clipboardData.getData('text/plain')) event.preventDefault()
+          addFiles.current?.(images)
+        }}
         readOnly={send.isPending}
         onChange={(event) => change(event.target.value, event.target.selectionStart)}
         onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
@@ -377,6 +394,7 @@ export function ConversationComposer({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
+            className="conversation-composer-menu"
             align="start"
             side="top"
             onCloseAutoFocus={(event) => {
@@ -393,7 +411,7 @@ export function ConversationComposer({
                 else picker.current?.click()
               }}
             >
-              <Paperclip />
+              <Paperclip aria-hidden="true" />
               {attachmentPolicy.isPending
                 ? '正在读取上传限制…'
                 : attachmentPolicy.isError
@@ -401,7 +419,7 @@ export function ConversationComposer({
                   : '上传文件'}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onNewTask(addTrigger.current)}>
-              <ConversationIcon name="file" />
+              <ClipboardPlus aria-hidden="true" />
               新建任务
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -414,7 +432,7 @@ export function ConversationComposer({
                 replace(prefix + draft.slice(caret), prefix.length)
               }}
             >
-              <ConversationIcon name="chat" />
+              <Link2 aria-hidden="true" />
               插入引用
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -424,7 +442,7 @@ export function ConversationComposer({
                 replace(`/${draft}`, 1)
               }}
             >
-              <ConversationIcon name="file" />
+              <FileText aria-hidden="true" />
               插入提示模板
             </DropdownMenuItem>
           </DropdownMenuContent>

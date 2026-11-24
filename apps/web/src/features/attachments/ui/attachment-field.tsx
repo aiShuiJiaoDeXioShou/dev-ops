@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent, type ReactNode, type RefObject } from 'react'
+import {
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { Button } from '@/shared/ui/controls/button'
 import { FormField } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
@@ -17,8 +26,14 @@ const MAX_CONCURRENT_UPLOADS = 3
 
 /** 附件表单区属性。 */
 export type AttachmentFieldProps = (
-  | { projectId: string; conversationId?: never; pickerRef?: never; isSubmitting?: never }
-  | { projectId?: never; conversationId: string; pickerRef: RefObject<HTMLInputElement | null>; isSubmitting: boolean }
+  | { projectId: string; conversationId?: never; pickerRef?: never; addFilesRef?: never; isSubmitting?: never }
+  | {
+      projectId?: never
+      conversationId: string
+      pickerRef: RefObject<HTMLInputElement | null>
+      addFilesRef: RefObject<((files: File[]) => void) | null>
+      isSubmitting: boolean
+    }
 ) & {
   /** 当前附件行，受控于父表单。 */
   value: PendingAttachment[]
@@ -47,13 +62,14 @@ function createClientId(): string {
 /**
  * 渲染附件表单区：前置校验 → 并发上传 → 进度/取消/失败重试 → 完成后进入提交集合。
  * 上限来自策略接口，零字节与超限文件在发请求前被拒绝。
- * @param props 上传范围、附件行、变更和提交状态；会话模式由输入区菜单触发文件选择。
+ * @param props 上传范围、附件行、变更和提交状态；会话模式还接收剪贴板图片。
  * @returns 附件选择、行状态列表与上限说明。
  */
 export function AttachmentField({
   projectId,
   conversationId,
   pickerRef,
+  addFilesRef,
   isSubmitting = false,
   value,
   onChange,
@@ -176,15 +192,16 @@ export function AttachmentField({
   }
 
   /**
-   * 处理文件选择：先做零字节、单文件上限与单次数量上限校验，通过后再排队上传。
-   * @param event 文件输入变化事件。
+   * 为文件选择和剪贴板共用零字节、大小和数量校验，再加入上传队列。
+   * @param selectedFiles 用户明确选中或粘贴的文件。
    */
-  const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(event.target.files ?? [])
-    // 清空输入值，保证连续选择同一文件时仍触发变更事件。
-    event.target.value = ''
+  function enqueueFiles(selectedFiles: File[]) {
+    if (selectedFiles.length === 0 || isSubmitting || disabled) return
     const currentPolicy = policy.data
-    if (selectedFiles.length === 0 || !currentPolicy || isSubmitting) return
+    if (!currentPolicy) {
+      setLimitError(policy.isError ? describeAttachmentError(policy.error) : '正在读取上传限制，请稍后重新粘贴。')
+      return
+    }
     const rejectionMessages: string[] = []
     const acceptedFiles: Array<{ clientId: string; file: File }> = []
     const maxCount =
@@ -217,6 +234,15 @@ export function AttachmentField({
     commit([...valueRef.current, ...rows])
     queueRef.current.push(...acceptedFiles.map((item) => item.clientId))
     startNext()
+  }
+
+  useImperativeHandle(addFilesRef, () => enqueueFiles)
+
+  const handleFilesSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    // 清空输入值，保证连续选择同一文件时仍触发变更事件。
+    event.target.value = ''
+    enqueueFiles(files)
   }
 
   /**

@@ -1,4 +1,5 @@
 import type { ConversationMessage } from '../api/queries'
+import type { TraceStep } from '../model/conversation-trace'
 
 export type MessageView = {
   id: string
@@ -7,13 +8,11 @@ export type MessageView = {
   kind: ConversationMessage['speakerKind']
   text: string
   time?: string
-  bot?: { id: string; avatarKey?: string | null; enabled?: boolean }
   status?: string
   statusText?: string
   /** 失败运行的原因说明；挂在触发消息下，随消息历史滚动而不是常驻末尾。 */
   failureText?: string
-  /** 当前运行已完成的工具调用次数。 */
-  toolCalls?: number
+  workSteps?: TraceStep[]
   elapsed?: string
   isStored?: boolean
   canEdit?: boolean
