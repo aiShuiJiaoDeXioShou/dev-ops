@@ -268,6 +268,8 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   }
   const composer = page.getByRole('textbox', { name: '协作消息' })
   await expect(composer).toHaveCSS('background-image', 'none')
+  await expect(composer).toHaveCSS('font-size', '16px')
+  expect(await composer.evaluate((element) => getComputedStyle(element, '::placeholder').fontSize)).toBe('16px')
   await composer.fill('@')
   const references = page.getByRole('group', { name: '引用资源候选' })
   await expect(references.getByText('Bot', { exact: true })).toBeVisible()
@@ -287,9 +289,14 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(work.getByText('正在整理结果', { exact: true })).toBeVisible()
   await expect(work.getByRole('button', { name: '正在工作' })).toHaveAttribute('aria-expanded', 'true')
   await expect(page.locator('.dsh-assistant-head')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '停止生成' })).toBeVisible()
+  const stopButton = page.getByRole('button', { name: '停止生成' })
+  const stopSize = testInfo.project.name === 'mobile' ? '44px' : '34px'
+  await expect(stopButton).toBeVisible()
+  await expect(stopButton).toHaveCSS('width', stopSize)
+  await expect(stopButton).toHaveCSS('height', stopSize)
+  await expect(stopButton).toHaveCSS('background-color', 'rgb(65, 118, 230)')
   await expect(page.getByRole('button', { name: '发送消息' })).toHaveCount(0)
-  await expect(page.locator('.dsh-send-ring')).toBeVisible()
+  await expect(stopButton.locator('.dsh-send-ring')).toHaveCount(0)
   await expect(work.locator('.dsh-cursor')).toHaveCount(0)
   await expect(page.getByText('正在准备回复…', { exact: true })).toHaveCount(0)
   await expect(page.locator('.dsh-running')).toHaveCount(0)
@@ -298,6 +305,17 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(work.getByText('正在整理结果，即将完成', { exact: true })).toBeVisible()
   await expect(work.locator('.dsh-cursor')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('bot-conversations-running.png'), animations: 'disabled' })
+  const composerBox = page.locator('.conversation-composer')
+  await composerBox.screenshot({ path: testInfo.outputPath('bot-conversations-composer.png'), animations: 'disabled' })
+  if (testInfo.project.name === 'desktop') {
+    await page.evaluate(() => document.documentElement.classList.add('dark'))
+    await expect(stopButton).toHaveCSS('background-color', 'rgb(122, 160, 240)')
+    await composerBox.screenshot({
+      path: testInfo.outputPath('bot-conversations-composer-dark.png'),
+      animations: 'disabled',
+    })
+    await page.evaluate(() => document.documentElement.classList.remove('dark'))
+  }
   await composer.fill('尚未发送的草稿')
   const trajectoryTab = page.getByRole('tab', { name: '轨迹' })
   if (testInfo.project.name === 'mobile') await trajectoryTab.tap()
@@ -595,7 +613,7 @@ test('[desktop] [mobile] 在对话和轨迹停止生成并保留已经输出的�
   await expect(page.getByText('已停止生成', { exact: true })).toBeVisible()
   await expect(page.getByText('已收到的正文片段')).toBeVisible()
   await expect(page.getByText('已保留部分结果')).toBeVisible()
-  await expect(page.locator('.dsh-send-ring')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '停止生成' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '发送消息' })).toBeDisabled()
   await page.screenshot({ path: testInfo.outputPath('bot-conversations-stopped.png'), animations: 'disabled' })
 })

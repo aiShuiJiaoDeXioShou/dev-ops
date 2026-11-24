@@ -321,12 +321,10 @@ export function ConversationComposer({
       <Textarea
         ref={input}
         rows={2}
-        className="dsh-composer-input min-h-15 resize-none! rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
+        className="dsh-composer-input min-h-15 resize-none! rounded-none border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0"
         maxLength={16000}
         aria-label="协作消息"
-        placeholder={
-          supplement ? `补充任务「${supplement.title}」` : `发消息给 ${room.name}，输入 @ 引用资源或 / 选择模板`
-        }
+        placeholder={supplement ? `补充任务「${supplement.title}」` : `发消息给 ${room.name}，@ 引用资源或 / 选择模板`}
         value={draft}
         onPaste={(event) => {
           if (supplement || send.isPending) return
@@ -475,7 +473,6 @@ export function ConversationComposer({
             disabled={isStopping}
             onClick={() => onStop(runningId)}
           >
-            <span className="dsh-send-ring" aria-hidden="true" />
             <ConversationIcon name="stop" />
           </Button>
         )}

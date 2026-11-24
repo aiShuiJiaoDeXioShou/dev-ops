@@ -681,22 +681,6 @@
   width: 15px;
   height: 15px;
 }
-.dsh-send.dsh-stop {
-  position: relative;
-  background: #202630;
-}
-.dsh-send.dsh-stop:hover {
-  background: #2d3440;
-}
-.dsh-send-ring {
-  position: absolute;
-  inset: -4px;
-  border: 2px solid transparent;
-  border-top-color: var(--dsh-blue);
-  border-right-color: #b9cdf5;
-  border-radius: 50%;
-  animation: dsh-spin 0.9s linear infinite;
-}
 .dsh-composer .mention-results {
   position: absolute;
   right: 20px;
@@ -1616,8 +1600,7 @@
   .dsh-pulse:after,
   .dsh-tab-pulse,
   .traj-run-dot.streaming,
-  .traj-seg.running,
-  .dsh-send-ring {
+  .traj-seg.running {
     animation: none !important;
   }
 }

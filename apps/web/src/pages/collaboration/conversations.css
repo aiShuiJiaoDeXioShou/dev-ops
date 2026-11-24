@@ -173,6 +173,8 @@
   }
 
   .live-conversations .dsh-composer-input {
+    /* 工作区根字号为 14px，输入区需要独立放大提示和正文。 */
+    --text-base: 16px;
     /* 共享文本域绘制手柄；对话按原型由内容撑高。 */
     background-image: none !important;
     line-height: 24px;
@@ -210,12 +212,19 @@
   }
 
   .live-conversations .dsh-send.dsh-stop {
-    background: var(--foreground);
-    color: var(--background);
+    width: 34px;
+    height: 34px;
+    background: var(--primary);
   }
 
-  .live-conversations .dsh-send-ring {
-    border-right-color: color-mix(in srgb, var(--primary) 36%, var(--background));
+  .live-conversations .dsh-send.dsh-stop:disabled {
+    opacity: 0.4;
+  }
+
+  @media (hover: hover) {
+    .live-conversations .dsh-send.dsh-stop:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--primary) 85%, var(--background));
+    }
   }
 
   .conversation-icon {
@@ -456,10 +465,6 @@
     .live-conversations .mobile-rooms-backdrop {
       width: 100%;
       height: 100%;
-    }
-
-    .live-conversations .dsh-composer-input {
-      font-size: 16px;
     }
 
     .live-conversations .mention-results button > small {
