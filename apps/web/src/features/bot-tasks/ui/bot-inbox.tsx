@@ -9,7 +9,7 @@ import { botInboxOptions } from '../api/queries'
 
 const reasons = [{ id: 'awaiting_reply', label: '等你回复' }] as const
 
-/** 展示当前成员可处理的任务，链接回其会话和任务面板。 */
+/** 展示当前成员可见且等待回复的会话，链接回会话继续沟通。 */
 export function BotInbox({ teamId }: { teamId: string }) {
   const inbox = useQuery(botInboxOptions(teamId))
   return (
@@ -24,12 +24,12 @@ export function BotInbox({ teamId }: { teamId: string }) {
         return (
           <section key={id} className="work-gap">
             <h3>{label}</h3>
-            {items.map((task) => (
-              <Button key={task.id} asChild variant="ghost" className="work-task-row">
-                <Link to={`/collaboration/${task.conversationId}`}>
-                  <strong>{task.conversationName}</strong>
+            {items.map((conversation) => (
+              <Button key={conversation.id} asChild variant="ghost" className="work-task-row">
+                <Link to={`/collaboration/${conversation.conversationId}`}>
+                  <strong>{conversation.conversationName}</strong>
                   <span className="small muted">
-                    {task.conversationName} · {formatDateTime(task.updatedAt)}
+                    {conversation.conversationName} · {formatDateTime(conversation.updatedAt)}
                   </span>
                 </Link>
               </Button>

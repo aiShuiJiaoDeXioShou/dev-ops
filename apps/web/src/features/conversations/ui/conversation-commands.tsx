@@ -37,7 +37,8 @@ export function ConversationCommands({
 }) {
   const navigate = useNavigate()
   const client = useQueryClient()
-  const messages = useInfiniteQuery({ ...messagesOptions(room.id), enabled: !!command })
+  const needsMessages = command === 'copy' || command === 'fork' || command === 'tree'
+  const messages = useInfiniteQuery({ ...messagesOptions(room.id), enabled: needsMessages })
   const usage = useQuery({
     queryKey: ['bot-conversation-usage', room.id],
     queryFn: () => apiClient.getBotConversationUsage(room.id),
@@ -113,7 +114,11 @@ export function ConversationCommands({
           <DialogTitle>/{command}</DialogTitle>
           <DialogDescription>{commandCandidates.find(({ token }) => token === command)?.name}</DialogDescription>
         </DialogHeader>
-        {command === 'session' && (
+        {command === 'session' && usage.isPending && <p role="status">正在加载会话用量…</p>}
+        {command === 'session' && usage.isError && (
+          <Button onClick={() => void usage.refetch()}>用量加载失败，重试</Button>
+        )}
+        {command === 'session' && usage.isSuccess && (
           <p>
             输入 {usage.data?.data.inputTokens ?? '—'} tokens · 输出 {usage.data?.data.outputTokens ?? '—'} tokens ·
             费用 {typeof usage.data?.data.costUsd !== 'number' ? '未知' : `$${usage.data.data.costUsd.toFixed(4)}`}
@@ -122,11 +127,19 @@ export function ConversationCommands({
         {(command === 'model' || command === 'thinking') && botId && (
           <ConversationRuntimeSettings room={room} botId={botId} name={room.name} readOnly={false} busy={busy} />
         )}
+        {command === 'copy' && messages.isSuccess && !items.some(({ speakerKind }) => speakerKind === 'bot') && (
+          <p>暂无可复制的回复。</p>
+        )}
         {(command === 'new' || command === 'compact' || command === 'copy') && (
           <>
             {command === 'new' && <p>创建一个独立的新会话，原会话及消息历史会保留。</p>}
             <Button
-              disabled={action.isPending || (command !== 'copy' && busy) || messages.isPending}
+              disabled={
+                action.isPending ||
+                (command !== 'copy' && busy) ||
+                (needsMessages && messages.isPending) ||
+                (command === 'copy' && !items.some(({ speakerKind }) => speakerKind === 'bot'))
+              }
               onClick={() => {
                 if (command) action.mutate({ command })
               }}
@@ -135,6 +148,7 @@ export function ConversationCommands({
             </Button>
           </>
         )}
+        {needsMessages && messages.isPending && <p role="status">正在加载会话消息…</p>}
         {(command === 'fork' || command === 'tree') && (
           <div className="grid gap-2 overflow-auto">
             {messages.hasNextPage && (
@@ -184,12 +198,14 @@ export function ConversationCommands({
                   )}
                 </div>
               ))}
-            {!messages.isPending && !items.some((item) => command === 'fork' || item.branchSiblings) && (
-              <p>暂无可用消息分支。</p>
-            )}
+            {!messages.isPending &&
+              !messages.isError &&
+              !items.some((item) => command === 'fork' || item.branchSiblings) && <p>暂无可用消息分支。</p>}
           </div>
         )}
-        {messages.isError && <Button onClick={() => void messages.refetch()}>消息加载失败，重试</Button>}
+        {needsMessages && messages.isError && (
+          <Button onClick={() => void messages.refetch()}>消息加载失败，重试</Button>
+        )}
         {action.isError && (
           <p role="alert" className="field-error">
             {describeRequestError(action.error).description}

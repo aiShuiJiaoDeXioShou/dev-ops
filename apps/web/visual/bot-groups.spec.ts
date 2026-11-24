@@ -6,7 +6,7 @@ function success(data: unknown) {
   return { success: true, code: 'OK', message: 'OK', requestId: 'bot-group-visual-test', data }
 }
 
-test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ page }, testInfo) => {
+test('[desktop] [mobile] 建立群组并管理设置，长工作使用消息和待办', async ({ page }, testInfo) => {
   await installApiMocks(page)
   const { teamId, userId } = VISUAL_IDS
   await page.route(`**/api/v1/teams/${teamId}/work-tags*`, (route) =>
@@ -49,6 +49,7 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
     tags: [],
     botSettings: [],
     skillReferences: [],
+    todos: [{ text: '核对团队交付', status: 'pending' }],
     members: [{ id: userId, name: '负责人', kind: 'user' }, ...bots.map(({ id, name }) => ({ id, name, kind: 'bot' }))],
   }
   const routeBase = `**/api/v1/teams/${teamId}`
@@ -127,7 +128,9 @@ test('[desktop] [mobile] 建立群组并切换设置与任务面板', async ({ p
   await page.keyboard.press('Escape')
   await expect(settings).toBeFocused()
   await expect(panel).toBeHidden()
-  await page.getByRole('button', { name: '任务列表' }).click()
-  await expect(page.getByRole('complementary', { name: '任务面板' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '任务列表' })).toHaveCount(0)
+  await expect(page.getByRole('complementary', { name: '任务面板' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: '工作待办' })).toContainText('核对团队交付')
+  await expect(page.getByRole('textbox', { name: '协作消息' })).toBeVisible()
   await expect(panel).toBeHidden()
 })

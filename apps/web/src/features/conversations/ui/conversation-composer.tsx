@@ -98,6 +98,7 @@ export function ConversationComposer({
   const [command, setCommand] = useState<string>()
   const [candidateIndex, setCandidateIndex] = useState(0)
   const input = useRef<HTMLTextAreaElement>(null)
+  const readOnlyOpener = useRef<HTMLButtonElement | null>(null)
   const nextCaret = useRef<number | null>(null)
   const requestId = useRef(cachedDraft?.text === draft ? cachedDraft?.requestId : undefined)
   const attachmentIds = doneAttachmentIds(attachments)
@@ -263,13 +264,35 @@ export function ConversationComposer({
     return (
       <div className="dsh-readonly-note">
         浏览者只读{' '}
-        <Button variant="ghost" size="sm" onClick={() => setCommand('copy')}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(event) => {
+            readOnlyOpener.current = event.currentTarget
+            setCommand('copy')
+          }}
+        >
           /copy
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => setCommand('session')}>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(event) => {
+            readOnlyOpener.current = event.currentTarget
+            setCommand('session')
+          }}
+        >
           /session
         </Button>
-        <ConversationCommands room={room} command={command} onClose={() => setCommand(undefined)} busy={!!runningId} />
+        <ConversationCommands
+          room={room}
+          command={command}
+          onClose={() => {
+            setCommand(undefined)
+            readOnlyOpener.current?.focus()
+          }}
+          busy={!!runningId}
+        />
       </div>
     )
   return (
@@ -334,7 +357,11 @@ export function ConversationComposer({
             )}
             {candidates.length === 0 && !(mention.symbol === '/' && templates.isError) && (
               <p className="mention-choice small muted" role="status">
-                {mention.symbol === '/' && templates.isPending ? '正在加载提示模板…' : '没有匹配的引用'}
+                {mention.symbol === '/' && templates.isPending
+                  ? '正在加载提示模板…'
+                  : mention.symbol === '/'
+                    ? '没有匹配的命令'
+                    : '没有匹配的 Bot'}
               </p>
             )}
             {candidates.map((candidate) => (

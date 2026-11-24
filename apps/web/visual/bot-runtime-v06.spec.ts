@@ -630,3 +630,51 @@ test('[desktop] [mobile] new 命令创建独立会话并保留原房间', async 
   await expect(page).toHaveURL(new RegExp(forkId))
   expect(created).toBe(true)
 })
+
+test('[desktop] [mobile] 浏览者命令只读且关闭后归还键盘焦点', async ({ page }) => {
+  await installRoom(page, sampleRoom('direct'))
+  await page.route('**/api/v1/me/teams', (route) =>
+    route.fulfill({
+      json: ok({
+        teams: [
+          {
+            id: teamId,
+            name: '研发团队',
+            iconText: null,
+            description: null,
+            version: 1,
+            role: 'viewer',
+            status: 'active',
+          },
+        ],
+        isPlatformAdmin: false,
+      }),
+    }),
+  )
+  await page.route(`${roomPath}/messages*`, (route) => route.fulfill({ json: ok({ items: [], nextBefore: null }) }))
+  let failed = true
+  await page.route(`${roomPath}/usage`, (route) =>
+    route.fulfill({
+      json: failed
+        ? { success: false, code: 'INTERNAL_ERROR', message: '暂不可用', requestId: 'usage-retry' }
+        : ok({ inputTokens: 20, outputTokens: 10, costUsd: null, contexts: [] }),
+    }),
+  )
+  await page.goto(`/collaboration/${roomId}`)
+  await expect(page.getByRole('textbox', { name: '协作消息' })).toHaveCount(0)
+  const session = page.getByRole('button', { name: '/session', exact: true })
+  await session.press('Enter')
+  const dialog = page.getByRole('dialog', { name: '/session' })
+  await expect(dialog.getByRole('button', { name: '用量加载失败，重试' })).toBeVisible()
+  failed = false
+  await dialog.getByRole('button', { name: '用量加载失败，重试' }).click()
+  await expect(dialog).toContainText('20')
+  await page.keyboard.press('Escape')
+  await expect(session).toBeFocused()
+  const copy = page.getByRole('button', { name: '/copy', exact: true })
+  await copy.press('Enter')
+  await expect(page.getByRole('dialog', { name: '/copy' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(copy).toBeFocused()
+  await expect(page.getByRole('button', { name: '/model', exact: true })).toHaveCount(0)
+})
