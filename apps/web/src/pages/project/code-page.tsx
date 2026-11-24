@@ -27,7 +27,9 @@ import {
 } from '@/features/code/api/queries'
 import { describeRequestError } from '@/shared/api/errors'
 import { PageError } from '@/shared/ui/page-state'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CodePageSkeleton } from '@/pages/page-skeletons'
+import { LogLinesSkeleton } from '@/shared/ui/page-skeleton'
+import { Skeleton, SkeletonRegion } from '@/shared/ui/controls/skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/controls/sheet'
 import { useToast } from '@/shared/ui/toast'
@@ -59,9 +61,10 @@ function DirectoryChildren({ scope, path, depth }: { scope: FileTreeScope; path:
   const directory = useQuery(repositoryTreeQueryOptions(scope.projectId, scope.repositoryId, scope.branch, path))
   if (directory.isPending) {
     return (
-      <p className="section-note ml-5" role="status">
-        正在读取目录…
-      </p>
+      <SkeletonRegion label="目录加载中" delay={0} className="ml-5 space-y-2 py-1">
+        <Skeleton width="68%" height={12} />
+        <Skeleton width="52%" height={12} />
+      </SkeletonRegion>
     )
   }
   if (directory.isError) {
@@ -175,7 +178,7 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
   useEffect(() => {
     setViewMode('preview')
   }, [activePath])
-  if (project.isPending || repositories.isPending) return <DelayedPageSkeleton />
+  if (project.isPending || repositories.isPending) return <CodePageSkeleton />
   if (project.isError || !project.data) {
     const described = describeRequestError(project.error)
     return (
@@ -339,9 +342,9 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
         <div className="file-browser">
           <nav className="file-tree" aria-label="文件目录">
             {tree.isPending ? (
-              <div className="file-tree-skeleton" role="status" aria-label="文件树加载中">
-                {[68, 52, 76, 44, 62, 58, 48, 70].map((width, index) => (
-                  <span key={index} className="skeleton-line" style={{ width: `${width}%` }} />
+              <div className="file-tree-skeleton" role="status" aria-busy="true" aria-label="文件树加载中">
+                {['68%', '52%', '76%', '44%', '62%', '58%', '48%', '70%'].map((width, index) => (
+                  <Skeleton key={index} width={width} height={12} />
                 ))}
               </div>
             ) : entries.length === 0 ? (
@@ -414,9 +417,9 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
               </span>
             </div>
             {file.isPending && activePath ? (
-              <p className="section-note" style={{ padding: 16 }}>
-                正在读取文件…
-              </p>
+              <div className="p-4">
+                <LogLinesSkeleton lines={12} label="文件加载中" />
+              </div>
             ) : file.isError && !file.data ? (
               <PageError
                 title="文件读取失败"

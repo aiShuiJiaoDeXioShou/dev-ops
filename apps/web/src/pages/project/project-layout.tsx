@@ -7,7 +7,7 @@ import { ProjectSettingsDialog } from '@/features/projects/ui/project-settings-d
 import { projectQueryOptions } from '@/features/projects/api/queries'
 import { Tag } from '@/shared/ui/tag'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { ProjectLayoutSkeleton } from '@/pages/page-skeletons'
 import { PageError } from '@/shared/ui/page-state'
 
 const STATUS_LABELS = { active: '进行中', paused: '暂停', ended: '已结束' } as const
@@ -28,7 +28,7 @@ export function Component() {
   const navigate = useNavigate()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const project = useQuery(projectQueryOptions(projectId))
-  if (project.isPending) return <DelayedPageSkeleton />
+  if (project.isPending) return <ProjectLayoutSkeleton pathname={location.pathname} />
   if (!project.data || isBusinessError(project.error, 'NOT_FOUND') || isBusinessError(project.error, 'FORBIDDEN')) {
     return (
       <PageError

@@ -6,7 +6,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { Tabs, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { formatRelativeTime } from '@/shared/lib/format'
 import { botListQueryOptions } from '../api/queries'
@@ -92,7 +92,9 @@ export function BotList({ teamId, userId, canEdit, canBindModel, selectedId }: B
         </div>
       </header>
       <div className="agent-catalog min-w-0">
-        {query.isPending && <DelayedPageSkeleton />}
+        {query.isPending && (
+          <CompactListSkeleton rows={6} leading="avatar" trailing bordered label="智能体列表加载中" />
+        )}
         {query.isError && (
           <PageError
             title="智能体列表加载失败"

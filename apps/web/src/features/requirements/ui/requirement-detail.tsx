@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Ellipsis, Pencil, Plus } from 'lucide-react'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
+import { DetailSheetSkeleton, TimelineListSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import {
   DropdownMenu,
@@ -32,7 +32,7 @@ import { projectQueryOptions } from '@/features/projects/api/queries'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { Markdown } from '@/shared/lib/markdown'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
 import { requirementQueryOptions, submissionQueryOptions } from '../api/queries'
 import { canWriteRequirements, isRequirementScopeEditable, requirementMutations } from '../api/mutations'
 import { REQUIREMENT_STATUS_LABELS, SELF_TEST_LABELS, requirementStatusTone } from '../model/labels'
@@ -106,9 +106,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
   if (query.isPending)
     return (
       <WorkItemDetailSheet label="需求详情" onClose={onClose}>
-        <DelayedLoading pending>
-          <PageLoading message="需求加载中…" />
-        </DelayedLoading>
+        <DetailSheetSkeleton showTimeline propertyRows={4} label="需求详情加载中" />
       </WorkItemDetailSheet>
     )
   if (query.isError) {
@@ -351,9 +349,7 @@ export function RequirementDetailPane({ requirementId, onClose }: { requirementI
           <TabsContent value="submissions" className="space-y-5">
             <h3 className="mb-3 text-sm font-semibold">提测历史</h3>
             {submissions.isPending ? (
-              <DelayedLoading pending>
-                <PageLoading message="提测记录加载中…" />
-              </DelayedLoading>
+              <TimelineListSkeleton rows={2} label="提测记录加载中" />
             ) : submissions.isError ? (
               <PageError
                 title="提测记录加载失败"

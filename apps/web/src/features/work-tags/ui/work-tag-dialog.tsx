@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { workTagsOptions, type WorkTag } from '../api/queries'
 import { tagTone } from './tag-tone'
 import './work-tags.css'
@@ -134,11 +135,7 @@ export function WorkTagDialog({
           <div className="work-tag-manage-meta">
             {list.isSuccess && (list.hasNextPage ? `已加载 ${tags.length} 个标签` : `共 ${tags.length} 个标签`)}
           </div>
-          {list.isPending && (
-            <p className="small muted" role="status">
-              正在加载标签…
-            </p>
-          )}
+          {list.isPending && <CompactListSkeleton rows={4} trailing label="标签加载中" />}
           {list.isError && (
             <div className="grid gap-2">
               <p role="alert" className="field-error">

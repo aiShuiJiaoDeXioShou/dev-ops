@@ -4,6 +4,7 @@ import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { cn } from '@/shared/lib/utils'
 import { Button } from './button'
+import { Skeleton } from './skeleton'
 
 export type MemberRole = 'admin' | 'developer' | 'viewer'
 export type MemberStatus = 'active' | 'disabled' | 'missing'
@@ -320,7 +321,17 @@ export function MemberMultiSelect({
           }}
         >
           {loading ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">成员加载中…</p>
+            <div className="space-y-2.5 px-2 py-2.5" role="status" aria-busy="true" aria-label="成员加载中">
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="flex items-center gap-2.5" aria-hidden="true">
+                  <Skeleton circle width={28} height={28} />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <Skeleton width="45%" height={12} />
+                    <Skeleton width="68%" height={10} />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : error ? (
             <div className="space-y-2 px-2 py-3">
               <p className="text-sm text-destructive">{error}</p>

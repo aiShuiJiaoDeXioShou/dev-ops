@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { BotConversation } from '@/features/conversations/api/queries'
 import { ConversationIcon } from '@/features/conversations/ui/conversation-icon'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { botTasksOptions, taskStatusLabels } from '../api/queries'
 import { TaskDetails } from './task-details'
@@ -81,7 +81,7 @@ export function ConversationTaskPanel({
         <TaskDetails key={taskId} taskId={taskId} room={room} readOnly={readOnly} onChanged={onChanged} />
       ) : (
         <>
-          {list.isPending && <DelayedPageSkeleton />}
+          {list.isPending && <CompactListSkeleton rows={4} bordered label="任务列表加载中" />}
           {list.isError && <PageError title="任务加载失败" error={list.error} onRetry={() => void list.refetch()} />}
           {list.isSuccess && items.length === 0 && <EmptyState title="还没有任务" />}
           {items.map((task) => (

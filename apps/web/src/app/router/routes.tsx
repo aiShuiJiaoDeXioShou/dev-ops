@@ -1,11 +1,34 @@
-import { Navigate, Outlet, type RouteObject } from 'react-router'
+import { Navigate, Outlet, useLocation, type RouteObject } from 'react-router'
 import { AppLayout } from '@/app/layouts/app-layout'
 import { WorkspaceShellSkeleton } from '@/app/layouts/workspace-loading'
 import { RequireAuth } from '@/features/identity/ui/require-auth'
 import { useSession } from '@/features/identity/model/session'
-import { DelayedPageLoading } from '@/shared/ui/page-state'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { CollaborationPageSkeleton } from '@/pages/collaboration/conversation-loading'
+import {
+  ArtifactsPageSkeleton,
+  AuthPageSkeleton,
+  BotMemoryPageSkeleton,
+  BotsPageSkeleton,
+  BugsPageSkeleton,
+  CapabilitiesLayoutSkeleton,
+  CodePageSkeleton,
+  EnvironmentPageSkeleton,
+  PipelineNodesPageSkeleton,
+  PipelineRunPageSkeleton,
+  PipelinesPageSkeleton,
+  PlatformManagementPageSkeleton,
+  ProfilePageSkeleton,
+  ProjectLayoutSkeleton,
+  ProjectListPageSkeleton,
+  PromptTemplatesPageSkeleton,
+  PrsPageSkeleton,
+  RequirementsPageSkeleton,
+  RoutePageSkeleton,
+  SkillsPageSkeleton,
+  SystemStatusPageSkeleton,
+  TeamSettingsPageSkeleton,
+  VaultPageSkeleton,
+} from '@/pages/page-skeletons'
 import { NotFoundPage } from '@/pages/not-found'
 import { collaborationRoutePath } from './collaboration-path'
 import { RouteErrorPage } from './route-error'
@@ -15,27 +38,45 @@ function RequirePlatformRoot() {
   return isPlatformAdmin ? <Outlet /> : <NotFoundPage />
 }
 
+/** 业务根路由懒加载回退：按当前路径匹配对应页面的专属骨架。 */
+function CurrentRouteSkeleton() {
+  const { pathname } = useLocation()
+  return <RoutePageSkeleton pathname={pathname} />
+}
+
+/** 项目工作区布局懒加载回退：渲染项目头部与当前子页对应的骨架。 */
+function CurrentProjectLayoutSkeleton() {
+  const { pathname } = useLocation()
+  return <ProjectLayoutSkeleton pathname={pathname} />
+}
+
+/** 能力中心布局懒加载回退：渲染能力导航与当前子页对应的骨架。 */
+function CurrentCapabilitiesLayoutSkeleton() {
+  const { pathname } = useLocation()
+  return <CapabilitiesLayoutSkeleton pathname={pathname} />
+}
+
 /**
  * 创建应用路由；认证页公开，业务页统一经过 RequireAuth 与会话上下文。
  * @returns 可交给浏览器或内存路由器的配置；调用本身不发起 API 请求。
  */
 export function createAppRoutes(): RouteObject[] {
   const routes: RouteObject[] = [
-    { path: '/login', lazy: () => import('@/pages/auth/login-page'), HydrateFallback: DelayedPageLoading },
+    { path: '/login', lazy: () => import('@/pages/auth/login-page'), HydrateFallback: AuthPageSkeleton },
     {
       path: '/accept-invitation',
       lazy: () => import('@/pages/auth/accept-invitation-page'),
-      HydrateFallback: DelayedPageLoading,
+      HydrateFallback: AuthPageSkeleton,
     },
     {
       path: '/forgot-password',
       lazy: () => import('@/pages/auth/forgot-password-page'),
-      HydrateFallback: DelayedPageLoading,
+      HydrateFallback: AuthPageSkeleton,
     },
     {
       path: '/reset-password',
       lazy: () => import('@/pages/auth/reset-password-page'),
-      HydrateFallback: DelayedPageLoading,
+      HydrateFallback: AuthPageSkeleton,
     },
     {
       element: <RequireAuth sessionFallback={<WorkspaceShellSkeleton />} />,
@@ -45,7 +86,7 @@ export function createAppRoutes(): RouteObject[] {
           path: '/',
           Component: AppLayout,
           ErrorBoundary: RouteErrorPage,
-          HydrateFallback: DelayedPageSkeleton,
+          HydrateFallback: CurrentRouteSkeleton,
           children: [
             { index: true, element: <Navigate to="/collaboration" replace /> },
             {
@@ -56,64 +97,64 @@ export function createAppRoutes(): RouteObject[] {
             {
               path: 'projects',
               lazy: () => import('@/pages/projects/project-list-page'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: ProjectListPageSkeleton,
             },
             {
               path: 'projects/:projectId',
               lazy: () => import('@/pages/project/project-layout'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: CurrentProjectLayoutSkeleton,
               children: [
                 { index: true, element: <Navigate to="requirements" replace /> },
                 {
                   path: 'requirements',
                   lazy: () => import('@/pages/project/requirements-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: RequirementsPageSkeleton,
                 },
-                { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: DelayedPageSkeleton },
-                { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: DelayedPageSkeleton },
-                { path: 'prs', lazy: () => import('@/pages/project/prs-page'), HydrateFallback: DelayedPageSkeleton },
+                { path: 'bugs', lazy: () => import('@/pages/project/bugs-page'), HydrateFallback: BugsPageSkeleton },
+                { path: 'code', lazy: () => import('@/pages/project/code-page'), HydrateFallback: CodePageSkeleton },
+                { path: 'prs', lazy: () => import('@/pages/project/prs-page'), HydrateFallback: PrsPageSkeleton },
                 {
                   path: 'pipelines',
                   lazy: () => import('@/pages/project/pipelines-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: PipelinesPageSkeleton,
                 },
                 {
                   path: 'pipelines/:runId',
                   lazy: () => import('@/pages/project/pipeline-run-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: PipelineRunPageSkeleton,
                 },
                 {
                   path: 'environment',
                   lazy: () => import('@/pages/project/environment-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: EnvironmentPageSkeleton,
                 },
                 {
                   path: 'artifacts',
                   lazy: () => import('@/pages/project/artifacts-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: ArtifactsPageSkeleton,
                 },
               ],
             },
             {
               path: 'capabilities',
               lazy: () => import('@/pages/capabilities/capabilities-layout'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: CurrentCapabilitiesLayoutSkeleton,
               children: [
                 { index: true, element: <Navigate to="bots" replace /> },
                 {
                   path: 'skills',
                   lazy: () => import('@/pages/capabilities/skills-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: SkillsPageSkeleton,
                 },
                 {
                   path: 'bots/:botId?',
                   lazy: () => import('@/pages/capabilities/bots-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: BotsPageSkeleton,
                 },
                 {
                   path: 'memory',
                   lazy: () => import('@/pages/capabilities/bot-memory-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: BotMemoryPageSkeleton,
                 },
                 {
                   path: 'usage',
@@ -122,7 +163,7 @@ export function createAppRoutes(): RouteObject[] {
                 {
                   path: 'prompt-templates',
                   lazy: () => import('@/pages/capabilities/bot-prompt-templates-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: PromptTemplatesPageSkeleton,
                 },
                 {
                   path: 'team-context',
@@ -137,18 +178,18 @@ export function createAppRoutes(): RouteObject[] {
             {
               path: 'settings/profile',
               lazy: () => import('@/pages/settings/profile-page'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: ProfilePageSkeleton,
             },
-            { path: 'vault', lazy: () => import('@/pages/vault-page'), HydrateFallback: DelayedPageSkeleton },
+            { path: 'vault', lazy: () => import('@/pages/vault-page'), HydrateFallback: VaultPageSkeleton },
             {
               path: 'settings/team',
               lazy: () => import('@/pages/settings/team-settings-page'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: TeamSettingsPageSkeleton,
             },
             {
               path: 'settings/pipeline-nodes',
               lazy: () => import('@/pages/settings/pipeline-nodes-page'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: PipelineNodesPageSkeleton,
             },
             {
               Component: RequirePlatformRoot,
@@ -156,7 +197,7 @@ export function createAppRoutes(): RouteObject[] {
                 {
                   path: 'platform',
                   lazy: () => import('@/pages/platform/platform-management-page'),
-                  HydrateFallback: DelayedPageSkeleton,
+                  HydrateFallback: PlatformManagementPageSkeleton,
                 },
                 { path: 'settings/storage-buckets', element: <Navigate to="/platform" replace /> },
               ],
@@ -164,7 +205,7 @@ export function createAppRoutes(): RouteObject[] {
             {
               path: 'system/status',
               lazy: () => import('@/pages/system-status'),
-              HydrateFallback: DelayedPageSkeleton,
+              HydrateFallback: SystemStatusPageSkeleton,
             },
             { path: '*', Component: NotFoundPage },
           ],

@@ -73,4 +73,13 @@ describe('DelayedLoading', () => {
     })
     expect(screen.queryByText('骨架内容')).not.toBeInTheDocument()
   })
+
+  it('外层已延迟时传入 delay=0 立即同步渲染，不额外延迟一帧', () => {
+    render(
+      <DelayedLoading pending delay={0}>
+        <p>立即骨架</p>
+      </DelayedLoading>,
+    )
+    expect(screen.getByText('立即骨架')).toBeInTheDocument()
+  })
 })

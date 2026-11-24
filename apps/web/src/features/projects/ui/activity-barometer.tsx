@@ -3,8 +3,8 @@ import type { ApiSuccessData } from '@dev-ops/api-client'
 import { Select } from '@/shared/ui/controls/select'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageLoading, PageError } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
+import { BarometerSkeleton } from '@/shared/ui/page-skeleton'
 
 const SOURCES = [
   { value: 'all', label: '全部' },
@@ -76,12 +76,7 @@ export function ActivityBarometer({
   }))
   const focusableDays = days.filter((day) => !day.future)
   const [activeDate, setActiveDate] = useState('')
-  if (!result && isPending)
-    return (
-      <DelayedLoading pending>
-        <PageLoading message="项目晴雨表加载中…" />
-      </DelayedLoading>
-    )
+  if (!result && isPending) return <BarometerSkeleton />
   if (!result && isError) {
     return (
       <PageError

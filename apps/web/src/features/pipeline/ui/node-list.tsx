@@ -1,8 +1,8 @@
 import { formatDateTime, formatRelativeTime } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/controls/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { nodeStatusLabel, nodeStatusTone } from '../lib/status'
 import type { PipelineNode } from '../model/types'
 import { StatusLabel } from './status-label'
@@ -75,9 +75,7 @@ export function NodeList({
         <span className="counter">{nodes.length}</span>
       </div>
       {isPending ? (
-        <DelayedLoading pending>
-          <PageLoading message="节点列表加载中…" />
-        </DelayedLoading>
+        <TableSkeleton rows={4} columns={['26%', '18%', '24%', '16%', '16%']} label="节点列表加载中" />
       ) : errorDescription !== null ? (
         <PageError title="节点列表加载失败" description={errorDescription} requestId={requestId} onRetry={onRetry} />
       ) : (

@@ -6,7 +6,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/controls/button'
 import { Textarea } from '@/shared/ui/controls/textarea'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { FormSectionSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
 
 type Context = ApiSuccessData<'/api/v1/teams/{teamId}/bot-context', 'get'>
@@ -27,7 +27,7 @@ function ContextForm({ teamId, isAdmin }: { teamId: string; isAdmin: boolean }) 
       setDraft(undefined)
     },
   })
-  if (details.isPending) return <DelayedPageSkeleton />
+  if (details.isPending) return <FormSectionSkeleton fields={2} label="团队上下文加载中" />
   if (!details.data)
     return (
       <PageError

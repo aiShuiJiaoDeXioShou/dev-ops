@@ -15,7 +15,7 @@ import {
 } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { FormSectionSkeleton } from '@/shared/ui/page-skeleton'
 import { useToast } from '@/shared/ui/toast'
 import { botQueryKey } from '../api/queries'
 import { botCatalogOptions, connectionQueryKey } from '../api/connections'
@@ -55,7 +55,7 @@ function LoginStep({ sessionId, onDone, onClose }: { sessionId: string; onDone: 
   return (
     <>
       <DialogFormBody className="space-y-4">
-        {progress.isPending && <DelayedPageSkeleton />}
+        {progress.isPending && <FormSectionSkeleton fields={2} label="登录进度加载中" />}
         {progress.isError && (
           <Button variant="outline" type="button" onClick={() => void progress.refetch()}>
             重试查看登录进度

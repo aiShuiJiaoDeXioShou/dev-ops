@@ -5,7 +5,7 @@ import { ArrowUpRight, Layers, Plus, Search } from 'lucide-react'
 import { useSession } from '@/features/identity/model/session'
 import { describeRequestError } from '@/shared/api/errors'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CardGridSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
@@ -76,7 +76,7 @@ export function SkillList({ teamId }: { teamId: string }) {
             onRetry={() => void query.refetch()}
           />
         ) : query.isPending ? (
-          <DelayedPageSkeleton />
+          <CardGridSkeleton count={6} iconShape="square" lines={2} label="技能库加载中" />
         ) : (
           <>
             <div className="skill-toolbar">

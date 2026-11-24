@@ -8,7 +8,8 @@ import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { Skeleton, SkeletonRegion } from '@/shared/ui/controls/skeleton'
+import { BarometerSkeleton, CardGridSkeleton } from '@/shared/ui/page-skeleton'
 import { projectActivityQueryOptions, projectListQueryOptions } from '../api/queries'
 import {
   countProjectCriteria,
@@ -88,7 +89,23 @@ export function ProjectList() {
         />
       </div>
     )
-  if (query.isPending) return <DelayedPageSkeleton />
+  if (query.isPending) {
+    return (
+      <SkeletonRegion label="项目列表加载中">
+        <header className="page-head" aria-hidden="true">
+          <div className="row">
+            <Skeleton width={64} height={24} />
+            <span className="spacer" />
+            <Skeleton width={104} height={34} borderRadius="var(--radius-md)" />
+          </div>
+        </header>
+        <div className="catalog project-home space-y-6" aria-hidden="true">
+          <BarometerSkeleton delay={0} />
+          <CardGridSkeleton count={6} iconShape="square" lines={2} delay={0} />
+        </div>
+      </SkeletonRegion>
+    )
+  }
   if (query.isError && !query.data) {
     return (
       <PageError

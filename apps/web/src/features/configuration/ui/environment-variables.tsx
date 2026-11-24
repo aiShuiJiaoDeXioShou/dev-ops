@@ -10,7 +10,8 @@ import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { useToast } from '@/shared/ui/toast'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { DelayedPageLoading, EmptyState, PageError } from '@/shared/ui/page-state'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
 import { envVariablesQueryOptions, credentialsQueryOptions } from '../api/queries'
 
 const ENVIRONMENTS = [
@@ -121,7 +122,17 @@ export function EnvironmentVariables({ projectId }: { projectId: string }) {
     if (form.kind === 'credential_ref' && !form.credentialId) return showToast('请选择已授权凭据。', 'error')
     save.mutate()
   }
-  if (variables.isPending) return <DelayedPageLoading />
+  if (variables.isPending) {
+    return (
+      <TableSkeleton
+        toolbar
+        rows={5}
+        columns={['28%', '18%', '34%', '20%']}
+        label="环境变量加载中"
+        className="project-tab-panel"
+      />
+    )
+  }
   if (variables.isError && !variables.data) {
     return (
       <PageError

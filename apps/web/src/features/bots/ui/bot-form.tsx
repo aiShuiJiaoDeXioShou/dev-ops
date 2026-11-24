@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/shared/ui/controls/alert-dialog'
 import { Button } from '@/shared/ui/controls/button'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { Checkbox } from '@/shared/ui/controls/checkbox'
 import {
   Dialog,
@@ -190,7 +191,7 @@ export function BotForm({ teamId, bot, defaultOwnerId, canBindModel = false, inl
           </label>
           <fieldset className="field full">
             <legend>Skills</legend>
-            {skillCatalog.isPending && <p className="small muted">正在加载技能…</p>}
+            {skillCatalog.isPending && <CompactListSkeleton rows={3} label="技能列表加载中" />}
             {skillCatalog.isError && (
               <Button type="button" variant="outline" onClick={() => void skillCatalog.refetch()}>
                 重试加载技能

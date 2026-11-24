@@ -16,7 +16,8 @@ import {
   AlertDialogTrigger,
 } from '@/shared/ui/controls/alert-dialog'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { Skeleton } from '@/shared/ui/controls/skeleton'
+import { DetailSheetSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { useOpenDirectConversation } from '@/features/conversations/api/open-direct'
@@ -111,7 +112,7 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
       </div>
       {query.isPending && (
         <div className="detail-scroll">
-          <DelayedPageSkeleton />
+          <DetailSheetSkeleton propertyRows={4} label="智能体详情加载中" />
         </div>
       )}
       {!query.isPending && !bot && (
@@ -191,7 +192,12 @@ export function BotDetail({ botId, teamId, userId, canEdit, canBindModel, onClos
               </h3>
               <div className="agent-skills">
                 {bot.skillIds.length === 0 && <p className="quiet small">尚未配置技能</p>}
-                {skillQuery.isFetching && bot.skillIds.length > 0 && <p className="quiet small">正在加载技能…</p>}
+                {skillQuery.isFetching && bot.skillIds.length > 0 && (
+                  <div className="flex flex-wrap gap-2" role="status" aria-busy="true" aria-label="技能加载中">
+                    <Skeleton width={72} height={24} borderRadius="var(--radius-full)" />
+                    <Skeleton width={88} height={24} borderRadius="var(--radius-full)" />
+                  </div>
+                )}
                 {skillQuery.isError && (
                   <Button variant="outline" type="button" onClick={() => void skillQuery.refetch()}>
                     重试加载技能

@@ -10,8 +10,8 @@ import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Select } from '@/shared/ui/controls/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
+import { PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { teamInvitationsQueryOptions, teamMembersQueryOptions } from '../api/team-queries'
 import { useSession, type TeamRole } from '../model/session'
@@ -146,11 +146,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
     },
   })
   if (members.isPending) {
-    return (
-      <DelayedLoading pending>
-        <PageLoading message="成员加载中…" />
-      </DelayedLoading>
-    )
+    return <TableSkeleton rows={5} columns={['34%', '28%', '18%', '20%']} label="成员列表加载中" />
   }
   if (members.isError) {
     const described = describeRequestError(members.error)
@@ -239,9 +235,7 @@ export function MemberManagement({ teamId, canManage }: { teamId: string; canMan
             <h3 id="team-invitations-title">待接受邀请</h3>
           </div>
           {invitations.isPending ? (
-            <DelayedLoading pending>
-              <PageLoading message="邀请加载中…" />
-            </DelayedLoading>
+            <TableSkeleton rows={3} columns={['36%', '22%', '22%', '20%']} label="邀请列表加载中" />
           ) : invitations.isError ? (
             <PageError
               title="邀请加载失败"

@@ -5,10 +5,10 @@ import { DirectConversationPicker } from '@/features/conversations/ui/direct-con
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { useSession } from '@/features/identity/model/session'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
+import { DetailSheetSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
 import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
 import { formatDateTime } from '@/shared/lib/format'
@@ -91,9 +91,7 @@ export function SkillDetailDialog({
     <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
       <DialogContent className="knowledge-dialog">
         {query.isPending ? (
-          <DelayedLoading pending>
-            <PageLoading message="技能加载中…" />
-          </DelayedLoading>
+          <DetailSheetSkeleton propertyRows={3} label="技能详情加载中" />
         ) : query.isError || !skill ? (
           <PageError
             title="技能加载失败"

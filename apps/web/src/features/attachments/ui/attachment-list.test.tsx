@@ -28,9 +28,11 @@ const allowAll = () => true
 const allowNone = () => false
 
 describe('AttachmentList', () => {
-  it('加载中展示骨架，不显示空态', () => {
-    render(<AttachmentList attachments={[]} loading canDelete={allowAll} onDelete={vi.fn()} />)
-    expect(screen.getByText('附件加载中…')).toBeInTheDocument()
+  it('加载中展示骨架，不显示空态与多余加载文案', () => {
+    const { container } = render(<AttachmentList attachments={[]} loading canDelete={allowAll} onDelete={vi.fn()} />)
+    expect(screen.getByRole('status', { name: '附件加载中' })).toBeInTheDocument()
+    expect(container.querySelectorAll('.react-loading-skeleton').length).toBeGreaterThan(0)
+    expect(screen.queryByText('附件加载中…')).not.toBeInTheDocument()
     expect(screen.queryByText('暂无附件。')).not.toBeInTheDocument()
   })
 

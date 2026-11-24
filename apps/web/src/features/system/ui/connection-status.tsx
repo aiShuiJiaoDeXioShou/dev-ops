@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
 import { RequestError } from '@dev-ops/api-client'
 import { Button } from '@/shared/ui/controls/button'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { readinessQueryOptions } from '../api/queries'
 
@@ -22,7 +23,7 @@ export default function ConnectionStatus() {
         <h3>服务连接</h3>
         <StatusBadge tone={query.isError ? 'danger' : 'neutral'}>{statusLabel}</StatusBadge>
       </div>
-      {query.isPending && <p className="section-note">正在检查后端与数据库…</p>}
+      {query.isPending && <CompactListSkeleton rows={2} leading="avatar" label="系统状态检查中" />}
       {query.isError && (
         <div className="error-box" role="alert">
           <strong>连接检查失败</strong>

@@ -1,5 +1,6 @@
 import { RefreshCw } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/shared/ui/controls/alert'
+import { LogLinesSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Select } from '@/shared/ui/controls/select'
 import { PageError } from '@/shared/ui/page-state'
@@ -106,9 +107,7 @@ export function LogViewer({
           )}
         </>
       ) : isPending ? (
-        <p className="section-note" role="status">
-          日志加载中…
-        </p>
+        <LogLinesSkeleton lines={8} delay={0} label="日志加载中" />
       ) : (
         <p className="section-note">{isRunActive ? '当前还没有日志输出，请稍候。' : '当前步骤没有日志输出。'}</p>
       )}

@@ -12,7 +12,7 @@ import { cancelPipelineRun, pipelineRunQueryOptions } from '@/features/pipeline/
 import { isRunActive } from '@/features/pipeline/lib/status'
 import { useFocusReturn } from '@/features/pipeline/hooks/use-focus-return'
 import { usePipelineLogs } from '@/features/pipeline/hooks/use-pipeline-logs'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { PipelineRunPageSkeleton } from '@/pages/page-skeletons'
 import { PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 
@@ -49,7 +49,7 @@ export function Component() {
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
 
-  if (run.isPending) return <DelayedPageSkeleton />
+  if (run.isPending) return <PipelineRunPageSkeleton />
   if (run.isError || !detail) {
     const described = describeRequestError(run.error)
     return (

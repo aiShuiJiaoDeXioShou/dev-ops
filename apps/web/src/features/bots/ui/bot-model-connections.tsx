@@ -19,7 +19,7 @@ import {
   AlertDialogTrigger,
 } from '@/shared/ui/controls/alert-dialog'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
 import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
@@ -72,7 +72,7 @@ export function BotModelConnections({ teamId, canManage }: { teamId: string; can
             </Button>
           )}
         </div>
-        {query.isPending && <DelayedPageSkeleton />}
+        {query.isPending && <CompactListSkeleton rows={3} trailing bordered label="模型连接加载中" />}
         {query.isError && (
           <PageError title="模型连接加载失败" error={query.error} onRetry={() => void query.refetch()} />
         )}

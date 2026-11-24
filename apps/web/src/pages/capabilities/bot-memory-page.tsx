@@ -25,7 +25,8 @@ import {
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { BotMemoryPageSkeleton } from '@/pages/page-skeletons'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 
 function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: boolean; isAdmin: boolean }) {
@@ -156,7 +157,7 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
           {describeRequestError(consolidate.error).description}
         </p>
       )}
-      {list.isPending && <DelayedPageSkeleton />}
+      {list.isPending && <CompactListSkeleton rows={4} leading="avatar" bordered label="记忆列表加载中" />}
       {list.isError && <PageError title="记忆加载失败" error={list.error} onRetry={() => void list.refetch()} />}
       {list.isSuccess && items.length === 0 && (
         <EmptyState icon={<Brain />} title={query || scope || botId ? '没有匹配的记忆' : '还没有记忆'} />
@@ -259,7 +260,7 @@ function TeamMemory({ teamId, canWrite, isAdmin }: { teamId: string; canWrite: b
 /** 查看选中团队中可见的 Bot 记忆。 */
 export function Component() {
   const { currentTeam, role, isReady } = useSession()
-  if (!isReady) return <DelayedPageSkeleton />
+  if (!isReady) return <BotMemoryPageSkeleton />
   if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
   return (
     <TeamMemory

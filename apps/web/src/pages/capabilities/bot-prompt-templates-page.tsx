@@ -17,7 +17,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/shared/ui/controls/dialog'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { PromptTemplatesPageSkeleton } from '@/pages/page-skeletons'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 
 type Template = ApiSuccessData<'/api/v1/teams/{teamId}/bot-prompt-templates', 'get'>['items'][number]
@@ -209,7 +210,7 @@ function TemplateList({ teamId, write }: { teamId: string; write: boolean }) {
           </TemplateDialog>
         )}
       </div>
-      {list.isPending && <DelayedPageSkeleton />}
+      {list.isPending && <CompactListSkeleton rows={5} trailing bordered label="提示模板列表加载中" />}
       {list.isError && (
         <PageError
           title="提示模板加载失败"
@@ -256,7 +257,7 @@ function TemplateList({ teamId, write }: { teamId: string; write: boolean }) {
  */
 export function Component() {
   const { currentTeam, role, isReady } = useSession()
-  if (!isReady) return <DelayedPageSkeleton />
+  if (!isReady) return <PromptTemplatesPageSkeleton />
   if (!currentTeam) return <EmptyState mascot="group" title="尚未选择团队" />
   return <TemplateList key={currentTeam.id} teamId={currentTeam.id} write={role === 'admin' || role === 'developer'} />
 }

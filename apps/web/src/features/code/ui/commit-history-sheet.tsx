@@ -2,10 +2,10 @@ import { useId, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, GitCommitHorizontal, X } from 'lucide-react'
 import { formatDateTime } from '@/shared/lib/format'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
+import { CompactListSkeleton, TimelineListSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/shared/ui/controls/sheet'
-import { PageLoading, PageError } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
 import { commitQueryOptions, commitsQueryOptions } from '../api/commit-queries'
 import './commit-history-sheet.css'
 
@@ -70,9 +70,7 @@ export function CommitHistorySheet({
         </SheetHeader>
         <div className="commit-history-body">
           {list.isPending ? (
-            <DelayedLoading pending>
-              <PageLoading />
-            </DelayedLoading>
+            <TimelineListSkeleton rows={5} label="提交记录加载中" />
           ) : list.isError && !list.data ? (
             <PageError
               title="提交记录加载失败"
@@ -151,9 +149,7 @@ function CommitFiles({
   if (detail.isPending) {
     return (
       <div id={id} className="commit-timeline-files">
-        <DelayedLoading pending>
-          <PageLoading />
-        </DelayedLoading>
+        <CompactListSkeleton rows={3} label="变更文件加载中" />
       </div>
     )
   }

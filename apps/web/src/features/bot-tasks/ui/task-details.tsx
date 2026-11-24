@@ -8,7 +8,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/controls/button'
 import { Textarea } from '@/shared/ui/controls/textarea'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { DetailSheetSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
 import { HandoffTaskDialog } from './handoff-task-dialog'
 import { TaskResults } from './task-results'
@@ -63,7 +63,7 @@ export function TaskDetails({
       onChanged()
     },
   })
-  if (query.isPending) return <DelayedPageSkeleton />
+  if (query.isPending) return <DetailSheetSkeleton propertyRows={3} label="任务详情加载中" />
   if (query.isError) return <PageError title="任务加载失败" error={query.error} onRetry={() => void query.refetch()} />
   if (!task) return null
   const active = task.runs.some(({ status }) => status === 'queued' || status === 'running')

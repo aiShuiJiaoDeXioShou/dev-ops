@@ -4,12 +4,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Folder, LayoutGrid, LogOut, Menu, PanelLeft, Settings2, Shield, Users, X as XIcon } from 'lucide-react'
 import { isCollaborationPath } from '@/app/router/collaboration-path'
 import { CollaborationPageSkeleton } from '@/pages/collaboration/conversation-loading'
+import { RoutePageSkeleton } from '@/pages/page-skeletons'
 import { cn } from '@/shared/lib/utils'
 import { signOut } from '@/features/identity/api/auth-client'
 import { useSession } from '@/features/identity/model/session'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { CollaborationNavIcon } from '@/shared/ui/collaboration-nav-icon'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import {
   AlertDialog,
@@ -294,7 +294,7 @@ export function AppLayout() {
               }
             />
           ) : (
-            <DelayedPageSkeleton />
+            <RoutePageSkeleton pathname={location.pathname} />
           )}
           <div id="workspace-detail-host" />
         </main>

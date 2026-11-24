@@ -104,7 +104,8 @@ describe('MemberMultiSelect', () => {
   it('加载中覆盖空候选，不以“暂无可选成员”冒充', async () => {
     render(<Harness loading />)
     await userEvent.click(screen.getByLabelText('搜索姓名或邮箱'))
-    expect(await screen.findByText('成员加载中…')).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: '成员加载中' })).toBeInTheDocument()
+    expect(screen.queryByText('成员加载中…')).not.toBeInTheDocument()
     expect(screen.queryByText('暂无可选成员')).not.toBeInTheDocument()
   })
 

@@ -10,6 +10,7 @@ import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
 import { projectServicesQueryOptions } from '../api/queries'
 import { PageError } from '@/shared/ui/page-state'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 
 /** 项目服务目录管理；管理员/开发者可创建与停用，浏览者只读。 */
 export function ServiceManagement({ projectId }: { projectId: string }) {
@@ -41,7 +42,7 @@ export function ServiceManagement({ projectId }: { projectId: string }) {
     },
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
-  if (services.isPending) return <p className="muted">服务加载中…</p>
+  if (services.isPending) return <CompactListSkeleton rows={3} trailing bordered label="服务列表加载中" />
   if (services.isError && !services.data) {
     return (
       <PageError

@@ -6,8 +6,8 @@ import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { Pagination } from '@/shared/ui/pagination'
 import { formatDurationSeconds, hasRunFilters, runDurationSeconds, shortCommitSha } from '../lib/format'
 import { RUN_FILTER_STATUSES, isPipelineRunStatus, runStatusLabel, runStatusTone } from '../lib/status'
@@ -147,9 +147,7 @@ export function RunHistory({
       ) : null}
 
       {isPending ? (
-        <DelayedLoading pending>
-          <PageLoading message="运行记录加载中…" />
-        </DelayedLoading>
+        <TableSkeleton rows={6} columns={['30%', '18%', '18%', '17%', '17%']} label="运行记录加载中" />
       ) : errorDescription !== null ? (
         <PageError title="运行记录加载失败" description={errorDescription} requestId={requestId} onRetry={onRetry} />
       ) : runs.length === 0 ? (

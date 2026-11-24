@@ -9,7 +9,7 @@ import { Select } from '@/shared/ui/controls/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
 import { useSession } from '@/features/identity/model/session'
 import { formatDateTime } from '@/shared/lib/format'
 import { parseListState, toSearchParams, updateListState } from '@/shared/lib/list-state'
@@ -37,7 +37,9 @@ export function RequirementList({ projectId }: { projectId: string }) {
   const [createOpen, setCreateOpen] = useState(false)
   const canWrite = canWriteRequirements(role)
   const update = (patch: Partial<typeof state>) => setParams(toSearchParams(updateListState(state, patch)))
-  if (query.isPending) return <DelayedPageSkeleton />
+  if (query.isPending) {
+    return <TableSkeleton toolbar rows={7} columns={['46%', '18%', '18%', '18%']} label="需求列表加载中" />
+  }
   if (query.isError && !query.data) {
     return (
       <PageError
