@@ -66,6 +66,9 @@
 | `devops conversation feedback`       | 提交回复评价                                                     |
 | `devops conversation switch-branch`  | 切换消息分支                                                     |
 | `devops conversation fork`           | 从现有消息派生一个会话                                           |
+| `devops conversation usage`          | 读取当前会话累计用量与费用                                       |
+| `devops conversation queued-inputs`  | 列出本人尚未投递的排队消息                                       |
+| `devops conversation withdraw-input` | 撤回本人尚未投递的消息并返回原稿                                 |
 | `devops conversation events`         | 查询或跟踪会话事件和运行轨迹                                     |
 | `devops task inbox`                  | 查询当前团队等你回复的会话                                       |
 | `devops task get`                    | 只读查询历史任务、运行和验收详情                                 |

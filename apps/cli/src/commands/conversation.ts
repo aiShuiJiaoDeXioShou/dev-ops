@@ -55,6 +55,29 @@ function registerMessages(group: Command, context: CliContext) {
   )
 }
 
+function registerQueuedInputs(group: Command, context: CliContext) {
+  apiAction(
+    group.command('usage').description('读取当前会话累计用量与费用').argument('<conversationId>', '会话 ID'),
+    context,
+    ({ business, arg }) => business.client.getBotConversationUsage(arg()),
+  )
+  apiAction(
+    group.command('queued-inputs').description('列出本人尚未投递的排队消息').argument('<conversationId>', '会话 ID'),
+    context,
+    ({ business, arg }) => business.client.listBotQueuedInputs(arg()),
+  )
+  apiAction(
+    group
+      .command('withdraw-input')
+      .description('撤回本人尚未投递的消息并返回原稿')
+      .argument('<conversationId>', '会话 ID')
+      .argument('<messageId>', '排队消息 ID'),
+    context,
+    ({ business, arg }) => business.client.withdrawBotQueuedInput(arg(), arg(1), writeOptions(business)),
+    { confirm: '确定撤回该排队消息？成功后返回原稿，可编辑后重新发送。' },
+  )
+}
+
 function registerEvents(group: Command, context: CliContext) {
   const events = withWaitTimeout(
     group
@@ -187,6 +210,7 @@ export function registerConversationCommands(program: Command, context: CliConte
       ({ business, arg }, body, write) => business.client.controlBotRelay(arg(), action, body, write),
     )
   }
+  registerQueuedInputs(group, context)
   registerMessages(group, context)
   registerEvents(group, context)
 }

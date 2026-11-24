@@ -119,6 +119,9 @@ devops requirement submit-test <requirementId> --test-owner <userId> --test-owne
 devops conversation list --all --json
 devops conversation send <conversationId> --file ./message.json
 devops conversation events <conversationId> --run <runId> --follow
+devops conversation usage <conversationId> --json
+devops conversation queued-inputs <conversationId> --json
+devops conversation withdraw-input <conversationId> <messageId> --yes --json
 devops task list <conversationId> --json
 devops task get <taskId> --json # 历史任务仅供只读查询
 devops task inbox --json # 等你回复的会话
@@ -127,7 +130,7 @@ devops skill export <skillId> --output ./skill.zip
 
 附件上传返回 `data.attachment.id`。需求或 Bug 更新时，重复的 `--attachment` 构成完整附件列表。添加新附件时一并传入要保留的附件 ID。`--plan-file` 接受流程节点数组，每个节点包含 `id`、`title`、`startsOn`、`endsOn` 和 `tasks`。日期采用 `YYYY-MM-DD` 或 `null`。
 
-消息请求示例为 `{"text":"检查当前交付","clientRequestId":"<每次发送唯一的 UUID>"}`。长任务直接通过会话消息交给 Bot；`task` 仅保留历史任务查询和等你回复的会话汇总，创建、补充、转交及验收命令已移除。需要验收的工作使用项目需求或 Bug。
+消息请求示例为 `{"text":"检查当前交付","clientRequestId":"<每次发送唯一的 UUID>"}`。长任务直接通过会话消息交给 Bot；`task` 仅保留历史任务查询和等你回复的会话汇总，创建、补充、转交及验收命令已移除。需要验收的工作使用项目需求或 Bug。`usage` 读取会话累计用量与费用；`queued-inputs` 仅显示本人尚未投递的消息，`withdraw-input` 成功后返回原稿，已被运行领取的消息不能撤回。
 
 新增命令的完整清单见 [V0.8 逐操作覆盖](WEB-COVERAGE.md)。复杂请求用 `--file <path>` 提交 JSON，筛选参数用 `--query-file <path>`。具体字段见各命令 `--help` 中的接口契约。游标列表用 `--cursor` 读取下一页，或用 `--all` 逐页收集。跟踪模式持续输出文本，分页查询可用 `--json`。
 
