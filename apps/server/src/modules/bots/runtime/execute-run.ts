@@ -1,16 +1,15 @@
+import { createCliGateway } from './cli-gateway.ts'
 import {
   localTools,
   memoryTools,
-  openApiTools,
   compactBotSession,
   runBotSession,
   webTools,
-  type ApiInvoker,
-  type PlatformApiOperation,
   type RunOutcome,
   type CompactBotSessionOptions,
 } from '@dev-ops/devops-bot'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Database } from '../../../platform/database/client.ts'
 import type { AppConfig } from '../../../platform/config/env.ts'
 import { createStorageService } from '../../storage/storage.service.ts'
@@ -20,15 +19,14 @@ import {
   isConversationBotRun,
   releaseInterruptedBotRun,
   renewBotRunLease,
-  type BotRunLease,
   type BotRunRecord,
-  type ConversationBotRunRecord,
 } from '../bots.run-queue.repository.ts'
-import type { BotCallLog } from './api-invoker.ts'
+import type { BotCallLog } from './tool-call-log.ts'
 import { loadBotRunContext } from './context.ts'
 import { createPgCredentialStore } from './credential-store.ts'
 import { createConversationAttachmentTool } from './conversation-attachment-tool.ts'
-import { createCurrentContextTool } from './current-context-tool.ts'
+import { issueBotRunToken, revokeBotRunToken } from '../bots.run-tokens.ts'
+import { createTodoTool } from './todo-tools.ts'
 import { readBotMcpServers } from './mcp-configuration.ts'
 import { fetchBotMcp } from './mcp-fetch.ts'
 import { executeBotMemoryConsolidation } from './memory-consolidation.ts'
@@ -39,7 +37,6 @@ import { createPgRunInputQueue } from './run-input-queue.ts'
 import { createPgSessionStore, hasSavedBotInput } from './session-store.ts'
 import { createPgRunSink } from './run-sink.ts'
 import { auditBotWebTools } from './web-tool-audit.ts'
-import { createTaskResultTool } from './task-tools.ts'
 
 export type BotRunner = typeof runBotSession
 export type BotCompactor = typeof compactBotSession
@@ -52,10 +49,6 @@ type RuntimeOptions = {
   compact?: BotCompactor
   onFailure: (run: BotRunRecord) => void
   logCall?: (event: BotCallLog) => void
-  platformApi?: (
-    lease: BotRunLease,
-    run: ConversationBotRunRecord,
-  ) => { catalog: readonly PlatformApiOperation[]; invoker: ApiInvoker }
 }
 
 const unavailable: RunOutcome = {
@@ -79,6 +72,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
   const lease = { id: run.id, owner: run.lease_owner, epoch: run.lease_epoch }
   const cancellation = new AbortController()
   const signal = AbortSignal.any([cancellation.signal, shutdown])
+  let gateway: Awaited<ReturnType<typeof createCliGateway>> | undefined
   let heartbeat: Promise<void> | undefined
   let leaseIsValid = true
   const timer = setInterval(() => {
@@ -132,10 +126,30 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
       teamId: run.team_id,
       connectionId: input.connectionId,
     })
-    const api = options.platformApi?.(lease, run)
     const memory = createPgMemoryStore(db, run, lease)
     const directory = resolve(config.BOT_WORKSPACE_DIR, run.team_id, run.bot_id)
-    const tools = (await localTools({ directory, access: input.accessMode })).map((tool) => ({
+    gateway = input.accessMode === 'sandbox' ? await createCliGateway(config.APP_ORIGIN) : undefined
+    const platformOrigin = gateway?.origin ?? config.APP_ORIGIN
+    const cliDirectory = fileURLToPath(new URL('../../../../../cli/dist/', import.meta.url))
+    const runToken = await issueBotRunToken(db, lease)
+    const tools = (
+      await localTools({
+        directory,
+        access: input.accessMode,
+        networkOrigin: platformOrigin,
+        readablePaths: [
+          cliDirectory,
+          resolve(cliDirectory, '../package.json'),
+          fileURLToPath(new URL('../../../../../../packages/api-client/dist/', import.meta.url)),
+          fileURLToPath(new URL('../../../../../../packages/api-client/package.json', import.meta.url)),
+        ],
+        environment: {
+          DEV_OPS_TOKEN: runToken,
+          DEV_OPS_SERVER: platformOrigin,
+          PATH: `${cliDirectory}:${dirname(process.execPath)}:/usr/bin:/bin`,
+        },
+      })
+    ).map((tool) => ({
       ...tool,
       /**
        * 执行本地工具前重查租约，防止已经切换权限的旧运行继续启动工具。
@@ -169,12 +183,12 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
           ...input.context.layers,
           {
             title: '本地工作目录',
-            body: `工作目录为 ${directory}。当前访问模式为 ${input.accessMode === 'full' ? '完全访问' : '沙盒，仅可访问工作目录中的文件'}。使用 read、write、edit、bash、grep、find、ls 或 powershell 处理本地文件。`,
+            body: `工作目录为 ${directory}。当前访问模式为 ${input.accessMode === 'full' ? '完全访问' : '沙盒，仅可访问工作目录中的文件'}。使用 read、write、edit、bash、grep、find、ls 或 powershell 处理本地文件。此目录保存本 Bot 的工作文件与下载资料；不得翻读执行主机其他目录（包括平台发布目录）。平台数据使用 devops CLI；项目代码通过平台 CLI 或接口获取到工作目录后读取。`,
           },
         ],
       },
       tools: [
-        createCurrentContextTool(db, lease),
+        createTodoTool(db, run, lease),
         createConversationAttachmentTool(db, run, lease, attachmentStorage),
         ...tools,
         ...memoryTools(memory),
@@ -190,8 +204,6 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
           }),
           options.logCall,
         ),
-        ...(run.task_id ? [createTaskResultTool(db, lease)] : []),
-        ...(api ? openApiTools(api.catalog, api.invoker) : []),
       ],
       limits: { timeoutMs: config.BOT_RUN_TIMEOUT_SECONDS * 1_000 },
       ...(run.kind === 'compact' ? {} : { queue: createPgRunInputQueue(db, run, lease) }),
@@ -201,7 +213,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
         sink,
         memory,
         session: createPgSessionStore(db, run, lease, input.roomCursor),
-        api: api?.invoker ?? { invoke: async () => ({ ok: false, code: 'BOT_API_FORBIDDEN' }) },
+        api: { invoke: async () => ({ ok: false, code: 'BOT_API_FORBIDDEN' }) },
       },
     }
     const resumed = run.resume_count > 0
@@ -215,6 +227,12 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
     if (shutdown.aborted) await releaseInterruptedBotRun(db, lease, config.BOT_RESUME_LIMIT)
     else await sink.finish(outcome)
   } catch {
+    const currentLease = await renewBotRunLease(db, lease, config.BOT_LEASE_TTL_SECONDS)
+    if (!currentLease) return
+    if (currentLease.stopRequested) {
+      await db.transaction((tx) => finishBotRun(tx, lease, { status: 'stopped' }))
+      return
+    }
     options.onFailure(run)
     // 写入轮次失败也要清除定时刷新。不能以丢失事件的运行结果标成功。
     try {
@@ -237,5 +255,7 @@ export async function executeClaimedBotRun(options: RuntimeOptions, run: BotRunR
   } finally {
     clearInterval(timer)
     await heartbeat
+    await gateway?.close()
+    await revokeBotRunToken(db, lease)
   }
 }

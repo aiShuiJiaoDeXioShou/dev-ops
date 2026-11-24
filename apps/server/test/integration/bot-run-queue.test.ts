@@ -188,13 +188,11 @@ test('Bot 执行进程使用 faux 领取一次运行并提交回复、事件和�
     config,
     async (options) => {
       const guidance = options.context.layers.find(({ title }) => title === '查询团队与用户数据')
-      assert.match(guidance?.body ?? '', /get_current_context/)
-      const currentContext = options.tools.find(({ name }) => name === 'get_current_context')
-      assert.ok(currentContext)
-      assert.equal((await currentContext.execute({ teamId: randomUUID() }, options.signal)).isError, true)
-      const result = await currentContext.execute({}, options.signal)
-      assert.equal(result.isError, undefined)
-      assert.deepEqual(JSON.parse(result.text), { teamName: '测试团队', teamId, userId, role: 'developer' })
+      assert.match(guidance?.body ?? '', /devops whoami/u)
+      assert.equal(
+        options.tools.some(({ name }) => name === 'get_current_context' || name === 'platform_api_call'),
+        false,
+      )
       for (const name of ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls', 'powershell']) {
         assert.ok(
           options.tools.some((tool) => tool.name === name),

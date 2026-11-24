@@ -101,7 +101,7 @@ OAuth 登录由 bot-worker 调用 devops-bot 的登录流程（底层为 pi-ai �
 | 运行时：组装 pi `Agent`、轮次与超时、取消、成功判定、通用事件流 | 团队、成员、角色、会话可见范围与排除名单 |
 | 库自有的消息格式及与 pi 格式的互转 | 会话、群组、Leader 路由、任务、验收、标签 |
 | 记忆引擎：记忆工具、规范化、密钥检查、预算与注入格式 | PostgreSQL 存储、迁移、运行队列与租约 |
-| 工具集：联网搜索与网页读取、OpenAPI 目录检索与调用 | 委托身份与 `app.inject()` 调用器、OpenAPI 目录生成 |
+| 工具集：联网、记忆、本地命令工具 | HTTP 运行令牌、CLI 注入和平台审计 |
 | 模型连接：模型目录、OAuth 登录流程、凭据刷新 | 页面、对外接口、审计 |
 
 | 接口 | dev-ops 的实现 |
@@ -263,12 +263,12 @@ flowchart TD
 
 Bot 在产品上与项目管理解耦：不按项目授权，不关联需求或 Bug。它需要团队信息时，以触发人的权限调用平台 API。
 
-- **工具清单**：`platform_api_search`（检索 API 目录）、`platform_api_call`（调用平台 API）、`web_search` 与 `web_fetch`（联网）、记忆的写入、检索、删除、`submit_task_result`（任务内提交结果，可附标签）。前四个与记忆工具由 devops-bot 提供，`submit_task_result` 由 dev-ops 以自定义工具注册。
-- **委托调用**：`platform_api_call` 只接受 GET 或 POST 与 `/api/v1/` 下的相对路径。`ApiInvoker` 校验运行仍有效、排除名单与路径属于平台路由后，用进程内一次性委托凭据经 `app.inject()` 转发；`resolveActor` 把它解析为触发人并标记经由的 Bot。所有业务路由的既有鉴权原样生效，Bot 权限等于触发人权限。
-- **排除名单**：成员、邀请与角色管理；凭据与环境变量；API Token 与节点令牌；写能力授权；变更计划放行；Skills 管理；Bot 与模型连接管理；Bot 任务验收与退回；认证端点。具体路由见 `specs/009-v05-bot-collaboration/research.md` R5，新增路由默认允许，契约测试遍历 OpenAPI 校验名单覆盖。
-- **API 目录**：从 OpenAPI 导出生成、过滤排除名单后作为系统技能交给 devops-bot，Bot 按关键词检索，不把整份契约放进上下文。
-- **写操作带幂等键**：转发时附 `Idempotency-Key: bot:<runId>:<key>`，复用全局幂等；超时后用同一键查询结果，不重新生成参数。
-- **活动追溯**：Bot 经平台 API 产生的写入，在 collaboration 活动中记录 `via_bot_id`；其他模块的审计由 `bot_api_call` 追溯。
+- **工具清单**：平台数据通过 bash 中的 devops CLI 获取；工具库提供本地工具、联网和记忆，平台注册会话待办、附件与技能工具。
+- **运行凭据**：开始时签发绑定触发人、Bot、运行及租约代次的令牌，数据库只存哈希。HTTP 每次请求重新检查租约、停止状态和成员有效性；运行结束、停止或租约失效立即拒绝，收尾显式撤销。
+- **权限入口**：HTTP 统一校验 Bot 令牌，业务路由继续按触发人权限处理。成员、邀请与登录、令牌管理和节点注册、凭据明文读取被排除，不能用运行令牌签发新令牌。
+- **CLI 环境**：DEV_OPS_TOKEN 与 DEV_OPS_SERVER 只注入 bash 子进程。发布脚本创建同版 CLI 的可执行入口，bash PATH 指向当前发布。macOS 沙盒只允许访问本机临时代理端口，代理固定上游平台地址并拒绝重定向；Linux bwrap 暂不能配置目标地址白名单，带平台访问的 bash 明确失败，不降级为完全访问。
+- **调用审计**：已认证的运行请求记录方法、路由模板、结果码、耗时并生成会话工具活动；未知凭据无法关联可信运行，按认证失败处理。日志与存储不记录令牌明文，模型文本使用统一凭据识别。
+- **调用习惯**：先查看 devops --help；复杂请求通过 --file，较大结果保存到工作目录再筛选。写操作失败后先查状态，再决定重试。
 - **群聊**里 Bot 代某成员读取的结果对会话全部成员可见，发起前提示；V0.5 不按消息追踪内容来源权限。
 
 ## 8. 记忆
@@ -402,6 +402,6 @@ _第 2 章是核对过的源码事实，第 3 章是项目维护者已确认的�
 
 [HTTP 服务](../../apps/server/src/bootstrap/create-http-app.ts)负责团队、模型连接、会话、任务、标签与记忆接口，执行进程由 [Bot Worker](../../apps/server/src/bootstrap/create-bot-worker.ts)领取队列。运行期间以 PostgreSQL 租约代次处理停止和恢复，使用游标读取资源与运行事件。
 
-[平台接口目录](../../tooling/scripts/generate-bot-api-catalog.mjs)从注册路由的 OpenAPI 生成，内部调用按触发人的当前团队和资源权限执行。执行记录追踪来源、幂等键与状态。记忆使用 PostgreSQL `pg_trgm` 检索，常驻正文总预算为 4096 字节。每次领取运行保存已配置 Skills 的版本，`skill_view` 按需读当次可用的版本。
+Bot 通过同版 CLI 调用平台 HTTP，运行令牌校验触发人和实时租约，并记录接口调用活动。记忆使用 PostgreSQL `pg_trgm` 检索，常驻正文总预算为 4096 字节。每次领取运行保存已配置 Skills 的版本，`skill_view` 按需读当次可用的版本。
 
 执行过程的 Web 入口统一为会话「轨迹」，由 [ConversationTrajectory](../../apps/web/src/features/conversations/ui/conversation-trajectory.tsx) 按运行增量读取会话事件，展示状态、耗时、真实用量、分类步骤、时间线和步骤详情。智能体详情仅展示配置与模型连接状态，不再请求或展示独立运行记录列表。`bot_run`、配置快照和事件仍保留，支撑调度、停止、恢复、权限校验与轨迹；移除界面入口不删除历史数据。

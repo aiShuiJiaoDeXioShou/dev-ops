@@ -31,7 +31,7 @@
 - **不强行接管代码托管与本地开发**：代码保留在 GitHub 或 Gitea，研发继续在本地使用习惯的编辑器与 AI 编码工具；平台通过 API、统一 CLI 与交付记录承接研发到发布的完整上下文。
 - **AI Bot 协作与项目管理解耦**：团队 Bot 拥有独立身份、长期记忆、技能库与隔离沙盒工具，以**触发人当前权限**委托调用平台 API（高危接口强制列入排除名单），既能跨项目群聊接力协作，又不会污染项目业务状态。
 - **业务流转与内置流水线严格解耦**：提测、回归与验收由团队显式维护；仓库内的 `.devops/workflows/*.yml` 由平台调度到自托管执行节点运行，构建结果不会自动改写需求或缺陷状态。
-- **单一契约驱动全端一致**：后端 TypeBox 路由导出唯一 OpenAPI 契约，自动生成类型化客户端、CLI 校验器与 Bot API 目录，确保 Web、CLI 与智能体共享同一套业务规则与权限校验。
+- **单一契约驱动全端一致**：后端 TypeBox 路由导出唯一 OpenAPI 契约，自动生成类型化客户端、CLI 校验器，确保 Web、CLI 与智能体共享同一套业务规则与权限校验。
 
 ---
 
@@ -437,7 +437,7 @@ node apps/pipeline-agent/dist/index.js
 ```bash
 pnpm check                 # 完整门禁：子模块检查、ESLint、Prettier、UI 规范、全量构建、依赖边界、全部测试与 E2E
 pnpm test:db               # 使用本机 PostgreSQL 在隔离临时库验证迁移、权限、无外键一致性与事务
-pnpm api:generate          # 修改后端 TypeBox 契约后重新导出 OpenAPI、API 客户端与 Bot 接口目录
+pnpm api:generate          # 修改后端 TypeBox 契约后重新导出 OpenAPI 与 API 客户端
 pnpm ui:check              # 检查设计 Token、样式分层与 UI 规范基线
 pnpm test:visual           # 运行 Web Playwright 视觉回归测试
 pnpm format                # 统一 Prettier 格式化

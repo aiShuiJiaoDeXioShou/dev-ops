@@ -5,7 +5,12 @@ import { ERROR_CODES } from '../../platform/http/error-codes.ts'
 import type { IdentityAuth } from './identity.auth.ts'
 import { getSessionUser, type SessionUser } from './identity.session.ts'
 import type { TokenService } from './identity.tokens.ts'
-import { isBotDelegationToken, type BotActor, type BotDelegation } from './identity.bot-delegation.ts'
+import {
+  getCurrentBotActor,
+  isBotDelegationToken,
+  type BotActor,
+  type BotDelegation,
+} from './identity.bot-delegation.ts'
 
 export type Actor = { user: SessionUser; credential: 'session' | 'token' } | BotActor
 
@@ -31,6 +36,8 @@ export async function resolveActor(
   headers: IncomingHttpHeaders,
   botDelegation?: BotDelegation | null,
 ): Promise<Actor | null> {
+  const current = getCurrentBotActor()
+  if (current && bearerToken(headers)?.startsWith('devops-run-')) return current
   const token = bearerToken(headers)
   if (token !== null) {
     if (isBotDelegationToken(token)) return botDelegation?.resolve(token, headers) ?? null
@@ -73,7 +80,8 @@ export async function requireHumanActor(request: FastifyRequest): Promise<Sessio
     request.server.botDelegation,
   )
   if (!actor) throw new ApiErrorClass(ERROR_CODES.UNAUTHENTICATED, '请先登录或提供有效 API Token')
-  if (actor.credential === 'bot') throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, '该操作需要成员本人执行')
+  if (actor.credential === 'bot' && !bearerToken(request.headers)?.startsWith('devops-run-'))
+    throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, '该操作需要成员本人执行')
   return actor.user
 }
 
@@ -85,6 +93,8 @@ export async function requireHumanActor(request: FastifyRequest): Promise<Sessio
  * @throws 使用 API Token 或内部委托时抛出 FORBIDDEN；无会话时抛出 UNAUTHENTICATED。
  */
 export async function requireSessionActor(request: FastifyRequest, action?: string): Promise<SessionUser> {
+  const current = getCurrentBotActor()
+  if (current && bearerToken(request.headers)?.startsWith('devops-run-')) return current.user
   const token = bearerToken(request.headers)
   if (token !== null) {
     if (isBotDelegationToken(token)) throw new ApiErrorClass(ERROR_CODES.FORBIDDEN, '该操作需要登录会话')

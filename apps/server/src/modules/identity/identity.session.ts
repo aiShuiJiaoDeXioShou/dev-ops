@@ -30,6 +30,8 @@ export function toAuthHeaders(headers: IncomingHttpHeaders): Headers {
  * @returns 有效用户；无会话或会话失效时返回 null。
  */
 export async function getSessionUser(auth: IdentityAuth, headers: IncomingHttpHeaders): Promise<SessionUser | null> {
+  const current = getCurrentBotActor()
+  if (current && headers.authorization?.match(/^Bearer\s+devops-run-/iu)) return current.user
   const session = await auth.api.getSession({ headers: toAuthHeaders(headers) })
   if (!session?.user) return null
   return { id: session.user.id, email: session.user.email, name: session.user.name }
@@ -58,7 +60,6 @@ export async function requireSessionUser(auth: IdentityAuth, headers: IncomingHt
  * @throws 非正常管理员时抛出 FORBIDDEN。
  */
 export async function requirePlatformAdmin(db: Database, userId: string): Promise<void> {
-  if (getCurrentBotActor()) throw new ApiError(ERROR_CODES.FORBIDDEN, '执行进程只具有当前团队权限')
   const [row] = await db
     .select({ userId: platformAdmin.user_id })
     .from(platformAdmin)

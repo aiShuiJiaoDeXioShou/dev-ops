@@ -1,12 +1,11 @@
 import type { RunBotSessionOptions } from '@dev-ops/devops-bot'
-import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { Type } from 'typebox'
 import { Check } from 'typebox/value'
 import type { Database } from '../../../platform/database/client.ts'
 import { relayMentionableBots } from '../../collaboration/bot-relay.repository.ts'
 import { botConversation, botConversationMember } from '../../collaboration/bot-conversations.tables.ts'
 import { teamMember } from '../../identity/identity.tables.ts'
-import { botTask, botTaskInput } from '../../tasks/bot-tasks.tables.ts'
 import type { ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
 import { skillVersionsOf, type BotSkillVersion } from '../bots.skills.ts'
 import { botThinkingLevel } from '../bots.session-settings.ts'
@@ -27,39 +26,6 @@ const configSnapshotSchema = Type.Object({
   status: Type.Literal('enabled'),
   accessMode: Type.Optional(Type.Union([Type.Literal('sandbox'), Type.Literal('full')])),
 })
-
-async function taskPrompt(db: Database, run: ConversationBotRunRecord): Promise<string | null> {
-  if (!run.task_id) return null
-  const [task] = await db
-    .select({ id: botTask.id, title: botTask.title, criteria: botTask.acceptance_criteria })
-    .from(botTask)
-    .where(
-      and(
-        eq(botTask.id, run.task_id),
-        eq(botTask.team_id, run.team_id),
-        eq(botTask.conversation_id, run.conversation_id),
-        eq(botTask.executor_bot_id, run.bot_id),
-        eq(botTask.input_version, run.input_version),
-        eq(botTask.status, 'in_progress'),
-      ),
-    )
-  if (!task) return null
-  const inputs = await db
-    .select({ content: botTaskInput.content })
-    .from(botTaskInput)
-    .where(
-      and(
-        eq(botTaskInput.team_id, run.team_id),
-        eq(botTaskInput.task_id, task.id),
-        lte(botTaskInput.input_version, run.input_version),
-      ),
-    )
-    .orderBy(desc(botTaskInput.input_version))
-    .limit(12)
-  return [`任务：${task.title}`, `验收条件：${task.criteria}`, ...inputs.reverse().map(({ content }) => content)].join(
-    '\n\n',
-  )
-}
 
 /**
  * 在调用模型之前组装会话、任务和记忆，重新检查触发人和连接的可用性。
@@ -155,7 +121,7 @@ export async function loadBotRunContext(
         )
     : []
   const room = run.kind === 'compact' ? undefined : await readBotRoomSync(db, run, roomSyncLimit)
-  const input = run.task_id ? await taskPrompt(db, run) : room?.input
+  const input = room?.input
   if (!input && run.kind !== 'compact') return null
   const essentialMemories = await readEssentialMemories(db, {
     teamId: run.team_id,
@@ -173,9 +139,9 @@ export async function loadBotRunContext(
     {
       title: '查询团队与用户数据',
       body: [
-        '需要确定当前团队或用户时，先调用 get_current_context 获取团队名称、teamId、触发人的 userId 和团队角色。',
+        '需要确定当前团队或用户时，先运行 devops whoami --json 与 devops team list --json 获取当前用户与团队。',
         '只读查询中，如果用户给出的团队简称或拼写明显指向当前团队，直接使用返回的 teamId，并在回复中说明团队名称。',
-        '查询项目数、成员名单等实时数据时，用 platform_api_search 按关键词找接口，用 platform_api_call 传入所需标识。本轮接口查询结果是回答的依据。',
+        '查询项目数、成员名单等实时数据时，使用 devops CLI；先看 --help，复杂请求用 --file，大结果写工作目录文件再筛选。本轮接口查询结果是回答的依据。',
       ].join('\n'),
     },
     { title: '团队上下文', body: team.content },

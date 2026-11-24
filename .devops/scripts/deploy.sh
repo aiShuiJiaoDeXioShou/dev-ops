@@ -365,6 +365,10 @@ tar -C "$SOURCE_DIR" \
   --exclude='apps/pipeline-agent/.env' \
   --exclude='apps/cli/.env' \
   -cf - . | tar -C "$TARGET_RELEASE" -xf -
+# Bot bash 使用同一发布中的 CLI，避免系统安装版本与服务端不一致。
+[[ -f "$TARGET_RELEASE/apps/cli/dist/index.js" ]] || die '缺少 CLI 构建产物'
+chmod +x "$TARGET_RELEASE/apps/cli/dist/index.js"
+ln -sf index.js "$TARGET_RELEASE/apps/cli/dist/devops"
 printf '%s\n' "$COMMIT_SHA" > "$TARGET_RELEASE/.devops-build-complete"
 
 # 5. 执行数据库迁移（新生成随机密码时先提示管理员同步数据库角色密码）。

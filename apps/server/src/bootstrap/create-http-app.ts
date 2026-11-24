@@ -1,3 +1,4 @@
+import { registerBotRunTokenHttp } from '../modules/bots/bots.run-token-http.ts'
 import Fastify from 'fastify'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
@@ -110,6 +111,7 @@ export function createHttpApp(
   app.decorate('auth', services.auth)
   app.decorate('tokenService', services.tokens)
   app.decorate('botDelegation', options.botDelegation ?? null)
+  registerBotRunTokenHttp(app)
   app.addHook('onClose', async () => {
     await services.close()
   })

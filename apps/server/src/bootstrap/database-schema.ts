@@ -25,6 +25,7 @@ export { botRoomRelay, botConversationBotSetting } from '../modules/collaboratio
 export {
   bot,
   botApiCall,
+  botRunToken,
   botLoginSession,
   botMemory,
   botModelCatalog,

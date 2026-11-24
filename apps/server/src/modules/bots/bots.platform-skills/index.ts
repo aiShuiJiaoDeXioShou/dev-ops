@@ -13,12 +13,12 @@ interface PlatformSkill {
 export const platformBotSkills: readonly PlatformSkill[] = [
   {
     id: '00000000-0000-4000-8000-000000000601',
-    name: '平台接口用法',
-    identifier: 'platform-api',
+    name: '平台 CLI 用法',
+    identifier: 'platform-cli',
     category: 'engineering',
     summary: '按当前团队和成员权限查询平台数据并核对结果。',
     content:
-      '# 平台接口用法\n\n查询团队与成员标识时先调用 get_current_context。按业务词使用 platform_api_search，确认摘要和参数后调用 platform_api_call。对分页查询使用返回的分页信息。遇到权限拒绝、结果未知或接口失败时，说明可确认的信息并先核对状态。',
+      '# 平台 CLI 用法\n\n先运行 devops whoami --json 与 devops team list --json。使用 devops --help 和业务子命令 --help 确认参数，复杂请求用 --file，大结果写工作目录文件后筛选。对分页查询使用返回的分页信息。遇到权限拒绝、结果未知或接口失败时，说明可确认的信息并先核对状态。',
   },
   {
     id: '00000000-0000-4000-8000-000000000602',

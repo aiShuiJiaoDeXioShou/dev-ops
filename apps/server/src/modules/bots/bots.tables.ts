@@ -285,3 +285,22 @@ export const botMemory = appSchema.table(
     check('ck_bot_memory_source', sql`${table.source_kind} in ('conversation', 'consolidation')`),
   ],
 )
+
+/** 运行级凭据仅存哈希，实时有效性同时受运行租约控制。 */
+export const botRunToken = appSchema.table(
+  'bot_run_token',
+  {
+    ...teamAuditColumns(),
+    run_id: uuid('run_id').notNull(),
+    bot_id: uuid('bot_id').notNull(),
+    user_id: uuid('user_id').notNull(),
+    lease_epoch: integer('lease_epoch').notNull(),
+    token_hash: text('token_hash').notNull(),
+    revoked_at: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ name: 'pk_bot_run_token_id', columns: [table.id] }),
+    unique('uk_bot_run_token_hash').on(table.token_hash),
+    index('idx_bot_run_token_run_epoch').on(table.run_id, table.lease_epoch),
+  ],
+)

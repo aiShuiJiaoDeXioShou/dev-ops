@@ -105,15 +105,15 @@ test('团队技能与平台内置标识冲突时，目录标注冲突且运行�
   const { botId, roomPath, devUser, teamPath, post, get } = await seedBotWorkflowFixture(app)
   const local = await post(`${teamPath}/skills`, {
     name: '团队接口流程',
-    identifier: 'platform-api',
+    identifier: 'platform-cli',
     category: 'engineering',
     summary: '同标识的团队流程',
     content: '团队版本正文',
     contentVersion: '1.0.0',
   })
   assert.equal(local.code, 'OK', local.message)
-  const listed = (await get(`${teamPath}/skills?search=platform-api`)).data.items.filter(
-    ({ identifier }: { identifier: string }) => identifier === 'platform-api',
+  const listed = (await get(`${teamPath}/skills?search=platform-cli`)).data.items.filter(
+    ({ identifier }: { identifier: string }) => identifier === 'platform-cli',
   )
   assert.deepEqual(
     listed.map(({ source, conflictsWithPlatform }: { source: string; conflictsWithPlatform?: boolean }) => ({
@@ -141,12 +141,12 @@ test('团队技能与平台内置标识冲突时，目录标注冲突且运行�
   )
   const room = (await get(roomPath)).data
   assert.deepEqual(
-    room.skillReferences.filter(({ identifier }: { identifier: string }) => identifier === 'platform-api'),
+    room.skillReferences.filter(({ identifier }: { identifier: string }) => identifier === 'platform-cli'),
     [
       {
         id: listed[0].id,
         name: listed[0].name,
-        identifier: 'platform-api',
+        identifier: 'platform-cli',
         summary: listed[0].summary,
         botIds: [botId],
       },
@@ -160,7 +160,7 @@ test('团队技能与平台内置标识冲突时，目录标注冲突且运行�
   const context = await loadBotRunContext(db, run, 50)
   assert.ok(context)
   const tool = createSkillViewTool(db, run, { id: run.id, owner, epoch: run.lease_epoch }, context.skillVersions)
-  const output = await tool.execute({ identifier: 'platform-api' }, new AbortController().signal)
-  assert.match(output.text, /get_current_context/u)
+  const output = await tool.execute({ identifier: 'platform-cli' }, new AbortController().signal)
+  assert.match(output.text, /devops whoami/u)
   assert.doesNotMatch(output.text, /团队版本正文/u)
 })

@@ -1,7 +1,7 @@
 import type { BotTool } from '@dev-ops/devops-bot'
 import type { Database } from '../../../platform/database/client.ts'
 import { lockBotRunLease, type BotRunLease, type ConversationBotRunRecord } from '../bots.run-queue.repository.ts'
-import type { BotCallLog } from './api-invoker.ts'
+import type { BotCallLog } from './tool-call-log.ts'
 import { botApiCall } from '../bots.tables.ts'
 
 /**
