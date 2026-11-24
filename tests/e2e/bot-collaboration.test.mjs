@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createBotWorker } from '../../apps/server/dist/bootstrap/create-bot-worker.js'
-import { listModelCatalog, runBotSession } from '../../packages/devops-bot/dist/index.js'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { botRunToken } from '../../apps/server/dist/modules/bots/bots.tables.js'
+import { botTask } from '../../apps/server/dist/modules/tasks/bot-tasks.tables.js'
 import { createFauxBotRunner } from '../../packages/devops-bot/dist/testing.js'
 import { createLocalHttpFixture } from './support/local-http.mjs'
 import { runDevops } from './support/devops-cli.mjs'
@@ -25,167 +30,221 @@ function checked(response) {
   return response.body.data
 }
 
-async function verifyBotCollaboration(t, live) {
+test('真实 HTTP 与 PostgreSQL：会话长任务、运行令牌 CLI、待办持久化与历史只读', { timeout: 120_000 }, async (t) => {
   const fixture = await createLocalHttpFixture(t)
   if (!fixture) return
-  const { address, cleanup, config, env, request, post, teamId, user } = fixture
+  const { app, address, cleanup, config, request, post, teamId, user } = fixture
   assert.ok(user?.id, 'HTTP 会话应返回团队管理员')
-  const configuredKey = live ? (process.env.DEEPSEEK_API_KEY ?? env.DEEPSEEK_API_KEY) : undefined
-  if (live && !configuredKey) {
-    t.skip('本地 Server .env 未配置 DeepSeek 凭据')
-    return
-  }
-  const projectsPath = `/api/v1/teams/${teamId}/projects`
-  const fixtureProject = checked(await post(projectsPath, { name: 'Bot 验收项目' }))
-  const catalog = live
-    ? listModelCatalog().filter(({ providerId }) => providerId === 'deepseek')
-    : [
-        {
-          providerId: 'fixture',
-          modelId: 'test-chat',
-          displayName: '测试模型',
-          authTypes: ['api_key'],
-          contextWindow: 8192,
-        },
-      ]
-  const reply = createFauxBotRunner('执行完成')
-  const runner = live
-    ? runBotSession
-    : async (options) => {
-        const read = options.tools.find(({ name }) => name === 'platform_api_call')
-        const submit = options.tools.find(({ name }) => name === 'submit_task_result')
-        assert.ok(read)
-        if (submit) {
-          const data = await read.execute({ method: 'GET', path: projectsPath }, options.signal)
-          assert.equal(data.isError, false, data.text)
-          assert.match(data.text, /Bot 验收项目/u)
-          const result = await submit.execute(
-            {
-              body: '已从项目列表核对 Bot 验收项目。',
-              completionNote: '项目已存在',
-              evidence: [`核对项目 ${fixtureProject.id}`],
-              tags: ['交付核验'],
-            },
-            options.signal,
-          )
-          assert.equal(result.isError, undefined, result.text)
-          return reply(options)
-        }
-        const identify = options.tools.find(({ name }) => name === 'get_current_context')
-        assert.ok(identify)
-        const identity = await identify.execute({}, options.signal)
-        assert.equal(identity.isError, undefined, identity.text)
-        const scope = JSON.parse(identity.text)
-        assert.equal(scope.teamId, teamId)
-        assert.equal(scope.userId, user.id)
-        assert.equal(scope.role, 'admin')
-        const projects = await read.execute(
-          { method: 'GET', path: `/api/v1/teams/${scope.teamId}/projects` },
+  const workspace = await mkdtemp(join(tmpdir(), 'devops-bot-http-'))
+  cleanup.push(() => rm(workspace, { recursive: true, force: true }))
+  const team = `/api/v1/teams/${teamId}`
+  const fixtureProject = checked(await post(`${team}/projects`, { name: 'Bot 验收项目' }))
+  const catalog = [
+    {
+      providerId: 'fixture',
+      modelId: 'test-chat',
+      displayName: '测试模型',
+      authTypes: ['api_key'],
+      contextWindow: 8192,
+    },
+  ]
+  const todos = [{ text: '核对验收项目', status: 'in_progress' }]
+  const completedTodos = [{ text: '核对验收项目', status: 'completed' }]
+  const cliEntry = fileURLToPath(new URL('../../apps/cli/dist/index.js', import.meta.url))
+  const logs = []
+  const runnerErrors = []
+  let executions = 0
+  let releaseFirstRun
+  const firstRunCanFinish = new Promise((resolve) => {
+    releaseFirstRun = resolve
+  })
+  const runner = async (options) => {
+    try {
+      executions += 1
+      for (const name of ['platform_api_call', 'get_current_context', 'submit_task_result']) {
+        assert.equal(
+          options.tools.some((tool) => tool.name === name),
+          false,
+          `已移除工具 ${name} 不应出现`,
+        )
+      }
+      const update = options.tools.find(({ name }) => name === 'update_todos')
+      const bash = options.tools.find(({ name }) => name === 'bash')
+      assert.ok(update)
+      assert.ok(bash)
+      if (executions === 1) {
+        const started = await update.execute({ items: todos }, options.signal)
+        assert.ok(!started.isError, started.text)
+        await firstRunCanFinish
+        // 测试自行安装命令入口，不依赖工作树中手工创建的 dist/devops 软链。
+        const bin = join(options.workspace.directory, 'bin')
+        await mkdir(bin)
+        await writeFile(join(bin, 'devops'), `#!/bin/sh\nexec node '${cliEntry.replaceAll("'", "'\\''")}' "$@"\n`, {
+          mode: 0o700,
+        })
+        const projects = await bash.execute(
+          { command: `PATH="$PWD/bin:$PATH" devops project list --team ${teamId} --json` },
           options.signal,
         )
         assert.equal(projects.isError, false, projects.text)
-        const data = JSON.parse(projects.text).data
-        assert.equal(data.total, 1)
-        return createFauxBotRunner(`「${scope.teamName}」共有 ${data.total} 个项目。`)(options)
+        const result = JSON.parse(projects.text)
+        assert.equal(result.success, true)
+        assert.equal(result.data.total, 1)
+        assert.equal(result.data.items[0].id, fixtureProject.id)
+        const waiting = await update.execute({ items: completedTodos, needsReply: true }, options.signal)
+        assert.ok(!waiting.isError, waiting.text)
+        return createFauxBotRunner('已核对验收项目。是否继续完成本次工作？')(options)
       }
-  const logs = []
-  const worker = createBotWorker(config, runner, (level, message, context) => logs.push({ level, message, context }), {
-    catalog,
-  })
+      const finished = await update.execute({ items: completedTodos, needsReply: false }, options.signal)
+      assert.ok(!finished.isError, finished.text)
+      return createFauxBotRunner('工作已完成。')(options)
+    } catch (error) {
+      runnerErrors.push(error)
+      throw error
+    }
+  }
+  const worker = createBotWorker(
+    { ...config, APP_ORIGIN: address, BOT_WORKSPACE_DIR: workspace },
+    runner,
+    (level, message, context) => logs.push({ level, message, context }),
+    { catalog },
+  )
   cleanup.push(() => worker.close())
+  cleanup.push(() => releaseFirstRun())
   await worker.start()
-  const team = `/api/v1/teams/${teamId}`
   const connection = checked(
     await post(`${team}/bot-model-connections`, {
       name: '验收模型连接',
-      providerId: live ? 'deepseek' : 'fixture',
-      apiKey: live ? configuredKey : 'fixture-only',
+      providerId: 'fixture',
+      apiKey: 'fixture-only',
     }),
   )
   const bot = checked(
     await post(`${team}/bots`, {
-      name: live ? '协作验收助理' : '小林',
+      name: '小林',
       ownerUserId: user.id,
       responsibility: '按成员明确要求核对团队项目与交付',
-      modelBinding: { connectionId: connection.id, modelId: live ? 'deepseek-flash' : 'test-chat' },
+      modelBinding: { connectionId: connection.id, modelId: 'test-chat' },
     }),
   )
-  assert.equal(bot.modelConnectionId, connection.id)
+  // Linux 尚无平台网络白名单沙盒；Mac 使用默认沙盒验证 CLI 网关。
+  if (process.platform !== 'darwin') {
+    checked(await post(`/api/v1/bots/${bot.id}/set-access`, { configVersion: bot.configVersion, accessMode: 'full' }))
+  }
   const room = checked(await post(`${team}/bot-conversations`, { kind: 'direct', botId: bot.id }))
   const roomPath = `/api/v1/bot-conversations/${room.id}`
   const { token } = checked(await post('/api/v1/me/tokens', { name: '协作 CLI 验收' }))
   const cli = { server: address, team: teamId, token }
+  const readRoomStatus = async () => {
+    if (runnerErrors.length > 0) throw runnerErrors[0]
+    return checked(await request(`${team}/bot-conversations`)).items.find(({ id }) => id === room.id)
+  }
+  assert.equal((await readRoomStatus()).workStatus, null)
   const sendStarted = performance.now()
   const sent = await runDevops(cli, ['conversation', 'send', room.id, '--file', '-'], {
-    text: live ? '请直接回复“就绪”。' : '我当前有多少个项目？在 devop 团队当中？',
+    text: '核对验收项目，列出步骤，完成后询问我是否继续。',
     clientRequestId: randomUUID(),
   })
   const events = checked(await request(`${roomPath}/events`))
-  const feedback = events.items.find(
-    ({ runId, kind, payload }) =>
-      runId === sent.runId && kind === 'run_status' && ['queued', 'running'].includes(payload.status),
+  assert.ok(
+    events.items.some(
+      ({ runId, kind, payload }) =>
+        runId === sent.runId && kind === 'run_status' && ['queued', 'running'].includes(payload.status),
+    ),
+    '发出消息后应能读取排队或执行反馈',
   )
-  assert.ok(feedback, '发出消息后应能读取排队或执行反馈')
   assert.ok(performance.now() - sendStarted < 3_000, '排队反馈必须在 3 秒内可见')
-  assert.equal(checked(await request(`${roomPath}/tasks`)).items.length, 0)
-  const history = await waitFor(
-    async () => checked(await request(`${roomPath}/messages`)),
-    ({ items }) => items.some((message) => message.speakerKind === 'bot' && message.runId === sent.runId),
-    live ? 60_000 : 15_000,
+  const active = await waitFor(
+    async () => {
+      if (runnerErrors.length > 0) throw runnerErrors[0]
+      return checked(await request(roomPath))
+    },
+    ({ todos }) => todos.length === 1,
   )
-  if (!live)
-    assert.match(history.items.find(({ speakerKind }) => speakerKind === 'bot')?.body.blocks[0].text, /共有 1 个项目/u)
-  const created = await runDevops(cli, ['task', 'create', room.id, '--file', '-'], {
-    title: '核对验收项目',
-    businessOwnerId: user.id,
-    acceptanceCriteria: `调用 platform_api_call 用 GET 读取 ${projectsPath}。确认结果含“Bot 验收项目”，再调用 submit_task_result 提交中文结果、完成说明和证据，证据写入找到的项目 ID。最后简短回复完成。`,
+  assert.deepEqual(active.todos, todos)
+  assert.equal((await readRoomStatus()).workStatus, 'running')
+  releaseFirstRun()
+  await waitFor(readRoomStatus, ({ workStatus }) => workStatus === 'awaiting_reply')
+  assert.deepEqual(checked(await request(roomPath)).todos, completedTodos)
+  const inbox = await runDevops(cli, ['task', 'inbox'])
+  assert.equal(inbox.count, 1)
+  assert.equal(inbox.items[0].conversationId, room.id)
+  assert.equal(inbox.items[0].reason, 'awaiting_reply')
+  assert.equal((await runDevops(cli, ['task', 'list', room.id])).items.length, 0)
+  const history = checked(await request(`${roomPath}/messages`))
+  assert.match(
+    history.items.find(({ speakerKind, runId }) => speakerKind === 'bot' && runId === sent.runId)?.body.blocks[0].text,
+    /是否继续/u,
+  )
+  const audit = checked(await request(`${roomPath}/events`)).items.find(
+    ({ runId, kind, payload }) => runId === sent.runId && kind === 'tool_activity' && payload.name === 'devops',
+  )
+  assert.equal(audit?.payload.state, 'succeeded')
+  assert.equal(audit?.payload.path, '/api/v1/teams/:teamId/projects')
+  assert.equal(audit?.payload.code, 'OK')
+  await runDevops(cli, ['conversation', 'send', room.id, '--file', '-'], {
+    text: '确认完成。',
+    clientRequestId: randomUUID(),
   })
-  assert.equal(created.runStatus, 'queued')
-  const taskPath = `/api/v1/bot-tasks/${created.task.id}`
-  const awaiting = await waitFor(
-    async () => checked(await request(taskPath)),
-    ({ status }) => status === 'awaiting_review' || status === 'waiting',
-    live ? 75_000 : 20_000,
+  await waitFor(readRoomStatus, ({ workStatus }) => workStatus === 'completed')
+  assert.equal((await runDevops(cli, ['task', 'inbox'])).count, 0)
+  assert.deepEqual(checked(await request(roomPath)).todos, completedTodos)
+  assert.equal(executions, 2)
+  const usage = await runDevops(cli, ['conversation', 'usage', room.id])
+  // faux 输入用量为零；输出用量仍由运行结果累计。
+  assert.equal(usage.inputTokens, 0)
+  assert.ok(usage.outputTokens > 0)
+  assert.equal(usage.contexts[0].botId, bot.id)
+  assert.deepEqual((await runDevops(cli, ['conversation', 'queued-inputs', room.id])).items, [])
+  const tokens = await waitFor(
+    () =>
+      app.db
+        .select({
+          runId: botRunToken.run_id,
+          botId: botRunToken.bot_id,
+          userId: botRunToken.user_id,
+          hash: botRunToken.token_hash,
+          revokedAt: botRunToken.revoked_at,
+        })
+        .from(botRunToken)
+        .limit(10),
+    (rows) => rows.length === 2 && rows.every(({ revokedAt }) => revokedAt !== null),
   )
-  assert.equal(
-    awaiting.status,
-    'awaiting_review',
-    JSON.stringify(awaiting.runs.map(({ failureKind, status }) => ({ failureKind, status }))),
-  )
-  assert.ok(awaiting.trace.some(({ kind, state }) => kind === 'platform_api' && state === 'succeeded'))
-  assert.equal(awaiting.results[0].submittedByBotId, bot.id)
-  assert.equal(checked(await request(`${team}/bot-inbox`)).items[0].id, created.task.id)
-  const accepted = await runDevops(cli, ['task', 'accept', created.task.id, '--file', '-'], {
-    resultId: awaiting.results[0].id,
-    comment: '验收通过',
+  for (const row of tokens) {
+    assert.equal(row.botId, bot.id)
+    assert.equal(row.userId, user.id)
+    assert.match(row.hash, /^[a-f0-9]{64}$/u)
+  }
+  assert.ok(tokens.some(({ runId }) => runId === sent.runId))
+  // 旧任务仅作为升级遗留数据写入夹具；业务链路全部通过会话消息推进。
+  const taskId = randomUUID()
+  await app.db.insert(botTask).values({
+    id: taskId,
+    team_id: teamId,
+    conversation_id: room.id,
+    title: '历史核对任务',
+    acceptance_criteria: '保留历史验收说明',
+    business_owner_id: user.id,
+    executor_bot_id: bot.id,
+    status: 'completed',
+    created_by: user.id,
   })
-  assert.equal(checked(await request(taskPath)).status, 'completed')
-  assert.equal(accepted.task.status, 'completed')
-  assert.equal(accepted.review.reviewerUserId, user.id)
-  assert.equal(checked(await request(`${team}/bot-inbox`)).count, 0)
-  const apiLog = logs
-    .map(({ context }) => context)
-    .find((context) => context?.runId === created.runId && context?.kind === 'platform_api')
-  assert.equal(apiLog?.teamId, teamId)
-  assert.equal(apiLog?.conversationId, room.id)
-  assert.equal(apiLog?.botId, bot.id)
-  assert.ok(apiLog?.callId)
+  assert.equal((await runDevops(cli, ['task', 'list', room.id])).items[0].id, taskId)
+  assert.equal((await runDevops(cli, ['task', 'get', taskId])).title, '历史核对任务')
+  for (const path of [
+    `${roomPath}/tasks`,
+    ...['append', 'handoff', 'rerun', 'cancel', 'accept', 'request-changes'].map(
+      (action) => `/api/v1/bot-tasks/${taskId}/${action}`,
+    ),
+  ]) {
+    const removed = await post(path, {})
+    assert.equal(removed.body.success, false)
+    assert.equal(removed.body.code, 'NOT_FOUND')
+  }
+  assert.equal((await runDevops(cli, ['task', 'get', taskId])).status, 'completed')
   const serialized = JSON.stringify(logs)
   assert.ok(!serialized.includes('Bot 验收项目'))
-  if (live) assert.ok(!serialized.includes(configuredKey))
-}
-
-test('真实 HTTP 与 PostgreSQL：Bot 领取运行、读取平台数据、送验与人工验收', { timeout: 120_000 }, async (t) => {
-  await verifyBotCollaboration(t, false)
+  assert.ok(!serialized.includes('fixture-only'))
+  assert.ok(!serialized.includes('devops-run-'))
+  assert.deepEqual(runnerErrors, [])
 })
-
-test(
-  'DeepSeek 实测：同一执行服务用 API Key 完成 Bot 任务闭环',
-  {
-    timeout: 150_000,
-    skip: process.env.DEVOPS_BOT_LIVE_TEST !== '1' && '按需开启真实模型验证',
-  },
-  async (t) => {
-    await verifyBotCollaboration(t, true)
-  },
-)
