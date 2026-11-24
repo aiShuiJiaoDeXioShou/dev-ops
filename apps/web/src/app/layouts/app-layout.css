@@ -16,6 +16,14 @@
   padding: 0 0 0 8px;
 }
 
+.dark .workspace-sidebar-head .brand img {
+  filter: invert(1);
+}
+
+.dark .workspace-shell .side-bottom .team-switcher {
+  border-color: var(--border);
+}
+
 .workspace-shell .workspace-sidebar-toggle {
   display: inline-flex;
   align-items: center;

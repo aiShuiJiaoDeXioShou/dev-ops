@@ -105,9 +105,12 @@ async function expectPageSnapshot(
 test('[desktop] [mobile] 工作区与项目设置弹窗沿用明暗主题的弱背景和次级文字色', async ({ page }, testInfo) => {
   await prepare(page, '/projects')
   const trigger = page.getByRole('button', { name: /项目设置/ }).first()
+  const activitySource = page.getByRole('combobox', { name: '活动来源' })
   const dialog = page.getByRole('dialog')
   for (const mode of ['light', 'dark']) {
     await page.evaluate((dark) => document.documentElement.classList.toggle('dark', dark), mode === 'dark')
+    const background = await page.locator('html').evaluate((element) => getComputedStyle(element).backgroundColor)
+    await expect(activitySource).toHaveCSS('background-color', background)
     await trigger.click()
     await expect(dialog).toBeVisible()
     const tokens = await dialog.evaluate((element) => {

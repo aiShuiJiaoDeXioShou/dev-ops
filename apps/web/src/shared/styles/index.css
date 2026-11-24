@@ -5,6 +5,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
+[data-color-preview='light'],
 :root {
   --background: #ffffff;
   --foreground: #0f1115;
@@ -33,16 +34,17 @@
   --radius: 0.625rem;
 }
 
+[data-color-preview='dark'],
 .dark {
-  --background: oklch(0.16 0.01 250);
+  --background: oklch(0.16 0 0);
   --foreground: oklch(0.97 0.003 250);
-  --card: oklch(0.205 0.012 250);
+  --card: oklch(0.205 0 0);
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
   --primary: #7aa0f0;
   --primary-foreground: #0b1220;
-  --secondary: oklch(0.26 0.012 250);
+  --secondary: oklch(0.26 0 0);
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
   --muted-foreground: oklch(0.72 0.01 250);
@@ -52,6 +54,17 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: var(--primary);
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+}
+
+:root {
+  background: var(--background);
+  color-scheme: light;
+}
+
+:root.dark {
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -615,7 +628,7 @@
   padding: 4px 26px 4px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--background);
   font-size: 12px;
 }
 .activity-heading .activity-source svg {
@@ -652,6 +665,22 @@
   --green: #269650;
   --amber: #c98719;
   --red: #ce5252;
+}
+
+.dark :is(.shell, .knowledge-dialog) {
+  --blue: var(--primary);
+  --blue-soft: color-mix(in srgb, var(--primary) 14%, var(--background));
+  --bg: var(--background);
+  --side: var(--sidebar);
+  --soft: var(--muted);
+  --selected: var(--accent);
+  --ink: var(--foreground);
+  --quiet: var(--muted-foreground);
+  --line: var(--border);
+}
+
+.dark .shell .user:hover {
+  background: var(--accent);
 }
 
 /* 弹窗表单字段：标签与输入框保持 8px 间距，避免中文标签直接贴住控件。 */
