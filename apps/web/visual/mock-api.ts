@@ -83,6 +83,11 @@ export async function installApiMocks(page: Page): Promise<void> {
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
     const { pathname: path } = url
+    if (/\/bot-conversations\/[^/]+\/events$/.test(path))
+      return route.fulfill({ json: envelope({ cursor: '0', items: [], activeRuns: [], resetRequired: false }) })
+    if (/\/bot-conversations\/[^/]+\/queued-inputs$/.test(path)) return route.fulfill({ json: envelope({ items: [] }) })
+    if (/\/bot-conversations\/[^/]+\/usage$/.test(path))
+      return route.fulfill({ json: envelope({ inputTokens: 120, outputTokens: 40, costUsd: 0.002, contexts: [] }) })
     if (path === '/api/v1/attachments/policy') return route.fulfill({ json: envelope(attachmentPolicy) })
     if (path === `/api/v1/projects/${VISUAL_IDS.projectId}/artifacts`) {
       return route.fulfill({ json: artifactPage })

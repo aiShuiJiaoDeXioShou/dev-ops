@@ -204,8 +204,7 @@ test('[desktop] [mobile] 群聊顺序点名、插话、暂停继续与轨迹', a
   await input.fill('@小林 @复核助理 比对交付计划')
   await input.press('Enter')
   await expect(page.getByRole('region', { name: '群聊接力' })).toContainText('接力进行中')
-  await expect(page.getByRole('switch', { name: '插话' })).not.toBeChecked()
-  await page.getByRole('switch', { name: '插话' }).click()
+  await expect(page.getByRole('switch', { name: '插话' })).toHaveCount(0)
   await input.fill('先核对权限')
   await input.press('Enter')
   const relayStatus = page.getByRole('region', { name: '群聊接力' })
@@ -538,4 +537,96 @@ test('[desktop] [mobile] 浏览者可读取团队上下文，失败时可以重�
   await expect(page.getByRole('textbox', { name: '团队共用指令' })).toHaveValue('共享约定')
   await expect(page.getByRole('textbox', { name: '团队共用指令' })).not.toBeEditable()
   await expect(page.getByRole('button', { name: '保存上下文' })).toHaveCount(0)
+})
+
+test('[desktop] [mobile] 输入区命令、组字、追加及撤回', async ({ page }, testInfo) => {
+  const room = sampleRoom('direct')
+  await installRoom(page, room)
+  let queued = [
+    {
+      messageId,
+      mode: 'follow_up',
+      text: '稍后检查',
+      attachmentIds: [],
+      attachments: [],
+      skillIds: [],
+      mentionBotIds: [],
+      mentionAll: false,
+    },
+  ]
+  const sent: { text: string; deliveryMode?: string }[] = []
+  await page.route(`${roomPath}/queued-inputs`, (route) => route.fulfill({ json: ok({ items: queued }) }))
+  await page.route(`${roomPath}/events*`, (route) =>
+    route.fulfill({
+      json: ok({ cursor: '0', items: [], activeRuns: [{ id: runId, botId, status: 'running' }], resetRequired: false }),
+    }),
+  )
+  await page.route(`${roomPath}/messages*`, (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: ok({ items: [], nextBefore: null }) })
+    sent.push(route.request().postDataJSON())
+    return route.fulfill({ json: ok({ message: sampleMessage(sent.at(-1)?.text ?? ''), runId, delivery: 'steer' }) })
+  })
+  await page.route(`${roomPath}/messages/${messageId}/withdraw`, (route) => {
+    const item = queued[0]
+    queued = []
+    return route.fulfill({ json: ok(item) })
+  })
+  await page.route(`${teamPath}/bot-prompt-templates*`, (route) => route.fulfill({ json: ok({ items: [template] }) }))
+  await page.goto(`/collaboration/${roomId}`)
+  const input = page.getByRole('textbox', { name: '协作消息' })
+  await expect(input).toBeVisible({ timeout: 15000 })
+  await expect(page.getByRole('button', { name: '消息操作' })).toHaveCount(0)
+  await input.fill('/')
+  await expect(page.getByRole('group', { name: '会话命令候选' })).toContainText('/model')
+  await input.press('Escape')
+  await input.fill('中文组字')
+  await input.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true })
+  expect(sent).toHaveLength(0)
+  await input.press('Enter')
+  await expect.poll(() => sent.length).toBe(1)
+  expect(sent[0]?.deliveryMode).toBe('steer')
+  await input.fill('下一项')
+  await input.press('Alt+Enter')
+  await expect.poll(() => sent.length).toBe(2)
+  expect(sent[1]?.deliveryMode).toBe('auto')
+  await page.getByRole('button', { name: '撤回到输入框' }).click()
+  await expect(input).toHaveValue('稍后检查')
+  await expect(page.getByText('本会话费用：', { exact: false })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('v010-composer.png'), fullPage: true })
+  await input.fill('/session')
+  await input.press('Enter')
+  await expect(page.getByRole('dialog', { name: '/session' })).toContainText('120')
+  await page.keyboard.press('Escape')
+  await expect(input).toBeFocused()
+})
+
+test('[desktop] [mobile] new 命令创建独立会话并保留原房间', async ({ page }) => {
+  const room = sampleRoom('direct')
+  await installRoom(page, room)
+  await page.route(`${roomPath}/messages*`, (route) => route.fulfill({ json: ok({ items: [], nextBefore: null }) }))
+  await page.route(`${roomPath}/events*`, (route) =>
+    route.fulfill({ json: ok({ cursor: '0', items: [], activeRuns: [], resetRequired: false }) }),
+  )
+  let created = false
+  await page.route(`${teamPath}/bot-conversations`, (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    expect(route.request().postDataJSON()).toEqual({ kind: 'direct', botId, newSession: true })
+    created = true
+    return route.fulfill({ json: ok({ ...room, id: forkId }) })
+  })
+  await page.route(`**/api/v1/bot-conversations/${forkId}`, (route) =>
+    route.fulfill({ json: ok({ ...room, id: forkId }) }),
+  )
+  await page.route(`**/api/v1/bot-conversations/${forkId}/messages*`, (route) =>
+    route.fulfill({ json: ok({ items: [], nextBefore: null }) }),
+  )
+  await page.goto(`/collaboration/${roomId}`)
+  const input = page.getByRole('textbox', { name: '协作消息' })
+  await input.fill('/new')
+  await input.press('Enter')
+  const dialog = page.getByRole('dialog', { name: '/new' })
+  await expect(dialog).toContainText('原会话及消息历史会保留')
+  await dialog.getByRole('button', { name: /确认/ }).click()
+  await expect(page).toHaveURL(new RegExp(forkId))
+  expect(created).toBe(true)
 })

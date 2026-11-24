@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { ClipboardPlus, FileText, Link2, Paperclip } from 'lucide-react'
+import { Paperclip } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAttachmentPolicy } from '@/features/attachments/api/queries'
 import { describeAttachmentError } from '@/features/attachments/lib/errors'
@@ -9,22 +9,17 @@ import { AttachmentField } from '@/features/attachments/ui/attachment-field'
 import { apiClient } from '@/shared/api/client'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/shared/ui/controls/dropdown-menu'
-import { Switch } from '@/shared/ui/controls/switch'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import type { BotConversation } from '../api/queries'
+import { ConversationCommands, commandCandidates } from './conversation-commands'
+import { botDetailQueryOptions } from '@/features/bots/api/queries'
 import { ConversationIcon } from './conversation-icon'
 import './conversation-content.css'
 
-type Candidate = { id: string; kind: 'bot' | 'skill' | 'all' | 'template'; name: string; token: string }
+type Candidate = { id: string; kind: 'bot' | 'skill' | 'all' | 'template' | 'command'; name: string; token: string }
 
 function asSkillCandidate(skill: BotConversation['skillReferences'][number]): Candidate {
-  return { id: skill.id, name: skill.name, token: skill.identifier, kind: 'skill' }
+  return { id: skill.id, name: skill.name, token: `skill:${skill.identifier}`, kind: 'skill' }
 }
 
 function mentionAt(text: string, caret: number) {
@@ -59,8 +54,6 @@ export function ConversationComposer({
   isStopping,
   onStop,
   initialSkillId,
-  task,
-  onNewTask,
   onSent,
 }: {
   room: BotConversation
@@ -69,8 +62,6 @@ export function ConversationComposer({
   isStopping: boolean
   onStop: (runId: string) => void
   initialSkillId?: string
-  task?: { id: string; title: string; version: number }
-  onNewTask: (opener: HTMLElement | null) => void
   onSent: () => void
 }) {
   const defaultBot = room.leaderBotId ?? room.members.find(({ kind }) => kind === 'bot')?.id
@@ -80,8 +71,21 @@ export function ConversationComposer({
   const client = useQueryClient()
   const draftKey = ['bot-conversation-draft', room.teamId, room.id]
   const cachedDraft = client.getQueryData<StoredDraft>(draftKey)
+  const queued = useQuery({
+    queryKey: ['bot-queued-inputs', room.id],
+    queryFn: () => apiClient.listBotQueuedInputs(room.id),
+    enabled: !readOnly,
+    refetchInterval: 1000,
+  })
+  const usage = useQuery({
+    queryKey: ['bot-conversation-usage', room.id],
+    queryFn: () => apiClient.getBotConversationUsage(room.id),
+    refetchInterval: runningId ? 1000 : 10000,
+  })
+  const bot = useQuery({ ...botDetailQueryOptions(defaultBot ?? ''), enabled: !!defaultBot })
+  const setting = room.botSettings?.find(({ botId }) => botId === defaultBot)
   const [draft, setDraft] = useState(() => {
-    const prefix = initialReference ? `@${initialReference.identifier} ` : ''
+    const prefix = initialReference ? `/skill:${initialReference.identifier} ` : ''
     const cached = cachedDraft?.text ?? ''
     return prefix && !cached.includes(prefix) ? prefix + cached : cached
   })
@@ -91,18 +95,14 @@ export function ConversationComposer({
   const attachmentPolicy = useAttachmentPolicy(!readOnly)
   const [caret, setCaret] = useState(draft.length)
   const [hideMentions, setHideMentions] = useState(false)
-  const [steering, setSteering] = useState(false)
+  const [command, setCommand] = useState<string>()
   const [candidateIndex, setCandidateIndex] = useState(0)
-  const [supplementId, setSupplementId] = useState<string>()
   const input = useRef<HTMLTextAreaElement>(null)
   const nextCaret = useRef<number | null>(null)
-  const addTrigger = useRef<HTMLButtonElement>(null)
   const requestId = useRef(cachedDraft?.text === draft ? cachedDraft?.requestId : undefined)
-  const menuOpenedMention = useRef(false)
-  const supplement = task && task.id === supplementId ? task : undefined
-  const attachmentIds = supplement ? [] : doneAttachmentIds(attachments)
-  const hasDraftContent = !!draft.trim() || (!supplement && attachments.length > 0)
-  const mention = supplement || hideMentions ? undefined : mentionAt(draft, caret)
+  const attachmentIds = doneAttachmentIds(attachments)
+  const hasDraftContent = !!draft.trim() || attachments.length > 0
+  const mention = hideMentions ? undefined : mentionAt(draft, caret)
   const botCandidates: Candidate[] = room.members
     .filter(({ kind, enabled }) => kind === 'bot' && enabled !== false)
     .map(({ id, name }) => ({ id, kind: 'bot', name, token: name }))
@@ -120,9 +120,7 @@ export function ConversationComposer({
     name: description,
   }))
   const chosenTemplate = templateCandidates.find(({ token }) => token === templateName)
-  const mentioned = supplement
-    ? []
-    : mentionsIn(draft, [...botCandidates, all, ...room.skillReferences.map(asSkillCandidate)])
+  const mentioned = mentionsIn(draft, [...botCandidates, all])
   const selectedBots = [...new Set(mentioned.flatMap((item) => (item?.kind === 'bot' ? [item.id] : [])))]
   const mentionAll = room.kind === 'group' && mentioned.some((item) => item?.kind === 'all')
   const targetBot = selectedBots[0] ?? defaultBot
@@ -131,18 +129,20 @@ export function ConversationComposer({
     .map(asSkillCandidate)
   const candidates = mention
     ? (mention.symbol === '/'
-        ? templateCandidates
-        : [...(room.kind === 'group' ? [all] : []), ...botCandidates, ...skillCandidates]
+        ? [...commandCandidates, ...templateCandidates, ...skillCandidates]
+        : [...(room.kind === 'group' ? [all] : []), ...botCandidates]
       )
         .filter(({ name, token }) => `${name} ${token}`.toLowerCase().includes(mention.query.toLowerCase()))
         .slice(0, 12)
     : []
   const activeCandidate = candidates[Math.min(candidateIndex, candidates.length - 1)]
-  const activeSkillIds = [...new Set(mentioned.flatMap((item) => (item?.kind === 'skill' ? [item.id] : [])))]
+  const activeSkillIds = skillCandidates
+    .filter(({ token }) => draft.split(/\s+/u).includes(`/${token}`))
+    .map(({ id }) => id)
   const hasUnknownReference = mentioned.some((item) => !item)
   const [referenceError, setReferenceError] = useState(false)
   const send = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (mode: 'steer' | 'auto') => {
       const id = requestId.current ?? crypto.randomUUID()
       requestId.current = id
       client.setQueryData<StoredDraft>(draftKey, {
@@ -150,14 +150,6 @@ export function ConversationComposer({
         requestId: id,
         attachments: attachments.filter(({ status }) => status === 'done'),
       })
-      if (supplement) {
-        await apiClient.appendBotTask(
-          supplement.id,
-          { version: supplement.version, content: draft },
-          { idempotencyKey: id },
-        )
-        return
-      }
       await apiClient.sendBotMessage(
         room.id,
         {
@@ -166,7 +158,7 @@ export function ConversationComposer({
           ...(attachmentIds.length ? { attachmentIds } : {}),
           ...(selectedBots.length && !mentionAll ? { mentionBotIds: selectedBots } : {}),
           ...(mentionAll ? { mentionAll: true } : {}),
-          ...(runningId && steering ? { deliveryMode: 'steer' } : {}),
+          ...(runningId ? { deliveryMode: mode } : {}),
           ...(chosenTemplate ? { promptTemplateId: chosenTemplate.id } : {}),
           ...(activeSkillIds.length ? { skillIds: activeSkillIds } : {}),
         },
@@ -176,14 +168,13 @@ export function ConversationComposer({
     onSuccess: () => {
       setDraft('')
       setCaret(0)
-      if (!supplement) setAttachments([])
-      client.setQueryData<StoredDraft>(draftKey, (current) => ({
+      setAttachments([])
+      client.setQueryData<StoredDraft>(draftKey, () => ({
         text: '',
-        attachments: supplement ? current?.attachments : [],
+        attachments: [],
       }))
-      setSupplementId(undefined)
-      setSteering(false)
       requestId.current = undefined
+      void queued.refetch()
       onSent()
       input.current?.focus()
     },
@@ -221,15 +212,42 @@ export function ConversationComposer({
   }
   const insert = (candidate: Candidate) => {
     if (!mention) return
+    if (candidate.kind === 'command') {
+      setCommand(candidate.token)
+      replace('', 0)
+      return
+    }
     const start = `${draft.slice(0, mention.start)}${mention.symbol}${candidate.token} `
     replace(start + draft.slice(caret), start.length)
   }
+  const withdraw = useMutation({
+    mutationFn: (messageId: string) =>
+      apiClient.withdrawBotQueuedInput(room.id, messageId, { idempotencyKey: crypto.randomUUID() }),
+    onSuccess: async ({ data }) => {
+      replace([draft, data.text].filter(Boolean).join('\n'), [draft, data.text].filter(Boolean).join('\n').length)
+      if (data.attachments.length)
+        changeAttachments([
+          ...attachments,
+          ...data.attachments.map((item): PendingAttachment => ({
+            clientId: crypto.randomUUID(),
+            attachmentId: item.id,
+            fileName: item.fileName,
+            sizeBytes: item.sizeBytes,
+            status: 'done',
+            progress: 100,
+          })),
+        ])
+      await queued.refetch()
+      onSent()
+    },
+  })
   const cannotSend =
     !hasDraftContent ||
     send.isPending ||
-    (!supplement && hasUnfinishedAttachments(attachments)) ||
+    withdraw.isPending ||
+    hasUnfinishedAttachments(attachments) ||
     (draft.startsWith('/') && templates.isPending)
-  const submit = () => {
+  const submit = (mode: 'steer' | 'auto' = 'steer') => {
     if (mention && activeCandidate) {
       insert(activeCandidate)
       return
@@ -239,256 +257,249 @@ export function ConversationComposer({
       setReferenceError(true)
       return
     }
-    send.mutate()
+    send.mutate(mode)
   }
-  if (readOnly) return <p className="dsh-readonly-note">浏览者只读</p>
+  if (readOnly)
+    return (
+      <div className="dsh-readonly-note">
+        浏览者只读{' '}
+        <Button variant="ghost" size="sm" onClick={() => setCommand('copy')}>
+          /copy
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setCommand('session')}>
+          /session
+        </Button>
+        <ConversationCommands room={room} command={command} onClose={() => setCommand(undefined)} busy={!!runningId} />
+      </div>
+    )
   return (
-    <form
-      className={cn('dsh-composer conversation-composer', runningId && 'is-generating')}
-      onSubmit={(event) => {
-        event.preventDefault()
-        submit()
-      }}
-    >
-      {mention && (
-        <div
-          className="mention-results"
-          role="group"
-          aria-label={mention.symbol === '/' ? '提示模板候选' : '引用资源候选'}
-        >
-          {mention.symbol === '/' && templates.isError && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => void templates.refetch()}>
-              模板加载失败，重试
-            </Button>
-          )}
-          {candidates.length === 0 && !(mention.symbol === '/' && templates.isError) && (
-            <p className="mention-choice small muted" role="status">
-              {mention.symbol === '/' && templates.isPending ? '正在加载提示模板…' : '没有匹配的引用'}
-            </p>
-          )}
-          {candidates.map((candidate) => (
+    <>
+      <form
+        className={cn('dsh-composer conversation-composer', runningId && 'is-generating')}
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes('Files')) event.preventDefault()
+        }}
+        onDrop={(event) => {
+          if (!send.isPending && event.dataTransfer.files.length) {
+            event.preventDefault()
+            addFiles.current?.(Array.from(event.dataTransfer.files))
+          }
+        }}
+        onSubmit={(event) => {
+          event.preventDefault()
+          submit()
+        }}
+      >
+        {queued.data?.data.items.map((item) => (
+          <div className="row small gap-2" key={item.messageId}>
+            <span className="min-w-0 truncate">
+              {item.mode === 'steer' ? '插话' : '追加'}：{item.text}
+            </span>
             <Button
-              unstyled
-              key={candidate.id}
               type="button"
               variant="ghost"
-              className={cn('mention-choice', candidate === activeCandidate && 'is-highlighted')}
-              onPointerDown={(event) => event.preventDefault()}
-              onClick={() => insert(candidate)}
+              size="sm"
+              disabled={withdraw.isPending || send.isPending}
+              onClick={() => withdraw.mutate(item.messageId)}
             >
-              {mention.symbol}
-              {candidate.token}
-              <small>
-                {candidate.kind === 'bot'
-                  ? 'Bot'
-                  : candidate.kind === 'skill'
-                    ? `技能 · ${candidate.name}`
-                    : candidate.name}
-              </small>
+              撤回到输入框
             </Button>
-          ))}
+          </div>
+        ))}
+        {usage.isError && (
+          <Button type="button" variant="ghost" onClick={() => void usage.refetch()}>
+            用量加载失败，重试
+          </Button>
+        )}
+        {withdraw.isError && (
+          <p role="alert" className="field-error">
+            {describeAttachmentError(withdraw.error)}
+          </p>
+        )}
+        {queued.isError && (
+          <Button type="button" variant="ghost" onClick={() => void queued.refetch()}>
+            队列加载失败，重试
+          </Button>
+        )}
+        {mention && (
+          <div
+            className="mention-results"
+            role="group"
+            aria-label={mention.symbol === '/' ? '会话命令候选' : 'Bot 候选'}
+          >
+            {mention.symbol === '/' && templates.isError && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => void templates.refetch()}>
+                模板加载失败，重试
+              </Button>
+            )}
+            {candidates.length === 0 && !(mention.symbol === '/' && templates.isError) && (
+              <p className="mention-choice small muted" role="status">
+                {mention.symbol === '/' && templates.isPending ? '正在加载提示模板…' : '没有匹配的引用'}
+              </p>
+            )}
+            {candidates.map((candidate) => (
+              <Button
+                unstyled
+                key={candidate.id}
+                type="button"
+                variant="ghost"
+                className={cn('mention-choice', candidate === activeCandidate && 'is-highlighted')}
+                onPointerDown={(event) => event.preventDefault()}
+                onClick={() => insert(candidate)}
+              >
+                {mention.symbol}
+                {candidate.token}
+                <small>
+                  {candidate.kind === 'bot'
+                    ? 'Bot'
+                    : candidate.kind === 'skill'
+                      ? `技能 · ${candidate.name}`
+                      : candidate.name}
+                </small>
+              </Button>
+            ))}
+          </div>
+        )}
+        <div>
+          <AttachmentField
+            conversationId={room.id}
+            label="待发送附件"
+            value={attachments}
+            onChange={changeAttachments}
+            pickerRef={picker}
+            addFilesRef={addFiles}
+            isSubmitting={send.isPending}
+          />
         </div>
-      )}
-      {task && (
-        <div className="composer-task-mode">
+        <Textarea
+          ref={input}
+          rows={2}
+          className="dsh-composer-input min-h-15 resize-none! rounded-none border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0"
+          maxLength={16000}
+          aria-label="协作消息"
+          placeholder={`发消息给 ${room.name}，@ 选择 Bot 或 / 打开命令`}
+          value={draft}
+          onPaste={(event) => {
+            if (send.isPending) return
+            const clipboard = event.clipboardData
+            const files = clipboard.files.length
+              ? Array.from(clipboard.files)
+              : Array.from(clipboard.items).flatMap((item) => {
+                  const file = item.kind === 'file' ? item.getAsFile() : null
+                  return file ? [file] : []
+                })
+            const images = files.filter(({ type }) => type.startsWith('image/'))
+            if (!images.length) return
+            // 仅含图片时接管粘贴；混合剪贴板仍由浏览器按光标位置插入普通文本。
+            if (!event.clipboardData.getData('text/plain')) event.preventDefault()
+            addFiles.current?.(images)
+          }}
+          readOnly={send.isPending || withdraw.isPending}
+          onChange={(event) => change(event.target.value, event.target.selectionStart)}
+          onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
+          onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return
+            if ((event.altKey || event.ctrlKey) && event.key === 'ArrowUp' && !withdraw.isPending) {
+              const latest = queued.data?.data.items.at(-1)
+              if (latest) {
+                event.preventDefault()
+                withdraw.mutate(latest.messageId)
+                return
+              }
+            }
+            if (event.key === 'Escape' && mention) {
+              event.preventDefault()
+              event.stopPropagation()
+              setHideMentions(true)
+              return
+            }
+            if (event.key === 'Escape' && runningId && !isStopping) {
+              event.preventDefault()
+              onStop(runningId)
+              return
+            }
+            if (mention && candidates.length && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+              event.preventDefault()
+              const current = Math.min(candidateIndex, candidates.length - 1)
+              setCandidateIndex((current + (event.key === 'ArrowDown' ? 1 : candidates.length - 1)) % candidates.length)
+            }
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              submit(event.altKey || event.ctrlKey ? 'auto' : 'steer')
+            }
+          }}
+        />
+        {initialSkillId && !initialReference && (
+          <p className="dsh-composer-notice">所选会话的默认智能体无法调用这项技能。</p>
+        )}
+        {referenceError && (
+          <p className="field-error" role="alert">
+            引用不存在或已停用，请从 @ 候选中重新选择。
+          </p>
+        )}
+        {send.isError && (
+          <p className="field-error" role="alert">
+            {describeAttachmentError(send.error)}
+          </p>
+        )}
+        <p className="small muted">
+          {runningId
+            ? 'Enter 插话 · Alt+Enter 追加（Windows 可用 Ctrl+Enter）· Esc 停止'
+            : 'Enter 发送 · Shift+Enter 换行'}
+        </p>
+        <p className="small muted break-words">
+          模型：{(setting?.isOverrideValid && setting.modelId) || bot.data?.data.modelId || '加载中'} · 思考：
+          {setting?.effectiveThinkingLevel ?? '默认'} · 最近上下文：
+          {usage.data?.data.contexts.find(({ botId }) => botId === defaultBot)?.tokens ?? '未知'} tokens · 本会话费用：
+          {typeof usage.data?.data.costUsd !== 'number' ? '未知' : `$${usage.data.data.costUsd.toFixed(4)}`}
+        </p>
+        <div className="dsh-composer-bar">
           <Button
-            unstyled
             type="button"
             variant="ghost"
-            className="text-btn"
-            disabled={send.isPending}
+            size="icon"
+            aria-label="上传附件"
+            disabled={send.isPending || attachmentPolicy.isPending}
             onClick={() => {
-              setSupplementId(supplement ? undefined : task.id)
-              requestId.current = undefined
-              input.current?.focus()
+              if (attachmentPolicy.isError) void attachmentPolicy.refetch()
+              else picker.current?.click()
             }}
           >
-            {supplement ? '正在补充任务 · 取消' : '补充当前任务'}
+            <Paperclip aria-hidden="true" />
           </Button>
-        </div>
-      )}
-      <div hidden={!!supplement}>
-        <AttachmentField
-          conversationId={room.id}
-          label="待发送附件"
-          value={attachments}
-          onChange={changeAttachments}
-          pickerRef={picker}
-          addFilesRef={addFiles}
-          isSubmitting={send.isPending}
-        />
-      </div>
-      <Textarea
-        ref={input}
-        rows={2}
-        className="dsh-composer-input min-h-15 resize-none! rounded-none border-0 bg-transparent p-0 text-base shadow-none focus-visible:ring-0"
-        maxLength={16000}
-        aria-label="协作消息"
-        placeholder={supplement ? `补充任务「${supplement.title}」` : `发消息给 ${room.name}，@ 引用资源或 / 选择模板`}
-        value={draft}
-        onPaste={(event) => {
-          if (supplement || send.isPending) return
-          const clipboard = event.clipboardData
-          const files = clipboard.files.length
-            ? Array.from(clipboard.files)
-            : Array.from(clipboard.items).flatMap((item) => {
-                const file = item.kind === 'file' ? item.getAsFile() : null
-                return file ? [file] : []
-              })
-          const images = files.filter(({ type }) => type.startsWith('image/'))
-          if (!images.length) return
-          // 仅含图片时接管粘贴；混合剪贴板仍由浏览器按光标位置插入普通文本。
-          if (!event.clipboardData.getData('text/plain')) event.preventDefault()
-          addFiles.current?.(images)
-        }}
-        readOnly={send.isPending}
-        onChange={(event) => change(event.target.value, event.target.selectionStart)}
-        onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
-        onKeyDown={(event) => {
-          if (event.nativeEvent.isComposing || event.keyCode === 229) return
-          if (event.key === 'Escape' && mention) {
-            event.preventDefault()
-            event.stopPropagation()
-            setHideMentions(true)
-          }
-          if (mention && candidates.length && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-            event.preventDefault()
-            const current = Math.min(candidateIndex, candidates.length - 1)
-            setCandidateIndex((current + (event.key === 'ArrowDown' ? 1 : candidates.length - 1)) % candidates.length)
-          }
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault()
-            submit()
-          }
-        }}
-      />
-      {initialSkillId && !initialReference && (
-        <p className="dsh-composer-notice">所选会话的默认智能体无法调用这项技能。</p>
-      )}
-      {referenceError && (
-        <p className="field-error" role="alert">
-          引用不存在或已停用，请从 @ 候选中重新选择。
-        </p>
-      )}
-      {send.isError && (
-        <p className="field-error" role="alert">
-          {describeAttachmentError(send.error)}
-        </p>
-      )}
-      <div className="dsh-composer-bar">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          {room.kind === 'group' && (
+            <span className="dsh-composer-hint is-required">智能体读取团队资料后，结果对会话全体成员可见。</span>
+          )}
+          <span className="spacer" />
+          {runningId && (
             <Button
               unstyled
               type="button"
-              variant="ghost"
+              className="dsh-send dsh-stop"
               size="icon"
-              className="dsh-icon-btn composer-add"
-              ref={addTrigger}
-              aria-label="消息操作"
-              disabled={send.isPending}
+              aria-label={isStopping ? '正在停止' : '停止生成'}
+              disabled={isStopping}
+              onClick={() => onStop(runningId)}
             >
-              <ConversationIcon name="plus" />
+              <ConversationIcon name="stop" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="conversation-composer-menu"
-            align="start"
-            side="top"
-            onCloseAutoFocus={(event) => {
-              if (!menuOpenedMention.current) return
-              event.preventDefault()
-              menuOpenedMention.current = false
-              input.current?.focus()
-            }}
-          >
-            <DropdownMenuItem
-              disabled={!!supplement || attachmentPolicy.isPending}
-              onSelect={() => {
-                if (attachmentPolicy.isError) void attachmentPolicy.refetch()
-                else picker.current?.click()
-              }}
-            >
-              <Paperclip aria-hidden="true" />
-              {attachmentPolicy.isPending
-                ? '正在读取上传限制…'
-                : attachmentPolicy.isError
-                  ? '重试读取上传限制'
-                  : '上传文件'}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onNewTask(addTrigger.current)}>
-              <ClipboardPlus aria-hidden="true" />
-              新建任务
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={!!supplement}
-              onSelect={() => {
-                menuOpenedMention.current = true
-                if (mention) return
-                const before = draft.slice(0, caret)
-                const prefix = `${before}${before && !/\s$/u.test(before) ? ' ' : ''}@`
-                replace(prefix + draft.slice(caret), prefix.length)
-              }}
-            >
-              <Link2 aria-hidden="true" />
-              插入引用
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={!!supplement}
-              onSelect={() => {
-                menuOpenedMention.current = true
-                replace(`/${draft}`, 1)
-              }}
-            >
-              <FileText aria-hidden="true" />
-              插入提示模板
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {room.kind === 'group' && (
-          <span className="dsh-composer-hint is-required">智能体读取团队资料后，结果对会话全体成员可见。</span>
-        )}
-        <span className="spacer" />
-        {runningId && !supplement && (
-          <label className="row small gap-2">
-            插话
-            <Switch
-              checked={steering}
-              aria-label="插话"
-              disabled={send.isPending}
-              onCheckedChange={(value) => {
-                setSteering(value)
-                requestId.current = undefined
-              }}
-            />
-          </label>
-        )}
-        {runningId && (
-          <Button
-            unstyled
-            type="button"
-            className="dsh-send dsh-stop"
-            size="icon"
-            aria-label={isStopping ? '正在停止' : '停止生成'}
-            disabled={isStopping}
-            onClick={() => onStop(runningId)}
-          >
-            <ConversationIcon name="stop" />
-          </Button>
-        )}
-        {(!runningId || hasDraftContent) && (
-          <Button
-            unstyled
-            type="submit"
-            className="dsh-send"
-            size="icon"
-            aria-label={supplement ? '保存补充' : '发送消息'}
-            disabled={cannotSend}
-          >
-            <ConversationIcon name="send" />
-          </Button>
-        )}
-      </div>
-    </form>
+          )}
+          {(!runningId || hasDraftContent) && (
+            <Button unstyled type="submit" className="dsh-send" size="icon" aria-label="发送消息" disabled={cannotSend}>
+              <ConversationIcon name="send" />
+            </Button>
+          )}
+        </div>
+      </form>
+      <ConversationCommands
+        room={room}
+        command={command}
+        onClose={() => {
+          setCommand(undefined)
+          input.current?.focus()
+        }}
+        busy={!!runningId}
+      />
+    </>
   )
 }
