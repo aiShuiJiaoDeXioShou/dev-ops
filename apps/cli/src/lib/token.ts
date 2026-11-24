@@ -4,9 +4,9 @@ import { CliError } from './errors.ts'
 
 export const TOKEN_PREFIX = 'devops_pat_'
 
-function normalizeToken(value: string, source: string): string {
+function normalizeToken(value: string, source: string, allowRunToken = false): string {
   const token = value.trim()
-  if (!token.startsWith(TOKEN_PREFIX)) {
+  if (!token.startsWith(TOKEN_PREFIX) && !(allowRunToken && /^devops-run-[A-Za-z0-9_-]{43}$/u.test(token))) {
     throw new CliError(`${source}不是有效的 API Token`, 1, { code: 'TOKEN_INVALID' })
   }
   return token
@@ -32,8 +32,8 @@ export async function resolveToken(
   if (options.tokenStdin && env.DEV_OPS_TOKEN) {
     throw new CliError('--token-stdin 与 DEV_OPS_TOKEN 不能同时使用', 2, { code: 'TOKEN_SOURCE_CONFLICT' })
   }
-  if (options.tokenStdin) return normalizeToken(await readStdin(), '标准输入的 Token ')
-  if (env.DEV_OPS_TOKEN) return normalizeToken(env.DEV_OPS_TOKEN, 'DEV_OPS_TOKEN ')
+  if (options.tokenStdin) return normalizeToken(await readStdin(), '标准输入的 Token ', true)
+  if (env.DEV_OPS_TOKEN) return normalizeToken(env.DEV_OPS_TOKEN, 'DEV_OPS_TOKEN ', true)
   if (config.token) {
     if (config.tokenServer !== undefined && config.tokenServer !== serverOrigin) {
       throw new CliError('本地 Token 与当前服务地址不匹配，请重新执行 devops config set token', 2, {

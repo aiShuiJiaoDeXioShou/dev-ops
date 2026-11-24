@@ -175,3 +175,5 @@ devops tool comment add --project <id> (--bug <id> | --requirement <id> | --remo
 
 - 取消受控代码修改和撤销授权要求 `--yes`；写请求默认生成幂等键，可用全局 `--idempotency-key` 覆盖。
 - 未验证：真实 Gitea 写操作。
+
+Bot 执行时使用运行级令牌，通过 `DEV_OPS_TOKEN`（或标准输入）读取；该格式不接受从本地配置恢复。令牌只在绑定的运行租约有效期间可用，执行结束、停止或租约失效后，服务端拒绝后续请求。平台发布同时部署相同版本的 CLI。
