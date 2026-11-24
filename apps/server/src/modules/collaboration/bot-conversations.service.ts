@@ -1,3 +1,4 @@
+import { readQueuedInputs, withdrawQueuedInput, readConversationUsage } from './bot-composer.service.ts'
 import { conversationWorkStatus, readConversationWorkStatus } from './bot-conversation-status.ts'
 import { readConversationTodos } from './bot-todos.ts'
 import { randomUUID } from 'node:crypto'
@@ -386,8 +387,15 @@ export function createBotConversationsService(
       )
       return { items, nextCursor: rows.length > LIST_PAGE_SIZE ? (items.at(-1)?.id ?? null) : null }
     },
-    /** 创建或复用当前人和同团队 Bot 的唯一私聊，锁定 Bot 防止重复创建。 */
-    async createDirect(actor: SessionUser, teamId: string, botId: string) {
+    /**
+     * 创建私聊并锁定 Bot 串行处理并发请求。
+     * @param actor 当前有写权限的用户。
+     * @param teamId Bot 所属团队。
+     * @param botId 要会话的 Bot。
+     * @param newSession 显式开启新会话；默认复用最近私聊。
+     * @returns 新建或复用的会话；无权限或 Bot 不可用时抛出业务异常。
+     */
+    async createDirect(actor: SessionUser, teamId: string, botId: string, newSession = false) {
       return db.transaction(async (tx) => {
         await requireTeamMember(tx, actor.id, teamId, EDIT_ROLES)
         const [target] = await tx
@@ -419,8 +427,9 @@ export function createBotConversationsService(
               ),
             ),
           )
+          .orderBy(desc(botConversation.last_message_at), desc(botConversation.id))
           .limit(1)
-        if (existing) return readBotConversationView(tx, existing.row)
+        if (existing && !newSession) return readBotConversationView(tx, existing.row)
         const [created] = await tx
           .insert(botConversation)
           .values({
@@ -444,6 +453,13 @@ export function createBotConversationsService(
         return readBotConversationView(tx, created)
       })
     },
+    /** 查询本人的待投递消息，权限失效时抛错。 */
+    queuedInputs: (actor: SessionUser, conversationId: string) => readQueuedInputs(db, actor, conversationId),
+    /** 撤回尚未领取的本人消息，返回原始草稿。 */
+    withdrawInput: (actor: SessionUser, conversationId: string, messageId: string) =>
+      withdrawQueuedInput(db, actor, conversationId, messageId),
+    /** 查询全会话累计用量，未知费用保留空值。 */
+    usage: (actor: SessionUser, conversationId: string) => readConversationUsage(db, actor, conversationId),
     /** 读取会话与当前成员。 */
     async get(actor: SessionUser, conversationId: string) {
       const row = await requireBotConversation(db, actor, conversationId)
@@ -470,7 +486,13 @@ export function createBotConversationsService(
           bot,
           and(eq(bot.id, botMessage.speaker_id), eq(bot.team_id, row.team_id), eq(botMessage.speaker_kind, 'bot')),
         )
-        .where(and(branchScope, previous === undefined ? undefined : lt(botMessage.sequence, previous)))
+        .where(
+          and(
+            branchScope,
+            sql`not exists (select 1 from ${botRunInput} where ${botRunInput.message_id} = ${botMessage.id} and ${botRunInput.status} = 'withdrawn')`,
+            previous === undefined ? undefined : lt(botMessage.sequence, previous),
+          ),
+        )
         .orderBy(desc(botMessage.sequence))
         .limit(limit + 1)
       const visible = messages.slice(0, limit)
@@ -568,7 +590,13 @@ export function createBotConversationsService(
         const [original] = await tx
           .select()
           .from(botMessage)
-          .where(and(scope, eq(botMessage.id, messageId)))
+          .where(
+            and(
+              scope,
+              eq(botMessage.id, messageId),
+              sql`not exists (select 1 from ${botRunInput} where ${botRunInput.message_id} = ${botMessage.id} and ${botRunInput.status} = 'withdrawn')`,
+            ),
+          )
         if (!original || original.speaker_kind !== 'user' || original.speaker_id !== actor.id)
           throw new ApiError(ERROR_CODES.NOT_FOUND, '找不到你可以编辑的消息')
         const rootId = original.edited_from_message_id ?? original.id

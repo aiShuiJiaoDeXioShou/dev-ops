@@ -93,6 +93,11 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   await db.insert(platformAdmin).values({ user_id: otherUser.userId })
   assert.equal((await get(roomPath, otherUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
 
+  const freshRoom = await post(listPath, devUser, { ...input, newSession: true })
+  assert.equal(freshRoom.code, 'OK', freshRoom.message)
+  assert.notEqual(freshRoom.data.id, roomId)
+  assert.equal((await post(listPath, devUser, input)).data.id, freshRoom.data.id)
+
   const messagePath = `${roomPath}/messages`
   const message = { text: '第一条消息', clientRequestId: randomUUID() }
   const [first, duplicate] = await Promise.all([
@@ -194,7 +199,12 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   assert.equal(uploaded.code, 'OK', uploaded.message)
   const attachmentId = String(uploaded.data.attachment.id)
   assert.equal((await get(`/api/v1/attachments/${attachmentId}/download`, devUser)).code, 'ATTACHMENT_NOT_FOUND')
-  const attachmentsInput = { text: '', clientRequestId: randomUUID(), attachmentIds: [attachmentId] }
+  const attachmentsInput = {
+    text: '',
+    deliveryMode: 'steer',
+    clientRequestId: randomUUID(),
+    attachmentIds: [attachmentId],
+  }
   assert.equal(
     (await post(messagePath, devUser, { ...attachmentsInput, attachmentIds: [attachmentId, randomUUID()] })).code,
     'ATTACHMENT_NOT_FOUND',
@@ -205,7 +215,7 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   ])
   assert.equal(attached.code, 'OK', attached.message)
   assert.equal(attached.data.message.id, sameAttachment.data.message.id)
-  assert.equal(attached.data.delivery, 'follow_up')
+  assert.equal(attached.data.delivery, 'steer')
   assert.deepEqual(attached.data.message.body.attachments, [{ id: attachmentId, fileName, sizeBytes: file.length }])
   const messageId = String(attached.data.message.id)
   const download = await app.inject({
@@ -224,8 +234,23 @@ test('Bot 私聊按成员范围隔离，消息重试复用运行，事件按增�
   )
   assert.equal((await post(`/api/v1/attachments/${attachmentId}/remove`, devUser, {})).code, 'ATTACHMENT_NOT_FOUND')
 
+  const withdrawDraft = await post(messagePath, devUser, { text: '撤回前不执行', clientRequestId: randomUUID() })
+  const withdrawId = String(withdrawDraft.data.message.id)
+  const queueBefore = await get(`${roomPath}/queued-inputs`, devUser)
+  assert.ok(queueBefore.data.items.some((item: { messageId: string }) => item.messageId === withdrawId))
+  assert.equal((await get(`${roomPath}/queued-inputs`, adminUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
+  assert.equal((await post(`${messagePath}/${withdrawId}/withdraw`, adminUser, {})).code, 'BOT_CONVERSATION_NOT_FOUND')
+  const withdrawn = await post(`${messagePath}/${withdrawId}/withdraw`, devUser, {})
+  assert.equal(withdrawn.code, 'OK', withdrawn.message)
+  assert.equal(withdrawn.data.text, '撤回前不执行')
+  assert.equal((await post(`${messagePath}/${withdrawId}/withdraw`, devUser, {})).code, 'VERSION_CONFLICT')
+  const queueAfter = await get(`${roomPath}/queued-inputs`, devUser)
+  assert.ok(!queueAfter.data.items.some((item: { messageId: string }) => item.messageId === withdrawId))
+  assert.equal((await get(`${roomPath}/usage`, devUser)).code, 'OK')
+  assert.equal((await get(`${roomPath}/usage`, adminUser)).code, 'BOT_CONVERSATION_NOT_FOUND')
+
   const lease = { id: claimed.id, owner: 'chat-test', epoch: claimed.lease_epoch }
-  const pending = await createPgRunInputQueue(db, claimed, lease).take()
+  const pending = await createPgRunInputQueue(db, claimed, lease).take({ allowFollowUp: true })
   assert.ok(pending.some((item) => item.messageId === messageId && item.text.includes(attachmentId)))
   const storage = createStorageService({
     db,

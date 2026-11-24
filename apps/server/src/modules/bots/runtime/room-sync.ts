@@ -75,6 +75,16 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
         eq(botRunInput.status, 'delivered'),
       ),
     )
+  const withdrawn = db
+    .select({ id: botRunInput.id })
+    .from(botRunInput)
+    .where(
+      and(
+        eq(botRunInput.team_id, run.team_id),
+        eq(botRunInput.message_id, botMessage.id),
+        eq(botRunInput.status, 'withdrawn'),
+      ),
+    )
   const rows = await db
     .select({ ...messageFields, total: sql<string>`count(*) over ()` })
     .from(botMessage)
@@ -85,6 +95,7 @@ export async function readBotRoomSync(db: Database, run: ConversationBotRunRecor
         input ? ne(botMessage.id, input.id) : undefined,
         gt(botMessage.sequence, after),
         notExists(alreadyDelivered),
+        notExists(withdrawn),
         session?.seededAt ? or(ne(botMessage.speaker_kind, 'bot'), ne(botMessage.speaker_id, run.bot_id)) : undefined,
       ),
     )

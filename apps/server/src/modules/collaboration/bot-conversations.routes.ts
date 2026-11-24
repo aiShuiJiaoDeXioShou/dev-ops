@@ -4,6 +4,9 @@ import { success } from '../../platform/http/response.ts'
 import { botSessionSettingBody } from '../bots/bots.session-settings.ts'
 import { requireActor } from '../identity/identity.actor.ts'
 import {
+  queuedInputsResponse,
+  withdrawInputResponse,
+  conversationUsageResponse,
   conversationBotParams,
   conversationCompactResponse,
   conversationReseedResponse,
@@ -43,6 +46,39 @@ export const botConversationsRoutes: FastifyPluginAsyncTypebox<{
   groups: BotGroupsService
 }> = async (app, { service, groups }) => {
   app.get(
+    '/bot-conversations/:conversationId/queued-inputs',
+    { schema: { summary: '读取本人排队消息', params: conversationParams, response: { 200: queuedInputsResponse } } },
+    async (request) =>
+      success(await service.queuedInputs(await requireActor(request), request.params.conversationId), request.id),
+  )
+  app.post(
+    '/bot-conversations/:conversationId/messages/:messageId/withdraw',
+    {
+      schema: {
+        summary: '撤回尚未消费的本人消息',
+        params: messageFeedbackParams,
+        response: { 200: withdrawInputResponse },
+      },
+    },
+    async (request) =>
+      success(
+        await service.withdrawInput(
+          await requireActor(request),
+          request.params.conversationId,
+          request.params.messageId,
+        ),
+        request.id,
+      ),
+  )
+  app.get(
+    '/bot-conversations/:conversationId/usage',
+    {
+      schema: { summary: '读取会话累计用量', params: conversationParams, response: { 200: conversationUsageResponse } },
+    },
+    async (request) =>
+      success(await service.usage(await requireActor(request), request.params.conversationId), request.id),
+  )
+  app.get(
     '/teams/:teamId/bot-conversations',
     {
       schema: {
@@ -70,7 +106,7 @@ export const botConversationsRoutes: FastifyPluginAsyncTypebox<{
       const teamId = request.params.teamId
       const data =
         request.body.kind === 'direct'
-          ? await service.createDirect(actor, teamId, request.body.botId)
+          ? await service.createDirect(actor, teamId, request.body.botId, request.body.newSession)
           : await groups.create(actor, teamId, request.body)
       return success(data, request.id)
     },

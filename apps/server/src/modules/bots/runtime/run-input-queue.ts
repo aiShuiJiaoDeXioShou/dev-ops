@@ -22,7 +22,7 @@ export function createPgRunInputQueue(
   lease: BotRunLease,
 ): QueuedInputSource {
   return {
-    async take() {
+    async take({ allowFollowUp }) {
       return db.transaction(async (tx) => {
         const active = await lockBotRunLease(tx, lease)
         if (!active || active.stop_requested) return []
@@ -48,12 +48,29 @@ export function createPgRunInputQueue(
             and(
               eq(botRunInput.team_id, run.team_id),
               eq(botRunInput.run_id, lease.id),
-              eq(botRunInput.status, 'pending'),
+              inArray(botRunInput.status, ['pending', 'delivering']),
             ),
           )
-          .orderBy(asc(botMessage.sequence))
+          .orderBy(sql`case when ${botRunInput.delivery_mode} = 'steer' then 0 else 1 end`, asc(botMessage.sequence))
           .limit(25)
-        return rows.map(({ messageId, mode, body, name }) => {
+        const mode = rows.some((row) => row.mode === 'steer') ? 'steer' : allowFollowUp ? 'follow_up' : null
+        const selected = rows.filter((row) => row.mode === mode).slice(0, 1)
+        if (selected.length === 0) return []
+        await tx
+          .update(botRunInput)
+          .set({ status: 'delivering', updated_at: sql`clock_timestamp()` })
+          .where(
+            and(
+              eq(botRunInput.run_id, lease.id),
+              eq(botRunInput.team_id, run.team_id),
+              inArray(
+                botRunInput.message_id,
+                selected.map((row) => row.messageId),
+              ),
+              inArray(botRunInput.status, ['pending', 'delivering']),
+            ),
+          )
+        return selected.map(({ messageId, mode, body, name }) => {
           if ((mode !== 'steer' && mode !== 'follow_up') || !Check(botMessageBodySchema, body)) {
             throw new Error('数据库中的待投递会话消息不合法')
           }
@@ -88,7 +105,7 @@ export async function acknowledgeBotRunInputs(
       and(
         eq(botRunInput.team_id, run.team_id),
         eq(botRunInput.run_id, run.id),
-        eq(botRunInput.status, 'pending'),
+        inArray(botRunInput.status, ['pending', 'delivering']),
         inArray(botRunInput.message_id, messageIds),
       ),
     )

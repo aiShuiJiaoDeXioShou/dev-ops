@@ -394,3 +394,13 @@ Worker 使用 Pi 内存会话，按会话与 Bot 将脱敏条目、分支叶子�
 远程 MCP 按 Bot 授权，只允许连接到通过公网地址校验的 HTTPS 服务。团队凭据库只提供授权时所需的凭据引用，密钥由 Worker 在连接时读取并写入请求头。
 
 需求创建与更新支持 `devOwnerUserIds`、`testOwnerUserIds`，分别最多 20 名团队正常成员；传空数组清空该类负责人。集合与旧单负责人字段同时传入时，以集合首位作为流程兼容的主负责人。详情返回 `devOwners`、`testOwners`，旧数据从单负责人字段回填。提测接口支持可选的 `testOwnerUserIds`，历史提测记录继续保存当次主负责人快照。
+
+### V0.10 会话输入命令与队列
+
+`POST /api/v1/teams/:teamId/bot-conversations` 的私聊请求可传 `newSession: true`，显式创建独立的新会话；省略时复用最近私聊。`/new` 使用此入口，群聊按当前成员及配置创建新群聊，原会话历史保留。
+
+`GET /api/v1/bot-conversations/:conversationId/queued-inputs` 返回当前用户尚未被运行领取的插话和追加消息（最多 100 条）。`POST /api/v1/bot-conversations/:conversationId/messages/:messageId/withdraw` 与运行领取共用行锁，只可撤回本人的 `pending` 消息；已领取返回 `VERSION_CONFLICT`。成功返回文字、附件与引用供客户端恢复草稿，原消息不再进入消息列表或模型上下文，附件恢复临时状态。
+
+`GET /api/v1/bot-conversations/:conversationId/usage` 聚合会话全部运行的输入、输出和费用，未知费用返回 null。`contexts` 返回各 Bot 当前会话末端模型回复记录的上下文 Token 数；没有可用模型记录时返回 null。它是最近一次模型请求及回复的用量，不伪装为尚未调用模型时的精确估算。
+
+上述接口继续使用成员权限、HTTP 200 和统一响应信封；浏览者仅可查询，不可撤回。输入区的 Enter 在运行中发送插话，Alt+Enter（Windows 可用 Ctrl+Enter）发送追加，Esc 停止，Alt+↑（或 Ctrl+↑）撤回最近待投递消息。

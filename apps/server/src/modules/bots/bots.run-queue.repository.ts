@@ -322,7 +322,13 @@ async function requeuePendingInputs(tx: BotRunTransaction, run: BotRunRecord) {
         eq(botMessage.conversation_id, run.conversation_id),
       ),
     )
-    .where(and(eq(botRunInput.run_id, run.id), eq(botRunInput.team_id, run.team_id), eq(botRunInput.status, 'pending')))
+    .where(
+      and(
+        eq(botRunInput.run_id, run.id),
+        eq(botRunInput.team_id, run.team_id),
+        inArray(botRunInput.status, ['pending', 'delivering']),
+      ),
+    )
     .orderBy(asc(botMessage.sequence))
   for (const { id, messageId, sender } of pending) {
     if (!sender) throw new Error('待投递 Bot 消息缺少触发人')

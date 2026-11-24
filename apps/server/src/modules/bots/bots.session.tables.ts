@@ -67,6 +67,9 @@ export const botRunInput = appSchema.table(
       .on(table.run_id)
       .where(sql`${table.status} = 'pending'`),
     check('ck_bot_run_input_mode', sql`${table.delivery_mode} in ('steer', 'follow_up')`),
-    check('ck_bot_run_input_status', sql`${table.status} in ('pending', 'delivered', 'requeued')`),
+    check(
+      'ck_bot_run_input_status',
+      sql`${table.status} in ('pending', 'delivering', 'delivered', 'requeued', 'withdrawn')`,
+    ),
   ],
 )

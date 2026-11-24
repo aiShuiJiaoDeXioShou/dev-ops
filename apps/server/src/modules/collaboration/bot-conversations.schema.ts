@@ -165,7 +165,7 @@ export const conversationEventsQuery = Type.Object(
   { additionalProperties: false },
 )
 export const createDirectConversationBody = Type.Object(
-  { kind: Type.Literal('direct'), botId: uuid },
+  { kind: Type.Literal('direct'), botId: uuid, newSession: Type.Optional(Type.Boolean()) },
   { additionalProperties: false },
 )
 export const sendBotMessageBody = Type.Object(
@@ -258,3 +258,24 @@ export type SendBotMessageResult = {
   delivery: 'queued' | 'steer' | 'follow_up'
 }
 export type SendBotMessageInput = Static<typeof sendBotMessageBody>
+
+export const queuedInputView = Type.Object({
+  messageId: uuid,
+  mode: Type.Union([Type.Literal('steer'), Type.Literal('follow_up')]),
+  text: Type.String(),
+  attachmentIds: Type.Array(uuid),
+  attachments: Type.Array(Type.Object({ id: uuid, fileName: Type.String(), sizeBytes: Type.Number() })),
+  skillIds: Type.Array(uuid),
+  mentionBotIds: Type.Array(uuid),
+  mentionAll: Type.Boolean(),
+})
+export const queuedInputsResponse = apiResponseSchema(Type.Object({ items: Type.Array(queuedInputView) }))
+export const withdrawInputResponse = apiResponseSchema(queuedInputView)
+export const conversationUsageResponse = apiResponseSchema(
+  Type.Object({
+    contexts: Type.Array(Type.Object({ botId: uuid, tokens: Type.Union([Type.Number(), Type.Null()]) })),
+    inputTokens: Type.Number(),
+    outputTokens: Type.Number(),
+    costUsd: Type.Union([Type.Number(), Type.Null()]),
+  }),
+)
