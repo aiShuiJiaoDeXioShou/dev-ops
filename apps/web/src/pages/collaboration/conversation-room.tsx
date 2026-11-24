@@ -1,9 +1,7 @@
+import { ConversationTodos } from '@/features/conversations/ui/conversation-todos'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createIdempotencyKey } from '@dev-ops/api-client'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { botTasksOptions, taskQueries } from '@/features/bot-tasks/api/queries'
-import { ConversationTaskPanel } from '@/features/bot-tasks/ui/conversation-task-panel'
-import { NewTaskDialog } from '@/features/bot-tasks/ui/new-task-dialog'
 import {
   conversationEventsOptions,
   conversationEventText,
@@ -49,7 +47,6 @@ export function ConversationRoom({
   userId,
   readOnly,
   listToggle,
-  initialTaskId,
   initialSkillId,
   onSkillUsed,
 }: {
@@ -57,22 +54,16 @@ export function ConversationRoom({
   userId: string
   readOnly: boolean
   listToggle: ReactNode
-  initialTaskId?: string
   initialSkillId?: string
   onSkillUsed: () => void
 }) {
   const client = useQueryClient()
   const [tab, setTab] = useState('chat')
-  const [panel, setPanel] = useState<'task' | 'settings' | null>(initialTaskId ? 'task' : null)
-  const [newTaskOpen, setNewTaskOpen] = useState(false)
-  const [taskId, setTaskId] = useState(initialTaskId)
-  const taskOpener = useRef<HTMLButtonElement>(null)
+  const [panel, setPanel] = useState<'settings' | null>(null)
   const settingsOpener = useRef<HTMLElement>(null)
-  const newTaskOpener = useRef<HTMLElement>(null)
-  const detail = useQuery({ ...conversationOptions(id), refetchInterval: 10000 })
+  const detail = useQuery({ ...conversationOptions(id), refetchInterval: 1000 })
   const messages = useInfiniteQuery({ ...messagesOptions(id), enabled: detail.isSuccess })
   const events = useQuery({ ...conversationEventsOptions(client, id), enabled: detail.isSuccess })
-  const tasks = useInfiniteQuery({ ...botTasksOptions(id), enabled: detail.isSuccess })
   const activeRelay = events.data ? events.data.activeRelay : detail.data?.data.activeRelay
   const running = events.data?.activeRuns.find(({ status }) => status === 'running')
   const stop = useMutation({
@@ -89,15 +80,13 @@ export function ConversationRoom({
     },
   })
   const now = useRunClock(!!running)
-  const taskPanelOpen = panel === 'task'
   const closePanel = () => {
     setPanel(null)
     if (panel === 'settings') settingsOpener.current?.focus()
-    if (panel === 'task') taskOpener.current?.focus()
   }
 
   useEffect(() => {
-    if (!panel || newTaskOpen) return
+    if (!panel) return
     const closeOnEscape = (event: KeyboardEvent) => {
       if (
         event.defaultPrevented ||
@@ -106,28 +95,16 @@ export function ConversationRoom({
       )
         return
       setPanel(null)
-      if (panel === 'task') taskOpener.current?.focus()
-      else settingsOpener.current?.focus()
+      settingsOpener.current?.focus()
     }
     document.addEventListener('keydown', closeOnEscape)
     return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [panel, newTaskOpen])
-  useEffect(() => {
-    if (events.data?.cursor && events.data.cursor !== '0') {
-      void client.invalidateQueries({ queryKey: taskQueries })
-    }
-  }, [client, events.data?.cursor])
+  }, [panel])
 
   if (detail.isPending) return <ConversationRoomSkeleton listToggle={listToggle} readOnly={readOnly} />
   if (detail.isError)
     return <PageError title="会话加载失败" error={detail.error} onRetry={() => void detail.refetch()} />
   const room = detail.data.data
-  const tasksInRoom = tasks.data?.pages.flatMap(({ data }) => data.items) ?? []
-  const currentTask = tasksInRoom.find((task) => task.id === taskId)
-  const editableTask =
-    taskPanelOpen && currentTask && ['waiting', 'in_progress', 'pending'].includes(currentTask.status)
-      ? currentTask
-      : undefined
   const bots = room.members.filter(({ kind }) => kind === 'bot')
   const leader = bots.find(({ id }) => id === room.leaderBotId) ?? bots[0]
   const orderedBots = leader ? [leader, ...bots.filter(({ id }) => id !== leader.id)] : bots
@@ -241,23 +218,10 @@ export function ConversationRoom({
       },
     ]
   })
-  function openTask() {
-    if (taskPanelOpen) {
-      closePanel()
-      return
-    }
-    const activeTask = tasksInRoom.find(({ status }) => !['completed', 'cancelled'].includes(status))
-    setTaskId(activeTask?.id)
-    setPanel('task')
-  }
   function openSettings(opener: HTMLElement) {
     settingsOpener.current = opener
     if (panel === 'settings') closePanel()
     else setPanel('settings')
-  }
-  function createTask(opener?: HTMLElement) {
-    newTaskOpener.current = opener ?? taskOpener.current
-    setNewTaskOpen(true)
   }
   const title = (
     <>
@@ -304,24 +268,7 @@ export function ConversationRoom({
                   {liveRun.statusText}
                 </span>
               )}
-              <Button
-                unstyled
-                ref={taskOpener}
-                type="button"
-                className="dsh-icon-btn"
-                aria-label="任务列表"
-                aria-pressed={taskPanelOpen}
-                title="任务列表"
-                onClick={openTask}
-              >
-                <ConversationIcon name="file" />
-                {tasksInRoom.length > 0 && (
-                  <span className="dsh-icon-badge">
-                    {tasksInRoom.length}
-                    {tasks.hasNextPage ? '+' : ''}
-                  </span>
-                )}
-              </Button>
+
               <Button
                 unstyled
                 type="button"
@@ -386,6 +333,7 @@ export function ConversationRoom({
               onChange={() => void events.refetch()}
             />
           )}
+          <ConversationTodos items={room.todos} />
           <ConversationComposer
             room={room}
             readOnly={readOnly}
@@ -393,14 +341,11 @@ export function ConversationRoom({
             runningId={running?.id}
             isStopping={stopping}
             onStop={(runId) => stop.mutate(runId)}
-            task={editableTask}
-            onNewTask={(opener) => createTask(opener ?? undefined)}
             onSent={() => {
               if (initialSkillId) onSkillUsed()
               void Promise.all([
                 client.invalidateQueries({ queryKey: messagesOptions(id).queryKey }),
                 client.invalidateQueries({ queryKey: conversationsQueryKey }),
-                client.invalidateQueries({ queryKey: taskQueries }),
                 events.refetch(),
               ])
             }}
@@ -428,20 +373,6 @@ export function ConversationRoom({
           </div>
         </TabsContent>
       </Tabs>
-      {taskPanelOpen && (
-        <ConversationTaskPanel
-          room={room}
-          taskId={taskId}
-          readOnly={readOnly}
-          onClose={closePanel}
-          onNew={() => {
-            const active = document.activeElement
-            createTask(active instanceof HTMLElement ? active : undefined)
-          }}
-          onSelect={setTaskId}
-          onChanged={() => void events.refetch()}
-        />
-      )}
       {panel === 'settings' && (
         <ConversationSettings
           room={room}
@@ -450,23 +381,6 @@ export function ConversationRoom({
           onClose={closePanel}
           readOnly={readOnly}
           busy={active.size > 0}
-        />
-      )}
-      {newTaskOpen && (
-        <NewTaskDialog
-          room={room}
-          userId={userId}
-          onClose={() => {
-            setNewTaskOpen(false)
-            requestAnimationFrame(() => newTaskOpener.current?.focus())
-          }}
-          onCreated={(createdTask) => {
-            setNewTaskOpen(false)
-            setPanel('task')
-            setTaskId(createdTask)
-            void client.invalidateQueries({ queryKey: taskQueries })
-            void events.refetch()
-          }}
         />
       )}
     </>

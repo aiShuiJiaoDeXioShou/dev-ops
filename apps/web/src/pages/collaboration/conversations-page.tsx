@@ -55,7 +55,6 @@ function TeamConversations({
   const inbox = useQuery(botInboxOptions(teamId))
   const [params, setParams] = useSearchParams()
   const isInbox = params.get('view') === 'inbox'
-  const linkedTask = params.get('task') ?? undefined
   const linkedSkill = params.get('skill') ?? undefined
   const skillSearch = linkedSkill ? `?skill=${encodeURIComponent(linkedSkill)}` : ''
   const list = useInfiniteQuery(conversationsOptions(teamId, useDeferredValue(filter.trim()), tagId || undefined))
@@ -200,7 +199,7 @@ function TeamConversations({
           }}
         >
           <ConversationIcon name="inbox" />
-          待你处理
+          等你回复
           {inbox.isSuccess && <span className="counter">{inbox.data.data.count}</span>}
         </Button>
         {list.isPending && <ConversationListSkeleton />}
@@ -260,7 +259,11 @@ function TeamConversations({
                   <time dateTime={room.lastMessageAt}>{clock.format(new Date(room.lastMessageAt))}</time>
                 )}
               </span>
-              <small>{room.lastMessagePreview ?? '还没有消息'}</small>
+              <small>
+                {room.workStatus &&
+                  `${room.workStatus === 'running' ? '运行中' : room.workStatus === 'awaiting_reply' ? '等你回复' : '已完成'} ·`}{' '}
+                {room.lastMessagePreview ?? '还没有消息'}
+              </small>
             </span>
           </Button>
         ))}
@@ -277,9 +280,8 @@ function TeamConversations({
       </aside>
       {selectedId && !isInbox ? (
         <ConversationRoom
-          key={`${selectedId}:${linkedTask ?? ''}`}
+          key={selectedId}
           id={selectedId}
-          initialTaskId={linkedTask}
           initialSkillId={linkedSkill}
           onSkillUsed={() => {
             const updated = new URLSearchParams(params)
