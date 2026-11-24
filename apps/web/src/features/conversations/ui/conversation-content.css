@@ -359,8 +359,7 @@
       transition: none;
     }
 
-    .conversation-answer[data-reveal],
-    .dsh-markdown .dsh-cursor {
+    .conversation-answer[data-reveal] {
       animation: none;
     }
   }

@@ -135,15 +135,7 @@ const markdownComponents: Components = {
   },
 }
 
-const MarkdownPart = memo(function MarkdownPart({
-  source,
-  withMath,
-  cursor = false,
-}: {
-  source: string
-  withMath: boolean
-  cursor?: boolean
-}) {
+const MarkdownPart = memo(function MarkdownPart({ source, withMath }: { source: string; withMath: boolean }) {
   const [math, setMath] = useState<typeof import('./conversation-math')>()
   const hasMath = withMath && source.lastIndexOf('$') > source.indexOf('$')
   useEffect(() => {
@@ -163,20 +155,6 @@ const MarkdownPart = memo(function MarkdownPart({
     }
   }, [hasMath, math])
 
-  const components: Components = cursor
-    ? {
-        ...markdownComponents,
-        p: ({ children, node }) => (
-          <p>
-            {children}
-            {node?.position?.end.offset === source.trimEnd().length && (
-              <span className="dsh-cursor" aria-hidden="true" />
-            )}
-          </p>
-        ),
-      }
-    : markdownComponents
-
   return (
     <ReactMarkdown
       remarkPlugins={
@@ -187,7 +165,7 @@ const MarkdownPart = memo(function MarkdownPart({
           ? [rehypeSanitize, [math.rehypeKatex, { trust: false, maxExpand: 100, maxSize: 20 }]]
           : [rehypeSanitize]
       }
-      components={components}
+      components={markdownComponents}
     >
       {source}
     </ReactMarkdown>
@@ -220,7 +198,7 @@ export function ConversationMarkdown({
           {parts.frozen.map(({ offset, source }) => (
             <MarkdownPart key={offset} source={source} withMath={false} />
           ))}
-          <MarkdownPart key={parts.tail.offset} source={parts.tail.source} withMath={false} cursor />
+          <MarkdownPart key={parts.tail.offset} source={parts.tail.source} withMath={false} />
         </>
       ) : (
         <MarkdownPart source={value} withMath={!compact} />

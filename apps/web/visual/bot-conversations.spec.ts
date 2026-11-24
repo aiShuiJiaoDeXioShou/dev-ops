@@ -90,6 +90,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   }
   let stage: 'empty' | 'queued' | 'running' | 'complete' = 'empty'
   let activeAt = stamp
+  let runningCursor = 6
   const list: Message[] = []
   await page.route(`**/api/v1/teams/${teamId}/bot-inbox`, (route) =>
     route.fulfill({ json: success({ items: [], count: 0 }) }),
@@ -218,10 +219,11 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
         createdAt: activeAt,
       },
       { sequence: '6', kind: 'output_delta', runId, payload: { text: '正在整理结果' }, createdAt: activeAt },
-      { sequence: '7', kind: 'run_status', runId, payload: { status: 'succeeded' }, createdAt: activeAt },
-      { sequence: '8', kind: 'message_committed', runId, payload: {}, createdAt: activeAt },
+      { sequence: '7', kind: 'output_delta', runId, payload: { text: '，即将完成' }, createdAt: activeAt },
+      { sequence: '8', kind: 'run_status', runId, payload: { status: 'succeeded' }, createdAt: activeAt },
+      { sequence: '9', kind: 'message_committed', runId, payload: {}, createdAt: activeAt },
     ]
-    const cursor = { empty: 0, queued: 1, running: 6, complete: 8 }[stage]
+    const cursor = { empty: 0, queued: 1, running: runningCursor, complete: allEvents.length }[stage]
     const activeRuns =
       stage === 'empty' || stage === 'complete'
         ? []
@@ -288,10 +290,13 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(page.getByRole('button', { name: '停止生成' })).toBeVisible()
   await expect(page.getByRole('button', { name: '发送消息' })).toHaveCount(0)
   await expect(page.locator('.dsh-send-ring')).toBeVisible()
-  await expect(page.locator('.dsh-cursor')).toBeVisible()
+  await expect(work.locator('.dsh-cursor')).toHaveCount(0)
   await expect(page.getByText('正在准备回复…', { exact: true })).toHaveCount(0)
   await expect(page.locator('.dsh-running')).toHaveCount(0)
   await expect(page.locator('.conversation-work-header .dsh-running-time')).toBeVisible()
+  runningCursor = 7
+  await expect(work.getByText('正在整理结果，即将完成', { exact: true })).toBeVisible()
+  await expect(work.locator('.dsh-cursor')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('bot-conversations-running.png'), animations: 'disabled' })
   await composer.fill('尚未发送的草稿')
   const trajectoryTab = page.getByRole('tab', { name: '轨迹' })
@@ -339,7 +344,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(work.locator('summary').getByText('正在检查', { exact: true })).toBeHidden()
   await workToggle.press('Enter')
   await expect(work.locator('summary').getByText('正在检查', { exact: true })).toBeVisible()
-  await expect(work.getByText('正在整理结果', { exact: true })).toHaveCount(0)
+  await expect(work.getByText('正在整理结果，即将完成', { exact: true })).toHaveCount(0)
   await workToggle.press('Enter')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect(work.locator('.conversation-work-content')).toHaveCSS('transition-duration', '0s')
