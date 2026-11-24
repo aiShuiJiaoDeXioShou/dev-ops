@@ -22,6 +22,7 @@ export const gitHubAccountRoutes: FastifyPluginAsyncTypebox<{
     '/me/github-account',
     {
       schema: {
+        summary: '读取当前用户绑定的 GitHub 账号',
         description: '查询当前登录用户已绑定的 GitHub 账号。',
         response: {
           200: apiResponseSchema(
@@ -40,6 +41,7 @@ export const gitHubAccountRoutes: FastifyPluginAsyncTypebox<{
     '/me/github-account/authorize',
     {
       schema: {
+        summary: '发起个人 GitHub 账号授权',
         description: '发起当前登录用户的 GitHub 绑定，可回到个人设置、代码、PR 或流水线页面。',
         body: Type.Object({ returnTo: Type.String({ minLength: 1, maxLength: 100 }) }, { additionalProperties: false }),
         response: { 200: apiResponseSchema(Type.Object({ authorizationUrl: Type.String() })) },

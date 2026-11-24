@@ -42,7 +42,11 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
   app.get(
     '/projects/:projectId/repositories',
     {
-      schema: { params: projectParamsSchema, response: { 200: repositoryListResponseSchema } },
+      schema: {
+        summary: '读取项目关联仓库',
+        params: projectParamsSchema,
+        response: { 200: repositoryListResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -54,6 +58,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/available',
     {
       schema: {
+        summary: '读取项目可关联仓库',
         params: projectParamsSchema,
         querystring: repositoryQuerySchema,
         response: { 200: availableRepositoryListResponseSchema },
@@ -71,7 +76,11 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
   app.get(
     '/projects/:projectId/repositories/:repositoryId/branches',
     {
-      schema: { params: projectRepositoryParamsSchema, response: { 200: repositoryBranchesResponseSchema } },
+      schema: {
+        summary: '读取项目仓库分支',
+        params: projectRepositoryParamsSchema,
+        response: { 200: repositoryBranchesResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -92,6 +101,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/github-action',
     {
       schema: {
+        summary: '获取 GitHub 文件编辑或创建 PR 入口',
         description: '检查个人 GitHub 权限后返回文件编辑或创建 PR 的 GitHub 地址。',
         params: projectRepositoryParamsSchema,
         body: gitHubActionBodySchema,
@@ -109,6 +119,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/tree',
     {
       schema: {
+        summary: '读取仓库目录树',
         params: projectRepositoryParamsSchema,
         querystring: repositoryTreeQuerySchema,
         response: { 200: repositoryTreeResponseSchema },
@@ -133,6 +144,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/file',
     {
       schema: {
+        summary: '读取仓库文件内容',
         params: projectRepositoryParamsSchema,
         querystring: repositoryFileQuerySchema,
         response: { 200: repositoryFileResponseSchema },
@@ -154,6 +166,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/commits',
     {
       schema: {
+        summary: '读取仓库提交列表',
         params: projectRepositoryParamsSchema,
         querystring: commitListQuerySchema,
         response: { 200: commitListResponseSchema },
@@ -176,10 +189,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
   app.get(
     '/projects/:projectId/repositories/:repositoryId/commits/:ref',
     {
-      schema: {
-        params: commitRefParamsSchema,
-        response: { 200: commitResponseSchema },
-      },
+      schema: { summary: '读取仓库提交详情', params: commitRefParamsSchema, response: { 200: commitResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -199,6 +209,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/pull-requests',
     {
       schema: {
+        summary: '读取仓库 PR 列表',
         params: projectRepositoryParamsSchema,
         querystring: pullRequestListQuerySchema,
         response: { 200: pullRequestListResponseSchema },
@@ -222,6 +233,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/pull-requests/:number',
     {
       schema: {
+        summary: '读取仓库 PR 详情',
         params: pullRequestParamsSchema,
         response: { 200: pullRequestResponseSchema },
       },
@@ -244,6 +256,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/pull-requests/:number/diff',
     {
       schema: {
+        summary: '读取仓库 PR 差异',
         params: pullRequestParamsSchema,
         response: { 200: pullRequestDiffResponseSchema },
       },
@@ -266,6 +279,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories',
     {
       schema: {
+        summary: '关联项目仓库',
         params: projectParamsSchema,
         body: linkRepositoryBodySchema,
         response: { 200: repositoryListResponseSchema },
@@ -284,6 +298,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/repositories/:repositoryId/remove',
     {
       schema: {
+        summary: '移除项目仓库关联',
         params: projectRepositoryParamsSchema,
         body: unlinkRepositoryBodySchema,
         response: { 200: repositoryListResponseSchema },
@@ -307,6 +322,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/projects/:projectId/code-references',
     {
       schema: {
+        summary: '创建项目代码关联',
         params: projectParamsSchema,
         body: createReferenceBodySchema,
         response: { 200: codeReferenceResponseSchema },
@@ -321,7 +337,11 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
   app.post(
     '/code-references/:codeReferenceId/refresh',
     {
-      schema: { params: codeReferenceParamsSchema, response: { 200: codeReferenceResponseSchema } },
+      schema: {
+        summary: '刷新代码关联来源状态',
+        params: codeReferenceParamsSchema,
+        response: { 200: codeReferenceResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -333,6 +353,7 @@ export const codeRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service
     '/code-references/:codeReferenceId/remove',
     {
       schema: {
+        summary: '移除代码关联',
         params: codeReferenceParamsSchema,
         body: removeReferenceBodySchema,
         response: { 200: removedResponseSchema },

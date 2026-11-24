@@ -46,7 +46,12 @@ export const projectLifecycleRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/teams/:teamId/project-recycle-bin',
     {
-      schema: { params: projectTeamParamsSchema, querystring: pageQuery, response: { 200: recycleResponse } },
+      schema: {
+        summary: '读取团队项目回收站',
+        params: projectTeamParamsSchema,
+        querystring: pageQuery,
+        response: { 200: recycleResponse },
+      },
     },
     async (request) => {
       const user = await requireHumanActor(request)
@@ -61,7 +66,12 @@ export const projectLifecycleRoutes: FastifyPluginAsyncTypebox<{
     {
       // 通用幂等钩子会对请求体生成摘要，密码验证请求必须跳过。
       config: { idempotency: false },
-      schema: { params: projectParamsSchema, body: passwordBody, response: { 200: projectResponse } },
+      schema: {
+        summary: '将项目移入回收站',
+        params: projectParamsSchema,
+        body: passwordBody,
+        response: { 200: projectResponse },
+      },
     },
     async (request) => {
       const user = await requireSessionActor(request, '删除项目')
@@ -77,7 +87,12 @@ export const projectLifecycleRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/projects/:projectId/restore',
     {
-      schema: { params: projectParamsSchema, body: restoreBody, response: { 200: projectResponse } },
+      schema: {
+        summary: '恢复已删除项目',
+        params: projectParamsSchema,
+        body: restoreBody,
+        response: { 200: projectResponse },
+      },
     },
     async (request) => {
       const user = await requireHumanActor(request)
@@ -88,7 +103,12 @@ export const projectLifecycleRoutes: FastifyPluginAsyncTypebox<{
     '/projects/:projectId/cleanup-files',
     {
       config: { idempotency: false },
-      schema: { params: projectParamsSchema, body: passwordBody, response: { 200: cleanupResponse } },
+      schema: {
+        summary: '清理已删除项目文件',
+        params: projectParamsSchema,
+        body: passwordBody,
+        response: { 200: cleanupResponse },
+      },
     },
     async (request) => {
       const user = await requireSessionActor(request, '清理项目文件')

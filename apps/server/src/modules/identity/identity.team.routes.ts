@@ -50,6 +50,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/update',
     {
       schema: {
+        summary: '更新团队资料',
         params: teamParamsSchema,
         body: updateTeamBodySchema,
         response: { 200: updateTeamResponseSchema },
@@ -64,10 +65,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/platform/teams',
     {
-      schema: {
-        body: createTeamBodySchema,
-        response: { 200: createTeamResponseSchema },
-      },
+      schema: { summary: '创建团队', body: createTeamBodySchema, response: { 200: createTeamResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -90,6 +88,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/members/:userId/update',
     {
       schema: {
+        summary: '更新团队成员',
         params: memberParamsSchema,
         body: memberUpdateBodySchema,
         response: { 200: memberResponseSchema },
@@ -111,6 +110,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/invitations',
     {
       schema: {
+        summary: '读取团队邀请列表',
         params: teamParamsSchema,
         querystring: invitationQuerySchema,
         response: { 200: invitationListResponseSchema },
@@ -129,6 +129,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/invitations',
     {
       schema: {
+        summary: '创建团队邀请',
         params: teamParamsSchema,
         body: inviteMemberBodySchema,
         response: { 200: invitationResponseSchema },
@@ -143,7 +144,11 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/teams/:teamId/invitations/:invitationId/resend',
     {
-      schema: { params: invitationParamsSchema, response: { 200: invitationResponseSchema } },
+      schema: {
+        summary: '重新发送团队邀请',
+        params: invitationParamsSchema,
+        response: { 200: invitationResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -157,7 +162,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/teams/:teamId/invitations/:invitationId/revoke',
     {
-      schema: { params: invitationParamsSchema, response: { 200: invitationResponseSchema } },
+      schema: { summary: '撤销团队邀请', params: invitationParamsSchema, response: { 200: invitationResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -171,7 +176,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/invitations/:token',
     {
-      schema: { params: tokenParamsSchema, response: { 200: invitationPublicResponseSchema } },
+      schema: { summary: '读取邀请详情', params: tokenParamsSchema, response: { 200: invitationPublicResponseSchema } },
     },
     async (request) => {
       return success(await options.service.getInvitationByToken(request.params.token), request.id)
@@ -182,6 +187,7 @@ export const identityTeamRoutes: FastifyPluginAsyncTypebox<{
     '/invitations/:token/accept',
     {
       schema: {
+        summary: '接受团队邀请',
         params: tokenParamsSchema,
         body: acceptInvitationBodySchema,
         response: { 200: acceptInvitationResponseSchema },

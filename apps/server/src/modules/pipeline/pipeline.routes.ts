@@ -70,6 +70,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/projects/:projectId/pipeline-workflows',
     {
       schema: {
+        summary: '读取项目流水线定义列表',
         params: pipelineProjectParamsSchema,
         querystring: pipelineWorkflowListQuerySchema,
         response: { 200: pipelineWorkflowListResponseSchema },
@@ -88,6 +89,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/projects/:projectId/pipeline-workflows/detail',
     {
       schema: {
+        summary: '读取流水线定义详情',
         params: pipelineProjectParamsSchema,
         querystring: pipelineWorkflowDetailQuerySchema,
         response: { 200: pipelineWorkflowDetailResponseSchema },
@@ -111,6 +113,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/projects/:projectId/pipeline-runs',
     {
       schema: {
+        summary: '触发项目流水线',
         params: pipelineProjectParamsSchema,
         body: pipelineTriggerBodySchema,
         response: { 200: pipelineRunDetailResponseSchema },
@@ -133,6 +136,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/projects/:projectId/pipeline-runs',
     {
       schema: {
+        summary: '读取项目流水线运行列表',
         params: pipelineProjectParamsSchema,
         querystring: pipelineRunListQuerySchema,
         response: { 200: pipelineRunListResponseSchema },
@@ -160,6 +164,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/pipeline-runs/:runId',
     {
       schema: {
+        summary: '读取流水线运行详情',
         params: pipelineRunParamsSchema,
         response: { 200: pipelineRunDetailResponseSchema },
       },
@@ -174,6 +179,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/pipeline-runs/:runId/cancel',
     {
       schema: {
+        summary: '取消流水线运行',
         params: pipelineRunParamsSchema,
         body: pipelineCancelBodySchema,
         response: { 200: pipelineRunDetailResponseSchema },
@@ -190,6 +196,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/pipeline-runs/:runId/logs',
     {
       schema: {
+        summary: '读取流水线运行日志',
         params: pipelineRunParamsSchema,
         querystring: pipelineLogQuerySchema,
         response: { 200: pipelineLogResponseSchema },
@@ -212,6 +219,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/pipeline-runs/:runId/artifacts',
     {
       schema: {
+        summary: '读取流水线运行产物',
         params: pipelineRunParamsSchema,
         response: { 200: pipelineArtifactListResponseSchema },
       },
@@ -225,7 +233,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
   app.get(
     '/pipeline-artifacts/:artifactId/download',
     {
-      schema: { params: pipelineArtifactParamsSchema },
+      schema: { summary: '下载流水线产物', params: pipelineArtifactParamsSchema },
     },
     async (request, reply) => {
       const actor = await requireActorWithCredential(request)
@@ -243,6 +251,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/teams/:teamId/pipeline-nodes',
     {
       schema: {
+        summary: '读取团队流水线节点',
         params: pipelineTeamParamsSchema,
         response: { 200: pipelineNodeListResponseSchema },
       },
@@ -257,6 +266,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/teams/:teamId/pipeline-nodes',
     {
       schema: {
+        summary: '创建流水线节点及注册令牌',
         params: pipelineTeamParamsSchema,
         body: pipelineCreateNodeBodySchema,
         response: { 200: pipelineCreateNodeResponseSchema },
@@ -278,6 +288,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/pipeline-nodes/:nodeId/drain',
     {
       schema: {
+        summary: '排空流水线节点',
         params: pipelineNodeParamsSchema,
         response: { 200: pipelineNodeResponseSchema },
       },
@@ -292,6 +303,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/pipeline-nodes/:nodeId/disable',
     {
       schema: {
+        summary: '停用流水线节点',
         params: pipelineNodeParamsSchema,
         response: { 200: pipelineNodeResponseSchema },
       },
@@ -306,6 +318,7 @@ export const pipelineRoutes: FastifyPluginAsyncTypebox<PipelineRoutesOptions> = 
     '/pipeline-nodes/:nodeId/tokens/rotate',
     {
       schema: {
+        summary: '轮换流水线节点令牌',
         params: pipelineNodeParamsSchema,
         response: { 200: pipelineRotateTokenResponseSchema },
       },

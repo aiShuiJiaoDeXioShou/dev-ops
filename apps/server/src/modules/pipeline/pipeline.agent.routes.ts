@@ -126,6 +126,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
     '/agent/register',
     {
       schema: {
+        summary: '注册流水线执行节点',
         tags: ['devops-internal'],
         body: AgentRegisterRequestSchema,
         response: { 200: agentRegisterResponseSchema },
@@ -148,6 +149,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
     '/agent/heartbeat',
     {
       schema: {
+        summary: '上报执行节点心跳',
         tags: ['devops-internal'],
         body: AgentHeartbeatRequestSchema,
         response: { 200: agentHeartbeatResponseSchema },
@@ -168,6 +170,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
     '/agent/lease',
     {
       schema: {
+        summary: '领取流水线执行租约',
         tags: ['devops-internal'],
         body: AgentLeaseRequestSchema,
         response: { 200: agentLeaseResponseSchema },
@@ -185,6 +188,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
     '/agent/lease/:leaseId/renew',
     {
       schema: {
+        summary: '续期流水线执行租约',
         tags: ['devops-internal'],
         params: pipelineLeaseParamsSchema,
         body: AgentLeaseRenewRequestSchema,
@@ -210,6 +214,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
     '/agent/lease/:leaseId/steps/:stepIndex/status',
     {
       schema: {
+        summary: '上报流水线步骤状态',
         tags: ['devops-internal'],
         params: pipelineLeaseStepParamsSchema,
         body: AgentStepStatusRequestSchema,
@@ -242,6 +247,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
     {
       bodyLimit: Math.max(64 * 1024, options.maxLogChunkBytes * 2),
       schema: {
+        summary: '上传流水线执行日志',
         tags: ['devops-internal'],
         params: pipelineLeaseParamsSchema,
         body: agentLogsUploadSchema,
@@ -266,6 +272,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
       // 留出 1MB 余量，让超限请求进入存储层的业务错误（AGENT_ARTIFACT_LIMIT_EXCEEDED）而不是被 HTTP 层直接拒绝。
       bodyLimit: options.maxArtifactBytes + 1024 * 1024,
       schema: {
+        summary: '上传流水线产物',
         tags: ['devops-internal'],
         params: pipelineLeaseParamsSchema,
         response: { 200: agentArtifactUploadResponseSchema },
@@ -300,6 +307,7 @@ export const pipelineAgentRoutes: FastifyPluginAsyncTypebox<PipelineAgentRoutesO
     '/agent/lease/:leaseId/complete',
     {
       schema: {
+        summary: '完成流水线执行租约',
         tags: ['devops-internal'],
         params: pipelineLeaseParamsSchema,
         body: AgentCompleteRequestSchema,

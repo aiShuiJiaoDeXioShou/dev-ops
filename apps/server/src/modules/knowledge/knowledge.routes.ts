@@ -32,6 +32,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/skills',
     {
       schema: {
+        summary: '读取团队技能列表',
         params: teamParamsSchema,
         querystring: skillListQuerySchema,
         response: { 200: skillPageResponseSchema },
@@ -45,7 +46,14 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
 
   app.post(
     '/teams/:teamId/skills',
-    { schema: { params: teamParamsSchema, body: createSkillBodySchema, response: { 200: skillDetailResponseSchema } } },
+    {
+      schema: {
+        summary: '创建团队技能',
+        params: teamParamsSchema,
+        body: createSkillBodySchema,
+        response: { 200: skillDetailResponseSchema },
+      },
+    },
     async (request) => {
       const user = await requireHumanActor(request)
       return success(await options.service.createSkill(user, request.params.teamId, request.body), request.id)
@@ -54,7 +62,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
 
   app.get(
     '/skills/:skillId',
-    { schema: { params: skillParamsSchema, response: { 200: skillDetailResponseSchema } } },
+    { schema: { summary: '读取技能详情', params: skillParamsSchema, response: { 200: skillDetailResponseSchema } } },
     async (request) => {
       const user = await requireHumanActor(request)
       return success(await options.service.getSkill(user, request.params.skillId), request.id)
@@ -64,7 +72,12 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/skills/:skillId/update',
     {
-      schema: { params: skillParamsSchema, body: updateSkillBodySchema, response: { 200: skillDetailResponseSchema } },
+      schema: {
+        summary: '更新技能',
+        params: skillParamsSchema,
+        body: updateSkillBodySchema,
+        response: { 200: skillDetailResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireHumanActor(request)
@@ -74,7 +87,14 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
 
   app.post(
     '/skills/:skillId/enable',
-    { schema: { params: skillParamsSchema, body: skillStateBodySchema, response: { 200: skillDetailResponseSchema } } },
+    {
+      schema: {
+        summary: '启用技能',
+        params: skillParamsSchema,
+        body: skillStateBodySchema,
+        response: { 200: skillDetailResponseSchema },
+      },
+    },
     async (request) => {
       const user = await requireHumanActor(request)
       return success(await options.service.enableSkill(user, request.params.skillId, request.body.version), request.id)
@@ -83,7 +103,14 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
 
   app.post(
     '/skills/:skillId/disable',
-    { schema: { params: skillParamsSchema, body: skillStateBodySchema, response: { 200: skillDetailResponseSchema } } },
+    {
+      schema: {
+        summary: '停用技能',
+        params: skillParamsSchema,
+        body: skillStateBodySchema,
+        response: { 200: skillDetailResponseSchema },
+      },
+    },
     async (request) => {
       const user = await requireHumanActor(request)
       return success(await options.service.disableSkill(user, request.params.skillId, request.body.version), request.id)
@@ -94,6 +121,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/skills/:skillId/versions',
     {
       schema: {
+        summary: '读取技能版本列表',
         params: skillParamsSchema,
         querystring: pageQuerySchema,
         response: { 200: skillVersionPageResponseSchema },
@@ -117,6 +145,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/skills/:skillId/versions/:skillVersionId',
     {
       schema: {
+        summary: '读取技能版本详情',
         params: skillVersionParamsSchema,
         response: { 200: skillVersionDetailResponseSchema },
       },
@@ -134,6 +163,7 @@ export const knowledgeRoutes: FastifyPluginAsyncTypebox<{
     '/skills/:skillId/activities',
     {
       schema: {
+        summary: '读取技能活动记录',
         params: skillParamsSchema,
         querystring: pageQuerySchema,
         response: { 200: activityPageResponseSchema },

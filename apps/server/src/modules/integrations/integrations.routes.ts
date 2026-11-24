@@ -33,7 +33,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/git-providers',
     {
-      schema: { response: { 200: providerListResponseSchema } },
+      schema: { summary: '读取 Git 提供方列表', response: { 200: providerListResponseSchema } },
     },
     async (request) => {
       await requireActor(request)
@@ -44,7 +44,11 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/teams/:teamId/git-connections',
     {
-      schema: { params: teamParamsSchema, response: { 200: connectionListResponseSchema } },
+      schema: {
+        summary: '读取团队 Git 连接列表',
+        params: teamParamsSchema,
+        response: { 200: connectionListResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -56,6 +60,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/github-installations/discover',
     {
       schema: {
+        summary: '发现团队可用的 GitHub 安装',
         description: '查询团队管理员可访问的现有 GitHub App 安装，必要时刷新个人授权令牌。',
         params: teamParamsSchema,
         response: { 200: githubInstallationListResponseSchema },
@@ -71,6 +76,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
     '/teams/:teamId/git-connections',
     {
       schema: {
+        summary: '创建团队 Git 连接',
         params: teamParamsSchema,
         body: createConnectionBodySchema,
         response: { 200: createConnectionResponseSchema },
@@ -91,6 +97,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
       // GitHub OAuth 授权码通过查询串返回，避免写入请求日志或 Referer。
       logLevel: 'silent',
       schema: {
+        summary: '处理 Git 提供方授权回调',
         description: 'GitHub App 团队安装与个人身份绑定共用回调，使用 HTTP 302 跳回平台或继续授权。',
         params: callbackParamsSchema,
         querystring: callbackQuerySchema,
@@ -136,7 +143,11 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/git-connections/:connectionId/check',
     {
-      schema: { params: connectionParamsSchema, response: { 200: checkConnectionResponseSchema } },
+      schema: {
+        summary: '检查 Git 连接状态',
+        params: connectionParamsSchema,
+        response: { 200: checkConnectionResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -147,7 +158,11 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/git-connections/:connectionId/sync-repositories',
     {
-      schema: { params: connectionParamsSchema, response: { 200: syncRepositoriesResponseSchema } },
+      schema: {
+        summary: '同步 Git 连接仓库',
+        params: connectionParamsSchema,
+        response: { 200: syncRepositoriesResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -159,6 +174,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
     '/git-connections/:connectionId/repositories',
     {
       schema: {
+        summary: '读取 Git 连接下的仓库',
         params: connectionParamsSchema,
         querystring: connectionRepositoryQuerySchema,
         response: { 200: connectionRepositoryListResponseSchema },
@@ -177,6 +193,7 @@ export const integrationsRoutes: FastifyPluginAsyncTypebox<{
     '/git-connections/:connectionId/revoke',
     {
       schema: {
+        summary: '撤销 Git 连接',
         params: connectionParamsSchema,
         body: revokeConnectionBodySchema,
         response: { 200: revokeConnectionResponseSchema },

@@ -33,6 +33,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/teams/:teamId/project-repositories',
     {
       schema: {
+        summary: '读取团队项目仓库筛选选项',
         description: '读取团队项目已关联的仓库筛选选项。',
         params: projectTeamParamsSchema,
         querystring: projectRepositoryOptionsQuerySchema,
@@ -68,6 +69,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/teams/:teamId/projects',
     {
       schema: {
+        summary: '创建团队项目',
         params: projectTeamParamsSchema,
         body: createProjectBodySchema,
         response: { 200: projectResponseSchema },
@@ -82,7 +84,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
   app.get(
     '/projects/:projectId',
     {
-      schema: { params: projectParamsSchema, response: { 200: projectResponseSchema } },
+      schema: { summary: '读取项目详情', params: projectParamsSchema, response: { 200: projectResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -94,6 +96,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/projects/:projectId/update',
     {
       schema: {
+        summary: '更新项目',
         params: projectParamsSchema,
         body: updateProjectBodySchema,
         response: { 200: projectResponseSchema },
@@ -108,7 +111,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
   app.get(
     '/projects/:projectId/stats',
     {
-      schema: { params: projectParamsSchema, response: { 200: projectStatsResponseSchema } },
+      schema: { summary: '读取项目统计', params: projectParamsSchema, response: { 200: projectStatsResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -119,7 +122,11 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
   app.get(
     '/projects/:projectId/services',
     {
-      schema: { params: projectParamsSchema, response: { 200: serviceListResponseSchema } },
+      schema: {
+        summary: '读取项目服务列表',
+        params: projectParamsSchema,
+        response: { 200: serviceListResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -130,7 +137,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
   app.get(
     '/projects/:projectId/services/:serviceId',
     {
-      schema: { params: serviceParamsSchema, response: { 200: serviceResponseSchema } },
+      schema: { summary: '读取项目服务详情', params: serviceParamsSchema, response: { 200: serviceResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -142,6 +149,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/projects/:projectId/services',
     {
       schema: {
+        summary: '创建项目服务',
         params: projectParamsSchema,
         body: createServiceBodySchema,
         response: { 200: serviceResponseSchema },
@@ -157,6 +165,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/projects/:projectId/services/:serviceId/update',
     {
       schema: {
+        summary: '更新项目服务',
         params: serviceParamsSchema,
         body: updateServiceBodySchema,
         response: { 200: serviceResponseSchema },
@@ -172,6 +181,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/projects/:projectId/services/:serviceId/repositories',
     {
       schema: {
+        summary: '关联服务仓库',
         params: serviceParamsSchema,
         body: addServiceRepositoryBodySchema,
         response: { 200: serviceResponseSchema },
@@ -190,6 +200,7 @@ export const projectRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; serv
     '/projects/:projectId/services/:serviceId/repositories/:repositoryId/remove',
     {
       schema: {
+        summary: '移除服务仓库关联',
         params: serviceRepositoryParamsSchema,
         body: removeServiceRepositoryBodySchema,
         response: { 200: serviceResponseSchema },

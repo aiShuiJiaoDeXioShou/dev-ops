@@ -40,6 +40,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/projects/:projectId/requirements',
     {
       schema: {
+        summary: '读取项目需求列表',
         params: projectRequirementParamsSchema,
         querystring: requirementsQuerySchema,
         response: { 200: requirementListResponseSchema },
@@ -55,6 +56,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/projects/:projectId/requirements',
     {
       schema: {
+        summary: '创建需求',
         params: projectRequirementParamsSchema,
         body: createRequirementBodySchema,
         response: { 200: requirementResponseSchema },
@@ -69,7 +71,11 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/requirements/:requirementId',
     {
-      schema: { params: requirementParamsSchema, response: { 200: requirementResponseSchema } },
+      schema: {
+        summary: '读取需求详情',
+        params: requirementParamsSchema,
+        response: { 200: requirementResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -81,6 +87,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/update',
     {
       schema: {
+        summary: '更新需求',
         params: requirementParamsSchema,
         body: updateRequirementBodySchema,
         response: { 200: requirementResponseSchema },
@@ -99,6 +106,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/comments',
     {
       schema: {
+        summary: '读取需求评论',
         params: requirementParamsSchema,
         querystring: pageQuerySchema,
         response: { 200: commentPageResponseSchema },
@@ -122,6 +130,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/comments',
     {
       schema: {
+        summary: '追加需求评论',
         params: requirementParamsSchema,
         body: commentBodySchema,
         response: { 200: commentResponseSchema },
@@ -140,6 +149,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/start-development',
     {
       schema: {
+        summary: '开始开发需求',
         params: requirementParamsSchema,
         body: startDevelopmentBodySchema,
         response: { 200: requirementResponseSchema },
@@ -160,6 +170,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
       // 幂等记录与提测提交共用业务事务，失败时允许用原键重试。
       config: { idempotency: false },
       schema: {
+        summary: '提交需求测试',
         params: requirementParamsSchema,
         body: submitTestBodySchema,
         response: { 200: submitTestResponseSchema },
@@ -179,6 +190,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/start-test',
     {
       schema: {
+        summary: '开始测试需求',
         params: requirementParamsSchema,
         body: startTestBodySchema,
         response: { 200: requirementResponseSchema },
@@ -194,6 +206,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/withdraw-test',
     {
       schema: {
+        summary: '撤回需求提测',
         params: requirementParamsSchema,
         body: withdrawTestBodySchema,
         response: { 200: requirementResponseSchema },
@@ -209,6 +222,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/return-to-development',
     {
       schema: {
+        summary: '退回需求开发',
         params: requirementParamsSchema,
         body: returnToDevelopmentBodySchema,
         response: { 200: requirementResponseSchema },
@@ -226,7 +240,11 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
   app.get(
     '/requirements/:requirementId/test-pass-eligibility',
     {
-      schema: { params: requirementParamsSchema, response: { 200: eligibilityResponseSchema } },
+      schema: {
+        summary: '检查需求测试通过条件',
+        params: requirementParamsSchema,
+        response: { 200: eligibilityResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -238,6 +256,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/pass-test',
     {
       schema: {
+        summary: '记录需求测试通过',
         params: requirementParamsSchema,
         body: passTestBodySchema,
         response: { 200: requirementResponseSchema },
@@ -253,6 +272,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/reopen-development',
     {
       schema: {
+        summary: '重新开发需求',
         params: requirementParamsSchema,
         body: reopenDevelopmentBodySchema,
         response: { 200: requirementResponseSchema },
@@ -271,6 +291,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/cancel',
     {
       schema: {
+        summary: '取消需求',
         params: requirementParamsSchema,
         body: cancelRequirementBodySchema,
         response: { 200: requirementResponseSchema },
@@ -289,6 +310,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/restore',
     {
       schema: {
+        summary: '恢复需求',
         params: requirementParamsSchema,
         body: restoreRequirementBodySchema,
         response: { 200: requirementResponseSchema },
@@ -307,6 +329,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/test-submissions',
     {
       schema: {
+        summary: '读取需求提测记录',
         params: requirementParamsSchema,
         querystring: pageQuerySchema,
         response: { 200: testSubmissionPageResponseSchema },
@@ -330,6 +353,7 @@ export const requirementRoutes: FastifyPluginAsyncTypebox<{
     '/requirements/:requirementId/activities',
     {
       schema: {
+        summary: '读取需求活动记录',
         params: requirementParamsSchema,
         querystring: pageQuerySchema,
         response: { 200: activityPageResponseSchema },

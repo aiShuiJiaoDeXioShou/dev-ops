@@ -46,6 +46,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/builds',
     {
       schema: {
+        summary: '上报项目构建',
         params: projectParamsSchema,
         body: reportBuildBodySchema,
         response: { 200: buildResponseSchema },
@@ -69,6 +70,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/builds',
     {
       schema: {
+        summary: '读取项目构建列表',
         params: projectParamsSchema,
         querystring: buildListQuerySchema,
         response: { 200: buildListResponseSchema },
@@ -90,7 +92,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
   app.get(
     '/builds/:buildId',
     {
-      schema: { params: buildParamsSchema, response: { 200: buildResponseSchema } },
+      schema: { summary: '读取构建详情', params: buildParamsSchema, response: { 200: buildResponseSchema } },
     },
     async (request) => {
       const actor = await requireActor(request)
@@ -102,6 +104,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/builds/:buildId/correct',
     {
       schema: {
+        summary: '更正构建信息',
         params: buildParamsSchema,
         body: correctBuildBodySchema,
         response: { 200: buildResponseSchema },
@@ -117,6 +120,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/builds/:buildId/artifacts',
     {
       schema: {
+        summary: '为构建登记产物',
         params: buildParamsSchema,
         body: addArtifactBodySchema,
         response: { 200: buildResponseSchema },
@@ -132,6 +136,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/builds/:buildId/targets',
     {
       schema: {
+        summary: '关联构建交付目标',
         params: buildParamsSchema,
         body: linkTargetBodySchema,
         response: { 200: buildResponseSchema },
@@ -147,6 +152,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/builds/:buildId/targets/:targetId/remove',
     {
       schema: {
+        summary: '移除构建交付目标',
         params: buildTargetParamsSchema,
         body: unlinkTargetBodySchema,
         response: { 200: buildResponseSchema },
@@ -165,6 +171,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/artifacts',
     {
       schema: {
+        summary: '读取项目产物列表',
         params: projectParamsSchema,
         querystring: projectArtifactListQuerySchema,
         response: { 200: projectArtifactListResponseSchema },
@@ -190,6 +197,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/services/:serviceId/run-versions',
     {
       schema: {
+        summary: '读取服务运行版本',
         params: projectServiceParamsSchema,
         response: { 200: runVersionListResponseSchema },
       },
@@ -205,6 +213,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/services/:serviceId/run-versions/:environment/history',
     {
       schema: {
+        summary: '读取服务环境版本历史',
         params: runVersionParamsSchema,
         querystring: runVersionHistoryQuerySchema,
         response: { 200: runVersionHistoryResponseSchema },
@@ -230,6 +239,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/services/:serviceId/run-versions/:environment/confirm',
     {
       schema: {
+        summary: '确认服务环境运行版本',
         params: runVersionParamsSchema,
         body: confirmRunVersionBodySchema,
         response: { 200: runVersionViewResponseSchema },
@@ -254,6 +264,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/reviews',
     {
       schema: {
+        summary: '登记外部审核',
         params: projectParamsSchema,
         body: createReviewBodySchema,
         response: { 200: reviewViewResponseSchema },
@@ -269,6 +280,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/reviews/:reviewId/update',
     {
       schema: {
+        summary: '更新外部审核记录',
         params: reviewParamsSchema,
         body: updateReviewBodySchema,
         response: { 200: reviewViewResponseSchema },
@@ -284,6 +296,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/reviews',
     {
       schema: {
+        summary: '读取项目外部审核列表',
         params: projectParamsSchema,
         querystring: reviewListQuerySchema,
         response: { 200: reviewListResponseSchema },
@@ -307,10 +320,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
   app.get(
     '/reviews/:reviewId',
     {
-      schema: {
-        params: reviewParamsSchema,
-        response: { 200: reviewViewResponseSchema },
-      },
+      schema: { summary: '读取外部审核详情', params: reviewParamsSchema, response: { 200: reviewViewResponseSchema } },
     },
     async (request) => {
       const actor = await requireActor(request)
@@ -322,6 +332,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/releases',
     {
       schema: {
+        summary: '登记项目发布',
         params: projectParamsSchema,
         body: createReleaseBodySchema,
         response: { 200: releaseViewResponseSchema },
@@ -337,6 +348,7 @@ export const deliveryRoutes: FastifyPluginAsyncTypebox<{ service: DeliveryServic
     '/projects/:projectId/releases',
     {
       schema: {
+        summary: '读取项目发布列表',
         params: projectParamsSchema,
         querystring: releaseListQuerySchema,
         response: { 200: releaseListResponseSchema },

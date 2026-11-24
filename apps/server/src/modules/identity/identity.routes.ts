@@ -33,6 +33,7 @@ export const identityAuthRoutes: FastifyPluginAsync<{ auth: IdentityAuth; origin
     method: ['GET', 'POST'],
     url: '/auth/*',
     schema: {
+      summary: '处理登录与身份认证协议',
       description:
         'Better Auth 认证协议端点，保留协议状态码。POST /api/v1/auth/update-user 可用登录 Cookie 更新本人的显示名称 name 和头像 image。头像为 160×160 的 JPEG data URL，解码后最多 32 KiB，传 null 可移除。GET /api/v1/auth/get-session 返回当前头像。',
     },

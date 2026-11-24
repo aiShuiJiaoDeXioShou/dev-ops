@@ -53,23 +53,24 @@ export const identityTokenRoutes: FastifyPluginAsyncTypebox<{
   tokenService: TokenService
   service: IdentityService
 }> = async (app, options) => {
-  app.get('/me', { schema: { response: { 200: meResponseSchema } } }, async (request) => {
+  app.get('/me', { schema: { summary: '读取当前用户身份', response: { 200: meResponseSchema } } }, async (request) => {
     const user = await requireActor(request)
     return success({ user, teams: await options.service.listMyTeams(user) }, request.id)
   })
 
-  app.get('/me/tokens', { schema: { response: { 200: tokenListResponseSchema } } }, async (request) => {
-    const user = await requireSessionActor(request)
-    return success({ items: await options.tokenService.list(user.id) }, request.id)
-  })
+  app.get(
+    '/me/tokens',
+    { schema: { summary: '读取个人令牌列表', response: { 200: tokenListResponseSchema } } },
+    async (request) => {
+      const user = await requireSessionActor(request)
+      return success({ items: await options.tokenService.list(user.id) }, request.id)
+    },
+  )
 
   app.post(
     '/me/tokens',
     {
-      schema: {
-        body: createTokenBodySchema,
-        response: { 200: tokenCreateResponseSchema },
-      },
+      schema: { summary: '创建个人令牌', body: createTokenBodySchema, response: { 200: tokenCreateResponseSchema } },
     },
     async (request) => {
       const user = await requireSessionActor(request)
@@ -80,10 +81,7 @@ export const identityTokenRoutes: FastifyPluginAsyncTypebox<{
   app.post(
     '/me/tokens/:tokenId/revoke',
     {
-      schema: {
-        params: tokenParamsSchema,
-        response: { 200: tokenResponseSchema },
-      },
+      schema: { summary: '撤销个人令牌', params: tokenParamsSchema, response: { 200: tokenResponseSchema } },
     },
     async (request) => {
       const user = await requireSessionActor(request)

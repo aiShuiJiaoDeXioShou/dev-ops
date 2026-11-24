@@ -28,6 +28,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
     '/platform/storage-buckets',
     {
       schema: {
+        summary: '读取平台储存桶列表',
         response: { 200: storageBucketListResponseSchema },
         description:
           '列出平台储存桶配置，按内置桶、默认桶、创建时间倒序稳定排序；仅返回 Access Key 掩码与最近探测结论。',
@@ -43,6 +44,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
     '/platform/storage-buckets',
     {
       schema: {
+        summary: '创建平台储存桶',
         body: createStorageBucketBodySchema,
         response: { 200: storageBucketResponseSchema },
         description:
@@ -59,6 +61,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
     '/platform/storage-buckets/:bucketId/update',
     {
       schema: {
+        summary: '更新平台储存桶',
         params: storageBucketParamsSchema,
         body: updateStorageBucketBodySchema,
         response: { 200: storageBucketResponseSchema },
@@ -76,6 +79,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
     '/platform/storage-buckets/:bucketId/test',
     {
       schema: {
+        summary: '测试储存桶连接',
         params: storageBucketParamsSchema,
         response: { 200: storageBucketProbeResponseSchema },
         description:
@@ -92,6 +96,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
     '/platform/storage-buckets/:bucketId/set-default',
     {
       schema: {
+        summary: '设置默认储存桶',
         params: storageBucketParamsSchema,
         body: setDefaultStorageBucketBodySchema,
         response: { 200: storageBucketResponseSchema },
@@ -112,6 +117,7 @@ export const storageRoutes: FastifyPluginAsyncTypebox<{
     '/platform/storage-buckets/:bucketId/remove',
     {
       schema: {
+        summary: '删除平台储存桶',
         params: storageBucketParamsSchema,
         response: { 200: storageBucketRemoveResponseSchema },
         description:

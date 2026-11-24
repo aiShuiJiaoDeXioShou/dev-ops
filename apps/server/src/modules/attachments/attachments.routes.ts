@@ -100,7 +100,11 @@ export const attachmentRoutes: FastifyPluginAsyncTypebox<AttachmentRoutesOptions
     '/projects/:projectId/attachments',
     {
       ...uploadRouteOptions,
-      schema: { params: projectAttachmentParamsSchema, response: { 200: attachmentUploadResponseSchema } },
+      schema: {
+        summary: '上传项目事项附件',
+        params: projectAttachmentParamsSchema,
+        response: { 200: attachmentUploadResponseSchema },
+      },
     },
     (request) => upload(request, request.params),
   )
@@ -109,6 +113,7 @@ export const attachmentRoutes: FastifyPluginAsyncTypebox<AttachmentRoutesOptions
     {
       ...uploadRouteOptions,
       schema: {
+        summary: '上传会话临时附件',
         description: '以 application/octet-stream 上传会话临时附件，通过发送消息的 attachmentIds 绑定。',
         params: conversationAttachmentParamsSchema,
         response: { 200: attachmentUploadResponseSchema },
@@ -117,15 +122,20 @@ export const attachmentRoutes: FastifyPluginAsyncTypebox<AttachmentRoutesOptions
     (request) => upload(request, request.params),
   )
 
-  app.get('/attachments/policy', { schema: { response: { 200: attachmentPolicyResponseSchema } } }, async (request) => {
-    await requireActor(request)
-    return success(options.service.getPolicy(), request.id)
-  })
+  app.get(
+    '/attachments/policy',
+    { schema: { summary: '读取附件上传策略', response: { 200: attachmentPolicyResponseSchema } } },
+    async (request) => {
+      await requireActor(request)
+      return success(options.service.getPolicy(), request.id)
+    },
+  )
 
   app.get(
     '/attachments/:attachmentId/download',
     {
       schema: {
+        summary: '下载项目事项附件',
         params: attachmentParamsSchema,
         description:
           '附件下载是已登记的文件传输显式例外：成功返回 application/octet-stream 流并带 X-Content-SHA256，失败仍返回 HTTP 200 + 统一 JSON 信封。',
@@ -142,6 +152,7 @@ export const attachmentRoutes: FastifyPluginAsyncTypebox<AttachmentRoutesOptions
     '/bot-conversations/:conversationId/messages/:messageId/attachments/:attachmentId/download',
     {
       schema: {
+        summary: '下载会话消息附件',
         params: conversationMessageAttachmentParamsSchema,
         description:
           '会话附件下载使用文件传输例外：成功返回 application/octet-stream 流与 X-Content-SHA256，失败返回 HTTP 200 与统一 JSON 信封。',
@@ -157,6 +168,7 @@ export const attachmentRoutes: FastifyPluginAsyncTypebox<AttachmentRoutesOptions
     '/attachments/:attachmentId/remove',
     {
       schema: {
+        summary: '删除附件',
         params: attachmentParamsSchema,
         response: { 200: attachmentRemoveResponseSchema },
       },

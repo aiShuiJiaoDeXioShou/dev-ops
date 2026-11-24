@@ -46,7 +46,13 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
 }> = async (app, options) => {
   app.get(
     '/projects/:projectId/tools/capabilities',
-    { schema: { params: toolProjectParamsSchema, response: { 200: toolCapabilitiesResponseSchema } } },
+    {
+      schema: {
+        summary: '读取项目写能力',
+        params: toolProjectParamsSchema,
+        response: { 200: toolCapabilitiesResponseSchema },
+      },
+    },
     async (request) => {
       const actor = await requireActor(request)
       const [capabilities, canManageGrants] = await Promise.all([
@@ -59,7 +65,13 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
 
   app.get(
     '/projects/:projectId/tools/grants',
-    { schema: { params: toolProjectParamsSchema, response: { 200: toolGrantListResponseSchema } } },
+    {
+      schema: {
+        summary: '读取项目写能力授权',
+        params: toolProjectParamsSchema,
+        response: { 200: toolGrantListResponseSchema },
+      },
+    },
     async (request) => {
       const actor = await requireActor(request)
       return success({ items: await listToolCapabilityGrants(options.db, actor, request.params.projectId) }, request.id)
@@ -70,6 +82,7 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
     '/projects/:projectId/tools/grants',
     {
       schema: {
+        summary: '授予项目写能力',
         params: toolProjectParamsSchema,
         body: toolGrantBodySchema,
         response: { 200: toolGrantResponseSchema },
@@ -88,6 +101,7 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
     '/projects/:projectId/tools/grants/:grantId/revoke',
     {
       schema: {
+        summary: '撤销项目写能力授权',
         params: toolGrantParamsSchema,
         body: toolGrantRevokeBodySchema,
         response: { 200: toolGrantRevokeResponseSchema },
@@ -111,6 +125,7 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
     {
       config: { idempotency: false },
       schema: {
+        summary: '创建受控代码修改',
         params: toolProjectParamsSchema,
         body: createCodeChangeBodySchema,
         response: { 200: createCodeChangeResponseSchema },
@@ -129,7 +144,13 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
 
   app.get(
     '/projects/:projectId/tools/code-changes',
-    { schema: { params: toolProjectParamsSchema, response: { 200: codeChangeListResponseSchema } } },
+    {
+      schema: {
+        summary: '读取受控代码修改列表',
+        params: toolProjectParamsSchema,
+        response: { 200: codeChangeListResponseSchema },
+      },
+    },
     async (request) => {
       const actor = await requireActor(request)
       return success({ items: await options.codeChanges.listCodeChanges(actor, request.params.projectId) }, request.id)
@@ -138,7 +159,13 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
 
   app.get(
     '/projects/:projectId/tools/invocations',
-    { schema: { params: toolProjectParamsSchema, response: { 200: toolInvocationListResponseSchema } } },
+    {
+      schema: {
+        summary: '读取项目工具调用记录',
+        params: toolProjectParamsSchema,
+        response: { 200: toolInvocationListResponseSchema },
+      },
+    },
     async (request) => {
       const actor = await requireActor(request)
       await getProjectRoleContext(options.db, actor, request.params.projectId)
@@ -148,7 +175,13 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
 
   app.get(
     '/tools/code-changes/:codeChangeId',
-    { schema: { params: toolCodeChangeParamsSchema, response: { 200: codeChangeResponseSchema } } },
+    {
+      schema: {
+        summary: '读取受控代码修改详情',
+        params: toolCodeChangeParamsSchema,
+        response: { 200: codeChangeResponseSchema },
+      },
+    },
     async (request) => {
       const actor = await requireActor(request)
       return success(
@@ -163,6 +196,7 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
     {
       config: { idempotency: false },
       schema: {
+        summary: '为代码修改创建 PR',
         params: toolCodeChangeParamsSchema,
         body: createPullRequestBodySchema,
         response: { 200: createPullRequestResponseSchema },
@@ -188,6 +222,7 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
     {
       config: { idempotency: false },
       schema: {
+        summary: '创建远端 Issue',
         params: toolProjectParamsSchema,
         body: createRemoteIssueBodySchema,
         response: { 200: createRemoteIssueResponseSchema },
@@ -211,6 +246,7 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
     {
       config: { idempotency: false },
       schema: {
+        summary: '发布远端评论',
         params: toolProjectParamsSchema,
         body: addToolCommentBodySchema,
         response: { 200: addToolCommentResponseSchema },
@@ -231,7 +267,13 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
 
   app.get(
     '/tools/code-changes/:codeChangeId/diff',
-    { schema: { params: toolCodeChangeParamsSchema, response: { 200: codeChangeDiffResponseSchema } } },
+    {
+      schema: {
+        summary: '读取代码修改差异',
+        params: toolCodeChangeParamsSchema,
+        response: { 200: codeChangeDiffResponseSchema },
+      },
+    },
     async (request) => {
       const actor = await requireActor(request)
       return success(await options.codeChanges.readDiff(actor, request.params.codeChangeId), request.id)
@@ -242,6 +284,7 @@ export const toolsRoutes: FastifyPluginAsyncTypebox<{
     '/tools/code-changes/:codeChangeId/cancel',
     {
       schema: {
+        summary: '取消代码修改',
         params: toolCodeChangeParamsSchema,
         body: cancelCodeChangeBodySchema,
         response: { 200: cancelCodeChangeResponseSchema },

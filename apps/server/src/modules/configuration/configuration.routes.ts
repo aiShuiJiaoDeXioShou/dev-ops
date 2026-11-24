@@ -48,6 +48,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/teams/:teamId/credentials',
     {
       schema: {
+        summary: '读取团队凭据列表',
         params: teamParamsSchema,
         querystring: credentialListQuerySchema,
         response: { 200: credentialListResponseSchema },
@@ -70,6 +71,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/teams/:teamId/credentials/:credentialId',
     {
       schema: {
+        summary: '读取团队凭据元数据',
         params: teamCredentialParamsSchema,
         response: { 200: credentialDetailResponseSchema },
       },
@@ -87,6 +89,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/teams/:teamId/credentials',
     {
       schema: {
+        summary: '创建团队凭据',
         params: teamParamsSchema,
         body: createCredentialBodySchema,
         response: { 200: credentialResponseSchema },
@@ -102,6 +105,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/credentials/:credentialId/rotate',
     {
       schema: {
+        summary: '轮换凭据内容',
         params: credentialParamsSchema,
         body: rotateCredentialBodySchema,
         response: { 200: credentialResponseSchema },
@@ -117,6 +121,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/credentials/:credentialId/revoke',
     {
       schema: {
+        summary: '撤销凭据',
         params: credentialParamsSchema,
         body: revokeCredentialBodySchema,
         response: { 200: credentialResponseSchema },
@@ -132,6 +137,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/credentials/:credentialId/grants',
     {
       schema: {
+        summary: '授权项目使用凭据',
         params: credentialParamsSchema,
         body: grantCredentialBodySchema,
         response: { 200: credentialResponseSchema },
@@ -147,6 +153,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/credentials/:credentialId/grants/:projectId/revoke',
     {
       schema: {
+        summary: '撤销项目凭据授权',
         params: credentialGrantParamsSchema,
         body: revokeGrantBodySchema,
         response: { 200: credentialResponseSchema },
@@ -170,6 +177,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/credentials/:credentialId/reveal-value',
     {
       schema: {
+        summary: '读取凭据明文',
         params: credentialParamsSchema,
         body: revealCredentialBodySchema,
         response: { 200: credentialRevealResponseSchema },
@@ -195,6 +203,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/credentials/:credentialId/usage',
     {
       schema: {
+        summary: '读取凭据使用记录',
         params: credentialParamsSchema,
         querystring: usageQuerySchema,
         response: { 200: credentialUsageListResponseSchema },
@@ -216,6 +225,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/projects/:projectId/environments/:environment/variables',
     {
       schema: {
+        summary: '读取项目环境变量',
         params: projectEnvironmentParamsSchema,
         response: { 200: envVarListResponseSchema },
       },
@@ -233,6 +243,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/projects/:projectId/environments/:environment/variables',
     {
       schema: {
+        summary: '创建项目环境变量',
         params: projectEnvironmentParamsSchema,
         body: createEnvVarBodySchema,
         response: { 200: envVarResponseSchema },
@@ -256,6 +267,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/project-variables/:variableId/update',
     {
       schema: {
+        summary: '更新项目环境变量',
         params: variableParamsSchema,
         body: updateEnvVarBodySchema,
         response: { 200: envVarResponseSchema },
@@ -274,6 +286,7 @@ export const configurationRoutes: FastifyPluginAsyncTypebox<{ service: Configura
     '/project-variables/:variableId/remove',
     {
       schema: {
+        summary: '删除项目环境变量',
         params: variableParamsSchema,
         body: removeEnvVarBodySchema,
         response: { 200: envVarRemoveResponseSchema },

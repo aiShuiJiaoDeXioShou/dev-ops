@@ -31,3 +31,22 @@ test('注册路由只使用 GET/POST，统一错误码与 API 404 信封', async
   assert.equal(wrongMethod.json().success, false)
   assert.equal(wrongMethod.json().code, 'NOT_FOUND')
 })
+
+test('所有业务 OpenAPI 路由提供中文摘要', async (t) => {
+  const app = createTestApp({ DOCS_ENABLED: 'true' })
+  t.after(() => app.close())
+  await app.ready()
+  const paths = app.swagger().paths ?? {}
+  let checked = 0
+  for (const [path, methods] of Object.entries(paths)) {
+    if (!path.startsWith('/api/v1/')) continue
+    for (const method of ['get', 'post'] as const) {
+      const operation = methods?.[method]
+      if (!operation) continue
+      assert.equal(typeof operation.summary, 'string', `${method} ${path} 缺少摘要`)
+      assert.match(operation.summary ?? '', /[\u3400-\u9fff]/u, `${method} ${path} 缺少中文摘要`)
+      checked++
+    }
+  }
+  assert.ok(checked > 0, '必须检查实际导出的业务路由')
+})

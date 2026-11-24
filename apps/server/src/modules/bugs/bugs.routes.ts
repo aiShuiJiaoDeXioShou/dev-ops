@@ -37,6 +37,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
     '/projects/:projectId/bugs',
     {
       schema: {
+        summary: '读取项目 Bug 列表',
         params: projectBugParamsSchema,
         querystring: bugsQuerySchema,
         response: { 200: bugListResponseSchema },
@@ -51,7 +52,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/projects/:projectId/bugs',
     {
-      schema: { params: projectBugParamsSchema, body: createBugBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '创建 Bug',
+        params: projectBugParamsSchema,
+        body: createBugBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -62,7 +68,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.get(
     '/bugs/:bugId',
     {
-      schema: { params: bugParamsSchema, response: { 200: bugResponseSchema } },
+      schema: { summary: '读取 Bug 详情', params: bugParamsSchema, response: { 200: bugResponseSchema } },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -73,7 +79,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/update',
     {
-      schema: { params: bugParamsSchema, body: updateBugBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '更新 Bug',
+        params: bugParamsSchema,
+        body: updateBugBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -84,7 +95,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/start-fix',
     {
-      schema: { params: bugParamsSchema, body: startFixBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '开始修复 Bug',
+        params: bugParamsSchema,
+        body: startFixBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -96,6 +112,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
     '/bugs/:bugId/submit-regression',
     {
       schema: {
+        summary: '提交 Bug 回归',
         params: bugParamsSchema,
         body: submitRegressionBodySchema,
         response: { 200: submitRegressionResponseSchema },
@@ -110,7 +127,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/withdraw-regression',
     {
-      schema: { params: bugParamsSchema, body: withdrawRegressionBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '撤回 Bug 回归',
+        params: bugParamsSchema,
+        body: withdrawRegressionBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -121,7 +143,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/record-regression',
     {
-      schema: { params: bugParamsSchema, body: recordRegressionBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '记录 Bug 回归结论',
+        params: bugParamsSchema,
+        body: recordRegressionBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -132,7 +159,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/close',
     {
-      schema: { params: bugParamsSchema, body: closeBugBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '关闭 Bug',
+        params: bugParamsSchema,
+        body: closeBugBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -143,7 +175,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/reopen',
     {
-      schema: { params: bugParamsSchema, body: reopenBugBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '重新打开 Bug',
+        params: bugParamsSchema,
+        body: reopenBugBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -154,7 +191,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/requirements',
     {
-      schema: { params: bugParamsSchema, body: linkRequirementBodySchema, response: { 200: bugResponseSchema } },
+      schema: {
+        summary: '关联 Bug 与需求',
+        params: bugParamsSchema,
+        body: linkRequirementBodySchema,
+        response: { 200: bugResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -174,6 +216,7 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
     '/bugs/:bugId/requirements/:requirementId/remove',
     {
       schema: {
+        summary: '移除 Bug 关联需求',
         params: bugRequirementParamsSchema,
         body: unlinkRequirementBodySchema,
         response: { 200: bugResponseSchema },
@@ -197,7 +240,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.get(
     '/bugs/:bugId/comments',
     {
-      schema: { params: bugParamsSchema, querystring: pageQuerySchema, response: { 200: commentPageResponseSchema } },
+      schema: {
+        summary: '读取 Bug 评论',
+        params: bugParamsSchema,
+        querystring: pageQuerySchema,
+        response: { 200: commentPageResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -216,7 +264,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.post(
     '/bugs/:bugId/comments',
     {
-      schema: { params: bugParamsSchema, body: commentBodySchema, response: { 200: commentResponseSchema } },
+      schema: {
+        summary: '追加 Bug 评论',
+        params: bugParamsSchema,
+        body: commentBodySchema,
+        response: { 200: commentResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)
@@ -230,7 +283,12 @@ export const bugRoutes: FastifyPluginAsyncTypebox<{ auth: IdentityAuth; service:
   app.get(
     '/bugs/:bugId/activities',
     {
-      schema: { params: bugParamsSchema, querystring: pageQuerySchema, response: { 200: activityPageResponseSchema } },
+      schema: {
+        summary: '读取 Bug 活动记录',
+        params: bugParamsSchema,
+        querystring: pageQuerySchema,
+        response: { 200: activityPageResponseSchema },
+      },
     },
     async (request) => {
       const user = await requireActor(request)

@@ -17,6 +17,7 @@ export const projectDashboardRoutes: FastifyPluginAsyncTypebox<{ service: Projec
     '/teams/:teamId/project-activity',
     {
       schema: {
+        summary: '读取团队项目活动',
         params: projectActivityTeamParamsSchema,
         querystring: projectActivityQuerySchema,
         response: { 200: projectActivityResponseSchema },
