@@ -10501,6 +10501,7 @@ export const apiFixtures: Record<string, unknown> = {
           contentVersion: '1.0.0',
           summary: '[audit] 用于 UI 审计的技能包',
           source: 'team',
+          fileCount: 0,
           enabled: false,
           version: 2,
           updatedAt: '2026-11-11T04:01:20.612Z',

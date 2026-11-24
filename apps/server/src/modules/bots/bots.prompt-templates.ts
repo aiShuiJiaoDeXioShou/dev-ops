@@ -102,7 +102,13 @@ export const botPromptTemplateRoutes: FastifyPluginAsyncTypebox<{ db: Database }
         .where(
           and(
             eq(botPromptTemplate.team_id, request.params.teamId),
-            query ? or(ilike(botPromptTemplate.name, term), ilike(botPromptTemplate.description, term)) : undefined,
+            query
+              ? or(
+                  ilike(botPromptTemplate.name, term),
+                  ilike(botPromptTemplate.description, term),
+                  ilike(botPromptTemplate.body, term),
+                )
+              : undefined,
             request.query.cursor ? gt(botPromptTemplate.id, request.query.cursor) : undefined,
           ),
         )

@@ -19,6 +19,7 @@ const skillPage = {
       contentVersion: '1.1.0',
       summary: '提交前检查风险',
       source: 'team',
+      fileCount: 2,
       enabled: true,
       version: 2,
       updatedAt: '2026-11-10T00:00:00.000Z',
@@ -53,7 +54,24 @@ describe('SkillList', () => {
     renderList()
     expect((await screen.findAllByText('代码评审')).length).toBeGreaterThan(0)
     expect(screen.getByText('@skill/code-review')).toBeInTheDocument()
+    expect(screen.getByText('2 个资源文件')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /发布 Skill/ })).toBeEnabled()
+  })
+
+  it('按来源和状态筛选时向服务端传递查询参数', async () => {
+    const urls: string[] = []
+    server.use(
+      http.get('*/api/v1/teams/team-1/skills', ({ request }) => {
+        urls.push(request.url)
+        return ok(skillPage)
+      }),
+    )
+    const user = userEvent.setup()
+    renderList()
+    await screen.findByText('代码评审')
+    await user.selectOptions(screen.getByLabelText('筛选技能来源'), 'team')
+    await user.selectOptions(screen.getByLabelText('筛选技能状态'), 'disabled')
+    expect(urls.some((url) => url.includes('source=team') && url.includes('enabled=false'))).toBe(true)
   })
 
   it('浏览者不显示发布入口', async () => {
