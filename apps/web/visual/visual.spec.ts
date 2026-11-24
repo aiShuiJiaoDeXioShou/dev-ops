@@ -511,7 +511,7 @@ test.describe('[desktop] 关键弹窗', () => {
       await page.getByRole('button', { name: trigger }).first().click()
       const dialog = page.getByRole('dialog').first()
       await expect(dialog).toBeVisible()
-      await expectPageSnapshot(page, testInfo, name)
+      await expectPageSnapshot(page, testInfo, name, dialog)
       const box = await dialog.boundingBox()
       expect(box).not.toBeNull()
       expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual((await page.viewportSize())!.height + 1)

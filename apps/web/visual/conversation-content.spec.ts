@@ -162,16 +162,17 @@ test('[desktop] [mobile] 输入区随文字增高，附件可重试并随消息�
   await expect(page.getByRole('table').getByRole('cell', { name: '查看项目' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('conversation-markdown.png'), animations: 'disabled' })
 
-  const actions = page.getByRole('button', { name: '消息操作' })
-  await actions.press('Enter')
-  const uploadAction = page.getByRole('menuitem', { name: '上传文件' })
+  await expect(page.getByRole('button', { name: '消息操作' })).toHaveCount(0)
+  const uploadAction = page.getByRole('button', { name: '上传附件' })
   await expect(uploadAction).toBeEnabled()
-  const iconSizes = await page
-    .getByRole('menu')
-    .locator('[role="menuitem"] > svg')
-    .evaluateAll((icons) => icons.map((icon) => [getComputedStyle(icon).width, getComputedStyle(icon).height]))
-  expect(iconSizes).toEqual(Array.from({ length: 4 }, () => ['16px', '16px']))
-  await page.screenshot({ path: testInfo.outputPath('conversation-menu.png'), animations: 'disabled' })
+  const iconSize = await uploadAction
+    .locator('svg')
+    .evaluate((icon) => [getComputedStyle(icon).width, getComputedStyle(icon).height])
+  // 工具栏采用共享按钮的 1rem 图标，工作区根字号为 14px。
+  expect(iconSize).toEqual(['14px', '14px'])
+  await uploadAction.focus()
+  await expect(uploadAction).toBeFocused()
+  await page.screenshot({ path: testInfo.outputPath('conversation-attachment-picker.png'), animations: 'disabled' })
   const choosing = page.waitForEvent('filechooser')
   await uploadAction.press('Enter')
   await (await choosing).setFiles({ name: attachment.fileName, mimeType: 'text/markdown', buffer: Buffer.from('test') })

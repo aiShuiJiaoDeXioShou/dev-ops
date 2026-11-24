@@ -28,7 +28,11 @@
       - button "更多节点操作"
       - term: 测试负责人
       - definition:
-        - button "测试负责人": 管理员
+        - combobox "测试负责人":
+          - text: 管理员
+          - button "移除 管理员"
+          - textbox "搜索姓名或邮箱"
+          - text: 已选 1/20
       - term: 节点排期
       - definition: 未设置
       - heading "全部任务 (0/0)" [level=4]
@@ -43,10 +47,18 @@
   - tabpanel "基本信息":
     - term: 研发负责人
     - definition:
-      - button "研发负责人": 开发同学
+      - combobox "研发负责人":
+        - text: 开发同学
+        - button "移除 开发同学"
+        - textbox "搜索姓名或邮箱"
+        - text: 已选 1/20
     - term: 测试负责人
     - definition:
-      - button "测试负责人": 管理员
+      - combobox "测试负责人":
+        - text: 管理员
+        - button "移除 管理员"
+        - textbox "搜索姓名或邮箱"
+        - text: 已选 1/20
     - term:
       - text: 协作人员
       - button "编辑协作人员"
@@ -54,6 +66,7 @@
       - list "协作人员":
         - listitem: 浏览同学
     - heading "需求描述" [level=3]
+    - button "编辑描述"
     - heading "背景" [level=2]
     - paragraph: 平台已完成 V0.1～V0.4b，具备项目、需求、Bug、代码、PR、流水线、产物与环境变量、变更发布、能力与凭据等能力。本次以 dev-ops 仓库自身作为自举项目，跑通一次真实的需求→开发→提测→Bug→回归→验收闭环，并修复全量体验审计中发现的 P0/P1 问题。
     - heading "范围" [level=2]

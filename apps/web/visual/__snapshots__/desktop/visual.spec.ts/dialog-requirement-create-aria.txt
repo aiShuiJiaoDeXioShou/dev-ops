@@ -1,0 +1,36 @@
+- dialog "创建需求":
+  - heading "创建需求" [level=2]
+  - region "基本信息":
+    - text: 标题 （必填）
+    - textbox "标题 （必填）"
+    - text: 内容方式 （必填）
+    - combobox "内容方式 （必填）":
+      - option "内置 Markdown" [selected]
+      - option "外部文档链接"
+    - text: 正文 （必填）
+    - textbox "正文 （必填）"
+    - paragraph: 支持 Markdown，说明背景、目标与范围。
+    - text: 验收标准
+    - textbox "验收标准"
+  - region "负责人与协作人":
+    - text: 研发负责人
+    - combobox "研发负责人":
+      - textbox "搜索姓名或邮箱"
+      - text: 已选 0/20
+    - text: 测试负责人
+    - combobox "测试负责人":
+      - textbox "搜索姓名或邮箱"
+      - text: 已选 0/20
+    - text: 协作人员
+    - combobox "协作人员":
+      - textbox "搜索姓名或邮箱"
+      - text: 已选 0/20
+    - paragraph: 可搜索姓名或邮箱，最多选择 20 人。
+  - region "附件":
+    - text: 附件文件
+    - button "选择文件"
+    - button "选择文件"
+    - paragraph: 单个文件不超过 50 MB，一次最多 10 个；上传完成后才能保存。
+  - button "取消"
+  - button "保存"
+  - button "关闭"
