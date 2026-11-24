@@ -327,7 +327,7 @@ V0.8 扩展已有个人 API Token 的可用接口。服务端按发起人的当�
 
 ## V0.5 Bot 协作接口
 
-团队的 `/api/v1/teams/:teamId` 路径下提供 `bots`、`bot-model-connections`、`bot-model-catalog`、`bot-conversations`、`bot-inbox`、`work-tags` 和 `bot-memories`。会话、任务、运行写操作通过各自的动作路径提交，读取事件用 `GET /api/v1/bot-conversations/:conversationId/events?after=`。游标失效时响应包含 `resetRequired`，页面重新读取消息。排队中的运行返回团队队列位置 `teamQueuePosition`；执行服务离线时，`queueReason` 为 `worker_offline`，运行仍保留在队列。
+团队的 `/api/v1/teams/:teamId` 路径下提供 `bots`、`bot-model-connections`、`bot-model-catalog`、`bot-conversations`、`bot-inbox`、`work-tags` 和 `bot-memories`。会话与运行写操作通过各自的动作路径提交，旧任务仅保留查询；读取事件用 `GET /api/v1/bot-conversations/:conversationId/events?after=`。游标失效时响应包含 `resetRequired`，页面重新读取消息。排队中的运行返回团队队列位置 `teamQueuePosition`；执行服务离线时，`queueReason` 为 `worker_offline`，运行仍保留在队列。
 
 会话列表仅返回当前成员可见的会话。`botAvatars` 最多返回四位当前 Bot，群聊优先返回 Leader。`lastMessagePreview` 是最新消息的纯文本摘要，没有消息时为 `null`。运行状态事件的 `botId` 标识当前执行者。
 
@@ -335,9 +335,9 @@ V0.8 扩展已有个人 API Token 的可用接口。服务端按发起人的当�
 
 团队管理员可在 `POST /api/v1/teams/:teamId/bots` 的请求中传入 `modelBinding: { connectionId, modelId }`，在创建 Bot 的同一事务中绑定团队模型连接与模型。常规创建允许省略该字段，已有 Bot 通过 `POST /api/v1/bots/:botId/bind-model` 更新绑定。
 
-模型 API Key 由管理员保存在团队凭据库。使用本地 `.env` 的 `DEEPSEEK_API_KEY` 验收时，先构建工程，再从根目录运行 `DEVOPS_BOT_LIVE_TEST=1 node --test tests/e2e/bot-collaboration.test.mjs`。通过订阅登录连接模型时，授权由发起连接的管理员亲自完成。
+模型 API Key 由管理员保存在团队凭据库。`tests/e2e/bot-collaboration.test.mjs` 使用 faux 模型和真实 HTTP、PostgreSQL 验证 CLI、会话待办及运行令牌，不读取真实模型密钥。通过订阅登录连接模型时，授权由发起连接的管理员亲自完成。
 
-Bot 默认启用 pi 的全部本地工具，`accessMode` 默认 `sandbox`。`BOT_WORKSPACE_DIR`（默认 `./bot-data`，相对执行服务工作目录）下按团队 ID / Bot ID 隔离文件。macOS 使用 `sandbox-exec`，Linux 执行主机须安装 `bubblewrap`；`grep` / `find` 需要 `rg` / `fd`，PowerShell 需要 `pwsh`。工具不继承模型或数据库凭据；沙盒不开放业务目录外的文件及直接网络访问，Node、pi 和系统运行库作为只读执行资源开放。联网工具继续通过平台原有的公网读取与审计路径执行。
+Bot 默认启用 pi 的全部本地工具，`accessMode` 默认 `sandbox`。`BOT_WORKSPACE_DIR`（默认 `./bot-data`，相对执行服务工作目录）下按团队 ID / Bot ID 隔离文件。macOS 使用 `sandbox-exec`，Linux 执行主机须安装 `bubblewrap`；`grep` / `find` 需要 `rg` / `fd`，PowerShell 需要 `pwsh`。工具不继承模型或数据库凭据；沙盒不开放业务目录外的文件及直接网络访问，Node、pi 和系统运行库作为只读执行资源开放。联网工具继续通过平台原有的公网读取与审计路径执行。macOS 沙盒中的 CLI 通过只允许访问平台的临时回环代理联网；Linux 沙盒暂不支持该目标限制，因此带平台网络环境的 bash 会明确失败，详见[运行工具与权限](../../docs/architecture/bots-architecture.md#7-平台工具与权限)。
 
 会话右侧「会话设置 → 工具权限」可切换为完全访问。管理员或开发者调用 `POST /api/v1/bots/:botId/set-access`，提交 `{ configVersion, accessMode: "sandbox" | "full" }`；版本冲突返回 `VERSION_CONFLICT`。切换会停止排队运行，并要求执行中的运行在心跳取消时退出。该配置作用于 Bot 的所有会话，后续运行使用新的配置快照。
 
