@@ -432,6 +432,8 @@ node apps/pipeline-agent/dist/index.js
 
 ## 开发验证与质量门禁
 
+本仓库的开发与 Bug 修复须在 DevOps 平台的 `devops` 项目中登记和跟踪。开工、状态流转和交付要求见 [DevOps 事项追踪](AGENTS.md#devops-事项追踪)。
+
 ```bash
 pnpm check                 # 完整门禁：子模块检查、ESLint、Prettier、UI 规范、全量构建、依赖边界、全部测试与 E2E
 pnpm test:db               # 使用本机 PostgreSQL 在隔离临时库验证迁移、权限、无外键一致性与事务
