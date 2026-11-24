@@ -49,12 +49,9 @@ test('README 中的命令组与帮助注册表一致', async () => {
   }
 })
 
-test('V0.8 覆盖清单的每个操作都有可离线解析的帮助', async () => {
-  const coverage = await readFile(
-    new URL('../../../specs/011-v08-cli-business-parity/coverage.md', import.meta.url),
-    'utf8',
-  )
-  const commands = [...coverage.matchAll(/^\| `devops ([a-z -]+)` \|/gm)].map((match) => match[1])
+test('当前覆盖清单的每个操作都有可离线解析的帮助', async () => {
+  const coverage = await readFile(new URL('../WEB-COVERAGE.md', import.meta.url), 'utf8')
+  const commands = [...coverage.matchAll(/^\| `devops ([a-z -]+)`\s+\|/gm)].map((match) => match[1])
   assert.ok(commands.length > 0)
   assert.equal(new Set(commands).size, commands.length)
   for (const path of commands) {

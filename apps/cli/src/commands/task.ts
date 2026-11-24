@@ -3,75 +3,27 @@ import { apiAction, jsonAction, queryAction, writeOptions } from '../lib/api-com
 import type { CliContext } from '../lib/context.ts'
 
 /**
- * 注册会话任务、待处理和验收命令。
+ * 注册历史会话任务的只读查询命令。
  * @param program CLI 根命令。
  * @param context CLI 执行上下文。
- * @returns 无返回值；转换任务状态时由服务端校验可用版本和操作权限。
+ * @returns 无返回值；读取时由服务端校验会话可见权限。
  */
 export function registerTaskCommands(program: Command, context: CliContext): void {
-  const group = program.command('task').description('管理智能体任务、待处理及验收')
-  apiAction(group.command('inbox').description('查询当前团队待处理任务'), context, async ({ business, team }) =>
+  const group = program.command('task').description('只读查询历史智能体任务')
+  apiAction(group.command('inbox').description('查询当前团队等你回复的会话'), context, async ({ business, team }) =>
     business.client.getBotInbox(await team()),
   )
   apiAction(
-    group.command('get').description('查询任务、运行和验收详情').argument('<taskId>', '任务 ID'),
+    group.command('get').description('只读查询历史任务、运行和验收详情').argument('<taskId>', '任务 ID'),
     context,
     ({ business, arg }) => business.client.getBotTask(arg()),
   )
   queryAction(
-    group.command('list').description('列出会话任务').argument('<conversationId>', '会话 ID'),
+    group.command('list').description('只读列出历史会话任务').argument('<conversationId>', '会话 ID'),
     context,
     '/api/v1/bot-conversations/{conversationId}/tasks',
     ({ business, arg }, query) => business.client.listBotTasks(arg(), query),
     'nextCursor',
-  )
-  jsonAction(
-    group.command('create').description('创建会话任务并交给执行智能体').argument('<conversationId>', '会话 ID'),
-    context,
-    '/api/v1/bot-conversations/{conversationId}/tasks',
-    ({ business, arg }, body, write) => business.client.createBotTask(arg(), body, write),
-  )
-  jsonAction(
-    group.command('append').description('追加任务指令').argument('<taskId>', '任务 ID'),
-    context,
-    '/api/v1/bot-tasks/{taskId}/append',
-    ({ business, arg }, body, write) => business.client.appendBotTask(arg(), body, write),
-  )
-  jsonAction(
-    group.command('handoff').description('转交任务给另一智能体').argument('<taskId>', '任务 ID'),
-    context,
-    '/api/v1/bot-tasks/{taskId}/handoff',
-    ({ business, arg }, body, write) => business.client.handoffBotTask(arg(), body, write),
-  )
-  jsonAction(
-    group.command('rerun').description('重新运行任务').argument('<taskId>', '任务 ID'),
-    context,
-    '/api/v1/bot-tasks/{taskId}/rerun',
-    ({ business, arg }, body, write) => business.client.rerunBotTask(arg(), body, write),
-  )
-  jsonAction(
-    group.command('cancel').description('取消任务').argument('<taskId>', '任务 ID'),
-    context,
-    '/api/v1/bot-tasks/{taskId}/cancel',
-    ({ business, arg }, body, write) => business.client.cancelBotTask(arg(), body, write),
-    { confirm: '确定取消该任务？' },
-  )
-  apiAction(
-    group.command('stop').description('停止任务的一次运行').argument('<runId>', '运行 ID'),
-    context,
-    ({ business, arg }) => business.client.stopBotRun(arg(), writeOptions(business)),
-  )
-  jsonAction(
-    group.command('accept').description('验收任务结果').argument('<taskId>', '任务 ID'),
-    context,
-    '/api/v1/bot-tasks/{taskId}/accept',
-    ({ business, arg }, body, write) => business.client.acceptBotTask(arg(), body, write),
-  )
-  jsonAction(
-    group.command('request-changes').description('退回任务结果并填写修改要求').argument('<taskId>', '任务 ID'),
-    context,
-    '/api/v1/bot-tasks/{taskId}/request-changes',
-    ({ business, arg }, body, write) => business.client.requestBotTaskChanges(arg(), body, write),
   )
 }
 

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { runCli } from '../src/cli.ts'
 import { startStubServer, successEnvelope } from './support/stub-server.ts'
 
@@ -42,8 +45,23 @@ test('无 TTY 危险操作缺少 --yes 退出 2 且不发送请求', async (t) =
   assert.equal(requests, 0)
 })
 
-test('无 Token 的业务命令退出 1 且不发起请求', async () => {
-  const result = await execute(['team', 'list', '--json'], { DEV_OPS_SERVER: 'http://127.0.0.1:1' })
+test('无 Token 的业务命令退出 1 且不发起请求', async (t) => {
+  const configDirectory = await mkdtemp(join(tmpdir(), 'devops-cli-no-token-'))
+  const previousConfigHome = process.env.XDG_CONFIG_HOME
+  // 配置文件读取使用进程环境；传给 CLI 的空 env 不会隔离开发者已保存的 Token。
+  process.env.XDG_CONFIG_HOME = configDirectory
+  t.after(async () => {
+    if (previousConfigHome === undefined) delete process.env.XDG_CONFIG_HOME
+    else process.env.XDG_CONFIG_HOME = previousConfigHome
+    await rm(configDirectory, { recursive: true, force: true })
+  })
+  let requests = 0
+  const server = await startStubServer(t, (_request, response) => {
+    requests += 1
+    response.end(successEnvelope({}))
+  })
+  const result = await execute(['team', 'list', '--json'], { DEV_OPS_SERVER: server })
+  assert.equal(requests, 0)
   assert.equal(result.code, 1)
   assert.equal(result.stdout, '')
   const payload = JSON.parse(result.stderr)

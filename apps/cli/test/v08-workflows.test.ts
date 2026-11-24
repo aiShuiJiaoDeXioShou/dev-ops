@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test, type TestContext } from 'node:test'
 import { runCli } from '../src/cli.ts'
-import { failureEnvelope, startStubServer, successEnvelope } from './support/stub-server.ts'
+import { startStubServer, successEnvelope } from './support/stub-server.ts'
 
 const teamId = '2080f0ec-aed8-42f3-81d3-c51b858be074'
 const personalToken = 'devops_pat_cli_fixture'
@@ -33,35 +33,18 @@ async function temporaryDirectory(t: TestContext) {
   return path
 }
 
-test('任务转交先验证 JSON，版本冲突只输出 stderr 并保留服务端错误码', async (t) => {
+test('历史任务仅保留只读命令，写命令在发出请求前拒绝', async (t) => {
   let requests = 0
-  const taskId = randomUUID()
-  const toBotId = randomUUID()
-  const server = await startStubServer(t, async (req, res) => {
+  const server = await startStubServer(t, (_req, res) => {
     requests += 1
-    assert.equal(req.url, `/api/v1/bot-tasks/${taskId}/handoff`)
-    assert.equal(req.headers.authorization, `Bearer ${personalToken}`)
-    const chunks: Buffer[] = []
-    for await (const chunk of req) chunks.push(chunk)
-    assert.equal(JSON.parse(Buffer.concat(chunks).toString()).toBotId, toBotId)
-    res.setHeader('content-type', 'application/json')
-    res.end(failureEnvelope('VERSION_CONFLICT', '任务版本已变更'))
+    res.end(successEnvelope({}))
   })
-  const args = ['task', 'handoff', taskId, '--file', '-']
-  const invalid = await execute(server, args, { version: '1' })
-  assert.equal(invalid.code, 2)
+  for (const command of ['create', 'append', 'handoff', 'rerun', 'cancel', 'stop', 'accept', 'request-changes']) {
+    const result = await execute(server, ['task', command, randomUUID()])
+    assert.equal(result.code, 2, command)
+    assert.equal(result.stdout, '')
+  }
   assert.equal(requests, 0)
-  const stale = await execute(server, args, {
-    version: 1,
-    toBotId,
-    reason: '转交',
-    summary: '摘要',
-    unfinished: '续做',
-  })
-  assert.equal(stale.code, 1, stale.stderr)
-  assert.equal(stale.stdout, '')
-  assert.equal(JSON.parse(stale.stderr).code, 'VERSION_CONFLICT')
-  assert.equal(requests, 1)
 })
 
 test('游标列表保持服务端游标语义并按 --all 读取后续页', async (t) => {

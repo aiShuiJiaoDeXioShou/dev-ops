@@ -119,20 +119,21 @@ devops requirement submit-test <requirementId> --test-owner <userId> --test-owne
 devops conversation list --all --json
 devops conversation send <conversationId> --file ./message.json
 devops conversation events <conversationId> --run <runId> --follow
-devops task get <taskId> --json
-devops task accept <taskId> --file ./decision.json
+devops task list <conversationId> --json
+devops task get <taskId> --json # 历史任务仅供只读查询
+devops task inbox --json # 等你回复的会话
 devops skill export <skillId> --output ./skill.zip
 ```
 
 附件上传返回 `data.attachment.id`。需求或 Bug 更新时，重复的 `--attachment` 构成完整附件列表。添加新附件时一并传入要保留的附件 ID。`--plan-file` 接受流程节点数组，每个节点包含 `id`、`title`、`startsOn`、`endsOn` 和 `tasks`。日期采用 `YYYY-MM-DD` 或 `null`。
 
-消息请求示例为 `{"text":"检查当前交付","clientRequestId":"<每次发送唯一的 UUID>"}`。验收读取 `task get` 中的结果 ID，然后提交 `{"resultId":"<resultId>","comment":"验收通过"}`。
+消息请求示例为 `{"text":"检查当前交付","clientRequestId":"<每次发送唯一的 UUID>"}`。长任务直接通过会话消息交给 Bot；`task` 仅保留历史任务查询和等你回复的会话汇总，创建、补充、转交及验收命令已移除。需要验收的工作使用项目需求或 Bug。
 
 新增命令的完整清单见 [V0.8 逐操作覆盖](WEB-COVERAGE.md)。复杂请求用 `--file <path>` 提交 JSON，筛选参数用 `--query-file <path>`。具体字段见各命令 `--help` 中的接口契约。游标列表用 `--cursor` 读取下一页，或用 `--all` 逐页收集。跟踪模式持续输出文本，分页查询可用 `--json`。
 
 节点创建和轮换要求 `--token-out <path>`，命令将一次性令牌写入新文件，权限为 `0600`。新建或轮换的凭据值、模型 API Key 及储存桶密钥用 `--file -` 从标准输入读取。使用文件或环境中的个人 Token 为这些请求认证。
 
-升级服务端后，已签发的 API Token 会继承账号可以执行的新增操作，含任务验收、项目恢复及储存桶管理。个人 GitHub 绑定和模型订阅授权在 Web 发起。`git account status` 和 `bot model list` 可查询当前状态。授权范围及保留的 Web 操作见 [V0.8 规格](../../specs/011-v08-cli-business-parity/spec.md#2-授权与调用)。
+升级服务端后，已签发的 API Token 会继承账号可以执行的新增操作，含项目恢复及储存桶管理。个人 GitHub 绑定和模型订阅授权在 Web 发起。`git account status` 和 `bot model list` 可查询当前状态。授权范围及保留的 Web 操作见 [V0.8 规格](../../specs/011-v08-cli-business-parity/spec.md#2-授权与调用)。
 
 ## 输出与退出码
 
