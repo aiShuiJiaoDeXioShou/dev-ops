@@ -42,6 +42,7 @@ import {
   DropdownMenuTrigger,
 } from '@/shared/ui/controls/dropdown-menu'
 import { Markdown } from '@/shared/lib/markdown'
+import { repositoryMarkdownUrl } from '@/features/code/lib/markdown-url'
 import { highlightCode } from '@/shared/lib/highlight'
 import 'highlight.js/styles/github.css'
 
@@ -431,7 +432,18 @@ function ProjectCodePage({ projectId }: { projectId: string }) {
               <>
                 {/\.(md|mdx)$/i.test(activePath) && viewMode === 'preview' ? (
                   <div className="code-markdown-preview">
-                    <Markdown>{file.data.data.content}</Markdown>
+                    <Markdown
+                      resolveUrl={(url, kind) =>
+                        repositoryMarkdownUrl(url, kind, {
+                          providerKey: repository.providerKey,
+                          webUrl: repository.webUrl,
+                          branch: currentBranch ?? repository.defaultBranch,
+                          path: activePath,
+                        })
+                      }
+                    >
+                      {file.data.data.content}
+                    </Markdown>
                   </div>
                 ) : (
                   <pre className="code">

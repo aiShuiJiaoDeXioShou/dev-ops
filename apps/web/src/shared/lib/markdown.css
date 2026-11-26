@@ -1,0 +1,64 @@
+@layer components {
+  .github-markdown {
+    --md-ink: var(--foreground);
+    --md-secondary: var(--muted-foreground);
+    --md-tertiary: var(--muted-foreground);
+    --md-caption: var(--muted-foreground);
+    --md-line-1: var(--border);
+    --md-line-2: var(--border);
+    --md-line-3: var(--border);
+    --md-soft: var(--muted);
+    --md-inline: var(--muted);
+    --md-blue: var(--primary);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .github-markdown img {
+    display: inline;
+    vertical-align: middle;
+    max-width: 100%;
+    height: auto;
+    border-radius: 0;
+  }
+  .github-markdown th,
+  .github-markdown td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+  }
+  .github-markdown th {
+    background: var(--muted);
+    font-weight: 600;
+  }
+  .github-markdown .contains-task-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  .github-markdown summary {
+    cursor: pointer;
+  }
+  .github-markdown :is(summary, a):focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .github-markdown .katex-display,
+  .markdown-diagram {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .github-markdown :is(h1, h2, h3, h4, h5, h6) {
+    scroll-margin-top: 16px;
+  }
+
+  .github-markdown .markdown-alert {
+    border-left-color: var(--primary);
+  }
+  .github-markdown .markdown-alert[data-alert='TIP'] {
+    border-left-color: var(--success);
+  }
+  .github-markdown .markdown-alert[data-alert='WARNING'] {
+    border-left-color: var(--warning);
+  }
+  .github-markdown .markdown-alert[data-alert='CAUTION'] {
+    border-left-color: var(--destructive);
+  }
+}
