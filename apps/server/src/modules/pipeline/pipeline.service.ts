@@ -15,17 +15,17 @@ import { findActivePipelineLeaseByRun, findPipelineNodeSummariesByIds } from './
 import { buildCodeChangeRunPlan, generateRunPlan, PipelinePlanError, type RunPlanTemplate } from './pipeline.planner.ts'
 import {
   aggregatePipelineRunLogs,
+  findPipelineRunDetailExtras,
   findPipelineRunWithPlan,
-  findLatestRunsByWorkflowPaths,
+  findRecentRunsByWorkflowPaths,
   findPipelineArtifactById,
   findPipelineArtifacts,
   findPipelineRunById,
   findPipelineRunByIdempotency,
-  findPipelineRunInputs,
   findPipelineRunLogs,
   findPipelineRuns,
   findPipelineRunStep,
-  findPipelineRunSteps,
+  findPipelineRunStepsByRunIds,
   insertPipelineRun,
   insertPipelineRunSteps,
   skipPendingPipelineRunSteps,
@@ -35,6 +35,7 @@ import {
 import { isPipelineRunStatus, isTerminalRunStatus, parseRunPlanTemplate } from './pipeline.state.ts'
 import type { PipelineStorage } from './pipeline.storage.ts'
 import {
+  durationSecondsOfRunRow,
   pipelinePageView,
   toPipelineArtifactView,
   toPipelineRunLogStatView,
@@ -45,6 +46,7 @@ import {
   type PipelineLogReadView,
   type PipelinePageView,
   type PipelineRunDetailView,
+  type PipelineRunPlanJobView,
   type PipelineRunView,
   type PipelineWorkflowDetailView,
   type PipelineWorkflowItemView,
@@ -272,6 +274,44 @@ function summarizeWorkflowPlan(workflow: ParsedWorkflow): PipelineWorkflowPlanSu
   }
 }
 
+/** 从运行计划与工作流快照提取作业拓扑摘要；不包含镜像、环境变量、命令与密钥引用。 */
+function extractPlanJobs(
+  workflowPath: string,
+  workflowSnapshot: string | null,
+  rawRunPlan: unknown,
+  maxBytes: number,
+): PipelineRunPlanJobView[] {
+  let template: RunPlanTemplate
+  try {
+    template = parseRunPlanTemplate(rawRunPlan)
+  } catch {
+    return []
+  }
+  const needsByJobId = new Map<string, string[]>()
+  if (workflowSnapshot) {
+    const parsed = parseWorkflowFile({ path: workflowPath, content: workflowSnapshot, maxBytes })
+    if (parsed.ok) {
+      for (const job of parsed.workflow.jobs) needsByJobId.set(job.id, job.needs)
+    }
+  }
+  return template.jobs.map((job) => ({
+    id: job.id,
+    name: job.name,
+    runsOn: [...job.runsOn],
+    needs: needsByJobId.get(job.id) ?? [],
+    stepIndexes: job.steps.map((step) => step.index),
+  }))
+}
+
+/** 计算解析成功工作流的超时分钟摘要；任一作业显式声明 timeoutMinutes 时取最大值。 */
+function workflowTimeoutMinutes(workflow: ParsedWorkflow): number | null {
+  const timeouts = workflow.jobs
+    .map((job) => job.timeoutMinutes)
+    .filter((value): value is number => typeof value === 'number')
+  if (timeouts.length === 0) return null
+  return Math.max(...timeouts)
+}
+
 /**
  * 创建平台流水线控制面服务。
  * @param deps 数据库、code 读取端口、本地存储与配置。
@@ -438,9 +478,11 @@ export function createPipelineService(deps: PipelineServiceDeps) {
   async function runViewList(rows: Awaited<ReturnType<typeof findPipelineRuns>>['rows']): Promise<PipelineRunView[]> {
     const userIds = [...new Set(rows.map((row) => row.triggered_by_user_id))]
     const nodeIds = rows.flatMap((row) => (row.node_id === null ? [] : [row.node_id]))
-    const [userRefs, nodes] = await Promise.all([
+    const runIds = rows.map((row) => row.id)
+    const [userRefs, nodes, stepsByRun] = await Promise.all([
       loadUserRefs(db, userIds),
       findPipelineNodeSummariesByIds(db, nodeIds),
+      findPipelineRunStepsByRunIds(db, runIds),
     ])
     const nodeNames = new Map(nodes.map((node) => [node.id, node.name]))
     const now = new Date()
@@ -448,6 +490,7 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       toPipelineRunView(row, {
         initiator: userNameOf(row.triggered_by_user_id, userRefs),
         nodeName: row.node_id === null ? null : (nodeNames.get(row.node_id) ?? null),
+        steps: (stepsByRun.get(row.id) ?? []).map(toPipelineRunStepView),
         now,
       }),
     )
@@ -456,25 +499,27 @@ export function createPipelineService(deps: PipelineServiceDeps) {
   async function loadRunDetail(runId: string): Promise<PipelineRunDetailView> {
     const row = await findPipelineRunById(db, runId)
     if (!row) throw new ApiError(ERROR_CODES.PIPELINE_RUN_NOT_FOUND, '流水线运行不存在')
-    const [views, steps, artifacts, logStats, inputRow] = await Promise.all([
+    const [views, artifacts, logStats, extrasRow] = await Promise.all([
       runViewList([row]),
-      findPipelineRunSteps(db, runId),
       findPipelineArtifacts(db, runId),
       aggregatePipelineRunLogs(db, runId),
-      findPipelineRunInputs(db, runId),
+      findPipelineRunDetailExtras(db, runId),
     ])
     const view = views[0]
     if (!view) throw new ApiError(ERROR_CODES.PIPELINE_RUN_NOT_FOUND, '流水线运行不存在')
     const inputSummary: Record<string, string | number | boolean | null> = {}
-    for (const [name, value] of Object.entries(inputRow?.inputs ?? {})) {
+    for (const [name, value] of Object.entries(extrasRow?.inputs ?? {})) {
       if (typeof value === 'string') inputSummary[name] = maskInputValue(name, value)
       else if (typeof value === 'number' || typeof value === 'boolean') inputSummary[name] = value
     }
+    const workflowSnapshot = extrasRow?.workflow_snapshot?.trim() ? extrasRow.workflow_snapshot : null
+    const planJobs = extractPlanJobs(row.workflow_path, workflowSnapshot, extrasRow?.run_plan, config.workflowMaxBytes)
     const items = logStats.map(toPipelineRunLogStatView)
     return {
       ...view,
       inputs: inputSummary,
-      steps: steps.map(toPipelineRunStepView),
+      workflowSnapshot,
+      planJobs,
       artifacts: artifacts.map(toPipelineArtifactView),
       logs: { items, totalSizeBytes: items.reduce((total, item) => total + item.sizeBytes, 0) },
     }
@@ -508,31 +553,68 @@ export function createPipelineService(deps: PipelineServiceDeps) {
       .map((entry) => entry.path)
       .sort()
     const commitSha = await resolveCommitSha(actor, projectId, repository.id, ref)
-    // 先读取最近运行，再逐个读取并解析文件；不能把依赖 lastRuns 的回调放进入参求值顺序不保证的表达式。
-    const lastRuns = await findLatestRunsByWorkflowPaths(db, projectId, workflowPaths)
+    // 先读取最近运行，再逐个读取并解析文件；不能把依赖 recentRuns 的回调放进入参求值顺序不保证的表达式。
+    const recentRuns = await findRecentRunsByWorkflowPaths(db, projectId, workflowPaths, 5)
+    const now = new Date()
     const items = await Promise.all(
       workflowPaths.map(async (path): Promise<PipelineWorkflowItemView> => {
         const file = await readWorkflowFile(actor, projectId, repository.id, ref, path)
-        const lastRunRow = lastRuns.get(path)
+        const history = recentRuns.get(path) ?? []
+        const lastRunRow = history[0]
         const lastRun = lastRunRow
-          ? { runId: lastRunRow.id, status: lastRunRow.status, createdAt: lastRunRow.created_at.toISOString() }
+          ? {
+              runId: lastRunRow.id,
+              status: lastRunRow.status,
+              createdAt: lastRunRow.created_at.toISOString(),
+              durationSeconds: durationSecondsOfRunRow(lastRunRow, now),
+              ref: lastRunRow.git_ref,
+            }
           : null
+        const recentStatuses = history.map((item) => item.status)
         if (file.truncated) {
           return {
             path,
             name: path.split('/').pop() ?? path,
             valid: false,
             parseErrors: [{ code: 'WORKFLOW_PARSE_ERROR', message: '工作流文件超过读取上限', fieldPath: path }],
+            runsOn: [],
+            jobCount: 0,
+            stepCount: 0,
+            inputCount: 0,
+            timeoutMinutes: null,
+            recentStatuses,
             lastRun,
           }
         }
         const parsed = parseWorkflowFile({ path, content: file.content, maxBytes: config.workflowMaxBytes })
-        if (parsed.ok) return { path, name: parsed.workflow.name, valid: true, parseErrors: [], lastRun }
+        if (parsed.ok) {
+          const runsOn = [...new Set(parsed.workflow.jobs.map((job) => job.runsOn))]
+          const stepCount = parsed.workflow.jobs.reduce((sum, job) => sum + job.steps.length, 0)
+          return {
+            path,
+            name: parsed.workflow.name,
+            valid: true,
+            parseErrors: [],
+            runsOn,
+            jobCount: parsed.workflow.jobs.length,
+            stepCount,
+            inputCount: Object.keys(parsed.workflow.inputs).length,
+            timeoutMinutes: workflowTimeoutMinutes(parsed.workflow),
+            recentStatuses,
+            lastRun,
+          }
+        }
         return {
           path,
           name: path.split('/').pop() ?? path,
           valid: false,
           parseErrors: parsed.issues.map(toParseErrorView),
+          runsOn: [],
+          jobCount: 0,
+          stepCount: 0,
+          inputCount: 0,
+          timeoutMinutes: null,
+          recentStatuses,
           lastRun,
         }
       }),

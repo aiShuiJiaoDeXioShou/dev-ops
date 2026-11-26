@@ -116,7 +116,13 @@ const parseErrorSchema = Type.Object({
 })
 
 const lastRunSchema = Type.Union([
-  Type.Object({ runId: Type.String(), status: Type.String(), createdAt: Type.String() }),
+  Type.Object({
+    runId: Type.String(),
+    status: Type.String(),
+    createdAt: Type.String(),
+    durationSeconds: Type.Union([Type.Integer(), Type.Null()]),
+    ref: Type.String(),
+  }),
   Type.Null(),
 ])
 
@@ -125,6 +131,12 @@ const workflowItemSchema = Type.Object({
   name: Type.String(),
   valid: Type.Boolean(),
   parseErrors: Type.Array(parseErrorSchema),
+  runsOn: Type.Array(Type.String()),
+  jobCount: Type.Integer(),
+  stepCount: Type.Integer(),
+  inputCount: Type.Integer(),
+  timeoutMinutes: Type.Union([Type.Integer(), Type.Null()]),
+  recentStatuses: Type.Array(Type.String()),
   lastRun: lastRunSchema,
 })
 
@@ -169,6 +181,26 @@ const workflowDetailSchema = Type.Object({
 
 const nullableString = Type.Union([Type.String(), Type.Null()])
 
+const stepViewSchema = Type.Object({
+  index: Type.Integer(),
+  name: Type.String(),
+  kind: Type.String(),
+  status: Type.String(),
+  exitCode: Type.Union([Type.Integer(), Type.Null()]),
+  errorCode: nullableString,
+  errorMessage: nullableString,
+  startedAt: nullableString,
+  finishedAt: nullableString,
+})
+
+const planJobViewSchema = Type.Object({
+  id: Type.String(),
+  name: Type.String(),
+  runsOn: Type.Array(Type.String()),
+  needs: Type.Array(Type.String()),
+  stepIndexes: Type.Array(Type.Integer()),
+})
+
 export const pipelineRunViewSchema = Type.Object({
   runId: uuidSchema,
   projectId: uuidSchema,
@@ -192,18 +224,7 @@ export const pipelineRunViewSchema = Type.Object({
   assignedAt: nullableString,
   startedAt: nullableString,
   finishedAt: nullableString,
-})
-
-const stepViewSchema = Type.Object({
-  index: Type.Integer(),
-  name: Type.String(),
-  kind: Type.String(),
-  status: Type.String(),
-  exitCode: Type.Union([Type.Integer(), Type.Null()]),
-  errorCode: nullableString,
-  errorMessage: nullableString,
-  startedAt: nullableString,
-  finishedAt: nullableString,
+  steps: Type.Array(stepViewSchema),
 })
 
 const artifactViewSchema = Type.Object({
@@ -229,7 +250,8 @@ const runDetailSchema = Type.Intersect([
   pipelineRunViewSchema,
   Type.Object({
     inputs: Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])),
-    steps: Type.Array(stepViewSchema),
+    workflowSnapshot: nullableString,
+    planJobs: Type.Array(planJobViewSchema),
     artifacts: Type.Array(artifactViewSchema),
     logs: Type.Object({ items: Type.Array(logStatViewSchema), totalSizeBytes: Type.Integer() }),
   }),

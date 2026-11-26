@@ -320,6 +320,39 @@ export async function findPipelineRuns(db: Database, projectId: string, filters:
 }
 
 /**
+ * 查询项目内多个工作流路径的最近若干次运行，供工作流列表展示 lastRun 与近期状态趋势。
+ * @param db 数据库连接。
+ * @param projectId 项目标识。
+ * @param workflowPaths 工作流路径列表。
+ * @param limitPerPath 每个路径最多保留的最近运行条数，默认 5 条。
+ * @returns 每个路径按创建时间倒序排列的最近运行列表；限定总读取上限避免无限查询。
+ */
+export async function findRecentRunsByWorkflowPaths(
+  db: Database,
+  projectId: string,
+  workflowPaths: string[],
+  limitPerPath = 5,
+) {
+  const paths = [...new Set(workflowPaths)].slice(0, 100)
+  if (paths.length === 0) return new Map<string, PipelineRunListRow[]>()
+  const rows = await db
+    .select(runListColumns)
+    .from(pipelineRun)
+    .where(and(eq(pipelineRun.project_id, projectId), inArray(pipelineRun.workflow_path, paths)))
+    .orderBy(desc(pipelineRun.created_at), desc(pipelineRun.id))
+    .limit(500)
+  const grouped = new Map<string, PipelineRunListRow[]>()
+  for (const row of rows) {
+    const list = grouped.get(row.workflow_path) ?? []
+    if (list.length < limitPerPath) {
+      list.push(row)
+      grouped.set(row.workflow_path, list)
+    }
+  }
+  return grouped
+}
+
+/**
  * 查询项目内多个工作流路径的最近一次运行，供工作流列表展示 lastRun。
  * @param db 数据库连接。
  * @param projectId 项目标识。
@@ -327,17 +360,11 @@ export async function findPipelineRuns(db: Database, projectId: string, filters:
  * @returns 每个路径最新一条运行摘要的 Map；限定读取上限避免无限查询。
  */
 export async function findLatestRunsByWorkflowPaths(db: Database, projectId: string, workflowPaths: string[]) {
-  const paths = [...new Set(workflowPaths)].slice(0, 100)
-  if (paths.length === 0) return new Map<string, PipelineRunListRow>()
-  const rows = await db
-    .select(runListColumns)
-    .from(pipelineRun)
-    .where(and(eq(pipelineRun.project_id, projectId), inArray(pipelineRun.workflow_path, paths)))
-    .orderBy(desc(pipelineRun.created_at), desc(pipelineRun.id))
-    .limit(500)
+  const grouped = await findRecentRunsByWorkflowPaths(db, projectId, workflowPaths, 1)
   const latest = new Map<string, PipelineRunListRow>()
-  for (const row of rows) {
-    if (!latest.has(row.workflow_path)) latest.set(row.workflow_path, row)
+  for (const [path, list] of grouped) {
+    const first = list[0]
+    if (first) latest.set(path, first)
   }
   return latest
 }
@@ -417,6 +444,29 @@ export async function findPipelineRunSteps(db: PipelineExecutor, runId: string) 
     .from(pipelineRunStep)
     .where(eq(pipelineRunStep.run_id, runId))
     .orderBy(asc(pipelineRunStep.step_index))
+}
+
+/**
+ * 批量查询多个运行的步骤快照，供运行历史列表展示步骤进度条，避免 N+1 查询。
+ * @param db 数据库连接或事务。
+ * @param runIds 运行标识列表；单批最多读取前 100 个唯一标识。
+ * @returns 按 runId 分组且组内按 step_index 升序排列的步骤 Map。
+ */
+export async function findPipelineRunStepsByRunIds(db: PipelineExecutor, runIds: string[]) {
+  const uniqueIds = [...new Set(runIds)].slice(0, 100)
+  if (uniqueIds.length === 0) return new Map<string, PipelineRunStepRow[]>()
+  const rows = await db
+    .select(stepColumns)
+    .from(pipelineRunStep)
+    .where(inArray(pipelineRunStep.run_id, uniqueIds))
+    .orderBy(asc(pipelineRunStep.run_id), asc(pipelineRunStep.step_index))
+  const grouped = new Map<string, PipelineRunStepRow[]>()
+  for (const row of rows) {
+    const list = grouped.get(row.run_id) ?? []
+    list.push(row)
+    grouped.set(row.run_id, list)
+  }
+  return grouped
 }
 
 /** 按运行与序号读取单个步骤。 */
@@ -664,10 +714,27 @@ export async function findPipelineArtifactByRunName(db: PipelineExecutor, runId:
   return row
 }
 
-/** 查询运行触发输入；单独读取避免列表与详情主查询携带大字段。 */
+/** 查询运行触发输入；单独读取避免列表主查询携带大字段。 */
 export async function findPipelineRunInputs(db: PipelineExecutor, runId: string) {
   const [row] = await db
     .select({ inputs: pipelineRun.inputs })
+    .from(pipelineRun)
+    .where(eq(pipelineRun.id, runId))
+    .limit(1)
+  return row
+}
+
+/**
+ * 查询运行详情专用的输入、工作流快照与计划摘要来源字段。
+ * 仅在单条运行详情读取时使用，不在列表接口中读取，避免列表响应携带大字段。
+ */
+export async function findPipelineRunDetailExtras(db: PipelineExecutor, runId: string) {
+  const [row] = await db
+    .select({
+      inputs: pipelineRun.inputs,
+      workflow_snapshot: pipelineRun.workflow_snapshot,
+      run_plan: pipelineRun.run_plan,
+    })
     .from(pipelineRun)
     .where(eq(pipelineRun.id, runId))
     .limit(1)

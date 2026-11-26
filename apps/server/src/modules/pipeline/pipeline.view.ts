@@ -5,7 +5,7 @@ import type {
   PipelineRunStepRow,
 } from './pipeline.repository.ts'
 
-/** 运行摘要视图；字段名对齐 contracts/rest-api.md §4.2。 */
+/** 运行摘要视图；字段名对齐 contracts/rest-api.md §4.2，补充步骤摘要供运行历史进度条展示。 */
 export interface PipelineRunView {
   runId: string
   projectId: string
@@ -29,6 +29,7 @@ export interface PipelineRunView {
   assignedAt: string | null
   startedAt: string | null
   finishedAt: string | null
+  steps: PipelineRunStepView[]
 }
 
 /** 运行步骤视图；只暴露执行事实，不返回工作区路径等内部信息。 */
@@ -42,6 +43,15 @@ export interface PipelineRunStepView {
   errorMessage: string | null
   startedAt: string | null
   finishedAt: string | null
+}
+
+/** 运行计划中的作业结构摘要；仅用于前端拓扑与步骤分组展示，不暴露镜像、环境变量与密钥引用。 */
+export interface PipelineRunPlanJobView {
+  id: string
+  name: string
+  runsOn: string[]
+  needs: string[]
+  stepIndexes: number[]
 }
 
 /** 运行产物视图；downloadUrl 为受鉴权接口路径，不是公开链接。 */
@@ -65,10 +75,11 @@ export interface PipelineRunLogStatView {
   lastSeq: number
 }
 
-/** 运行详情视图；包含输入摘要、发起人、节点摘要、步骤、产物与日志元数据。 */
+/** 运行详情视图；包含输入摘要、发起人、节点摘要、步骤、作业拓扑摘要、工作流快照、产物与日志元数据。 */
 export interface PipelineRunDetailView extends PipelineRunView {
   inputs: Record<string, string | number | boolean | null>
-  steps: PipelineRunStepView[]
+  workflowSnapshot: string | null
+  planJobs: PipelineRunPlanJobView[]
   artifacts: PipelineArtifactView[]
   logs: { items: PipelineRunLogStatView[]; totalSizeBytes: number }
 }
@@ -105,14 +116,22 @@ export interface PipelineWorkflowLastRunView {
   runId: string
   status: string
   createdAt: string
+  durationSeconds: number | null
+  ref: string
 }
 
-/** 工作流列表项。 */
+/** 工作流列表项；补充执行标签、步骤规模与近期运行状态序列，避免工作流目录出现信息空白。 */
 export interface PipelineWorkflowItemView {
   path: string
   name: string
   valid: boolean
   parseErrors: PipelineWorkflowParseErrorView[]
+  runsOn: string[]
+  jobCount: number
+  stepCount: number
+  inputCount: number
+  timeoutMinutes: number | null
+  recentStatuses: string[]
   lastRun: PipelineWorkflowLastRunView | null
 }
 
@@ -184,6 +203,7 @@ export interface PipelinePageView<T> {
 export interface PipelineRunViewExtras {
   initiator: string
   nodeName: string | null
+  steps?: PipelineRunStepView[]
   now?: Date
 }
 
@@ -192,7 +212,7 @@ function toIso(value: Date | null | undefined): string | null {
 }
 
 /** 计算运行耗时（秒）；未开始返回 null，进行中按当前时间计算。 */
-function durationSecondsOf(row: PipelineRunListRow, now: Date): number | null {
+export function durationSecondsOfRunRow(row: PipelineRunListRow, now: Date): number | null {
   const start = row.started_at ?? row.assigned_at ?? row.created_at
   if (!start) return null
   const end = row.finished_at ?? now
@@ -202,7 +222,7 @@ function durationSecondsOf(row: PipelineRunListRow, now: Date): number | null {
 /**
  * 将运行行映射为契约摘要视图。
  * @param row 运行摘要行。
- * @param extras 发起人展示名、节点名与计算耗时用的当前时间。
+ * @param extras 发起人展示名、节点名、步骤摘要与计算耗时用的当前时间。
  * @returns 不包含运行计划、工作流快照与密钥引用的响应视图。
  */
 export function toPipelineRunView(row: PipelineRunListRow, extras: PipelineRunViewExtras): PipelineRunView {
@@ -223,12 +243,13 @@ export function toPipelineRunView(row: PipelineRunListRow, extras: PipelineRunVi
     nodeName: extras.nodeName,
     errorCode: row.error_code,
     errorMessage: row.error_message,
-    durationSeconds: durationSecondsOf(row, extras.now ?? new Date()),
+    durationSeconds: durationSecondsOfRunRow(row, extras.now ?? new Date()),
     cancelRequestedAt: toIso(row.cancel_requested_at),
     createdAt: toIso(row.created_at) ?? '',
     assignedAt: toIso(row.assigned_at),
     startedAt: toIso(row.started_at),
     finishedAt: toIso(row.finished_at),
+    steps: extras.steps ?? [],
   }
 }
 
