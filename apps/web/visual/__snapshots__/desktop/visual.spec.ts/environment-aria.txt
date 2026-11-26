@@ -14,10 +14,39 @@
     - tab "开发 1" [selected]
     - tab "测试 0"
     - tab "生产 0"
+  - link "团队凭据库":
+    - /url: /vault
   - button "新增配置"
-  - list:
-    - listitem:
-      - strong: VISUAL_API_BASE_URL
-      - text: https://api.visual.example.test 普通变量 可用
-      - button "编辑"
-      - button "删除"
+  - text: 开发环境配置 1 普通变量 1 密钥引用 0 待处理失效项 0 开发、测试、生产三套环境严格隔离，不自动继承；敏感密钥统一通过团队凭据引用在流水线运行时注入，页面不回显明文。
+  - combobox "按变量类型筛选":
+    - option "全部类型" [selected]
+    - option "普通变量"
+    - option "密钥引用"
+  - combobox "按状态筛选变量":
+    - option "全部状态" [selected]
+    - option "可用"
+    - option "失效"
+  - textbox "搜索环境变量"
+  - table "开发环境变量列表":
+    - rowgroup:
+      - row "变量名称 值 / 引用凭据 类型 状态 更新时间 操作":
+        - cell "变量名称"
+        - cell "值 / 引用凭据"
+        - cell "类型"
+        - cell "状态"
+        - cell "更新时间"
+        - cell "操作"
+    - rowgroup:
+      - row "VISUAL_API_BASE_URL v1 https://api.visual.example.test 复制 VISUAL_API_BASE_URL 的值 普通变量 可用 2026/11/11 11:00 编辑 删除":
+        - cell "VISUAL_API_BASE_URL v1":
+          - strong: VISUAL_API_BASE_URL
+          - text: v1
+        - cell "https://api.visual.example.test 复制 VISUAL_API_BASE_URL 的值":
+          - text: https://api.visual.example.test
+          - button "复制 VISUAL_API_BASE_URL 的值"
+        - cell "普通变量"
+        - cell "可用"
+        - cell "2026/11/11 11:00"
+        - cell "编辑 删除":
+          - button "编辑"
+          - button "删除"

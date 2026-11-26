@@ -1,0 +1,189 @@
+/* 项目环境变量页样式；全部颜色通过共享设计 Token 输出，支持明暗主题与窄屏布局。 */
+
+.env-root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.env-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.env-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.env-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.env-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.env-metric-label {
+  font-size: 11.5px;
+  color: var(--muted-foreground);
+}
+
+.env-metric-value {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.env-metric-value.danger {
+  color: var(--destructive);
+}
+
+.env-security-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--secondary);
+  font-size: 12.5px;
+  color: var(--muted-foreground);
+}
+
+.env-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.env-filter-selects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.env-filter-select {
+  width: auto;
+  min-width: 124px;
+  height: 32px;
+  font-size: 12.5px;
+}
+
+.env-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 200px;
+  max-width: 280px;
+  flex: 1;
+}
+
+.env-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+
+.env-search-input {
+  padding-left: 30px;
+  height: 32px;
+  font-size: 12.5px;
+}
+
+.env-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.env-value-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 340px;
+}
+
+.env-value-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-value-text.masked {
+  color: var(--muted-foreground);
+  letter-spacing: 0.08em;
+}
+
+.env-cred-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  font-size: 12px;
+  color: var(--foreground);
+  white-space: nowrap;
+}
+
+.env-kind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.env-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.env-empty-jumps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .env-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .env-search-wrap {
+    max-width: none;
+    width: 100%;
+  }
+}

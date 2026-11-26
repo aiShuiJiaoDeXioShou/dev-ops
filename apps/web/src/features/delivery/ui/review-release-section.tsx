@@ -1,16 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, ClipboardCheck, Rocket } from 'lucide-react'
 import { useSession } from '@/features/identity/model/session'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
-import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
+import { formatDateTime } from '@/shared/lib/format'
+import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { Textarea } from '@/shared/ui/controls/textarea'
-import { useToast } from '@/shared/ui/toast'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { StatusBadge, type StatusTone } from '@/shared/ui/status-badge'
+import { useToast } from '@/shared/ui/toast'
 import { releasesQueryOptions, reviewsQueryOptions } from '../api/review-queries'
 
 const REVIEW_LABELS: Record<string, string> = {
@@ -20,16 +25,39 @@ const REVIEW_LABELS: Record<string, string> = {
   withdrawn: '已撤回',
   unknown: '未知',
 }
+
+const REVIEW_TONES: Record<string, StatusTone> = {
+  pending: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  withdrawn: 'neutral',
+  unknown: 'neutral',
+}
+
 const RELEASE_LABELS: Record<string, string> = {
   not_released: '未发布',
   released: '已发布',
   partially_released: '部分发布',
   unknown: '未知',
 }
+
+const RELEASE_TONES: Record<string, StatusTone> = {
+  not_released: 'neutral',
+  released: 'success',
+  partially_released: 'warning',
+  unknown: 'neutral',
+}
+
 type ReviewTarget = 'mini_program' | 'mobile_app'
 type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn'
 
-/** 外部审核与实际发布记录：两者分开表达，审核通过不自动视为已发布。 */
+/**
+ * 外部审核与实际发布记录。
+ *
+ * 两者分开表达，审核通过不自动视为已发布；使用结构化表格与语义状态徽标展示审核进度与实际发布范围。
+ * @param props.projectId 项目标识。
+ * @returns 外部提审与实际发布管理视图。
+ */
 export function ReviewReleaseSection({ projectId }: { projectId: string }) {
   const { role } = useSession()
   const canManage = role === 'admin' || role === 'developer'
@@ -38,30 +66,54 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
   const reviews = useQuery(reviewsQueryOptions(projectId))
   const releases = useQuery(releasesQueryOptions(projectId))
   const [reviewOpen, setReviewOpen] = useState(false)
-  const [reviewForm, setReviewForm] = useState({
+  const [reviewForm, setReviewForm] = useState(() => ({
     targetType: 'mini_program' as ReviewTarget,
     versionLabel: '',
     reviewPlatform: '',
     submittedAt: new Date().toISOString(),
     note: '',
-  })
-  const [statusTarget, setStatusTarget] = useState<{ id: string; version: number } | null>(null)
+  }))
+  const [statusTarget, setStatusTarget] = useState<{ id: string; version: number; versionLabel: string } | null>(null)
   const [statusForm, setStatusForm] = useState<{ reviewStatus: ReviewStatus; reviewReason: string }>({
     reviewStatus: 'approved',
     reviewReason: '',
   })
   const [releaseOpen, setReleaseOpen] = useState(false)
-  const [releaseForm, setReleaseForm] = useState({
+  const [releaseForm, setReleaseForm] = useState(() => ({
     reviewId: '',
     versionLabel: '',
     releaseStatus: 'released' as 'not_released' | 'released' | 'partially_released' | 'unknown',
     releasedAt: new Date().toISOString(),
     scopeNote: '',
-  })
+  }))
+
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['delivery', 'reviews', projectId] })
     await queryClient.invalidateQueries({ queryKey: ['delivery', 'releases', projectId] })
   }
+
+  const openCreateReview = () => {
+    setReviewForm({
+      targetType: 'mini_program',
+      versionLabel: '',
+      reviewPlatform: '',
+      submittedAt: new Date().toISOString(),
+      note: '',
+    })
+    setReviewOpen(true)
+  }
+
+  const openCreateRelease = () => {
+    setReleaseForm({
+      reviewId: '',
+      versionLabel: '',
+      releaseStatus: 'released',
+      releasedAt: new Date().toISOString(),
+      scopeNote: '',
+    })
+    setReleaseOpen(true)
+  }
+
   const createReview = useMutation({
     mutationFn: () =>
       apiClient.createReview(projectId, {
@@ -78,6 +130,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
     },
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
+
   const updateStatus = useMutation({
     mutationFn: () => {
       if (!statusTarget) throw new Error('缺少提审记录')
@@ -94,6 +147,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
     },
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
+
   const createRelease = useMutation({
     mutationFn: () =>
       apiClient.createRelease(projectId, {
@@ -110,6 +164,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
     },
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
+
   const reviewItems = reviews.data?.data.items ?? []
   const releaseItems = releases.data?.data.items ?? []
   const isLoading = reviews.isPending || releases.isPending
@@ -117,20 +172,26 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
   const hasAnyRecord = reviewItems.length > 0 || releaseItems.length > 0
 
   return (
-    <section aria-label="外部审核与发布" className="project-summary-section space-y-6">
-      <div className="row spread flex-wrap gap-3">
-        <p className="small quiet">审核通过不等同于已发布，两类记录分别维护。</p>
+    <section aria-label="外部审核与发布" className="space-y-6">
+      <div className="dlv-info-banner">
+        <span className="inline-flex items-center gap-2">
+          <CheckCircle2 size={15} className="text-muted-foreground" aria-hidden="true" />
+          <span>审核通过不等同于已发布，小程序及应用商店提审与实际发布结果分开维护。</span>
+        </span>
         {canManage ? (
-          <div className="row">
-            <Button type="button" variant="outline" size="sm" onClick={() => setReviewOpen(true)}>
-              记录提审
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={() => setReleaseOpen(true)}>
+          <div className="dlv-review-actions">
+            <Button type="button" variant="outline" size="sm" onClick={openCreateRelease}>
+              <Rocket size={14} aria-hidden="true" />
               记录发布
+            </Button>
+            <Button type="button" size="sm" onClick={openCreateReview}>
+              <ClipboardCheck size={14} aria-hidden="true" />
+              记录提审
             </Button>
           </div>
         ) : null}
       </div>
+
       {!isLoading && !hasLoadError && !hasAnyRecord ? (
         <EmptyState
           mascot="prism"
@@ -138,7 +199,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
           description="记录小程序或移动端应用的提审与发布结果，方便团队追溯上架进度。"
           action={
             canManage ? (
-              <Button type="button" onClick={() => setReviewOpen(true)}>
+              <Button type="button" onClick={openCreateReview}>
                 记录提审
               </Button>
             ) : undefined
@@ -146,11 +207,14 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
         />
       ) : (
         <>
-          <section aria-label="提审记录">
-            <div className="section-heading">
-              <h3>提审记录</h3>
-              <span className="counter">{reviewItems.length}</span>
+          <section aria-label="提审记录" className="dlv-section">
+            <div className="dlv-section-head">
+              <div className="dlv-section-title">
+                <h3>提审记录</h3>
+                <span className="counter">{reviewItems.length}</span>
+              </div>
             </div>
+
             {reviews.isPending ? (
               <CompactListSkeleton rows={3} trailing bordered label="提审记录加载中" />
             ) : reviews.isError && !reviews.data ? (
@@ -161,37 +225,85 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
                 onRetry={() => void reviews.refetch()}
               />
             ) : reviewItems.length === 0 ? (
-              <p className="muted">还没有提审记录。</p>
+              <p className="text-sm text-muted-foreground">还没有提审记录。</p>
             ) : (
-              <ul className="plain-list">
-                {reviewItems.map((review) => (
-                  <li key={review.id}>
-                    <span>
-                      {review.targetType === 'mini_program' ? '小程序' : '移动端应用'} {review.versionLabel}
-                    </span>
-                    <span className="muted">{review.reviewPlatform}</span>
-                    <span className="tag">{REVIEW_LABELS[review.reviewStatus] ?? review.reviewStatus}</span>
-                    <span className="muted">{review.submittedAt}</span>
-                    {canManage ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setStatusTarget({ id: review.id, version: review.version })}
-                      >
-                        更新审核状态
-                      </Button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
+              <div className="table-wrap">
+                <Table aria-label="提审记录列表">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>版本与对象</TableHead>
+                      <TableHead>提审平台</TableHead>
+                      <TableHead>审核状态</TableHead>
+                      <TableHead>提审时间</TableHead>
+                      <TableHead>说明 / 审核原因</TableHead>
+                      {canManage ? <TableHead>操作</TableHead> : null}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reviewItems.map((review) => (
+                      <TableRow key={review.id}>
+                        <TableCell>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">
+                              {review.targetType === 'mini_program' ? '小程序' : '移动端应用'}
+                            </Badge>
+                            <strong className="mono">{review.versionLabel}</strong>
+                          </div>
+                        </TableCell>
+                        <TableCell>{review.reviewPlatform}</TableCell>
+                        <TableCell>
+                          <StatusBadge tone={REVIEW_TONES[review.reviewStatus] ?? 'neutral'}>
+                            {REVIEW_LABELS[review.reviewStatus] ?? review.reviewStatus}
+                          </StatusBadge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{formatDateTime(review.submittedAt)}</TableCell>
+                        <TableCell className="text-muted-foreground whitespace-normal">
+                          {review.reviewReason ?? review.note ?? '—'}
+                        </TableCell>
+                        {canManage ? (
+                          <TableCell>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setStatusForm({
+                                  reviewStatus:
+                                    review.reviewStatus === 'pending' ||
+                                    review.reviewStatus === 'approved' ||
+                                    review.reviewStatus === 'rejected' ||
+                                    review.reviewStatus === 'withdrawn'
+                                      ? review.reviewStatus
+                                      : 'approved',
+                                  reviewReason: review.reviewReason ?? '',
+                                })
+                                setStatusTarget({
+                                  id: review.id,
+                                  version: review.version,
+                                  versionLabel: review.versionLabel,
+                                })
+                              }}
+                            >
+                              更新审核状态
+                            </Button>
+                          </TableCell>
+                        ) : null}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </section>
-          <section aria-label="实际发布">
-            <div className="section-heading">
-              <h3>实际发布</h3>
-              <span className="counter">{releaseItems.length}</span>
+
+          <section aria-label="实际发布" className="dlv-section">
+            <div className="dlv-section-head">
+              <div className="dlv-section-title">
+                <h3>实际发布</h3>
+                <span className="counter">{releaseItems.length}</span>
+              </div>
             </div>
+
             {releases.isPending ? (
               <CompactListSkeleton rows={3} trailing bordered label="发布记录加载中" />
             ) : releases.isError && !releases.data ? (
@@ -202,17 +314,40 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
                 onRetry={() => void releases.refetch()}
               />
             ) : releaseItems.length === 0 ? (
-              <p className="muted">还没有发布记录。</p>
+              <p className="text-sm text-muted-foreground">还没有发布记录。</p>
             ) : (
-              <ul className="plain-list">
-                {releaseItems.map((release) => (
-                  <li key={release.id}>
-                    <span>{release.versionLabel}</span>
-                    <span className="tag">{RELEASE_LABELS[release.releaseStatus] ?? release.releaseStatus}</span>
-                    <span className="muted">{release.releasedAt ?? '发布时间未知'}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="table-wrap">
+                <Table aria-label="实际发布列表">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>版本标识</TableHead>
+                      <TableHead>发布结果</TableHead>
+                      <TableHead>发布时间</TableHead>
+                      <TableHead>发布范围说明</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {releaseItems.map((release) => (
+                      <TableRow key={release.id}>
+                        <TableCell>
+                          <strong className="mono">{release.versionLabel}</strong>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge tone={RELEASE_TONES[release.releaseStatus] ?? 'neutral'}>
+                            {RELEASE_LABELS[release.releaseStatus] ?? release.releaseStatus}
+                          </StatusBadge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {release.releasedAt ? formatDateTime(release.releasedAt) : '发布时间未知'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground whitespace-normal">
+                          {release.scopeNote ?? '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </section>
         </>
@@ -247,6 +382,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <Input
                 value={reviewForm.versionLabel}
                 maxLength={200}
+                placeholder="例如 v1.2.0"
                 onChange={(event) => setReviewForm({ ...reviewForm, versionLabel: event.target.value })}
               />
             </label>
@@ -255,6 +391,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <Input
                 value={reviewForm.reviewPlatform}
                 maxLength={200}
+                placeholder="例如 微信小程序、App Store、华为应用市场"
                 onChange={(event) => setReviewForm({ ...reviewForm, reviewPlatform: event.target.value })}
               />
             </label>
@@ -271,7 +408,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
                 取消
               </Button>
               <Button type="submit" disabled={createReview.isPending}>
-                保存
+                {createReview.isPending ? '保存中…' : '保存'}
               </Button>
             </DialogFooter>
           </form>
@@ -296,6 +433,11 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
             <DialogHeader>
               <DialogTitle>更新审核状态</DialogTitle>
             </DialogHeader>
+            {statusTarget ? (
+              <p className="text-sm text-muted-foreground">
+                当前版本：<strong className="mono text-foreground">{statusTarget.versionLabel}</strong>
+              </p>
+            ) : null}
             <label className="block space-y-1.5 text-sm font-medium">
               审核状态
               <Select
@@ -309,7 +451,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               </Select>
             </label>
             <label className="block space-y-1.5 text-sm font-medium">
-              原因
+              原因（拒绝或撤回时必填）
               <Input
                 value={statusForm.reviewReason}
                 maxLength={1000}
@@ -321,7 +463,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
                 取消
               </Button>
               <Button type="submit" disabled={updateStatus.isPending}>
-                保存
+                {updateStatus.isPending ? '保存中…' : '保存'}
               </Button>
             </DialogFooter>
           </form>
@@ -346,6 +488,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <Input
                 value={releaseForm.versionLabel}
                 maxLength={200}
+                placeholder="例如 v1.2.0"
                 onChange={(event) => setReleaseForm({ ...releaseForm, versionLabel: event.target.value })}
               />
             </label>
@@ -371,6 +514,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <Textarea
                 value={releaseForm.scopeNote}
                 maxLength={2000}
+                placeholder="例如 全量放量、灰度 20% 用户"
                 onChange={(event) => setReleaseForm({ ...releaseForm, scopeNote: event.target.value })}
               />
             </label>
@@ -379,7 +523,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
                 取消
               </Button>
               <Button type="submit" disabled={createRelease.isPending}>
-                保存
+                {createRelease.isPending ? '保存中…' : '保存'}
               </Button>
             </DialogFooter>
           </form>

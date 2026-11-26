@@ -31,10 +31,13 @@ describe('artifacts-page', () => {
     expect(await screen.findByText('还没有构建产物')).toBeInTheDocument()
   })
 
-  it('展示三环境运行版本并打开确认弹窗', async () => {
+  it('支持多服务切换展示运行版本卡片并打开确认弹窗', async () => {
     server.use(
       http.get('*/api/v1/projects/project-1/services', () =>
-        success([{ id: 'service-1', name: 'Web', status: 'active', description: null, version: 1, repositories: [] }]),
+        success([
+          { id: 'service-1', name: 'Web', status: 'active', description: null, version: 1, repositories: [] },
+          { id: 'service-2', name: 'API', status: 'active', description: null, version: 1, repositories: [] },
+        ]),
       ),
       http.get('*/api/v1/projects/project-1/services/service-1/run-versions', () =>
         success({
@@ -43,16 +46,35 @@ describe('artifacts-page', () => {
               serviceId: 'service-1',
               environment: 'test',
               version: 1,
-              versionLabel: null,
-              verificationStatus: 'unknown',
-              confirmedAt: null,
-              updatedAt: null,
+              versionLabel: 'v1.0.0-web',
+              verificationStatus: 'confirmed',
+              confirmedAt: '2026-11-10T08:00:00.000Z',
+              updatedAt: '2026-11-10T08:00:00.000Z',
               source: 'manual',
             },
           ],
           page: 1,
           pageSize: 3,
-          total: 3,
+          total: 1,
+        }),
+      ),
+      http.get('*/api/v1/projects/project-1/services/service-2/run-versions', () =>
+        success({
+          items: [
+            {
+              serviceId: 'service-2',
+              environment: 'test',
+              version: 2,
+              versionLabel: 'v2.3.0-api',
+              verificationStatus: 'pending',
+              confirmedAt: null,
+              updatedAt: null,
+              source: 'deployment_receipt',
+            },
+          ],
+          page: 1,
+          pageSize: 3,
+          total: 1,
         }),
       ),
       http.get('*/api/v1/projects/project-1/artifacts', () => success({ items: [], page: 1, pageSize: 50, total: 0 })),
@@ -70,7 +92,11 @@ describe('artifacts-page', () => {
         </SessionProvider>
       </QueryClientProvider>,
     )
-    const confirmButton = await screen.findByRole('button', { name: '确认/更正' })
+    expect(await screen.findByText('v1.0.0-web')).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: '切换服务' }), 'service-2')
+    expect(await screen.findByText('v2.3.0-api')).toBeInTheDocument()
+
+    const confirmButton = screen.getByRole('button', { name: '确认/更正' })
     await userEvent.click(confirmButton)
     expect(await screen.findByText('确认运行版本')).toBeInTheDocument()
   })

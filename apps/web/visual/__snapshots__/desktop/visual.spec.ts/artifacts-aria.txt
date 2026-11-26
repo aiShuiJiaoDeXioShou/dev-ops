@@ -15,30 +15,58 @@
     - tab "审核与发布"
   - button "上报构建"
   - tabpanel "构建产物":
-    - tablist "环境":
-      - tab "全部" [selected]
-      - tab "开发"
-      - tab "测试"
-      - tab "生产"
     - region "运行版本":
       - heading "运行版本" [level=3]
-      - text: 开发
-      - strong: 未知版本
-      - text: 版本号 0 未知 尚未确认
-      - button "确认/更正"
-      - text: 测试
-      - strong: 未知版本
-      - text: 版本号 0 未知 尚未确认
-      - button "确认/更正"
-      - text: 生产
-      - strong: 未知版本
-      - text: 版本号 0 未知 尚未确认
-      - button "确认/更正"
+      - text: Web 前端 开发 / 测试 / 生产当前运行版本核对状态
+      - article:
+        - text: 开发环境 未知
+        - strong: 未知版本
+        - text: v0 待记录来源 尚未确认
+        - button "确认/更正"
+      - article:
+        - text: 测试环境 未知
+        - strong: 未知版本
+        - text: v0 待记录来源 尚未确认
+        - button "确认/更正"
+      - article:
+        - text: 生产环境 未知
+        - strong: 未知版本
+        - text: v0 待记录来源 尚未确认
+        - button "确认/更正"
     - region "产物":
-      - list:
-        - listitem:
-          - strong: v0.0.1-visual
-          - text: 测试地址 未指定环境
-          - link "打开产物":
-            - /url: https://example.test/preview
-          - button "构建详情"
+      - heading "构建产物" [level=3]
+      - text: "1"
+      - tablist "环境":
+        - tab "全部" [selected]
+        - tab "开发"
+        - tab "测试"
+        - tab "生产"
+      - combobox "按产物类型筛选":
+        - option "全部类型" [selected]
+        - option "测试地址"
+        - option "移动安装包"
+        - option "小程序二维码"
+      - button "仅看最新" [pressed]
+      - textbox "搜索构建产物"
+      - table "构建产物列表":
+        - rowgroup:
+          - row "版本标识 产物类型 环境 来源与采集时间 状态 操作":
+            - cell "版本标识"
+            - cell "产物类型"
+            - cell "环境"
+            - cell "来源与采集时间"
+            - cell "状态"
+            - cell "操作"
+        - rowgroup:
+          - row "v0.0.1-visual 最新 测试地址 未指定 外部系统 2026/11/11 11:00 可用 打开产物 构建详情":
+            - cell "v0.0.1-visual 最新":
+              - strong: v0.0.1-visual
+              - text: 最新
+            - cell "测试地址"
+            - cell "未指定"
+            - cell "外部系统 2026/11/11 11:00"
+            - cell "可用"
+            - cell "打开产物 构建详情":
+              - link "打开产物":
+                - /url: https://example.test/preview
+              - button "构建详情"

@@ -5,7 +5,8 @@
     "height": 1000
   },
   "headings": [
-    "运行版本"
+    "运行版本",
+    "构建产物"
   ],
   "tabs": [
     "需求",
@@ -21,14 +22,15 @@
     "开发",
     "测试"
   ],
-  "rows": 0,
+  "rows": 1,
   "statusTexts": [
     "未知",
     "未知",
-    "未知"
+    "未知",
+    "可用"
   ],
   "documentOverflow": false,
-  "interactiveCount": 33,
+  "interactiveCount": 34,
   "nonPointerControls": [],
   "smallTargets": [
     "项目",

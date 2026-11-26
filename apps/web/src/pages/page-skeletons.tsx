@@ -179,69 +179,96 @@ export function PrsPageSkeleton({ delay }: { delay?: number }) {
 }
 
 /**
- * 项目流水线页专属骨架：工作流 / 运行历史页签 + 工作流卡片网格。
+ * 项目流水线页专属骨架：上下文条 + 左侧工作流目录 + 右侧指标与运行流卡片。
  * @param props.delay 延迟时长（毫秒）。
- * @returns 贴合流水线页结构的骨架。
+ * @returns 贴合流水线双栏工作台结构的骨架。
  */
 export function PipelinesPageSkeleton({ delay }: { delay?: number }) {
   return (
-    <SkeletonRegion label="流水线加载中" delay={delay} className="project-tab-panel space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3" aria-hidden="true">
-        <div className="flex items-center gap-2">
-          <Skeleton width={88} height={34} borderRadius="var(--radius-md)" />
-          <Skeleton width={96} height={34} borderRadius="var(--radius-md)" />
+    <SkeletonRegion label="工作流加载中" delay={delay} className="project-tab-panel space-y-4">
+      <div
+        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-secondary/40 p-3"
+        aria-hidden="true"
+      >
+        <div className="flex items-center gap-2.5">
+          <Skeleton width={92} height={28} borderRadius="var(--radius-md)" />
+          <Skeleton width={168} height={18} />
         </div>
-        <Skeleton width={92} height={34} borderRadius="var(--radius-md)" />
+        <div className="flex items-center gap-2">
+          <Skeleton width={132} height={30} borderRadius="var(--radius-md)" />
+          <Skeleton width={84} height={30} borderRadius="var(--radius-md)" />
+          <Skeleton width={92} height={30} borderRadius="var(--radius-md)" />
+        </div>
       </div>
-      <CardGridSkeleton count={4} iconShape="square" lines={2} delay={0} className="lg:grid-cols-2" />
+      <div className="grid gap-4 lg:grid-cols-12" aria-hidden="true">
+        <div className="space-y-2.5 rounded-xl border border-border bg-secondary/40 p-3 lg:col-span-3">
+          <Skeleton width={108} height={14} />
+          <CompactListSkeleton rows={4} leading="icon" delay={0} />
+        </div>
+        <div className="space-y-4 lg:col-span-9">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((item) => (
+              <div key={item} className="space-y-2 rounded-lg border border-border bg-card p-3">
+                <Skeleton width={76} height={12} />
+                <Skeleton width={64} height={22} />
+              </div>
+            ))}
+          </div>
+          <CompactListSkeleton rows={4} leading="icon" trailing bordered delay={0} />
+        </div>
+      </div>
     </SkeletonRegion>
   )
 }
 
 /**
- * 流水线运行详情页专属骨架：运行摘要卡片 + 步骤时间线 + 等宽日志终端 + 产物表。
+ * 流水线运行详情页专属骨架：页头 + 紧凑元信息条 + 阶段过程流 + 左侧步骤树与日志终端。
  * @param props.delay 延迟时长（毫秒）。
  * @returns 贴合运行详情页结构的骨架。
  */
 export function PipelineRunPageSkeleton({ delay }: { delay?: number }) {
   return (
-    <SkeletonRegion label="页面加载中" delay={delay} className="project-tab-panel space-y-6">
-      <div className="rounded-xl border border-border bg-card p-5 space-y-4" aria-hidden="true">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Skeleton width={76} height={24} borderRadius="var(--radius-full)" />
-            <Skeleton width={220} height={22} />
-          </div>
-          <div className="flex items-center gap-2">
-            <Skeleton width={76} height={32} borderRadius="var(--radius-md)" />
-            <Skeleton width={88} height={32} borderRadius="var(--radius-md)" />
+    <SkeletonRegion label="页面加载中" delay={delay} className="project-tab-panel space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3" aria-hidden="true">
+        <div className="space-y-2">
+          <Skeleton width={180} height={13} />
+          <div className="flex items-center gap-2.5">
+            <Skeleton width={72} height={24} borderRadius="var(--radius-full)" />
+            <Skeleton width={200} height={22} />
           </div>
         </div>
-        <div className="flex flex-wrap gap-6">
-          <Skeleton width={120} height={13} />
-          <Skeleton width={108} height={13} />
-          <Skeleton width={144} height={13} />
-          <Skeleton width={92} height={13} />
+        <div className="flex items-center gap-2">
+          <Skeleton width={76} height={32} borderRadius="var(--radius-md)" />
+          <Skeleton width={88} height={32} borderRadius="var(--radius-md)" />
         </div>
       </div>
-
-      <div className="space-y-3" aria-hidden="true">
-        <Skeleton width={72} height={16} />
-        <div className="flex flex-wrap gap-2.5">
-          {[0, 1, 2, 3].map((step) => (
-            <Skeleton key={step} width={148} height={42} borderRadius="var(--radius-lg)" />
-          ))}
+      <div className="grid gap-3 rounded-lg border border-border bg-secondary/40 p-3 sm:grid-cols-5" aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((cell) => (
+          <div key={cell} className="space-y-1.5">
+            <Skeleton width={72} height={11} />
+            <Skeleton width={116} height={14} />
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-4" aria-hidden="true">
+        {[0, 1, 2, 3].map((step) => (
+          <Skeleton key={step} width={148} height={34} borderRadius="var(--radius-md)" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-12" aria-hidden="true">
+        <div className="rounded-xl border border-border bg-secondary/40 p-3 lg:col-span-3">
+          <CompactListSkeleton rows={5} leading="icon" delay={0} />
+        </div>
+        <div className="lg:col-span-9">
+          <LogLinesSkeleton lines={10} delay={0} />
         </div>
       </div>
-
-      <LogLinesSkeleton lines={10} delay={0} />
-      <TableSkeleton rows={3} columns={['40%', '20%', '20%', '20%']} delay={0} />
     </SkeletonRegion>
   )
 }
 
 /**
- * 项目产物与版本页专属骨架：构建产物/审核发布页签 + 环境分段 + 产物表格。
+ * 项目产物与版本页专属骨架：视图页签 + 三环境运行版本卡 + 产物筛选与表格。
  * @param props.delay 延迟时长（毫秒）。
  * @returns 贴合产物与版本页结构的骨架。
  */
@@ -255,12 +282,19 @@ export function ArtifactsPageSkeleton({ delay }: { delay?: number }) {
         </div>
         <Skeleton width={108} height={34} borderRadius="var(--radius-md)" />
       </div>
-      <div className="flex items-center gap-2" aria-hidden="true">
-        {[0, 1, 2, 3].map((env) => (
-          <Skeleton key={env} width={64} height={30} borderRadius="var(--radius-full)" />
+      <div className="grid gap-3 md:grid-cols-3" aria-hidden="true">
+        {[0, 1, 2].map((card) => (
+          <div key={card} className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between">
+              <Skeleton width={64} height={14} />
+              <Skeleton width={56} height={22} borderRadius="var(--radius-full)" />
+            </div>
+            <Skeleton width={156} height={20} />
+            <Skeleton width={120} height={12} />
+          </div>
         ))}
       </div>
-      <TableSkeleton rows={5} columns={['34%', '18%', '18%', '15%', '15%']} delay={0} />
+      <TableSkeleton rows={5} columns={['30%', '16%', '12%', '18%', '10%', '14%']} delay={0} />
     </SkeletonRegion>
   )
 }
