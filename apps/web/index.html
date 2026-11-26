@@ -2,6 +2,10 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
+    <!-- 先固定层顺序，避免生产构建的预加载样式先声明 components，反转布局覆盖关系。 -->
+    <style>
+      @layer theme, base, prototype, components, utilities;
+    </style>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DevOps 项目开发平台</title>

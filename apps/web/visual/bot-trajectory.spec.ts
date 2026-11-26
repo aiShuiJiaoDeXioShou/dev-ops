@@ -136,7 +136,18 @@ test('[desktop] [mobile] 自动展示最近一次运行并在时间线上查看�
   })
 
   await page.goto(`/collaboration/${room.id}`)
+  const chatPanel = page.getByRole('tabpanel', { name: '对话' })
+  const tracePanel = page.getByRole('tabpanel', { name: '轨迹' })
+  await expect(chatPanel).toBeVisible()
+  await expect(tracePanel).toBeHidden()
+  await expect(page.locator('.conversation-composer')).not.toContainText(/Shift\+Enter|最近上下文|本会话费用/)
   await page.getByRole('tab', { name: '轨迹' }).click()
+  await expect(chatPanel).toBeHidden()
+  await expect(tracePanel).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight))
+    .toBeLessThanOrEqual(1)
+
   await expect(page.getByRole('combobox', { name: '运行记录' })).toHaveCount(0)
   const stepList = page.getByRole('list', { name: '运行步骤' })
   const apiStep = stepList.getByRole('button', { name: /platform_api_call/ })
@@ -185,6 +196,14 @@ test('[desktop] [mobile] 自动展示最近一次运行并在时间线上查看�
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth))
     .toBeLessThanOrEqual(1)
   await page.screenshot({ path: testInfo.outputPath('bot-trace.png'), animations: 'disabled' })
+  await page.getByRole('tab', { name: '对话', exact: true }).click()
+  await expect(tracePanel).toBeHidden()
+  await expect(chatPanel).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight))
+    .toBeLessThanOrEqual(1)
+  await page.screenshot({ path: testInfo.outputPath('conversation-return-from-trace.png'), animations: 'disabled' })
+  await page.getByRole('tab', { name: '轨迹', exact: true }).click()
   await page.evaluate(() => document.documentElement.classList.add('dark'))
   await page.screenshot({ path: testInfo.outputPath('bot-trace-dark.png'), animations: 'disabled' })
 })

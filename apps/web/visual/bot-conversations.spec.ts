@@ -369,7 +369,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
   await expect(work.locator('.conversation-work-content')).toHaveCSS('transition-duration', '0s')
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await expect(page.getByText('查看轨迹', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('Enter 发送 · Shift+Enter 换行', { exact: true })).toBeVisible()
+  await expect(page.getByText('Enter 发送 · Shift+Enter 换行', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('table').getByRole('columnheader')).toHaveCount(3)
   await expect(page.getByRole('table').getByRole('cell', { name: '查看项目' })).toBeVisible()
   const footer = page.getByRole('group', { name: '回答操作' })

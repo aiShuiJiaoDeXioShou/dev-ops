@@ -28,9 +28,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'pnpm dev --port 5174 --strictPort',
+    command: process.env.VISUAL_PRODUCTION
+      ? 'pnpm preview --port 5174 --strictPort'
+      : 'pnpm dev --port 5174 --strictPort',
     url: 'http://localhost:5174',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !process.env.CI && !process.env.VISUAL_PRODUCTION,
     timeout: 120_000,
   },
   expect: {

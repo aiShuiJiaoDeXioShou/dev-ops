@@ -6,6 +6,7 @@ Playwright 视觉回归用于阻止“页面能打开但布局/状态不可读�
 
 ```bash
 pnpm test:visual                 # 比对现有基线
+pnpm --dir apps/web build && VISUAL_PRODUCTION=1 pnpm test:visual  # 验证生产 CSS 分块加载顺序
 pnpm --dir apps/web test:visual -- --update-snapshots   # 明确改变布局后更新基线
 ```
 

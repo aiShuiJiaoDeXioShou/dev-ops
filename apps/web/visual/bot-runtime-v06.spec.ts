@@ -591,7 +591,7 @@ test('[desktop] [mobile] 输入区命令、组字、追加及撤回', async ({ p
   expect(sent[1]?.deliveryMode).toBe('auto')
   await page.getByRole('button', { name: '撤回到输入框' }).click()
   await expect(input).toHaveValue('稍后检查')
-  await expect(page.getByText('本会话费用：', { exact: false })).toBeVisible()
+  await expect(page.getByText('本会话费用：', { exact: false })).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('v010-composer.png'), fullPage: true })
   await input.fill('/session')
   await input.press('Enter')

@@ -12,7 +12,6 @@ import { Button } from '@/shared/ui/controls/button'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import type { BotConversation } from '../api/queries'
 import { ConversationCommands, commandCandidates } from './conversation-commands'
-import { botDetailQueryOptions } from '@/features/bots/api/queries'
 import { ConversationIcon } from './conversation-icon'
 import './conversation-content.css'
 
@@ -77,13 +76,6 @@ export function ConversationComposer({
     enabled: !readOnly,
     refetchInterval: 1000,
   })
-  const usage = useQuery({
-    queryKey: ['bot-conversation-usage', room.id],
-    queryFn: () => apiClient.getBotConversationUsage(room.id),
-    refetchInterval: runningId ? 1000 : 10000,
-  })
-  const bot = useQuery({ ...botDetailQueryOptions(defaultBot ?? ''), enabled: !!defaultBot })
-  const setting = room.botSettings?.find(({ botId }) => botId === defaultBot)
   const [draft, setDraft] = useState(() => {
     const prefix = initialReference ? `/skill:${initialReference.identifier} ` : ''
     const cached = cachedDraft?.text ?? ''
@@ -329,11 +321,6 @@ export function ConversationComposer({
             </Button>
           </div>
         ))}
-        {usage.isError && (
-          <Button type="button" variant="ghost" onClick={() => void usage.refetch()}>
-            用量加载失败，重试
-          </Button>
-        )}
         {withdraw.isError && (
           <p role="alert" className="field-error">
             {describeAttachmentError(withdraw.error)}
@@ -469,17 +456,6 @@ export function ConversationComposer({
             {describeAttachmentError(send.error)}
           </p>
         )}
-        <p className="small muted">
-          {runningId
-            ? 'Enter 插话 · Alt+Enter 追加（Windows 可用 Ctrl+Enter）· Esc 停止'
-            : 'Enter 发送 · Shift+Enter 换行'}
-        </p>
-        <p className="small muted break-words">
-          模型：{(setting?.isOverrideValid && setting.modelId) || bot.data?.data.modelId || '加载中'} · 思考：
-          {setting?.effectiveThinkingLevel ?? '默认'} · 最近上下文：
-          {usage.data?.data.contexts.find(({ botId }) => botId === defaultBot)?.tokens ?? '未知'} tokens · 本会话费用：
-          {typeof usage.data?.data.costUsd !== 'number' ? '未知' : `$${usage.data.data.costUsd.toFixed(4)}`}
-        </p>
         <div className="dsh-composer-bar">
           <Button
             type="button"
