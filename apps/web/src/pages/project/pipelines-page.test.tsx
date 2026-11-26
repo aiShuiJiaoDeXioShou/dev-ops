@@ -14,7 +14,19 @@ const workflowValid = {
   name: 'web-build',
   valid: true,
   parseErrors: [],
-  lastRun: { runId: 'run-1', status: 'succeeded', createdAt: '2026-11-10T08:00:00.000Z' },
+  runsOn: ['linux'],
+  jobCount: 1,
+  stepCount: 2,
+  inputCount: 1,
+  timeoutMinutes: 15,
+  recentStatuses: ['succeeded'],
+  lastRun: {
+    runId: 'run-1',
+    status: 'succeeded',
+    createdAt: '2026-11-10T08:00:00.000Z',
+    durationSeconds: 40,
+    ref: 'main',
+  },
 }
 
 const workflowInvalid = {
@@ -30,6 +42,12 @@ const workflowInvalid = {
       column: 9,
     },
   ],
+  runsOn: [],
+  jobCount: 0,
+  stepCount: 0,
+  inputCount: 0,
+  timeoutMinutes: null,
+  recentStatuses: [],
   lastRun: null,
 }
 
@@ -56,16 +74,67 @@ const runSummary = {
   assignedAt: '2026-11-10T08:00:10.000Z',
   startedAt: '2026-11-10T08:00:20.000Z',
   finishedAt: '2026-11-10T08:01:00.000Z',
+  steps: [
+    {
+      index: 0,
+      name: '检出代码',
+      kind: 'builtin_checkout',
+      status: 'succeeded',
+      exitCode: 0,
+      errorCode: null,
+      errorMessage: null,
+      startedAt: '2026-11-10T08:00:20.000Z',
+      finishedAt: '2026-11-10T08:00:30.000Z',
+    },
+    {
+      index: 1,
+      name: '构建应用',
+      kind: 'run',
+      status: 'succeeded',
+      exitCode: 0,
+      errorCode: null,
+      errorMessage: null,
+      startedAt: '2026-11-10T08:00:30.000Z',
+      finishedAt: '2026-11-10T08:01:00.000Z',
+    },
+  ],
 }
 
 let lastRunQuery: URLSearchParams | null = null
 
-/** 注册工作流列表处理。 */
+/** 注册工作流列表与节点默认处理。 */
 function mockWorkflows(items: unknown[] = [workflowValid]) {
   server.use(
     http.get('*/api/v1/projects/project-1/pipeline-workflows', () =>
       success({ ref: 'main', commitSha: 'a1b2c3d4e5f6a7b8', items }),
     ),
+    http.get('*/api/v1/projects/project-1/pipeline-workflows/detail', () =>
+      success({
+        path: '.devops/workflows/ci.yml',
+        name: 'web-build',
+        repositoryId: 'repo-1',
+        ref: 'main',
+        commitSha: 'a1b2c3d4e5f6a7b8',
+        content: 'name: web-build\non:\n  workflow_dispatch:\njobs: {}\n',
+        contentHash: 'hash-1',
+        valid: true,
+        parseErrors: [],
+        planSummary: {
+          jobs: [
+            {
+              id: 'build',
+              name: '构建与测试',
+              steps: [
+                { index: 0, name: '检出代码', kind: 'builtin_checkout' },
+                { index: 1, name: '构建应用', kind: 'run' },
+              ],
+            },
+          ],
+        },
+        inputs: [],
+      }),
+    ),
+    http.get('*/api/v1/teams/*/pipeline-nodes', () => success({ items: [] })),
   )
 }
 
@@ -97,16 +166,12 @@ function renderPage() {
   )
 }
 
-/** 切换到运行历史页签；两个视图互斥，需要先切换再断言。 */
-async function openRunsTab() {
-  await userEvent.click(await screen.findByRole('tab', { name: /运行历史/ }))
-}
-
 describe('pipelines-page', () => {
   it('工作流加载中显示稳定占位', async () => {
     server.use(
       http.get('*/api/v1/projects/project-1/pipeline-workflows', () => new Promise(() => undefined)),
       http.get('*/api/v1/projects/project-1/pipeline-runs', () => new Promise(() => undefined)),
+      http.get('*/api/v1/teams/*/pipeline-nodes', () => success({ items: [] })),
     )
     renderPage()
     expect(await screen.findByRole('status', { name: '工作流加载中' })).toBeInTheDocument()
@@ -114,7 +179,6 @@ describe('pipelines-page', () => {
   })
 
   it('仓库不可用时显示错误与重试，不显示空工作流列表', async () => {
-    // 仓库连接失效时服务端返回业务错误信封，页面必须显示错误而不是空列表。
     server.use(
       http.get('*/api/v1/projects/project-1/pipeline-workflows', () =>
         HttpResponse.json(
@@ -127,6 +191,7 @@ describe('pipelines-page', () => {
           { headers: { 'x-request-id': 'test-request' } },
         ),
       ),
+      http.get('*/api/v1/teams/*/pipeline-nodes', () => success({ items: [] })),
     )
     mockRuns()
     renderPage()
@@ -134,19 +199,20 @@ describe('pipelines-page', () => {
     expect(screen.getByRole('button', { name: /重新检查/ })).toBeInTheDocument()
   })
 
-  it('默认展示工作流页签，切换页签后展示运行历史空状态', async () => {
+  it('无工作流时显示空工作流引导状态', async () => {
     mockWorkflows([])
     mockRuns([])
     renderPage()
     expect(await screen.findByText('还没有流水线工作流')).toBeInTheDocument()
     expect(screen.queryByText('还没有运行记录')).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /工作流/ })).toHaveAttribute('aria-selected', 'true')
+  })
 
-    await openRunsTab()
+  it('有工作流但无运行记录时，左侧显示工作流目录且右侧隐藏无效筛选栏', async () => {
+    mockWorkflows([workflowValid])
+    mockRuns([])
+    renderPage()
     expect(await screen.findByText('还没有运行记录')).toBeInTheDocument()
-    expect(screen.queryByText('还没有流水线工作流')).not.toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /运行历史/ })).toHaveAttribute('aria-selected', 'true')
-    // 没有任何运行记录时隐藏筛选栏，避免空页面出现一排无效控件。
+    expect(screen.getByRole('complementary', { name: '仓库工作流目录' })).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: '按状态筛选' })).not.toBeInTheDocument()
   })
 
@@ -154,14 +220,13 @@ describe('pipelines-page', () => {
     mockWorkflows([workflowValid, workflowInvalid])
     mockRuns([])
     renderPage()
-    expect(await screen.findByText('解析失败')).toBeInTheDocument()
-    const errorRegion = screen.getByRole('region', { name: '解析错误' })
+    const errorRegion = await screen.findByRole('region', { name: '解析错误' })
     expect(within(errorRegion).getByText('.devops/workflows/broken.yml')).toBeInTheDocument()
     expect(within(errorRegion).getByText(/jobs\.build\.steps\[0\]\.uses/)).toBeInTheDocument()
     expect(within(errorRegion).getByText(/第 12 行第 9 列/)).toBeInTheDocument()
     expect(within(errorRegion).getByText(/不支持 uses: actions\/checkout@v4/)).toBeInTheDocument()
+    expect(within(errorRegion).getByText('不可触发')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: '触发运行' })).toHaveLength(1)
-    expect(screen.getByText('不可触发')).toBeInTheDocument()
   })
 
   it('浏览者只读：显示说明且没有触发入口', async () => {
@@ -177,13 +242,14 @@ describe('pipelines-page', () => {
     expect(screen.queryByRole('button', { name: '触发运行' })).not.toBeInTheDocument()
   })
 
-  it('运行历史行链接到详情，并支持状态筛选与无匹配清除', async () => {
+  it('运行历史展示内嵌阶段进度条并直达对应步骤日志，同时支持状态筛选与清除', async () => {
     mockWorkflows()
     mockRuns()
     renderPage()
-    await openRunsTab()
     const titleLink = await screen.findByRole('link', { name: 'web-build' })
     expect(titleLink).toHaveAttribute('href', '/projects/project-1/pipelines/run-1')
+    const stepLink = screen.getByRole('link', { name: /2\. 构建应用/ })
+    expect(stepLink).toHaveAttribute('href', '/projects/project-1/pipelines/run-1?step=1')
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '按状态筛选' }), 'failed')
     expect(await screen.findByText('没有匹配的运行')).toBeInTheDocument()
@@ -193,14 +259,12 @@ describe('pipelines-page', () => {
     await userEvent.click(clearButtons[0] as HTMLElement)
     expect(await screen.findByRole('link', { name: 'web-build' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '按状态筛选' })).toHaveValue('')
-    expect(screen.queryByRole('button', { name: '清除筛选' })).not.toBeInTheDocument()
   })
 
-  it('日期筛选写入查询参数后无匹配可清除', async () => {
+  it('日期筛选写入查询参数', async () => {
     mockWorkflows()
     mockRuns()
     renderPage()
-    await openRunsTab()
     await screen.findByRole('link', { name: 'web-build' })
     const fromInput = screen.getByLabelText('开始日期')
     fireEvent.change(fromInput, { target: { value: '2026-11-01' } })
@@ -208,7 +272,7 @@ describe('pipelines-page', () => {
     expect(screen.getByLabelText('结束日期')).toBeInTheDocument()
   })
 
-  it('开发者从合法工作流打开触发对话框并提交幂等触发', async () => {
+  it('开发者打开触发对话框并提交幂等触发', async () => {
     mockWorkflows()
     mockRuns()
     let triggerBody: unknown = null
@@ -222,6 +286,8 @@ describe('pipelines-page', () => {
           steps: [],
           artifacts: [],
           inputs: {},
+          workflowSnapshot: null,
+          planJobs: [],
           logs: { items: [], totalSizeBytes: 0 },
         })
       }),

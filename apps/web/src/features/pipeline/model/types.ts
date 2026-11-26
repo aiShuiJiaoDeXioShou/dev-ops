@@ -13,6 +13,9 @@ export type PipelineRunStatus =
 /** 运行内步骤状态。 */
 export type PipelineStepStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'cancelled'
 
+/** 展示层步骤状态；运行异常中断时，仍处于 running 的步骤按 interrupted 展示。 */
+export type PipelineStepDisplayStatus = PipelineStepStatus | 'interrupted'
+
 /** 执行节点状态。 */
 export type PipelineNodeStatus = 'pending' | 'online' | 'draining' | 'offline' | 'disabled'
 
@@ -33,14 +36,22 @@ export interface PipelineWorkflowLastRun {
   runId: string
   status: PipelineRunStatus
   createdAt: string
+  durationSeconds: number | null
+  ref: string
 }
 
-/** 工作流列表项：解析状态决定是否允许触发。 */
+/** 工作流列表项：解析状态决定是否允许触发，同时提供执行标签、步骤规模与近期趋势。 */
 export interface PipelineWorkflowSummary {
   path: string
   name: string | null
   valid: boolean
   parseErrors: PipelineWorkflowParseError[]
+  runsOn: string[]
+  jobCount: number
+  stepCount: number
+  inputCount: number
+  timeoutMinutes: number | null
+  recentStatuses: PipelineRunStatus[]
   lastRun: PipelineWorkflowLastRun | null
 }
 
@@ -51,20 +62,36 @@ export interface PipelineWorkflowList {
   items: PipelineWorkflowSummary[]
 }
 
-/** 运行列表摘要。 */
-export interface PipelineRunSummary {
-  runId: string
-  workflowPath: string
-  workflowName: string | null
+/** 工作流手动触发输入声明；用于在触发弹窗按类型渲染输入控件。 */
+export interface PipelineWorkflowInput {
+  name: string
+  type: 'string' | 'boolean' | 'number' | 'choice'
+  required: boolean
+  defaultValue?: string | number | boolean
+  options?: string[]
+  description?: string
+}
+
+/** 工作流执行计划中的作业摘要。 */
+export interface PipelineWorkflowPlanJob {
+  id: string
+  name: string
+  steps: Array<{ index: number; name: string; kind: string }>
+}
+
+/** 单个工作流的完整定义与解析计划视图。 */
+export interface PipelineWorkflowDetail {
+  path: string
+  name: string
+  repositoryId: string
   ref: string
   commitSha: string
-  status: PipelineRunStatus
-  /** 发起人的展示名；接口只返回标识时由接口层兜底成“未知成员”。 */
-  initiator: string
-  createdAt: string
-  startedAt: string | null
-  finishedAt: string | null
-  durationSeconds: number | null
+  content: string
+  contentHash: string
+  valid: boolean
+  parseErrors: PipelineWorkflowParseError[]
+  planJobs: PipelineWorkflowPlanJob[]
+  inputs: PipelineWorkflowInput[]
 }
 
 /** 运行步骤执行事实。 */
@@ -78,6 +105,38 @@ export interface PipelineRunStep {
   errorMessage: string | null
   startedAt: string | null
   finishedAt: string | null
+}
+
+/** 运行计划中的作业拓扑摘要，用于运行详情展示 Job 流与步骤分组。 */
+export interface PipelineRunPlanJob {
+  id: string
+  name: string
+  runsOn: string[]
+  needs: string[]
+  stepIndexes: number[]
+}
+
+/** 运行列表摘要；包含步骤摘要用于内嵌阶段进度条。 */
+export interface PipelineRunSummary {
+  runId: string
+  workflowPath: string
+  workflowName: string | null
+  ref: string
+  commitSha: string
+  status: PipelineRunStatus
+  triggerSource: string
+  initiatorChannel: string
+  /** 发起人的展示名；接口只返回标识时由接口层兜底成“未知成员”。 */
+  initiator: string
+  nodeId: string | null
+  nodeName: string | null
+  errorCode: string | null
+  errorMessage: string | null
+  createdAt: string
+  startedAt: string | null
+  finishedAt: string | null
+  durationSeconds: number | null
+  steps: PipelineRunStep[]
 }
 
 /** 产物元数据；downloadUrl 由接口层按权限签发，页面不得自行拼接。 */
@@ -103,17 +162,12 @@ export interface PipelineLogStat {
 /** 触发运行时的输入值；null 表示工作流声明的默认值。 */
 export type PipelineRunDetailInputValue = string | number | boolean | null
 
-/** 运行详情：摘要 + 步骤 + 产物 + 日志统计 + 终态原因。 */
+/** 运行详情：摘要 + 作业拓扑 + 工作流快照 + 步骤 + 产物 + 日志统计 + 终态原因。 */
 export interface PipelineRunDetail extends PipelineRunSummary {
-  triggerSource: string
-  initiatorChannel: string
-  nodeId: string | null
-  nodeName: string | null
-  errorCode: string | null
-  errorMessage: string | null
   cancelRequestedAt: string | null
   inputs: Record<string, PipelineRunDetailInputValue>
-  steps: PipelineRunStep[]
+  workflowSnapshot: string | null
+  planJobs: PipelineRunPlanJob[]
   artifacts: PipelineRunArtifact[]
   logs: PipelineLogStat[]
 }

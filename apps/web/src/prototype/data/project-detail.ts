@@ -17,18 +17,6 @@ export interface DemoPullRequest {
   diff: string[]
 }
 
-/** 流水线运行记录。 */
-export interface DemoPipelineRun {
-  id: string
-  projectId: string
-  workflow: string
-  branch: string
-  status: '运行中' | '成功' | '失败'
-  triggeredBy: string
-  time: string
-  logs: string[]
-}
-
 /** 服务构建产物与环境运行版本。 */
 export interface DemoServiceDelivery {
   projectId: string
@@ -213,40 +201,6 @@ export const pullRequests: DemoPullRequest[] = [
     targetBranch: 'main',
     linkedItems: ['PRD-008'],
     diff: ['+ 登录状态恢复', '+ 失败重试入口'],
-  },
-]
-
-/** 原型中的流水线运行记录。 */
-export const pipelineRuns: DemoPipelineRun[] = [
-  {
-    id: 'run-1201',
-    projectId: 'dev-ops',
-    workflow: 'web-build',
-    branch: 'main',
-    status: '成功',
-    triggeredBy: '研发自配流水线',
-    time: '今天 09:42',
-    logs: ['checkout a7c92e1', 'install dependencies', 'build web', 'upload artifact: web-0.9.2'],
-  },
-  {
-    id: 'run-1200',
-    projectId: 'dev-ops',
-    workflow: 'api-test',
-    branch: 'feat/error-handling',
-    status: '失败',
-    triggeredBy: '研发自配流水线',
-    time: '昨天 18:10',
-    logs: ['checkout b8d304f', 'install dependencies', 'run integration tests', '1 test failed: error envelope'],
-  },
-  {
-    id: 'run-1202',
-    projectId: 'dev-ops',
-    workflow: 'web-build',
-    branch: 'feat/error-handling',
-    status: '运行中',
-    triggeredBy: '研发自配流水线',
-    time: '刚刚',
-    logs: ['checkout b8d304f', 'install dependencies', 'build web', 'waiting for runner…'],
   },
 ]
 

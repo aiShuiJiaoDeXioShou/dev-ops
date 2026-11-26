@@ -14,18 +14,15 @@
     "PR",
     "流水线",
     "产物与版本",
-    "环境变量",
-    "工作流 1",
-    "运行历史 2"
+    "环境变量"
   ],
-  "rows": 1,
+  "rows": 0,
   "statusTexts": [],
   "documentOverflow": false,
-  "interactiveCount": 26,
+  "interactiveCount": 32,
   "nonPointerControls": [],
   "smallTargets": [
     "项目",
-    "PR",
-    "<relative-time>"
+    "PR"
   ]
 }

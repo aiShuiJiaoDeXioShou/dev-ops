@@ -7,6 +7,7 @@ import type {
   PipelineRunArtifact,
   PipelineRunDetail,
   PipelineRunDetailInputValue,
+  PipelineRunPlanJob,
   PipelineRunStep,
   PipelineRunSummary,
   TriggerRunInput,
@@ -101,11 +102,18 @@ function toRunSummary(run: PipelineRunSummaryResponse): PipelineRunSummary {
     ref: run.ref,
     commitSha: run.commitSha,
     status: run.status,
+    triggerSource: run.triggerSource,
+    initiatorChannel: run.initiatorChannel,
     initiator: run.initiator,
+    nodeId: run.nodeId,
+    nodeName: run.nodeName,
+    errorCode: run.errorCode,
+    errorMessage: run.errorMessage,
     createdAt: run.createdAt,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
     durationSeconds: run.durationSeconds,
+    steps: (run.steps ?? []).map(toRunStep),
   }
 }
 
@@ -120,23 +128,25 @@ function toRunDetail(data: PipelineRunDetailResponse): PipelineRunDetail {
   for (const [key, value] of Object.entries(data.inputs)) {
     inputs[key] = value
   }
+  const planJobs: PipelineRunPlanJob[] = (data.planJobs ?? []).map((job) => ({
+    id: job.id,
+    name: job.name,
+    runsOn: [...job.runsOn],
+    needs: [...job.needs],
+    stepIndexes: [...job.stepIndexes],
+  }))
   return {
     ...summary,
-    triggerSource: data.triggerSource,
-    initiatorChannel: data.initiatorChannel,
-    nodeId: data.nodeId,
-    nodeName: data.nodeName,
-    errorCode: data.errorCode,
-    errorMessage: data.errorMessage,
     cancelRequestedAt: data.cancelRequestedAt,
     inputs,
-    steps: data.steps.map(toRunStep),
+    workflowSnapshot: data.workflowSnapshot ?? null,
+    planJobs,
     artifacts: data.artifacts.map(toRunArtifact),
     logs: data.logs.items.map(toLogStat),
   }
 }
 
-/** 项目流水线运行列表查询；返回已映射的视图模型与请求标识。 */
+/** 项目流水线运行列表查询；当前页包含未结束运行时自动低频轮询以推进步骤进度条。 */
 export function pipelineRunsQueryOptions(projectId: string, query: PipelineRunListQuery = {}) {
   return queryOptions({
     queryKey: ['pipeline', 'runs', projectId, query],
@@ -151,6 +161,7 @@ export function pipelineRunsQueryOptions(projectId: string, query: PipelineRunLi
       }
     },
     enabled: Boolean(projectId),
+    refetchInterval: (state) => (state.state.data?.items.some((item) => isRunActive(item.status)) ? 5000 : false),
   })
 }
 

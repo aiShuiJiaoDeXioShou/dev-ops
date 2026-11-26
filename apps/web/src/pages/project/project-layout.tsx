@@ -41,7 +41,9 @@ export function Component() {
     )
   }
   const detail = project.data.data
-  const activeTab = tabs.find((tab) => location.pathname.endsWith(`/${tab.slug}`))?.slug ?? 'requirements'
+  const activeTab =
+    tabs.find((tab) => location.pathname.endsWith(`/${tab.slug}`) || location.pathname.includes(`/${tab.slug}/`))
+      ?.slug ?? 'requirements'
   return (
     <>
       <header className="project-header">

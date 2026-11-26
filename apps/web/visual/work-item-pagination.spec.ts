@@ -78,9 +78,9 @@ for (const { label, path, endpoint, itemSelector, idKey } of [
   },
   {
     label: '流水线运行历史',
-    path: `${projectPath}/pipelines?tab=runs`,
+    path: `${projectPath}/pipelines`,
     endpoint: `/api/v1${projectPath}/pipeline-runs`,
-    itemSelector: 'tbody tr',
+    itemSelector: '.pl-run-card',
     idKey: 'runId',
   },
 ]) {

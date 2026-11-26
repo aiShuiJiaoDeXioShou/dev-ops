@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
@@ -87,7 +87,7 @@ describe('交互原型路由', () => {
     ['/prototype/capabilities/bots', '智能体目录', 'text'],
     ['/prototype/project/dev-ops/collaboration', '研发协作平台协作组', 'text'],
     ['/prototype/project/dev-ops/code', 'README.md', 'text'],
-    ['/prototype/project/dev-ops/pipelines', '运行流水线', 'button'],
+    ['/prototype/project/dev-ops/pipelines', '触发运行', 'button'],
     ['/prototype/project/dev-ops/environment', '访问记录', 'button'],
   ] as const)('原型路由 %s 可以渲染', async (path, expectedText, kind) => {
     renderPrototype(path)
@@ -102,5 +102,25 @@ describe('交互原型路由', () => {
     const elements = await screen.findAllByText(expectedText)
     expect(elements.length).toBeGreaterThan(0)
     expect(elements[0]).toBeVisible()
+  })
+
+  it('流水线原型支持工作流主从筛选、阶段跳转运行详情与手风琴日志', async () => {
+    const router = renderPrototype('/prototype/project/dev-ops/pipelines')
+    expect(await screen.findByRole('button', { name: '触发运行' })).toBeVisible()
+    expect(screen.getByText('全部工作流')).toBeVisible()
+
+    // 选中单个工作流后显示具体配置与链路
+    const workflowRail = screen.getByLabelText('仓库工作流目录')
+    await userEvent.click(within(workflowRail).getByRole('button', { name: /deploy-macmini/ }))
+    expect(await screen.findByRole('button', { name: '查看 YAML 与计划' })).toBeVisible()
+    expect(screen.getByText('workflow_dispatch')).toBeVisible()
+
+    // 点击列表中的阶段胶囊直接进入运行详情并展开对应步骤日志
+    const stageButtons = screen.getAllByRole('button', { name: /构建、迁移并切换生产版本/ })
+    expect(stageButtons[0]).toBeDefined()
+    if (stageButtons[0]) await userEvent.click(stageButtons[0])
+    expect(await screen.findByRole('button', { name: '返回流水线列表' })).toBeVisible()
+    expect(router.state.location.search).toContain('run=run-18')
+    expect(screen.getByRole('log', { name: '构建、迁移并切换生产版本 日志' })).toBeVisible()
   })
 })

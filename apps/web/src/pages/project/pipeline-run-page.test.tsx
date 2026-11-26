@@ -32,6 +32,7 @@ const runBase = {
   assignedAt: '2026-11-10T08:00:10.000Z',
   startedAt: '2026-11-10T08:00:20.000Z',
   finishedAt: '2026-11-10T08:01:00.000Z',
+  steps: [],
 }
 
 const stepInstall = {
@@ -71,6 +72,8 @@ function runDetail(overrides: Record<string, unknown> = {}) {
   return {
     ...runBase,
     inputs: {},
+    workflowSnapshot: 'name: web-build\non:\n  workflow_dispatch:\njobs: {}\n',
+    planJobs: [],
     steps: [],
     artifacts: [],
     logs: { items: [], totalSizeBytes: 0 },
@@ -102,11 +105,11 @@ function mockRun(
   )
 }
 
-function renderPage() {
+function renderPage(initialPath = '/projects/project-1/pipelines/run-1') {
   return render(
     <QueryClientProvider client={createQueryClient()}>
       <SessionProvider initialUser={sessionFixture.user}>
-        <MemoryRouter initialEntries={['/projects/project-1/pipelines/run-1']}>
+        <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
             <Route path="/projects/:projectId/pipelines/:runId" element={<PipelineRunPage />} />
           </Routes>
@@ -133,7 +136,6 @@ describe('pipeline-run-page', () => {
   })
 
   it('中断状态、失败步骤与终态原因可区分展示', async () => {
-    // 运行中断时仍停留在 running 的步骤展示为已中断，且不按当前时间累计假耗时。
     mockRun(
       runDetail({
         steps: [
@@ -146,14 +148,14 @@ describe('pipeline-run-page', () => {
     expect(await screen.findByRole('heading', { name: 'web-build' })).toBeInTheDocument()
     expect(screen.getByText('运行已中断')).toBeInTheDocument()
     expect(screen.getByText('执行节点失联，租约已过期。')).toBeInTheDocument()
-    expect(screen.getByText('Install')).toBeInTheDocument()
+    expect(screen.getAllByText(/1\. Install/).length).toBeGreaterThan(0)
     expect(screen.getByText(/退出码：1/)).toBeInTheDocument()
-    expect(screen.getByText('Wait')).toBeInTheDocument()
-    expect(screen.getAllByText('已中断')).toHaveLength(2)
+    expect(screen.getAllByText(/2\. Wait/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('已中断').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('dev-machine-01')).toBeInTheDocument()
   })
 
-  it('运行日志按步骤展示，过期日志通过重新读取恢复', async () => {
+  it('运行日志按步骤展示并支持工作流快照查看', async () => {
     mockRun(runDetail({ status: 'failed', errorMessage: '步骤执行失败。', steps: [stepInstall] }), {
       items: [
         { seq: 0, content: '> install dependencies\n', truncated: false },
@@ -161,15 +163,18 @@ describe('pipeline-run-page', () => {
       ],
     })
     renderPage()
-    // seq=0 的首片也必须在真实 afterSeq 语义下返回，避免日志首片被跳过。
     expect(await screen.findByText(/ERR_PNPM_NO_SCRIPT/)).toBeInTheDocument()
     expect(screen.getByText(/install dependencies/)).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '按步骤筛选日志' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: /工作流快照与参数/ }))
+    expect(await screen.findByLabelText('本次运行的工作流 YAML 快照')).toBeInTheDocument()
   })
 
-  it('有下载地址时产物可从详情下载', async () => {
+  it('切换到运行产物页签后可下载受控产物', async () => {
     mockRun(runDetail({ status: 'failed', steps: [stepInstall], artifacts: [artifactWebDist] }))
     renderPage()
+    await userEvent.click(await screen.findByRole('tab', { name: /运行产物/ }))
     expect(await screen.findByText('web-dist')).toBeInTheDocument()
     expect(screen.getByText('2.0 KB')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /下载/ })).toHaveAttribute('href', artifactWebDist.downloadUrl)

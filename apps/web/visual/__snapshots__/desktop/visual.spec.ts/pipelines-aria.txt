@@ -11,30 +11,44 @@
     - tab "产物与版本"
     - tab "环境变量"
   - heading "流水线" [level=1]
-  - tablist "流水线视图":
-    - tab "工作流 1" [selected]
-    - tab "运行历史 2"
-  - text: main · 7918a5f4
+  - text: main 7918a5f4 .devops/workflows/
+  - button "查看自托管执行节点状态": 1/6 执行节点在线
   - button "重新检查"
-  - tabpanel "工作流 1":
-    - region "工作流":
-      - table "流水线工作流":
-        - rowgroup:
-          - row "工作流 解析状态 最近运行 操作":
-            - cell "工作流"
-            - cell "解析状态"
-            - cell "最近运行"
-            - cell "操作"
-        - rowgroup:
-          - row "platform-smoke .devops/workflows/platform-smoke.yml 可运行 成功 查看最近一次运行 成功 触发运行":
-            - cell "platform-smoke .devops/workflows/platform-smoke.yml":
-              - strong: platform-smoke
-              - text: .devops/workflows/platform-smoke.yml
-            - cell "可运行"
-            - cell "成功 查看最近一次运行 成功":
-              - text: 成功
-              - link "查看最近一次运行 成功":
-                - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines/4f8812e5-40bc-588b-bc7e-2726a8902e21
-                - text: <relative-time>
-            - cell "触发运行":
-              - button "触发运行"
+  - button "触发运行"
+  - complementary "仓库工作流目录":
+    - text: 工作流（1） 最近趋势
+    - button "全部工作流 2 1 个可运行" [pressed]
+    - button "platform-smoke 可运行 最近运行趋势 <relative-time>": platform-smoke 可运行 <relative-time>
+  - text: 进行中 / 排队 0 实时推进 可运行工作流 1 / 1 个定义 近期成功率 50% 1 通过 · 1 异常 平均成功耗时 6 秒 近 1 次
+  - region "运行历史":
+    - combobox "按状态筛选":
+      - option "全部状态" [selected]
+      - option "排队中"
+      - option "已分配"
+      - option "运行中"
+      - option "取消中"
+      - option "成功"
+      - option "失败"
+      - option "已取消"
+      - option "已中断"
+    - text: 开始日期
+    - textbox "开始日期"
+    - text: 结束日期
+    - textbox "结束日期"
+    - article:
+      - link "platform-smoke":
+        - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines/4f8812e5-40bc-588b-bc7e-2726a8902e21
+      - text: "#4f8812e5 成功 feat/platform-polish-2026-11 a0ea7ceb local-audit-node-3 管理员 <relative-time> 6 秒 手动触发"
+      - button "重跑"
+      - link "查看日志":
+        - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines/4f8812e5-40bc-588b-bc7e-2726a8902e21
+    - article:
+      - link "platform-smoke":
+        - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines/e768d92c-0bb6-5edf-878d-612843940554
+      - text: "#e768d92c 已中断 feat/platform-polish-2026-11 a0ea7ceb local-audit-node-2 管理员 <relative-time> 5 分 45 秒 手动触发"
+      - button "重跑"
+      - link "查看日志":
+        - /url: /projects/53d557da-d55b-5985-b44a-db55b313d0f2/pipelines/e768d92c-0bb6-5edf-878d-612843940554
+      - note:
+        - strong: "[NODE_OFFLINE]"
+        - text: 执行节点心跳超时，运行已中断

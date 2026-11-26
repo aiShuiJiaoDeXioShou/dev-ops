@@ -1,5 +1,23 @@
-import type { PipelineRunFilters, PipelineRunSummary } from '../model/types'
+import type {
+  PipelineRunFilters,
+  PipelineRunStatus,
+  PipelineRunStep,
+  PipelineRunSummary,
+  PipelineStepDisplayStatus,
+} from '../model/types'
 import { isPipelineRunStatus } from './status'
+
+const STEP_KIND_LABELS: Record<string, string> = {
+  run: '命令',
+  builtin_checkout: '检出代码',
+  builtin_upload_artifact: '上传产物',
+  builtin_verify_service: '服务核验',
+  builtin_deploy_native: '原生发布',
+  builtin_apply_patch: '应用补丁',
+  builtin_commit_changes: '提交变更',
+  builtin_collect_diff: '收集差异',
+  builtin_push_branch: '推送分支',
+}
 
 /**
  * 把秒数格式化为便于快速比较的耗时文案。
@@ -16,6 +34,21 @@ export function formatDurationSeconds(seconds: number | null | undefined): strin
 }
 
 /**
+ * 格式化紧凑耗时，用于阶段胶囊与左侧步骤目录，保持横向空间克制。
+ * @param seconds 秒数；null/undefined 或负数返回空字符串。
+ * @returns 如“12s”“1m 40s”。
+ */
+export function formatCompactDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) return ''
+  const total = Math.round(seconds)
+  if (total < 60) return `${total}s`
+  const minutes = Math.floor(total / 60)
+  const rest = total % 60
+  if (minutes < 60) return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
+/**
  * 根据运行时间字段计算耗时；优先使用接口给出的 durationSeconds。
  * @param run 运行摘要或详情。
  * @returns 秒数；缺少结束时间时按开始到当前计算，完全没有开始时间返回 null。
@@ -28,6 +61,45 @@ export function runDurationSeconds(run: PipelineRunSummary): number | null {
   const finished = run.finishedAt ? new Date(run.finishedAt).getTime() : Date.now()
   if (Number.isNaN(finished) || finished < started) return null
   return Math.floor((finished - started) / 1000)
+}
+
+/**
+ * 推导步骤展示状态：运行已中断但步骤仍停留在 running 时按 interrupted 展示。
+ * @param step 步骤执行事实。
+ * @param runStatus 所属运行状态。
+ * @returns 面向界面的步骤状态。
+ */
+export function resolveStepDisplayStatus(
+  step: PipelineRunStep,
+  runStatus: PipelineRunStatus,
+): PipelineStepDisplayStatus {
+  if (runStatus === 'interrupted' && step.status === 'running') return 'interrupted'
+  return step.status
+}
+
+/**
+ * 计算单步耗时（秒）；运行已结束但步骤缺少结束时间时不伪造持续计时。
+ * @param step 步骤执行事实。
+ * @param allowLiveElapsed 是否允许对进行中的步骤按当前时间累计耗时。
+ * @returns 秒数或 null。
+ */
+export function stepDurationSeconds(step: PipelineRunStep, allowLiveElapsed: boolean): number | null {
+  if (!step.startedAt) return null
+  const started = new Date(step.startedAt).getTime()
+  if (Number.isNaN(started)) return null
+  if (!step.finishedAt && (!allowLiveElapsed || step.status !== 'running')) return null
+  const finished = step.finishedAt ? new Date(step.finishedAt).getTime() : Date.now()
+  if (Number.isNaN(finished) || finished < started) return null
+  return Math.floor((finished - started) / 1000)
+}
+
+/**
+ * 获取步骤类型的中文标签。
+ * @param kind 步骤类型标识。
+ * @returns 中文标签；未知类型原样返回。
+ */
+export function stepKindLabel(kind: string): string {
+  return STEP_KIND_LABELS[kind] ?? kind
 }
 
 /**
@@ -66,8 +138,9 @@ export function parseErrorLocation(error: {
 }): string {
   const parts: string[] = []
   if (error.fieldPath) parts.push(error.fieldPath)
-  if (error.line !== null)
+  if (error.line !== null) {
     parts.push(error.column !== null ? `第 ${error.line} 行第 ${error.column} 列` : `第 ${error.line} 行`)
+  }
   return parts.join(' · ') || '文件级错误'
 }
 
