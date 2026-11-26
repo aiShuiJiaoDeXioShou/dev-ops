@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useId, useRef, useState, type FormEvent } from 'react'
 import { createIdempotencyKey, type ApiSuccessData } from '@dev-ops/api-client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2 } from 'lucide-react'
@@ -145,6 +145,7 @@ function PromptTemplateEditorContent({
   const [name, setName] = useState(template?.name ?? initialDraft?.name ?? '')
   const [description, setDescription] = useState(template?.description ?? initialDraft?.description ?? '')
   const [body, setBody] = useState(template?.body ?? initialDraft?.body ?? '')
+  const bodyId = useId()
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const client = useQueryClient()
   const { showToast } = useToast()
@@ -242,7 +243,7 @@ function PromptTemplateEditorContent({
         <DialogFormBody>
           <div className="prompt-editor-split">
             <div className="space-y-4">
-              <label className="field">
+              <label className="field" htmlFor={bodyId}>
                 <span className="flex items-center justify-between gap-2">
                   <span>命令名称</span>
                   <span className="text-xs font-normal text-muted-foreground">小写字母、数字、短横线</span>
@@ -268,7 +269,7 @@ function PromptTemplateEditorContent({
                 )}
               </label>
 
-              <label className="field">
+              <label className="field" htmlFor={bodyId}>
                 <span className="flex items-center justify-between gap-2">
                   <span>摘要</span>
                   <span className="text-xs font-normal text-muted-foreground">{description.length} / 200</span>
@@ -283,7 +284,7 @@ function PromptTemplateEditorContent({
                 />
               </label>
 
-              <label className="field">
+              <label className="field" htmlFor={bodyId}>
                 <span className="flex items-center justify-between gap-2">
                   <span>模板正文</span>
                   {write && (
@@ -301,6 +302,7 @@ function PromptTemplateEditorContent({
                   )}
                 </span>
                 <Textarea
+                  id={bodyId}
                   ref={bodyRef}
                   required
                   rows={9}

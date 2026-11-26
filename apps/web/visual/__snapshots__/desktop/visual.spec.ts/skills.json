@@ -11,7 +11,9 @@
   "rows": 0,
   "statusTexts": [],
   "documentOverflow": false,
-  "interactiveCount": 23,
+  "interactiveCount": 25,
   "nonPointerControls": [],
-  "smallTargets": []
+  "smallTargets": [
+    "[audit] UI 审计技能"
+  ]
 }

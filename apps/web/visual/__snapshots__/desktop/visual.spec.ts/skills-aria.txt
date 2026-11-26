@@ -9,19 +9,33 @@
     - link "提示模板":
       - /url: /capabilities/prompt-templates
   - heading "技能库" [level=1]
+  - text: "1"
+  - paragraph:
+    - text: 沉淀团队可复用的指令与脚本包，在会话中通过
+    - code: "@skill/标识"
+    - text: 调用。
+  - button "导入目录"
   - button "发布 Skill"
   - group "技能分类":
     - button "全部" [pressed]
     - button "产品"
     - button "研发"
     - button "交付"
-  - textbox "搜索团队技能"
+  - combobox "筛选技能来源":
+    - option "全部来源" [selected]
+    - option "平台内置"
+    - option "团队维护"
+  - combobox "筛选技能状态":
+    - option "全部状态" [selected]
+    - option "仅已启用"
+    - option "仅已停用"
+  - searchbox "搜索团队技能"
   - list:
     - listitem:
-      - text: 已停用
       - link "[audit] UI 审计技能":
         - /url: /capabilities/skills?skill=dc114230-72bc-5566-9f37-dae40a5573de
+      - text: 团队维护 交付 v1.0.0 已停用
       - paragraph: "[audit] 用于 UI 审计的技能包"
-      - text: 交付 v1.0.0 团队维护
-      - code: "@skill/ui-audit-skill"
-      - button "查看技能 [audit] UI 审计技能"
+      - button "复制调用指令 @skill/ui-audit-skill":
+        - code: "@skill/ui-audit-skill"
+      - button "查看技能 [audit] UI 审计技能": 详情
