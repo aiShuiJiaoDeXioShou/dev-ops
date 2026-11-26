@@ -22,6 +22,7 @@ packages/api-client/src/generated/
 !/.agents/skills/dsh-client-ui-ux/
 !/.agents/skills/dsh-responsive-ui/
 !/.agents/skills/dsh-official-plugin-artwork/
+!/.agents/skills/devops-workflow/
 .vscode
 .dsh
 .specify
