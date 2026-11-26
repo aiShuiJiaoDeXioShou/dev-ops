@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-import { editedPaths, touchesRepository } from '../agent-hooks/devops-hook.mjs'
+import { editedPaths, runsGitSubcommand, touchesRepository } from '../agent-hooks/devops-hook.mjs'
 
 const hook = fileURLToPath(new URL('../agent-hooks/devops-hook.mjs', import.meta.url))
 
@@ -135,4 +135,12 @@ test('editedPaths 与 touchesRepository 识别编辑目标', () => {
   assert.equal(touchesRepository(['/tmp/x'], '/repo', '/repo'), false)
   assert.equal(touchesRepository(['src/a.ts'], '/repo', '/repo'), true)
   assert.equal(touchesRepository([], '/repo', '/repo'), true)
+})
+
+test('runsGitSubcommand 只识别命令段开头的 git 子命令', () => {
+  assert.equal(runsGitSubcommand('git commit -m "x"', 'commit'), true)
+  assert.equal(runsGitSubcommand('pnpm format && git -C repo push origin main', 'push'), true)
+  assert.equal(runsGitSubcommand('git add .\ngit commit -m x', 'commit'), true)
+  assert.equal(runsGitSubcommand('devops work log "git commit 后提醒"', 'commit'), false)
+  assert.equal(runsGitSubcommand('git log --oneline', 'commit'), false)
 })

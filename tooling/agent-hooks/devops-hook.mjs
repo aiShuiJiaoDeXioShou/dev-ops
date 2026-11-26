@@ -254,6 +254,16 @@ async function onPreEdit(root, event) {
 }
 
 /**
+ * 判断 shell 命令是否执行了指定的 git 子命令；只认命令段开头的 git，避免把引号里的说明文字当成命令。
+ * @param {string} command 编码助手执行的 shell 命令。
+ * @param {string} subcommand 例如 commit、push。
+ * @returns {boolean}
+ */
+export function runsGitSubcommand(command, subcommand) {
+  return new RegExp(`(?:^|[;&|(]|\\n)\\s*git\\b[^\\n;&|]*?\\s${subcommand}\\b`).test(command)
+}
+
+/**
  * 处理命令执行后：推送后自动关联提交，提交后提醒勾选待办。
  * @param {string} root
  * @param {Record<string, unknown>} event
@@ -265,8 +275,8 @@ async function onPostBash(root, event) {
       ? /** @type {Record<string, unknown>} */ (event.tool_input)
       : {}
   const command = typeof input.command === 'string' ? input.command : ''
-  const isPush = /\bgit\b[^\n;&|]*\bpush\b/.test(command)
-  const isCommit = /\bgit\b[^\n;&|]*\bcommit\b/.test(command)
+  const isPush = runsGitSubcommand(command, 'push')
+  const isCommit = runsGitSubcommand(command, 'commit')
   if (!isPush && !isCommit) return null
   const local = await readStatus(root, true)
   if (!local.ok || local.status.binding !== 'tracked') return null
