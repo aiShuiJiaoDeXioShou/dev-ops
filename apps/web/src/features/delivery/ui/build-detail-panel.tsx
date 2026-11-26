@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { DetailSheetSkeleton } from '@/shared/ui/page-skeleton'
 import { buildQueryOptions } from '../api/queries'
 import { PageError } from '@/shared/ui/page-state'
 
@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
  */
 export function BuildDetailPanel({ buildId }: { buildId: string }) {
   const query = useQuery(buildQueryOptions(buildId))
-  if (query.isPending) return <DelayedPageSkeleton />
+  if (query.isPending) return <DetailSheetSkeleton propertyRows={4} label="构建详情加载中" />
   if (!query.data) {
     return (
       <PageError

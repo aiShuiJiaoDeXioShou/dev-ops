@@ -3,7 +3,7 @@ import { useNavigate, useOutletContext, useParams, useLocation } from 'react-rou
 import { BotDetail } from '@/features/bots/ui/bot-detail'
 import { BotList } from '@/features/bots/ui/bot-list'
 import { useSession } from '@/features/identity/model/session'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { BotsPageSkeleton } from '@/pages/page-skeletons'
 import { EmptyState } from '@/shared/ui/page-state'
 
 /** 智能体目录及右侧详情栏，团队切换时使用新团队权限。 */
@@ -13,7 +13,7 @@ export function Component() {
   const detailHost = useOutletContext<HTMLDivElement | null>()
   const navigate = useNavigate()
   const { user, currentTeam, role, isReady } = useSession()
-  if (!isReady) return <DelayedPageSkeleton />
+  if (!isReady) return <BotsPageSkeleton />
   if (!currentTeam)
     return <EmptyState mascot="group" title="尚未选择团队" description="加入团队后即可查看团队的智能体。" />
   const canEdit = role === 'admin' || role === 'developer'

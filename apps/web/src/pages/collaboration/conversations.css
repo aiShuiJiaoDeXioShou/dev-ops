@@ -55,25 +55,8 @@
     background: transparent;
   }
 
-  .conversation-placeholder {
-    display: block;
-    border-radius: var(--radius-sm);
-    background: var(--accent);
-  }
-
   .conversation-loading-room .dsh-tab {
     cursor: default;
-  }
-
-  .conversation-loading-status {
-    display: grid;
-    flex: 1;
-    min-height: 0;
-    place-items: center;
-  }
-
-  .conversation-trace-scroll .conversation-loading-status {
-    min-height: 8rem;
   }
 
   .live-conversations .conversation-list-empty {

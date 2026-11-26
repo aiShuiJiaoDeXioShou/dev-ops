@@ -4,6 +4,7 @@ import { LogSheet } from '@/shared/ui/log-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { toolInvocationsQueryOptions } from '../api/queries'
 import { PageError } from '@/shared/ui/page-state'
+import { TimelineListSkeleton } from '@/shared/ui/page-skeleton'
 
 /** 写能力调用状态到可读标签。 */
 const INVOCATION_STATUS_LABELS: Record<string, string> = {
@@ -55,7 +56,7 @@ export function CodeInvocationLogSheet({
       footer={<p className="small muted">调用记录只保留摘要；敏感参数不会出现在这里。</p>}
     >
       {invocations.isPending ? (
-        <p className="small quiet">调用记录加载中…</p>
+        <TimelineListSkeleton rows={4} label="调用记录加载中" />
       ) : invocations.isError && !invocations.data ? (
         <PageError
           title="调用记录读取失败"

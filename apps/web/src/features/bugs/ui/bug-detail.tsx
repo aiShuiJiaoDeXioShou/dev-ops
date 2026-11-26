@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Pencil, Plus } from 'lucide-react'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
+import { DetailSheetSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { TabsContent } from '@/shared/ui/controls/tabs'
 import { WorkItemDetailSheet } from '@/shared/ui/controls/work-item-detail-sheet'
@@ -19,7 +19,7 @@ import { RemoteBugActions } from '@/features/tools/ui/remote-bug-actions'
 import { useSession } from '@/features/identity/model/session'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
 import { bugMutations, canWriteBugs, isBugScopeEditable } from '../api/mutations'
 import { bugQueryOptions } from '../api/queries'
 import { BUG_STATUS_LABELS, REGRESSION_RESULT_LABELS, bugStatusTone } from '../model/labels'
@@ -79,9 +79,7 @@ export function BugDetailPane({ bugId, onClose }: { bugId: string; onClose: () =
   if (query.isPending)
     return (
       <WorkItemDetailSheet label="Bug 详情" onClose={onClose}>
-        <DelayedLoading pending>
-          <PageLoading message="Bug 加载中…" />
-        </DelayedLoading>
+        <DetailSheetSkeleton showTimeline propertyRows={4} label="Bug 详情加载中" />
       </WorkItemDetailSheet>
     )
   if (query.isError) {

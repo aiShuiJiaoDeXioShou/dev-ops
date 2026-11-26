@@ -65,6 +65,7 @@ export interface SkillVersionRow {
 export interface SkillListFilters {
   search?: string
   category?: string
+  enabled?: boolean
   offset: number
   limit: number
 }
@@ -80,9 +81,10 @@ export interface SkillListRecord {
   version: number
   updatedAt: Date
   contentVersion: string
+  fileCount: number
 }
 
-export interface SkillDetailRecord extends SkillListRecord {
+export interface SkillDetailRecord extends Omit<SkillListRecord, 'fileCount'> {
   teamId: string
   content: string
   files: SkillFileStored[]
@@ -94,7 +96,7 @@ export interface SkillDetailRecord extends SkillListRecord {
  * 查询团队技能分页。
  * @param db 数据库连接。
  * @param teamId 团队标识。
- * @param filters 关键词、分类与分页条件。
+ * @param filters 关键词、分类、启停状态与分页条件。
  * @returns 技能列表记录与总数；只返回已存在当前内容版本的技能。
  */
 export async function findSkills(db: Database, teamId: string, filters: SkillListFilters) {
@@ -105,27 +107,31 @@ export async function findSkills(db: Database, teamId: string, filters: SkillLis
     if (search) conditions.push(search)
   }
   if (filters.category) conditions.push(eq(skill.category, filters.category))
+  if (filters.enabled !== undefined) conditions.push(eq(skill.enabled, filters.enabled))
   const where = and(...conditions)
   const [rows, [total]] = await Promise.all([
-    db
-      .select({
-        id: skill.id,
-        name: skill.name,
-        identifier: skill.identifier,
-        category: skill.category,
-        summary: skill.summary,
-        source: skill.source,
-        enabled: skill.enabled,
-        version: skill.version,
-        updatedAt: skill.updated_at,
-        contentVersion: skillVersion.content_version,
-      })
-      .from(skill)
-      .innerJoin(skillVersion, eq(skill.current_version_id, skillVersion.id))
-      .where(where)
-      .orderBy(desc(skill.updated_at), desc(skill.id))
-      .limit(filters.limit)
-      .offset(filters.offset),
+    filters.limit <= 0
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: skill.id,
+            name: skill.name,
+            identifier: skill.identifier,
+            category: skill.category,
+            summary: skill.summary,
+            source: skill.source,
+            enabled: skill.enabled,
+            version: skill.version,
+            updatedAt: skill.updated_at,
+            contentVersion: skillVersion.content_version,
+            fileCount: sql<number>`coalesce(jsonb_array_length(${skillVersion.files}), 0)`.mapWith(Number),
+          })
+          .from(skill)
+          .innerJoin(skillVersion, eq(skill.current_version_id, skillVersion.id))
+          .where(where)
+          .orderBy(desc(skill.updated_at), desc(skill.id))
+          .limit(filters.limit)
+          .offset(filters.offset),
     db.select({ value: count() }).from(skill).where(where),
   ])
   return { items: rows as SkillListRecord[], total: total?.value ?? 0 }

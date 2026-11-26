@@ -7,10 +7,11 @@ import { EditProfileDialog } from '@/features/identity/ui/edit-profile-dialog'
 import { GitHubAccountSection } from '@/features/identity/ui/github-account'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
+import { ProfileColorMode } from './profile-color-mode'
 import './settings-page.css'
 
 /**
- * 渲染个人资料与 API Token 页签，并在 URL 中保留选中的页签。
+ * 渲染个人资料、配色设置与 API Token，并在 URL 中保留选中的页签。
  * @returns 个人页面，默认显示登录账号的资料。
  */
 export function Component() {
@@ -60,6 +61,7 @@ export function Component() {
                 </div>
               </dl>
             </section>
+            <ProfileColorMode />
             <section className="settings-section" aria-labelledby="profile-security">
               <div className="settings-heading">
                 <h2 id="profile-security">登录安全</h2>

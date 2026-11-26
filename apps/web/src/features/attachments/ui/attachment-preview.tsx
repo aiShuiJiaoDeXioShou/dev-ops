@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/ui/controls/dialog'
+import { PreviewSkeleton } from '@/shared/ui/page-skeleton'
 import { attachmentDownloadPath, fetchAttachmentBlob } from '../api/attachments-api'
 import { describeAttachmentError } from '../lib/errors'
 import type { AttachmentSummary } from '../model/types'
@@ -67,7 +68,7 @@ function PreviewBody({ file, format }: { file: PreviewFile; format: PreviewForma
       return { ...format, blob }
     },
   })
-  if (query.isPending) return <p role="status">正在加载预览…</p>
+  if (query.isPending) return <PreviewSkeleton delay={0} />
   if (query.isError) {
     return (
       <div className="space-y-3">
@@ -84,7 +85,7 @@ function PreviewBody({ file, format }: { file: PreviewFile; format: PreviewForma
   if (preview.kind === 'image') return <ImagePreview blob={preview.blob} mime={preview.mime} fileName={file.fileName} />
   if (preview.kind === 'pdf') {
     return (
-      <Suspense fallback={<p role="status">正在加载 PDF 预览…</p>}>
+      <Suspense fallback={<PreviewSkeleton delay={0} />}>
         <PdfPreview blob={preview.blob} />
       </Suspense>
     )

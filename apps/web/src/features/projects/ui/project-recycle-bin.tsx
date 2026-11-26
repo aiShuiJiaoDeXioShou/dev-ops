@@ -13,7 +13,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/shared/ui/controls/dialog'
-import { DelayedPageLoading, PageError } from '@/shared/ui/page-state'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
+import { PageError } from '@/shared/ui/page-state'
 import { ProjectLifecycleAction } from './project-lifecycle-action'
 
 const statuses = {
@@ -89,7 +90,7 @@ export function ProjectRecycleBin({ teamId }: { teamId: string }) {
         </DialogFormHeader>
         <DialogFormBody>
           {query.isPending ? (
-            <DelayedPageLoading message="正在加载回收站…" />
+            <CompactListSkeleton rows={4} trailing bordered label="回收站加载中" />
           ) : query.isError ? (
             <PageError
               title="回收站加载失败"

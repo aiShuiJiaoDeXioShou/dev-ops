@@ -12,8 +12,8 @@ import {
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
+import { PageError } from '@/shared/ui/page-state'
 import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
 import { projectRepositoriesQueryOptions } from '../api/queries'
@@ -63,9 +63,7 @@ export function RepositoryPicker({ projectId, canManage }: { projectId: string; 
           <span className="small quiet">{repositories.length} 个已关联</span>
         </div>
         {projectRepos.isPending ? (
-          <DelayedLoading pending>
-            <PageLoading message="仓库加载中…" />
-          </DelayedLoading>
+          <CompactListSkeleton rows={3} leading="icon" trailing bordered label="仓库加载中" />
         ) : projectRepos.isError ? (
           <PageError
             title="已关联仓库加载失败"

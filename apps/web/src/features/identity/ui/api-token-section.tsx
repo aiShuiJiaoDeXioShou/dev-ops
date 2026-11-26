@@ -16,7 +16,8 @@ import {
 import { Input } from '@/shared/ui/controls/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
 import { Tag, type TagVariant } from '@/shared/ui/tag'
-import { DelayedPageLoading, PageError } from '@/shared/ui/page-state'
+import { PageError } from '@/shared/ui/page-state'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
 import { useToast } from '@/shared/ui/toast'
 import { apiTokensQueryOptions, type ApiTokenMetadata } from '../api/tokens'
 
@@ -97,7 +98,8 @@ export function ApiTokenSection() {
     }
   }
 
-  if (tokens.isPending) return <DelayedPageLoading message="正在加载 API Token…" />
+  if (tokens.isPending)
+    return <TableSkeleton rows={4} columns={['30%', '20%', '20%', '15%', '15%']} label="API Token 加载中" />
   if (tokens.isError) {
     const described = describeRequestError(tokens.error)
     return (

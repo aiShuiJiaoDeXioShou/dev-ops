@@ -10,6 +10,7 @@ export interface SkillListItemView {
   contentVersion: string
   summary: string
   source: 'team'
+  fileCount: number
   enabled: boolean
   version: number
   updatedAt: string
@@ -70,6 +71,7 @@ export function toSkillListItem(row: SkillListRecord): SkillListItemView {
     contentVersion: row.contentVersion,
     summary: row.summary,
     source: toSkillSource(row.source),
+    fileCount: row.fileCount,
     enabled: row.enabled,
     version: row.version,
     updatedAt: row.updatedAt.toISOString(),
@@ -79,7 +81,7 @@ export function toSkillListItem(row: SkillListRecord): SkillListItemView {
 /** 技能详情记录 → 视图。 */
 export function toSkillDetail(row: SkillDetailRecord): SkillDetailView {
   return {
-    ...toSkillListItem(row),
+    ...toSkillListItem({ ...row, fileCount: row.files.length }),
     teamId: row.teamId,
     content: row.content,
     files: toSkillFiles(row.files),

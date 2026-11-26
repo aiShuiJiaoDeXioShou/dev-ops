@@ -59,6 +59,7 @@ test('[desktop] [mobile] 私聊沿用原型并展示排队、增量与最终消�
     summary: '核对证据',
     category: 'delivery',
     source: 'team',
+    fileCount: 0,
     enabled: true,
     version: 1,
     contentVersion: '1.0.0',

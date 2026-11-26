@@ -5,6 +5,7 @@ import { SKILL_CATEGORIES } from './knowledge.types.ts'
 const uuidSchema = Type.String({ pattern: '^[0-9a-fA-F-]{36}$' })
 const versionSchema = Type.Integer({ minimum: 1 })
 const categorySchema = Type.Union([Type.Literal('product'), Type.Literal('engineering'), Type.Literal('delivery')])
+const skillSourceSchema = Type.Union([Type.Literal('team'), Type.Literal('platform')])
 const activitySchema = Type.Object({
   id: uuidSchema,
   action: Type.String(),
@@ -28,9 +29,10 @@ const skillListItemSchema = Type.Object({
   category: categorySchema,
   contentVersion: Type.String(),
   summary: Type.String(),
-  source: Type.Union([Type.Literal('team'), Type.Literal('platform')]),
+  source: skillSourceSchema,
   conflictsWithPlatform: Type.Optional(Type.Boolean()),
   content: Type.Optional(Type.String()),
+  fileCount: Type.Integer({ minimum: 0 }),
   enabled: Type.Boolean(),
   version: versionSchema,
   updatedAt: Type.String(),
@@ -80,6 +82,8 @@ export const pageQuerySchema = Type.Object({
 export const skillListQuerySchema = Type.Object({
   search: Type.Optional(Type.String({ maxLength: 200 })),
   category: Type.Optional(categorySchema),
+  source: Type.Optional(skillSourceSchema),
+  enabled: Type.Optional(Type.Boolean()),
   page: Type.Optional(Type.Integer({ minimum: 1 })),
   pageSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
 })

@@ -18,7 +18,7 @@ import {
 import { FormField } from '@/shared/ui/controls/form-field'
 import { Input } from '@/shared/ui/controls/input'
 import { TooltipProvider } from '@/shared/ui/controls/tooltip'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { useGroupMemberChoices } from '../api/group-members'
@@ -142,7 +142,7 @@ export function NewGroupDialog({
                 onChange={(event) => setName(event.target.value)}
               />
             </FormField>
-            {choices.pending && <DelayedPageSkeleton />}
+            {choices.pending && <CompactListSkeleton rows={4} leading="avatar" bordered label="可选成员加载中" />}
             {choices.error && <PageError title="成员加载失败" error={choices.error} onRetry={choices.retry} />}
             {!choices.pending && !choices.error && (
               <>

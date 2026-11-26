@@ -7,7 +7,7 @@ import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 
 type Usage = ApiSuccessData<'/api/v1/teams/{teamId}/bot-usage', 'get'>
@@ -204,7 +204,7 @@ export function BotUsage({ teamId, canManage }: { teamId: string; canManage: boo
           </Button>
         )}
       </div>
-      {list.isPending && <DelayedPageSkeleton />}
+      {list.isPending && <TableSkeleton rows={4} columns={['34%', '22%', '22%', '22%']} label="用量加载中" />}
       {list.isError && (
         <PageError
           title="用量加载失败"

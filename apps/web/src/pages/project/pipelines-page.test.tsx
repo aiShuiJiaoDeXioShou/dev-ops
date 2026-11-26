@@ -109,7 +109,8 @@ describe('pipelines-page', () => {
       http.get('*/api/v1/projects/project-1/pipeline-runs', () => new Promise(() => undefined)),
     )
     renderPage()
-    expect(await screen.findByText('工作流加载中…')).toBeInTheDocument()
+    expect(await screen.findByRole('status', { name: '工作流加载中' })).toBeInTheDocument()
+    expect(screen.queryByText('工作流加载中…')).not.toBeInTheDocument()
   })
 
   it('仓库不可用时显示错误与重试，不显示空工作流列表', async () => {

@@ -14,6 +14,7 @@ import { useToast } from '@/shared/ui/toast'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { codeChangesQueryOptions, toolCapabilitiesQueryOptions } from '../api/queries'
 import { PageError } from '@/shared/ui/page-state'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 
 const CODE_CHANGE_STATUS_LABELS: Record<string, string> = {
   queued: '排队中',
@@ -159,7 +160,7 @@ export function CodeChangeSection({
         </div>
       )}
       {changes.isPending ? (
-        <p className="small quiet">代码变更加载中…</p>
+        <CompactListSkeleton rows={3} bordered label="代码变更加载中" />
       ) : changes.isError && !changes.data ? (
         <PageError
           title="代码变更读取失败"

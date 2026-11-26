@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
+import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { PageFailure } from '@/shared/ui/page-failure'
-import { DelayedAppShellSkeleton } from '@/shared/ui/page-skeleton'
+import { AppShellSkeleton, TableSkeleton } from '@/shared/ui/page-skeleton'
 import { AuthRequestError } from '../api/auth-client'
 import { sessionQueryOptions } from '../api/queries'
 import { SessionProvider } from '../model/session'
@@ -16,7 +17,17 @@ import { SessionProvider } from '../model/session'
  * @param props.sessionFallback 应用在等待认证时提供的加载视图，默认显示工作区骨架。
  * @returns 受保护子路由、加载状态、登录跳转或服务错误页。
  */
-export function RequireAuth({ sessionFallback = <DelayedAppShellSkeleton /> }: { sessionFallback?: ReactNode }) {
+export function RequireAuth({
+  sessionFallback = (
+    <DelayedLoading pending>
+      <AppShellSkeleton>
+        <TableSkeleton toolbar rows={6} delay={0} className="catalog" />
+      </AppShellSkeleton>
+    </DelayedLoading>
+  ),
+}: {
+  sessionFallback?: ReactNode
+}) {
   const location = useLocation()
   const session = useQuery(sessionQueryOptions)
   const isCheckingSession = session.isPending || (session.data === null && session.isFetching)

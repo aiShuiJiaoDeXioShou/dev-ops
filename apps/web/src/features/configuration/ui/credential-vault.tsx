@@ -8,7 +8,7 @@ import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/utils'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
+import { CompactListSkeleton, DetailSheetSkeleton, TimelineListSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -17,7 +17,7 @@ import { LogSheet } from '@/shared/ui/log-sheet'
 import { StatusBadge } from '@/shared/ui/status-badge'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
-import { EmptyState, PageLoading, PageError } from '@/shared/ui/page-state'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { credentialUsageQueryOptions, credentialsQueryOptions, type CredentialList } from '../api/queries'
 import { CredentialValueReveal } from './credential-value-dialog'
 
@@ -222,9 +222,7 @@ export function CredentialVault() {
           </div>
 
           {list.isPending ? (
-            <DelayedLoading pending>
-              <PageLoading message="凭据加载中…" />
-            </DelayedLoading>
+            <CompactListSkeleton rows={5} leading="icon" bordered label="凭据加载中" />
           ) : list.isError ? (
             <p className="muted small">凭据加载失败。</p>
           ) : items.length === 0 ? (
@@ -373,9 +371,7 @@ export function CredentialVault() {
                 description={`${selected.name} · 最近使用与敏感操作`}
               >
                 {usage.isPending ? (
-                  <DelayedLoading pending>
-                    <PageLoading />
-                  </DelayedLoading>
+                  <TimelineListSkeleton rows={4} label="使用记录加载中" />
                 ) : usage.isError || !usage.data ? (
                   <EmptyState
                     title="使用记录不可用"
@@ -413,9 +409,7 @@ export function CredentialVault() {
               </LogSheet>
             </>
           ) : list.isPending ? (
-            <DelayedLoading pending>
-              <PageLoading />
-            </DelayedLoading>
+            <DetailSheetSkeleton propertyRows={4} label="凭据详情加载中" />
           ) : (
             <EmptyState
               mascot="prism"

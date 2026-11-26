@@ -12,8 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/controls/dialog'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
+import { PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import {
   availableRepositoriesQueryOptions,
@@ -80,9 +80,7 @@ export function LinkRepositoryDialog({
           <DialogDescription>选择已授权的 GitHub 或 Gitea 仓库。</DialogDescription>
         </DialogHeader>
         {isPending ? (
-          <DelayedLoading pending>
-            <PageLoading message="可用仓库加载中…" />
-          </DelayedLoading>
+          <CompactListSkeleton rows={4} leading="icon" bordered label="可用仓库加载中" />
         ) : loadError ? (
           <PageError
             title="可用仓库加载失败"

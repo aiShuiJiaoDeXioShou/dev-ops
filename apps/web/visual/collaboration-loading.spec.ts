@@ -60,13 +60,14 @@ test('[desktop] [mobile] 协作首屏按会话分栏加载，等待消息时保�
 
   const isMobile = testInfo.project.name === 'mobile'
   await page.goto('/collaboration')
-  await expect(page.getByText('正在加载会话…')).toBeVisible()
+  await expect(page.getByRole('status', { name: '会话消息加载中' })).toBeVisible()
   await expect(page.locator('.skeleton-grid')).toHaveCount(0)
+  await expect(page.getByText('正在加载会话…')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('collaboration-loading-session.png') })
 
   auth.resolve()
   await expect(page.getByRole('link', { name: '协作首页', includeHidden: true })).toBeAttached()
-  await expect(page.getByText('正在加载会话…')).toBeVisible()
+  await expect(page.getByRole('status', { name: '会话消息加载中' })).toBeVisible()
   await expect(page.locator('.skeleton-grid')).toHaveCount(0)
 
   teams.resolve()
@@ -84,19 +85,22 @@ test('[desktop] [mobile] 协作首屏按会话分栏加载，等待消息时保�
 
   list.resolve()
   await expect(page).toHaveURL(new RegExp(`/collaboration/${room.id}$`))
-  await expect(page.getByText('正在加载会话…')).toBeVisible()
+  await expect(page.getByRole('status', { name: '会话消息加载中' })).toBeVisible()
   const header = page.locator('.dsh-chat-header')
   const pendingHeader = await header.boundingBox()
   detail.resolve()
   const input = page.getByRole('textbox', { name: '协作消息' })
-  const loading = page.getByRole('status').filter({ hasText: '正在加载消息…' })
+  const loading = page.getByRole('status', { name: '会话消息加载中' })
   await expect(input).toBeVisible()
   await expect(loading).toBeVisible()
+  await expect(page.getByText('正在加载消息…')).toHaveCount(0)
   const loadedHeader = await header.boundingBox()
   expect(Math.abs((loadedHeader?.height ?? 0) - (pendingHeader?.height ?? 0))).toBeLessThanOrEqual(8)
-  await expect(loading.locator('svg')).toHaveCSS('animation-name', 'spin')
+  const skeletonItem = loading.locator('.react-loading-skeleton').first()
+  await expect(skeletonItem).toBeVisible()
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await expect(loading.locator('svg')).toHaveCSS('animation-name', 'none')
+  const animationName = await skeletonItem.evaluate((element) => getComputedStyle(element, '::after').animationName)
+  expect(animationName).toBe('none')
   if (isMobile) await page.locator('.workspace-shell').evaluate((element) => element.classList.add('dark'))
   await page.screenshot({ path: testInfo.outputPath('collaboration-loading-messages.png') })
 

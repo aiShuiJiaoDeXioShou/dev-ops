@@ -3,23 +3,6 @@ import { Inbox } from 'lucide-react'
 import { describeRequestError } from '@/shared/api/errors'
 import { cn } from '@/shared/lib/utils'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-
-/**
- * 展示页面或数据首次加载时的占位内容。
- * @param props.message 向辅助技术播报的加载说明，默认为页面加载中。
- * @returns 不依赖具体业务的加载状态，不发起请求。
- */
-export function PageLoading({ message = '页面加载中…' }: { message?: string }) {
-  return (
-    <div role="status" aria-busy="true" className="space-y-4 py-6">
-      <p className="small quiet">{message}</p>
-      <span className="skeleton-line skeleton-title" />
-      <span className="skeleton-line skeleton-subtitle" />
-      <span className="skeleton-line skeleton-card-line" />
-    </div>
-  )
-}
 
 interface PageErrorProps {
   title: string
@@ -159,18 +142,5 @@ export function EmptyState({
         </div>
       )}
     </div>
-  )
-}
-
-/**
- * 认证页等启动阶段使用的延迟加载占位。
- * @param props.message 向辅助技术播报的加载说明，默认为页面加载中。
- * @returns 延迟后展示的加载占位；快速加载时不渲染，避免骨架闪烁。
- */
-export function DelayedPageLoading({ message }: { message?: string }) {
-  return (
-    <DelayedLoading pending>
-      <PageLoading message={message} />
-    </DelayedLoading>
   )
 }

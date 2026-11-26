@@ -1,12 +1,11 @@
-import { useState, type FormEvent } from 'react'
-import { FilePlus2, Pencil, Trash2, Download } from 'lucide-react'
+import { useState } from 'react'
+import { Download, FileCode2, FilePlus2, Trash2 } from 'lucide-react'
 import { Button } from '@/shared/ui/controls/button'
-import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { Tag } from '@/shared/ui/tag'
 import { useToast } from '@/shared/ui/toast'
+import { cn } from '@/shared/lib/utils'
 import type { SkillFileDraft } from '../model/types'
 import {
   SKILL_FILE_LIMITS,
@@ -22,8 +21,8 @@ import {
 const PATH_PATTERN = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/
 
 /**
- * 技能资源文件编辑器：展示 scripts/references/assets 等文件，支持新增、编辑文本与下载。
- * @param props.files 当前文件草稿。
+ * 技能资源文件双栏编辑器：左侧文件树、右侧内联编辑/预览面板，不再嵌套弹窗。
+ * @param props.files 当前文件草稿列表。
  * @param props.onChange 文件变化回调。
  * @param props.disabled 只读时禁止编辑。
  */
@@ -37,32 +36,41 @@ export function SkillFilesEditor({
   disabled?: boolean
 }) {
   const { showToast } = useToast()
-  const [formOpen, setFormOpen] = useState(false)
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [mode, setMode] = useState<'idle' | 'create' | 'edit'>('idle')
+  const [editingPath, setEditingPath] = useState<string | null>(null)
   const [path, setPath] = useState('')
   const [content, setContent] = useState('')
   const [error, setError] = useState('')
   const totalBytes = files.reduce((total, file) => total + skillFileSize(file), 0)
+  const activeFile = editingPath ? files.find((item) => item.path === editingPath) : undefined
 
   const openCreate = () => {
-    setEditingIndex(null)
+    setMode('create')
+    setEditingPath(null)
     setPath('')
     setContent('')
     setError('')
-    setFormOpen(true)
   }
-  const openEdit = (index: number) => {
-    const file = files[index]
-    if (!file) return
-    setEditingIndex(index)
+
+  const selectFile = (file: SkillFileDraft) => {
+    setEditingPath(file.path)
     setPath(file.path)
     setContent(file.content)
     setError('')
-    setFormOpen(true)
+    setMode(!disabled && isEditableSkillFile(file.path, file.content, file.encoding) ? 'edit' : 'idle')
   }
-  const remove = (index: number) => {
-    onChange(files.filter((_, current) => current !== index))
+
+  const remove = (targetPath: string) => {
+    onChange(files.filter((file) => file.path !== targetPath))
+    if (editingPath === targetPath) {
+      setMode('idle')
+      setEditingPath(null)
+      setPath('')
+      setContent('')
+      setError('')
+    }
   }
+
   const download = (file: SkillFileDraft) => {
     if (file.encoding === 'base64') {
       downloadBlob(file.path.split('/').pop() ?? 'file', blobFromBytes(base64ToBytes(file.content)))
@@ -71,8 +79,8 @@ export function SkillFilesEditor({
     }
     showToast('已开始下载资源文件', 'success')
   }
-  const submit = (event: FormEvent) => {
-    event.preventDefault()
+
+  const saveDraft = () => {
     setError('')
     const nextPath = path.trim()
     const segments = nextPath.split('/')
@@ -96,15 +104,13 @@ export function SkillFilesEditor({
       setError(`单个文本文件不能超过 ${SKILL_FILE_LIMITS.textMaxLength} 个字符。`)
       return
     }
-    if (files.some((file, index) => file.path === nextPath && index !== editingIndex)) {
+    if (files.some((file) => file.path === nextPath && file.path !== editingPath)) {
       setError('资源文件路径重复。')
       return
     }
     const nextFile: SkillFileDraft = { path: nextPath, content, encoding: 'utf8' }
     const nextFiles =
-      editingIndex === null
-        ? [...files, nextFile]
-        : files.map((file, index) => (index === editingIndex ? nextFile : file))
+      mode === 'create' ? [...files, nextFile] : files.map((file) => (file.path === editingPath ? nextFile : file))
     if (nextFiles.length > SKILL_FILE_LIMITS.maxCount) {
       setError(`资源文件最多 ${SKILL_FILE_LIMITS.maxCount} 个。`)
       return
@@ -115,7 +121,8 @@ export function SkillFilesEditor({
       return
     }
     onChange(nextFiles.sort((left, right) => left.path.localeCompare(right.path)))
-    setFormOpen(false)
+    setEditingPath(nextPath)
+    setMode('edit')
   }
 
   return (
@@ -128,108 +135,146 @@ export function SkillFilesEditor({
         <span className="flex-1" />
         {!disabled && (
           <Button type="button" variant="outline" size="sm" onClick={openCreate}>
-            <FilePlus2 className="size-4" />
+            <FilePlus2 className="size-4" aria-hidden="true" />
             添加文件
           </Button>
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        可包含 scripts/、references/、assets/ 等目录；文本文件可直接编辑，二进制文件通过目录导入后仅可下载。
+        支持 scripts/、references/、assets/ 等目录；左侧选择文件，右侧直接编辑或预览，无需嵌套弹窗。
       </p>
-      {files.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-          暂未添加资源文件。可以在技能表单中导入完整目录，或手动添加文本文件。
-        </p>
+
+      {files.length === 0 && mode !== 'create' ? (
+        <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+          暂未添加资源文件。可点击上方「导入技能包目录」批量导入，或点击「添加文件」手动新建文本文件。
+        </div>
       ) : (
-        <ul className="space-y-2">
-          {files.map((file, index) => (
-            <li
-              key={file.path}
-              className="clickable-row flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2"
-              onClick={(event) => {
-                if (isNestedInteractiveTarget(event.target)) return
-                openEdit(index)
-              }}
-            >
-              <code className="min-w-0 flex-1 truncate text-xs">{file.path}</code>
-              <Tag variant={file.encoding === 'utf8' ? 'neutral' : 'blue'}>
-                {file.encoding === 'utf8' ? '文本' : '二进制'}
-              </Tag>
-              <span className="text-xs text-muted-foreground">{formatFileSize(skillFileSize(file))}</span>
-              {!disabled && isEditableSkillFile(file.path, file.content, file.encoding) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`编辑 ${file.path}`}
-                  onClick={() => openEdit(index)}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`下载 ${file.path}`}
-                onClick={() => download(file)}
-              >
-                <Download className="size-4" />
-              </Button>
-              {!disabled && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`删除 ${file.path}`}
-                  onClick={() => remove(index)}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="knowledge-dialog w-full max-w-xl">
-          <form className="space-y-4" onSubmit={submit}>
-            <DialogHeader>
-              <DialogTitle>{editingIndex === null ? '添加资源文件' : '编辑资源文件'}</DialogTitle>
-            </DialogHeader>
-            <label className="block space-y-1 text-sm font-medium">
-              相对路径
-              <Input
-                value={path}
-                maxLength={200}
-                placeholder="如 references/checklist.md"
-                readOnly={editingIndex !== null}
-                onChange={(event) => setPath(event.target.value)}
-              />
-            </label>
-            <label className="block space-y-1 text-sm font-medium">
-              文件内容
-              <Textarea
-                value={content}
-                rows={12}
-                className="font-mono text-xs"
-                onChange={(event) => setContent(event.target.value)}
-              />
-            </label>
-            {error && (
-              <p className="text-sm text-destructive" role="alert">
-                {error}
-              </p>
+        <div className="skill-file-browser">
+          <div className="skill-file-tree" role="list" aria-label="资源文件列表">
+            {files.length === 0 ? (
+              <p className="px-2 py-3 text-xs text-muted-foreground">正在新建第一个资源文件…</p>
+            ) : (
+              files.map((file) => {
+                const isActive = mode !== 'create' && editingPath === file.path
+                return (
+                  <div key={file.path} role="listitem" className={cn('skill-file-tree-row', isActive && 'is-active')}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="skill-file-tree-btn"
+                      onClick={() => selectFile(file)}
+                    >
+                      <FileCode2 className="size-3.5 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate font-mono">{file.path}</span>
+                    </Button>
+                    <Tag variant={file.encoding === 'utf8' ? 'neutral' : 'blue'}>
+                      {file.encoding === 'utf8' ? '文本' : '二进制'}
+                    </Tag>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`下载 ${file.path}`}
+                      onClick={() => download(file)}
+                    >
+                      <Download className="size-3.5" aria-hidden="true" />
+                    </Button>
+                    {!disabled && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`删除 ${file.path}`}
+                        onClick={() => remove(file.path)}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden="true" />
+                      </Button>
+                    )}
+                  </div>
+                )
+              })
             )}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>
-                取消
-              </Button>
-              <Button type="submit">保存文件</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+
+          <div className="skill-file-preview">
+            {mode === 'create' || mode === 'edit' ? (
+              <div className="skill-file-editor-pane">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {mode === 'create' ? '新建资源文件' : `编辑 ${editingPath}`}
+                  </span>
+                  {activeFile && (
+                    <span className="text-xs text-muted-foreground">{formatFileSize(skillFileSize(activeFile))}</span>
+                  )}
+                </div>
+                <label className="block space-y-1 text-xs font-medium">
+                  相对路径
+                  <Input
+                    value={path}
+                    maxLength={200}
+                    placeholder="如 references/checklist.md"
+                    readOnly={mode === 'edit'}
+                    onChange={(event) => setPath(event.target.value)}
+                  />
+                </label>
+                <label className="block space-y-1 text-xs font-medium">
+                  文件内容
+                  <Textarea
+                    value={content}
+                    rows={10}
+                    className="font-mono text-xs"
+                    onChange={(event) => setContent(event.target.value)}
+                  />
+                </label>
+                {error && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {error}
+                  </p>
+                )}
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setMode('idle')
+                      setError('')
+                    }}
+                  >
+                    取消
+                  </Button>
+                  <Button type="button" size="sm" onClick={saveDraft}>
+                    保存文件
+                  </Button>
+                </div>
+              </div>
+            ) : activeFile ? (
+              <>
+                <div className="skill-file-preview-head">
+                  <code className="min-w-0 truncate text-xs font-medium">{activeFile.path}</code>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{formatFileSize(skillFileSize(activeFile))}</span>
+                    <Button type="button" variant="outline" size="sm" onClick={() => download(activeFile)}>
+                      <Download className="size-3.5" aria-hidden="true" />
+                      下载
+                    </Button>
+                  </div>
+                </div>
+                <pre className="skill-file-preview-body font-mono">
+                  {activeFile.encoding === 'utf8'
+                    ? activeFile.content
+                    : '二进制资源文件不支持在线文本编辑，可点击右上角下载核对。'}
+                </pre>
+              </>
+            ) : (
+              <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-muted-foreground">
+                在左侧点击任意资源文件即可编辑或预览，或点击「添加文件」创建新文件。
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

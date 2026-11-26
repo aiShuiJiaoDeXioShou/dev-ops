@@ -2,6 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button, buttonVariants } from '@/shared/ui/controls/button'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { Tag } from '@/shared/ui/tag'
 import { botMemoryOptions } from '../api/memories'
 import type { BotView } from '../api/queries'
@@ -30,11 +31,7 @@ export function BotMemoryPanel({ bot }: { bot: BotView }) {
           管理记忆
         </Link>
       </div>
-      {list.isPending && (
-        <p className="settings-scope-note" role="status">
-          正在加载记忆…
-        </p>
-      )}
+      {list.isPending && <CompactListSkeleton rows={2} label="长期记忆加载中" />}
       {list.isError && (
         <div className="grid gap-2">
           <p className="field-error" role="alert">

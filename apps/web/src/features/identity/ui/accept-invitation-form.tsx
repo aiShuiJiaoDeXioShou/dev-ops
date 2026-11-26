@@ -4,7 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { isBusinessError } from '@dev-ops/api-client'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
-import { DelayedPageLoading } from '@/shared/ui/page-state'
+import { FormSectionSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { sessionQueryOptions } from '../api/queries'
@@ -64,7 +64,7 @@ export function AcceptInvitationForm() {
         邀请链接缺少 token。
       </p>
     )
-  if (invitation.isPending) return <DelayedPageLoading />
+  if (invitation.isPending) return <FormSectionSkeleton fields={3} label="邀请信息加载中" />
   if (invitation.isError || !invitation.data)
     return (
       <p role="alert" className="text-sm text-destructive">

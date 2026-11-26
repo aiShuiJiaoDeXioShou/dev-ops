@@ -7,7 +7,7 @@ export const DEFAULT_LOADING_DELAY_MS = 200
 interface DelayedLoadingProps {
   /** 是否处于加载中；调用方应在加载分支中渲染本组件。 */
   pending: boolean
-  /** 延迟满足后展示的加载占位，例如骨架屏或 PageLoading。 */
+  /** 延迟满足后展示的结构化骨架占位。 */
   children: ReactNode
   /** 延迟时长（毫秒），默认 200；仅用于测试或确有必要的特殊场景。 */
   delay?: number
@@ -32,6 +32,7 @@ interface DelayedLoadingProps {
 export function DelayedLoading({ pending, children, delay = DEFAULT_LOADING_DELAY_MS }: DelayedLoadingProps) {
   const visible = useSpinDelay(pending, { delay, minDuration: 0, ssr: false })
 
-  if (!pending || !visible) return null
-  return <>{children}</>
+  if (!pending) return null
+  if (delay <= 0 || visible) return <>{children}</>
+  return null
 }

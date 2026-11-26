@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useSearchParams } from 'react-router'
 import { apiClient } from '@/shared/api/client'
 import { useSession } from '@/features/identity/model/session'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
@@ -17,8 +16,9 @@ import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
 import { StatusBadge } from '@/shared/ui/status-badge'
-import { EmptyState, PageLoading, PageError } from '@/shared/ui/page-state'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { CompactListSkeleton, TableSkeleton } from '@/shared/ui/page-skeleton'
+import { ArtifactsPageSkeleton } from '@/pages/page-skeletons'
 
 const ENVIRONMENTS = [
   { value: 'development', label: '开发' },
@@ -112,7 +112,7 @@ export function Component() {
     onError: (error: unknown) => showToast(describeRequestError(error).description, 'error'),
   })
 
-  if (services.isPending) return <DelayedPageSkeleton />
+  if (services.isPending) return <ArtifactsPageSkeleton />
   if (services.isError && !services.data) {
     return (
       <PageError
@@ -185,9 +185,7 @@ export function Component() {
                     <h3>运行版本</h3>
                   </div>
                   {runVersions.isPending ? (
-                    <DelayedLoading pending>
-                      <PageLoading />
-                    </DelayedLoading>
+                    <CompactListSkeleton rows={3} trailing bordered label="运行版本加载中" />
                   ) : runVersions.isError && !runVersions.data ? (
                     <PageError
                       title="运行版本加载失败"
@@ -258,9 +256,7 @@ export function Component() {
 
               <section aria-label="产物">
                 {artifacts.isPending ? (
-                  <DelayedLoading pending>
-                    <PageLoading />
-                  </DelayedLoading>
+                  <TableSkeleton rows={5} columns={['34%', '18%', '18%', '15%', '15%']} label="产物加载中" />
                 ) : artifacts.isError && !artifacts.data ? (
                   <PageError
                     title="产物加载失败"

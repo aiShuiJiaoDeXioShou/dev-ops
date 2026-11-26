@@ -12,6 +12,15 @@
       - definition: admin@example.test
       - term: 当前团队
       - definition: DevOps 研发团队
+    - region "配色模式":
+      - heading "配色模式" [level=2]
+      - radiogroup "配色模式":
+        - radio "跟随系统" [checked]
+        - text: 跟随系统
+        - radio "浅色"
+        - text: 浅色
+        - radio "深色"
+        - text: 深色
     - region "登录安全":
       - heading "登录安全" [level=2]
       - text: 登录密码

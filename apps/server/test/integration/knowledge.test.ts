@@ -112,6 +112,22 @@ test('技能管理与运行时解析', { timeout: 90_000 }, async (t) => {
   const skillList = await inject('GET', `/api/v1/teams/${teamId}/skills?search=评审`, viewerUser)
   assert.equal(skillList.json().data.total, 1)
   assert.equal(skillList.json().data.items[0].identifier, 'code-review')
+  assert.equal(skillList.json().data.items[0].fileCount, 2)
+
+  const platformOnly = await inject('GET', `/api/v1/teams/${teamId}/skills?source=platform`, viewerUser)
+  assert.ok(platformOnly.json().data.total >= 2)
+  assert.ok(
+    platformOnly
+      .json()
+      .data.items.every(
+        (item: { source: string; fileCount: number }) => item.source === 'platform' && item.fileCount === 0,
+      ),
+  )
+
+  const teamOnly = await inject('GET', `/api/v1/teams/${teamId}/skills?source=team`, viewerUser)
+  assert.equal(teamOnly.json().data.total, 1)
+  assert.equal(teamOnly.json().data.items[0].source, 'team')
+  assert.equal(teamOnly.json().data.items[0].fileCount, 2)
 
   const viewerCreate = await inject('POST', `/api/v1/teams/${teamId}/skills`, viewerUser, {
     name: '浏览者技能',
@@ -193,6 +209,13 @@ test('技能管理与运行时解析', { timeout: 90_000 }, async (t) => {
   const disabled = await inject('POST', `/api/v1/skills/${skill.id}/disable`, devUser, { version: 2 })
   assert.equal(disabled.json().data.enabled, false)
   assert.equal(disabled.json().data.version, 3)
+
+  const disabledList = await inject('GET', `/api/v1/teams/${teamId}/skills?enabled=false`, viewerUser)
+  assert.equal(disabledList.json().data.total, 1)
+  assert.equal(disabledList.json().data.items[0].id, skill.id)
+
+  const enabledTeamList = await inject('GET', `/api/v1/teams/${teamId}/skills?source=team&enabled=true`, viewerUser)
+  assert.equal(enabledTeamList.json().data.total, 0)
 
   const crossTeamSkill = await inject('GET', `/api/v1/skills/${skill.id}`, otherUser)
   assert.equal(crossTeamSkill.json().code, 'NOT_FOUND')

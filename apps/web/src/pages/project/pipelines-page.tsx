@@ -13,8 +13,8 @@ import { pipelineWorkflowsQueryOptions } from '@/features/pipeline/api/workflows
 import { useFocusReturn } from '@/features/pipeline/hooks/use-focus-return'
 import type { PipelineWorkflowSummary, TriggerRunInput } from '@/features/pipeline/model/types'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { CardGridSkeleton } from '@/shared/ui/page-skeleton'
+import { PageError } from '@/shared/ui/page-state'
 import { useGitHubAccountFeedback } from '@/features/identity/model/use-github-account-feedback'
 import { GitHubAccountButton } from '@/features/identity/ui/github-account'
 import { useProjectRole } from '@/features/projects/model/use-project-role'
@@ -195,9 +195,13 @@ export function Component() {
         <div role="tabpanel" id={`pipeline-panel-${tab}`} aria-labelledby={`pipeline-tab-${tab}`} className="space-y-6">
           {tab === 'workflows' ? (
             workflows.isPending ? (
-              <DelayedLoading pending>
-                <PageLoading message="工作流加载中…" />
-              </DelayedLoading>
+              <CardGridSkeleton
+                count={4}
+                iconShape="square"
+                lines={2}
+                label="工作流加载中"
+                className="lg:grid-cols-2"
+              />
             ) : workflows.isError ? (
               <PageError
                 title="工作流读取失败"

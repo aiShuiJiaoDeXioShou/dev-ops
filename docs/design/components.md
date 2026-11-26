@@ -44,9 +44,10 @@
 | `Card` | `shared/ui/controls/card.tsx` | 卡片容器 |
 | `Alert` | `shared/ui/controls/alert.tsx` | 错误/提示摘要 |
 | `Toast` | `shared/ui/toast.tsx` | 操作结果反馈 |
-| `PageLoading` / `PageError` / `EmptyState` | `shared/ui/page-state.tsx` | 页面级状态 |
+| `PageError` / `EmptyState` | `shared/ui/page-state.tsx` | 页面级错误与空状态 |
 | `DelayedLoading` | `shared/ui/delayed-loading.tsx` | 延迟渲染加载占位（默认 200ms），避免快速请求导致骨架闪烁 |
-| `PageSkeleton` / `Skeleton` | `shared/ui/page-skeleton.tsx` / `skeleton.tsx` | 加载骨架 |
+| `Skeleton` / `SkeletonRegion` | `shared/ui/controls/skeleton.tsx` | 基于 `react-loading-skeleton` 的主题化骨架原语与无障碍容器 |
+| 页面与区块专属骨架 | `shared/ui/page-skeleton.tsx` / `pages/page-skeletons.tsx` | 按真实页面/面板布局定制的纯骨架占位（不渲染无意义加载文案） |
 
 ## 页面中不允许的写法
 

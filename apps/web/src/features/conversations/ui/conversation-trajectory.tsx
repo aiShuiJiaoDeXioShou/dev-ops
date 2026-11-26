@@ -5,8 +5,8 @@ import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/shared/ui/controls/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { conversationTraceOptions } from '../api/queries'
 import {
   traceLanes,
@@ -379,11 +379,11 @@ function TraceRun({
             onRetry={() => void trace.refetch()}
           />
         ))}
-      <DelayedLoading pending={trace.isPending}>
+      {trace.isPending && (
         <div className="trace-notice">
-          <PageLoading message="轨迹加载中…" />
+          <CompactListSkeleton rows={5} bordered label="运行轨迹加载中" />
         </div>
-      </DelayedLoading>
+      )}
       {trace.data && (
         <>
           <div className="filters trace-filters">
@@ -496,11 +496,7 @@ function TraceRun({
                   }
                 />
               )}
-              {trace.data.hasMore && (
-                <p className="trace-notice trace-muted" role="status">
-                  正在加载更多步骤…
-                </p>
-              )}
+              {trace.data.hasMore && <CompactListSkeleton rows={2} delay={0} label="更多步骤加载中" />}
             </div>
             {selected && !useDrawer && (
               <aside className="trace-inspector" aria-labelledby={titleId}>

@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/model/session'
 import { LinkRepositoryDialog } from '@/features/code/ui/link-repository-dialog'
 import { RepositoryPicker } from '@/features/code/ui/repository-picker'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import {
   Dialog,
   DialogContent,
@@ -14,7 +13,7 @@ import {
 } from '@/shared/ui/controls/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { Button } from '@/shared/ui/controls/button'
-import { PageSkeleton } from '@/shared/ui/page-skeleton'
+import { FormSectionSkeleton } from '@/shared/ui/page-skeleton'
 import { projectQueryOptions } from '../api/queries'
 import { ProjectLifecycleAction } from './project-lifecycle-action'
 import { ProjectSettingsForm } from './project-settings-form'
@@ -66,9 +65,7 @@ export function ProjectSettingsDialog({
         </DialogFormHeader>
         {project.isPending ? (
           <DialogFormBody>
-            <DelayedLoading pending>
-              <PageSkeleton />
-            </DelayedLoading>
+            <FormSectionSkeleton fields={4} label="项目设置加载中" />
           </DialogFormBody>
         ) : !project.data ? (
           <DialogFormBody>

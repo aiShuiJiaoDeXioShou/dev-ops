@@ -4,7 +4,10 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter } from 'react-router'
 import { createAppRoutes } from '@/app/router/routes'
+import { initializeColorMode } from '@/shared/model/color-mode'
 import App from './app/providers/application.tsx'
+
+initializeColorMode()
 
 const rootElement = document.getElementById('root')
 if (!rootElement) throw new Error('未找到应用挂载节点')

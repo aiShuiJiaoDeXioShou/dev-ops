@@ -13,13 +13,14 @@ import { describeRequestError } from '@/shared/api/errors'
 import { formatDateTime } from '@/shared/lib/format'
 import { cn } from '@/shared/lib/utils'
 import { isNestedInteractiveTarget } from '@/shared/lib/clickable'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
 import { Button } from '@/shared/ui/controls/button'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/shared/ui/controls/sheet'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { Skeleton } from '@/shared/ui/controls/skeleton'
+import { PrsPageSkeleton } from '@/pages/page-skeletons'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
+import { CompactListSkeleton, DetailSheetSkeleton, LogLinesSkeleton } from '@/shared/ui/page-skeleton'
 import { Tag } from '@/shared/ui/tag'
 
 const STATE_LABELS: Record<string, string> = {
@@ -148,7 +149,7 @@ export function Component() {
   const activeFile = changedFiles.find((file) => file.path === selectedFile) ?? changedFiles[0]
   const fileGroups = groupChangedFiles(changedFiles)
 
-  if (repositories.isPending) return <DelayedPageSkeleton />
+  if (repositories.isPending) return <PrsPageSkeleton />
   if (repositories.isError) {
     return (
       <PageError
@@ -261,9 +262,7 @@ export function Component() {
         )}
       </div>
       {list.isPending ? (
-        <DelayedLoading pending>
-          <PageLoading />
-        </DelayedLoading>
+        <CompactListSkeleton rows={6} leading="icon" trailing bordered label="PR 列表加载中" />
       ) : list.isError ? (
         <PageError
           title="PR 加载失败"
@@ -336,11 +335,13 @@ export function Component() {
                 {detail.data ? `#${detail.data.data.number} ${detail.data.data.title}` : `PR #${selectedNumber}`}
               </SheetTitle>
               <SheetDescription className="pr-sheet-meta">
-                {detail.data
-                  ? `${detail.data.data.sourceBranch} → ${detail.data.data.targetBranch} · ${
-                      STATE_LABELS[detail.data.data.state] ?? detail.data.data.state
-                    } · ${detail.data.data.authorName}`
-                  : '正在加载 PR 详情…'}
+                {detail.data ? (
+                  `${detail.data.data.sourceBranch} → ${detail.data.data.targetBranch} · ${
+                    STATE_LABELS[detail.data.data.state] ?? detail.data.data.state
+                  } · ${detail.data.data.authorName}`
+                ) : (
+                  <Skeleton width={200} height={13} inline />
+                )}
               </SheetDescription>
             </div>
             <div className="row">
@@ -356,7 +357,7 @@ export function Component() {
           </div>
           {detail.isPending ? (
             <div className="pr-sheet-state">
-              <PageLoading message="PR 详情加载中…" />
+              <DetailSheetSkeleton propertyRows={3} label="PR 详情加载中" />
             </div>
           ) : detail.isError ? (
             <div className="pr-sheet-state">
@@ -479,11 +480,7 @@ function FullDiff({
   describeError: (cause: unknown) => string
 }) {
   if (diff.isPending) {
-    return (
-      <DelayedLoading pending>
-        <PageLoading message="差异加载中…" />
-      </DelayedLoading>
-    )
+    return <LogLinesSkeleton lines={10} label="差异加载中" />
   }
   if (diff.isError) {
     return (

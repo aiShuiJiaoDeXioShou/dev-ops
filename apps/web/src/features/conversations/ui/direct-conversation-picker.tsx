@@ -5,7 +5,7 @@ import { botChoicesOptions } from '@/features/bots/api/queries'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { TooltipProvider } from '@/shared/ui/controls/tooltip'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useOpenDirectConversation } from '../api/open-direct'
 import { ConversationBotOption } from './conversation-bot-option'
@@ -59,7 +59,7 @@ export function DirectConversationPicker({
             {skill ? '选择智能体，技能会带入聊天输入框。' : '选择智能体以打开对话。'}
           </DialogDescription>
         </DialogHeader>
-        {list.isPending && <DelayedPageSkeleton />}
+        {list.isPending && <CompactListSkeleton rows={4} leading="avatar" bordered label="智能体列表加载中" />}
         {list.isError && !list.isFetchNextPageError && (
           <PageError
             title="智能体加载失败"

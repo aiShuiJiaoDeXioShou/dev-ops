@@ -24,7 +24,8 @@ import { cn } from '@/shared/lib/utils'
 import { Badge } from '@/shared/ui/controls/badge'
 import { Button } from '@/shared/ui/controls/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/controls/table'
-import { EmptyState, PageError, PageLoading } from '@/shared/ui/page-state'
+import { TableSkeleton } from '@/shared/ui/page-skeleton'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { formatDateTime } from '@/shared/lib/format'
 import { StorageBucketConfirmDialog } from './storage-bucket-confirm-dialog'
@@ -146,7 +147,7 @@ export function StorageBucketManagement() {
             onRetry={() => void buckets.refetch()}
           />
         ) : buckets.isPending ? (
-          <PageLoading message="储存桶加载中…" />
+          <TableSkeleton rows={4} columns={['28%', '18%', '24%', '15%', '15%']} label="储存桶加载中" />
         ) : bucketItems.length === 0 ? (
           <EmptyState
             title="还没有储存桶配置"

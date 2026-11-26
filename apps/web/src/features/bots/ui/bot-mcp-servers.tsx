@@ -17,7 +17,7 @@ import {
 } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { PageError } from '@/shared/ui/page-state'
 import { botChoicesOptions } from '../api/queries'
 
@@ -333,7 +333,7 @@ export function BotMcpServers({ teamId }: { teamId: string }) {
           </ServerDialog>
         )}
       </div>
-      {list.isPending && <DelayedPageSkeleton />}
+      {list.isPending && <CompactListSkeleton rows={3} trailing bordered label="MCP 服务器加载中" />}
       {list.isError && (
         <PageError
           title="MCP 服务器加载失败"

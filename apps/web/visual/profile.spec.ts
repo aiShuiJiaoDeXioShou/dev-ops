@@ -1,6 +1,59 @@
 import { expect, test } from '@playwright/test'
 import { installApiMocks } from './mock-api'
 
+test('[desktop] [mobile] 个人设置切换配色并在刷新后恢复', async ({ page }, testInfo) => {
+  await installApiMocks(page)
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.goto('/settings/profile')
+
+  const html = page.locator('html')
+  const modes = page.getByRole('radiogroup', { name: '配色模式' })
+  const system = modes.getByRole('radio', { name: '跟随系统' })
+  const light = modes.getByRole('radio', { name: '浅色' })
+  const dark = modes.getByRole('radio', { name: '深色' })
+  await expect(system).toBeChecked({ timeout: 15_000 })
+  await expect(html).toHaveCSS('color-scheme', 'light')
+  await page.screenshot({ path: testInfo.outputPath('profile-color-light.png') })
+
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expect(system).toBeChecked()
+  await expect(html).toHaveCSS('color-scheme', 'dark')
+  if (testInfo.project.name === 'desktop') {
+    await system.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(light).toBeFocused()
+    await expect(light).toBeChecked()
+  } else {
+    await modes.getByText('浅色', { exact: true }).tap()
+    await expect(light).toBeChecked()
+  }
+  await expect(html).toHaveCSS('color-scheme', 'light')
+  await modes.getByText('深色', { exact: true }).click()
+  await expect(dark).toBeChecked()
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expect(html).toHaveCSS('color-scheme', 'dark')
+  await expect(page.locator('.workspace-shell .sidebar')).toHaveCSS('background-color', 'oklch(0.205 0 0)')
+  await page.screenshot({ path: testInfo.outputPath('profile-color-dark.png') })
+  expect(await modes.evaluate((element) => element.getBoundingClientRect().right)).toBeLessThanOrEqual(
+    await page.evaluate(() => window.innerWidth),
+  )
+  expect(await html.evaluate((element) => element.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => window.innerWidth),
+  )
+
+  await page.reload()
+  await expect(dark).toBeChecked()
+  await expect(html).toHaveCSS('color-scheme', 'dark')
+  await page.goto('/collaboration')
+  await expect(html).toHaveCSS('color-scheme', 'dark')
+  await expect(page.getByRole('link', { name: '查看智能体' })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('workspace-color-dark.png') })
+  await page.goto('/settings/profile')
+  await modes.getByText('跟随系统', { exact: true }).click()
+  await expect(system).toBeChecked()
+  await expect(html).toHaveCSS('color-scheme', 'light')
+})
+
 test('[desktop] [mobile] 个人资料可上传头像，密码和 Token 各有独立入口', async ({ page }, testInfo) => {
   await installApiMocks(page)
   const user: { id: string; name: string; email: string; image: string | null } = {

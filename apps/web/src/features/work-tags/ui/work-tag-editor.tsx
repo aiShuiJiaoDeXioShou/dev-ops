@@ -8,6 +8,7 @@ import { Button } from '@/shared/ui/controls/button'
 import { Combobox } from '@/shared/ui/controls/combobox'
 import { Input } from '@/shared/ui/controls/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/controls/popover'
+import { Skeleton } from '@/shared/ui/controls/skeleton'
 import { workTagsOptions, type WorkTag, type WorkTagTarget } from '../api/queries'
 import { WorkTagDialog } from './work-tag-dialog'
 import { tagTone } from './tag-tone'
@@ -118,9 +119,10 @@ export function WorkTagEditor({
         />
       )}
       {list.isPending && (
-        <p className="small muted" role="status">
-          正在加载已有标签…
-        </p>
+        <div className="flex items-center gap-2 py-1" role="status" aria-busy="true" aria-label="标签加载中">
+          <Skeleton width={64} height={22} borderRadius="var(--radius-full)" />
+          <Skeleton width={80} height={22} borderRadius="var(--radius-full)" />
+        </div>
       )}
       {save.isPending && (
         <p className="small muted" role="status">

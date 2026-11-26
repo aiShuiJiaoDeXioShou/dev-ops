@@ -3,7 +3,7 @@ import { Inbox } from 'lucide-react'
 import { Link } from 'react-router'
 import { formatDateTime } from '@/shared/lib/format'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedPageSkeleton } from '@/shared/ui/page-skeleton'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { botInboxOptions } from '../api/queries'
 
@@ -15,7 +15,7 @@ export function BotInbox({ teamId }: { teamId: string }) {
   return (
     <div className="work-padding overflow-y-auto">
       <h2>等你回复</h2>
-      {inbox.isPending && <DelayedPageSkeleton />}
+      {inbox.isPending && <CompactListSkeleton rows={4} bordered label="等待回复的会话加载中" />}
       {inbox.isError && <PageError title="会话汇总加载失败" error={inbox.error} onRetry={() => void inbox.refetch()} />}
       {inbox.data?.data.items.length === 0 && <EmptyState icon={<Inbox />} title="暂无等待回复的会话" />}
       {reasons.map(({ id, label }) => {

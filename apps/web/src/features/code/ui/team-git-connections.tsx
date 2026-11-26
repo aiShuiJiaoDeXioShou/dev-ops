@@ -15,8 +15,8 @@ import {
   DialogTrigger,
 } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
-import { PageError, PageLoading } from '@/shared/ui/page-state'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
+import { PageError } from '@/shared/ui/page-state'
 import { useToast } from '@/shared/ui/toast'
 import { gitConnectionsQueryOptions } from '../api/queries'
 import { GitHubConnectionDialog } from './github-connection-dialog'
@@ -127,11 +127,7 @@ export function TeamGitConnections({
   })
 
   if (connections.isPending) {
-    return (
-      <DelayedLoading pending>
-        <PageLoading message="Git 连接加载中…" />
-      </DelayedLoading>
-    )
+    return <CompactListSkeleton rows={3} leading="icon" trailing bordered label="Git 连接加载中" />
   }
   if (connections.isError) {
     const described = describeRequestError(connections.error)

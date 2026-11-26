@@ -30,7 +30,11 @@ import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/controls/tabs'
 import { PageError } from '@/shared/ui/page-state'
-import { ConversationLoading, ConversationRoomSkeleton } from './conversation-loading'
+import {
+  ConversationMessagesSkeleton,
+  ConversationRoomSkeleton,
+  ConversationTrajectorySkeleton,
+} from './conversation-loading'
 
 const tabItems = [
   { id: 'chat', label: '对话' },
@@ -292,7 +296,7 @@ export function ConversationRoom({
           </TabsList>
         </header>
         <TabsContent value="chat" forceMount className="dsh-scroll-area">
-          {messages.isPending && <ConversationLoading message="正在加载消息…" />}
+          {messages.isPending && <ConversationMessagesSkeleton />}
           {messages.isError && (
             <PageError title="消息加载失败" error={messages.error} onRetry={() => void messages.refetch()} />
           )}
@@ -354,7 +358,7 @@ export function ConversationRoom({
         <TabsContent value="activity" className="dsh-tab-panel">
           <div className="dsh-panel-scroll conversation-trace-scroll">
             {!traceRun && (events.isPending || messages.isPending) ? (
-              <ConversationLoading message="正在加载轨迹…" />
+              <ConversationTrajectorySkeleton />
             ) : !traceRun && (events.isError || messages.isError) ? (
               <PageError
                 title="轨迹加载失败"

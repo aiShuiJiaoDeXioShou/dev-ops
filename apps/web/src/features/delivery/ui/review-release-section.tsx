@@ -3,14 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/model/session'
 import { apiClient } from '@/shared/api/client'
 import { describeRequestError } from '@/shared/api/errors'
-import { DelayedLoading } from '@/shared/ui/delayed-loading'
+import { CompactListSkeleton } from '@/shared/ui/page-skeleton'
 import { Button } from '@/shared/ui/controls/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/controls/dialog'
 import { Input } from '@/shared/ui/controls/input'
 import { Select } from '@/shared/ui/controls/select'
 import { Textarea } from '@/shared/ui/controls/textarea'
 import { useToast } from '@/shared/ui/toast'
-import { EmptyState, PageLoading, PageError } from '@/shared/ui/page-state'
+import { EmptyState, PageError } from '@/shared/ui/page-state'
 import { releasesQueryOptions, reviewsQueryOptions } from '../api/review-queries'
 
 const REVIEW_LABELS: Record<string, string> = {
@@ -152,9 +152,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <span className="counter">{reviewItems.length}</span>
             </div>
             {reviews.isPending ? (
-              <DelayedLoading pending>
-                <PageLoading />
-              </DelayedLoading>
+              <CompactListSkeleton rows={3} trailing bordered label="提审记录加载中" />
             ) : reviews.isError && !reviews.data ? (
               <PageError
                 title="提审记录加载失败"
@@ -195,9 +193,7 @@ export function ReviewReleaseSection({ projectId }: { projectId: string }) {
               <span className="counter">{releaseItems.length}</span>
             </div>
             {releases.isPending ? (
-              <DelayedLoading pending>
-                <PageLoading />
-              </DelayedLoading>
+              <CompactListSkeleton rows={3} trailing bordered label="发布记录加载中" />
             ) : releases.isError && !releases.data ? (
               <PageError
                 title="发布记录加载失败"

@@ -3,7 +3,7 @@ import { Markdown } from '@/shared/lib/markdown'
 import { formatDateTime } from '@/shared/lib/format'
 import { UserAvatar } from '@/shared/ui/user-avatar'
 import { Button } from '@/shared/ui/controls/button'
-import { DelayedPageLoading } from '@/shared/ui/page-state'
+import { TimelineListSkeleton } from '@/shared/ui/page-skeleton'
 import { commentsQueryOptions, type CollabTarget } from '../api/queries'
 import './comment-list.css'
 
@@ -14,7 +14,7 @@ import './comment-list.css'
  */
 export function CommentList({ target, targetId }: { target: CollabTarget; targetId: string }) {
   const query = useQuery(commentsQueryOptions(target, targetId))
-  if (query.isPending) return <DelayedPageLoading message="评论加载中…" />
+  if (query.isPending) return <TimelineListSkeleton rows={3} label="评论加载中" />
   if (query.isError)
     return (
       <div className="space-y-2">

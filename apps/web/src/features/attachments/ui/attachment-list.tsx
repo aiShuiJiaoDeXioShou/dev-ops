@@ -55,10 +55,9 @@ export function AttachmentList({
 
   if (loading) {
     return (
-      <div className="space-y-2" aria-busy="true">
-        <p className="text-sm text-muted-foreground">附件加载中…</p>
-        <Skeleton className="h-14 w-full" />
-        <Skeleton className="h-14 w-full" />
+      <div className="space-y-2" role="status" aria-busy="true" aria-label="附件加载中">
+        <Skeleton height={56} borderRadius="var(--radius-lg)" />
+        <Skeleton height={56} borderRadius="var(--radius-lg)" />
       </div>
     )
   }

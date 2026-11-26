@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useSession } from '@/features/identity/model/session'
 import { describeRequestError } from '@/shared/api/errors'
 import { Button } from '@/shared/ui/controls/button'
+import { FormSectionSkeleton } from '@/shared/ui/page-skeleton'
 import { botDetailQueryOptions } from '../api/queries'
 import { BotForm } from './bot-form'
 import { BotMemoryPanel } from './bot-memory-panel'
@@ -46,11 +47,7 @@ export function BotSettingsPanel({
         <div className="settings-section-row">
           <h4>{heading}</h4>
         </div>
-        {query.isPending && (
-          <p className="settings-scope-note" role="status">
-            正在加载智能体配置…
-          </p>
-        )}
+        {query.isPending && <FormSectionSkeleton fields={2} label="智能体配置加载中" />}
         {query.isError && (
           <>
             <p className="field-error" role="alert">

@@ -79,13 +79,20 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
    * 读取团队技能分页。
    * @param actor 当前用户。
    * @param teamId 团队标识。
-   * @param query 关键词、分类与分页参数。
+   * @param query 关键词、分类、来源、启停状态与分页参数。
    * @returns 技能分页视图。
    */
   async function listSkills(
     actor: SessionUser,
     teamId: string,
-    query: { search?: string; category?: string; page?: number; pageSize?: number },
+    query: {
+      search?: string
+      category?: string
+      source?: 'team' | 'platform'
+      enabled?: boolean
+      page?: number
+      pageSize?: number
+    },
   ) {
     await requireTeamMember(db, actor.id, teamId)
     const page = query.page ?? 1
@@ -94,26 +101,34 @@ export function createKnowledgeService(deps: KnowledgeServiceDeps) {
     const category = query.category === undefined ? undefined : validateSkillCategory(query.category)
     const search = query.search?.trim()
     const term = search?.toLowerCase()
-    const builtins = platformBotSkills.filter(
-      (item) =>
-        (!category || item.category === category) &&
-        (!term || [item.name, item.identifier, item.summary].some((value) => value.toLowerCase().includes(term))),
-    )
+    const includePlatform = query.source !== 'team' && query.enabled !== false
+    const builtins = includePlatform
+      ? platformBotSkills.filter(
+          (item) =>
+            (!category || item.category === category) &&
+            (!term || [item.name, item.identifier, item.summary].some((value) => value.toLowerCase().includes(term))),
+        )
+      : []
     const offset = (page - 1) * pageSize
     const listed = builtins.slice(offset, offset + pageSize).map((item) => ({
       ...item,
       source: 'platform' as const,
+      fileCount: 0,
       enabled: true,
       version: 1,
       contentVersion: '1.0.0',
       updatedAt: new Date(0).toISOString(),
     }))
-    const result = await findSkills(db, teamId, {
-      search: search ? escapeLikeTerm(search) : undefined,
-      category,
-      offset: Math.max(0, offset - builtins.length),
-      limit: pageSize - listed.length,
-    })
+    const result =
+      query.source === 'platform'
+        ? { items: [], total: 0 }
+        : await findSkills(db, teamId, {
+            search: search ? escapeLikeTerm(search) : undefined,
+            category,
+            enabled: query.enabled,
+            offset: Math.max(0, offset - builtins.length),
+            limit: pageSize - listed.length,
+          })
     const configured = result.items.map((row) => ({
       ...toSkillListItem(row),
       conflictsWithPlatform: platformBotSkills.some(({ identifier }) => identifier === row.identifier),

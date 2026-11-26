@@ -6,6 +6,8 @@ import type { SkillListItem } from '../model/types'
 export interface SkillListFilters {
   search?: string
   category?: SkillListItem['category']
+  source?: SkillListItem['source']
+  enabled?: boolean
   page?: number
   pageSize?: number
 }
