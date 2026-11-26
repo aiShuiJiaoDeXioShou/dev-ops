@@ -138,6 +138,34 @@ devops skill export <skillId> --output ./skill.zip
 
 升级服务端后，已签发的 API Token 会继承账号可以执行的新增操作，含项目恢复及储存桶管理。个人 GitHub 绑定和模型订阅授权在 Web 发起。`git account status` 和 `bot model list` 可查询当前状态。授权范围及保留的 Web 操作见 [V0.8 规格](../../specs/011-v08-cli-business-parity/spec.md#2-授权与调用)。
 
+## 编码助手事项追踪（devops work）
+
+`devops work` 把当前 Git 工作区绑定到一个需求或 Bug，把规划待办、附件、代码关联和交付流转封装成组合命令，供 Codex、Claude Code 等编码助手及其 hooks 使用。绑定写在当前 worktree 的私有 git 目录（`git rev-parse --git-path devops/active.json`），不进入版本库，每个 worktree 各自独立。
+
+```bash
+devops work start REQ-12                 # 按 Git 远端找到项目；待处理时流转为开发中
+devops work start BUG-3                  # Bug 待处理时流转为修复中
+devops work start --untracked "只回答咨询"  # 声明本次改动无需事项
+devops work status --json                # 事项状态、待办进度、提交推送与关联、缺失步骤
+
+devops work task add "后端接口" "前端页面"  # 追加待办，空规划时创建“开发”节点
+devops work task done t1
+devops work task list
+
+devops work attach ./design.html --kind design --note "首页改版设计稿"
+devops work log "改用游标分页：列表超过 1 万行时偏移量查询过慢"
+devops work link --pr 34                 # 关联已推送未关联的提交与 PR
+
+devops work deliver --summary "登录页" --verification "pnpm check 通过；未做窄屏验证" --self-test passed
+devops work deliver --summary "修复空指针" --verification "回归用例通过"   # Bug：提交回归
+devops work stop
+```
+
+- `start` 未指定 `--project` 时遍历团队内活跃项目，用关联仓库地址与 `origin` 比对；有多个项目关联同一仓库时要求显式指定。
+- `status` 的 `gaps` 中 `blocking: true` 的项表示还缺追踪步骤：已推送提交未关联、出现新提交后尚未用 `log` 或 `deliver` 回写、事项仍是待处理。`--local` 只读本地绑定，不访问服务。
+- `attach --kind` 取 `design`、`screenshot`、`report`、`other`，前三种在文件名前加“设计稿-”“截图-”“测试报告-”。已有附件全部保留，单个事项最多 10 个附件。
+- `deliver` 先关联代码，任一关联失败即退出 1，不写记录也不流转；随后写入交付记录评论。需求处于开发中时提测，测试负责人默认取需求上的设置，缺失时只回写记录并在 `transition.skipped` 说明原因；Bug 处于修复中时提交回归。`--no-transition` 只回写记录。
+
 ## 输出与退出码
 
 - 默认输出人类可读文本；`--json` 时 stdout 只包含平台成功信封。

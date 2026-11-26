@@ -16,6 +16,7 @@ import { registerCodeCommands } from './commands/code.ts'
 import { registerRequirementCommands } from './commands/requirement.ts'
 import { registerBugCommands } from './commands/bug.ts'
 import { registerToolCommands } from './commands/tool.ts'
+import { registerWorkCommands } from './commands/work.ts'
 import type { CliContext } from './lib/context.ts'
 import { CliError, reportError } from './lib/errors.ts'
 
@@ -59,6 +60,7 @@ function createProgram(context: CliContext): Command {
   registerConversationCommands(program, context)
   registerTaskCommands(program, context)
   registerWorkTagCommands(program, context)
+  registerWorkCommands(program, context)
   registerSkillCommands(program, context)
   registerCredentialCommands(program, context)
   registerStorageCommands(program, context)
