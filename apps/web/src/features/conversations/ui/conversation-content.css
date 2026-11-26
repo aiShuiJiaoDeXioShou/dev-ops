@@ -288,6 +288,8 @@
   }
 
   .conversation-work-state {
+    /* 将读屏状态文字的绝对定位限制在图标内，避免长对话撑高整个文档。 */
+    position: relative;
     display: inline-flex;
     flex: none;
     align-items: center;

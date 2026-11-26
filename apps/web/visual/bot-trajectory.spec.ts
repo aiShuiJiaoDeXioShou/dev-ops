@@ -36,8 +36,13 @@ test('[desktop] [mobile] 自动展示最近一次运行并在时间线上查看�
     ],
   }
   const runs = [
-    { id: oldRun, offset: 0, text: '查一下团队成员', reply: '团队共有 3 位成员。' },
-    { id: latestRun, offset: 12_000, text: '我当前有多少个项目？在 devop 团队当中？', reply: '团队共有 4 个项目。' },
+    { id: oldRun, offset: 0, text: '查一下团队成员', reply: '团队共有 3 位成员。\n\n'.repeat(80) },
+    {
+      id: latestRun,
+      offset: 12_000,
+      text: '我当前有多少个项目？在 devop 团队当中？',
+      reply: '团队共有 4 个项目。\n\n'.repeat(80),
+    },
   ]
   const messages = runs.flatMap<Message>((run, index) => [
     {
@@ -139,6 +144,25 @@ test('[desktop] [mobile] 自动展示最近一次运行并在时间线上查看�
   const chatPanel = page.getByRole('tabpanel', { name: '对话' })
   const tracePanel = page.getByRole('tabpanel', { name: '轨迹' })
   await expect(chatPanel).toBeVisible()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight))
+    .toBeLessThanOrEqual(1)
+
+  const messageScroll = page.locator('.dsh-chat-scroll')
+  await expect.poll(() => messageScroll.evaluate((e) => e.scrollHeight - e.clientHeight)).toBeGreaterThan(2000)
+  for (const edge of ['top', 'bottom']) {
+    await messageScroll.evaluate((element, edge) => {
+      element.scrollTop = edge === 'top' ? 0 : element.scrollHeight
+    }, edge)
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight))
+      .toBeLessThanOrEqual(1)
+    const composer = await page.locator('.conversation-composer').boundingBox()
+    expect(composer).not.toBeNull()
+    expect((composer?.y ?? 0) + (composer?.height ?? 0)).toBeLessThanOrEqual(page.viewportSize()?.height ?? 0)
+  }
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
   await expect(tracePanel).toBeHidden()
   await expect(page.locator('.conversation-composer')).not.toContainText(/Shift\+Enter|最近上下文|本会话费用/)
   await page.getByRole('tab', { name: '轨迹' }).click()
