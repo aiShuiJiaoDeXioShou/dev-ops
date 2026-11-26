@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tooling/agent-hooks/devops-hook.mjs\" session-start",
+            "timeout": 20,
+            "statusMessage": "读取 DevOps 事项"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tooling/agent-hooks/devops-hook.mjs\" pre-edit",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tooling/agent-hooks/devops-hook.mjs\" post-bash",
+            "timeout": 35,
+            "statusMessage": "同步 DevOps 事项"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/tooling/agent-hooks/devops-hook.mjs\" stop",
+            "timeout": 20,
+            "statusMessage": "检查 DevOps 事项"
+          }
+        ]
+      }
+    ]
+  }
+}

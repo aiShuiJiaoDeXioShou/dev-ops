@@ -2,13 +2,14 @@
 
 根目录统一运行契约生成、构建和依赖检查。应用及 API 客户端使用各自声明的 TypeScript 7；openapi-typescript 和 dependency-cruiser 使用根工程的 TypeScript 5.9 编译器 API，两个版本按工作区依赖隔离。
 
-| 位置                                        | 职责                                           | 验证入口                  |
-| ------------------------------------------- | ---------------------------------------------- | ------------------------- |
-| [typescript](typescript)                    | 应用共享的严格类型配置                         | 各应用 typecheck 和 build |
-| [生成脚本](scripts/generate-api-client.mjs) | 从导出的 OpenAPI 生成类型和 CLI 输入校验器     | `pnpm api:generate`       |
-| [依赖规则](dependency-rules.mjs)            | Web 分层、应用与共享包边界、循环依赖           | `pnpm check:boundaries`   |
-| [规则测试](test/dependency-rules.test.mjs)  | 用临时 TypeScript 工程实际验证允许和禁止的导入 | `pnpm test:tooling`       |
-| [UI 规范检查](scripts/check-ui.mjs)         | token 同步、样式分层、存量 UI 违规基线         | `pnpm ui:check`           |
+| 位置                                          | 职责                                            | 验证入口                  |
+| --------------------------------------------- | ----------------------------------------------- | ------------------------- |
+| [typescript](typescript)                      | 应用共享的严格类型配置                          | 各应用 typecheck 和 build |
+| [生成脚本](scripts/generate-api-client.mjs)   | 从导出的 OpenAPI 生成类型和 CLI 输入校验器      | `pnpm api:generate`       |
+| [依赖规则](dependency-rules.mjs)              | Web 分层、应用与共享包边界、循环依赖            | `pnpm check:boundaries`   |
+| [规则测试](test/dependency-rules.test.mjs)    | 用临时 TypeScript 工程实际验证允许和禁止的导入  | `pnpm test:tooling`       |
+| [UI 规范检查](scripts/check-ui.mjs)           | token 同步、样式分层、存量 UI 违规基线          | `pnpm ui:check`           |
+| [编码助手 hooks](agent-hooks/devops-hook.mjs) | Codex 与 Claude Code 共用的 DevOps 事项追踪检查 | `pnpm test:tooling`       |
 
 `pnpm check` 先构建客户端，再检查依赖与 UI 规范，保证生成模块、工作区包和设计 token 能够正确解析。
 
